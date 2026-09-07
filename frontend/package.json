@@ -13,6 +13,7 @@
     "lint": "expo lint"
   },
   "dependencies": {
+    "@expo/vector-icons": "^15.1.1",
     "expo": "~57.0.20",
     "expo-constants": "~57.0.17",
     "expo-font": "~57.0.3",

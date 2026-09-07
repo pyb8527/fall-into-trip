@@ -72,7 +72,7 @@ export default function AdminUsers() {
             setPage(0);
           }}
         />
-        <Row gap={Spacing.one}>
+        <Row gap={Spacing.xs}>
           {FILTERS.map((f) => (
             <Chip key={f.key} label={f.label} selected={filter === f.key} onPress={() => apply(f.key)} />
           ))}
@@ -147,18 +147,18 @@ function UserCard({ user, onChanged }: { user: AdminUser; onChanged: () => void 
           <Subtitle>{user.name}</Subtitle>
           <Caption tone="secondary">{user.email}</Caption>
         </View>
-        <Row gap={Spacing.one}>
+        <Row gap={Spacing.xs}>
           {isMe ? <Badge label="나" tone="accent" /> : null}
           {user.role === 'ADMIN' ? <Badge label="운영자" tone="accent" /> : null}
           {user.disabled ? <Badge label="잠김" tone="danger" /> : null}
         </Row>
       </Row>
 
-      <Row gap={Spacing.three}>
+      <Row gap={Spacing.md}>
         <Caption>가입 {user.createdAt.slice(0, 10)}</Caption>
         <Caption>마지막 로그인 {user.lastLoginAt ? user.lastLoginAt.slice(0, 10) : '없음'}</Caption>
       </Row>
-      <Row gap={Spacing.three}>
+      <Row gap={Spacing.md}>
         <Caption>소유 여행 {user.ownedTrips}</Caption>
         <Caption tone={user.activeSessions > 0 ? 'success' : 'muted'}>
           로그인 중 {user.activeSessions}
@@ -168,7 +168,7 @@ function UserCard({ user, onChanged }: { user: AdminUser; onChanged: () => void 
       {error ? <ErrorNote message={error} /> : null}
       {notice ? <Body tone="success">{notice}</Body> : null}
 
-      <Row gap={Spacing.one}>
+      <Row gap={Spacing.xs}>
         {user.role === 'ADMIN' ? (
           <ConfirmButton
             label="운영자 해제"
@@ -247,7 +247,7 @@ function UserCard({ user, onChanged }: { user: AdminUser; onChanged: () => void 
             secureTextEntry
             hint="8자 이상. 설정하면 이 계정의 모든 세션이 끊기고, 감사 로그에 남습니다."
           />
-          <Row gap={Spacing.two}>
+          <Row gap={Spacing.sm}>
             <Button
               label="설정"
               compact

@@ -65,7 +65,7 @@ export default function AdminAudit() {
       <Title>감사 로그</Title>
 
       <Card>
-        <Row gap={Spacing.one}>
+        <Row gap={Spacing.xs}>
           <Chip
             label="전체"
             selected={action === null}
@@ -94,7 +94,7 @@ export default function AdminAudit() {
           placeholder="비우면 전체"
           autoCapitalize="none"
         />
-        <Row gap={Spacing.two}>
+        <Row gap={Spacing.sm}>
           <View style={styles.half}>
             <Field label="시작" value={from} onChangeText={setFrom} placeholder="2026-09-01" autoCapitalize="none" />
           </View>

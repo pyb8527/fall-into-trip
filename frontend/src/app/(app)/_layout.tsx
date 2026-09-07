@@ -25,6 +25,8 @@ export default function AppLayout() {
 
   return (
     <Stack>
+      {/* 첫 화면은 제목 대신 로고를 본문 안에 두므로 막대를 감춥니다. */}
+      <Stack.Screen name="home" options={{ headerShown: false }} />
       <Stack.Screen name="trips" options={{ title: '내 여행' }} />
       <Stack.Screen name="settings" options={{ title: '내 계정' }} />
     </Stack>

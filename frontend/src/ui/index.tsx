@@ -1,69 +1,184 @@
-import { useState } from 'react';
+import Feather from '@expo/vector-icons/Feather';
+import { forwardRef, useImperativeHandle, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
+  type StyleProp,
   type TextInputProps,
+  type TextStyle,
   type ViewProps,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { MaxContentWidth, Radius, Spacing, type Theme } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import {
+  Colors,
+  Gutter,
+  MaxContentWidth,
+  Radius,
+  ScreenGap,
+  Spacing,
+  Tap,
+  Type,
+  Weight,
+} from '@/constants/theme';
 
 /**
  * 화면 어디서나 쓰는 조각들.
  *
- * 화면마다 StyleSheet 을 새로 쓰면 여백과 색이 조금씩 어긋납니다. 여기 있는
- * 것만 조합해서 씁니다.
+ * <p>손에 쥔 폰을 먼저 생각하고 만들었습니다.
+ *
+ * <ul>
+ *   <li>누르는 것은 무엇이든 44 아래로 내려가지 않습니다. 작아 보이는
+ *       버튼도 hitSlop 으로 실제 넓이를 채웁니다.</li>
+ *   <li>화면의 주 동작은 아래에 붙입니다. 한 손으로 쥐면 엄지가 닿는 곳은
+ *       아래쪽이고, 위 모서리는 거의 닿지 않습니다.</li>
+ *   <li>노치와 홈 인디케이터를 피해 여백을 잡습니다.</li>
+ *   <li>입력칸 글자는 17 입니다. 16 아래면 iOS 사파리가 누를 때 화면을
+ *       확대해 버립니다.</li>
+ * </ul>
  */
 
 /* ------------------------------------------------------------------ 뼈대 */
 
-export function Screen({
-  children,
-  scroll = true,
-  ...rest
-}: ViewProps & { scroll?: boolean }) {
-  const theme = useTheme();
-  const body = (
-    <View style={[styles.screenInner, { maxWidth: MaxContentWidth }]} {...rest}>
-      {children}
-    </View>
+/** 화면 바깥에서 스크롤을 움직여야 할 때 쓰는 손잡이. */
+export type ScreenHandle = {
+  /** 맨 위로. 목록에서 무언가를 골라 위쪽 지도를 보여 줘야 할 때 씁니다. */
+  scrollToTop: () => void;
+};
+
+type ScreenProps = {
+  children: React.ReactNode;
+  /**
+   * 스크롤과 함께 움직이지 않고 위에 붙어 있는 자리.
+   *
+   * 지도처럼 "아래 목록을 훑는 내내 계속 보여야 하는 것" 을 둡니다. 같이
+   * 흘려보내면 목록에서 무언가를 고를 때마다 위로 되감아야 합니다.
+   */
+  header?: React.ReactNode;
+  /** 화면의 주 동작. 아래에 고정해 엄지가 닿는 자리에 둡니다. */
+  footer?: React.ReactNode;
+  scroll?: boolean;
+  /** 위에 막대(헤더)가 없는 화면이면 켭니다. 노치를 피해 여백을 넣습니다. */
+  safeTop?: boolean;
+};
+
+export const Screen = forwardRef<ScreenHandle, ScreenProps>(function Screen(
+  { children, header, footer, scroll = true, safeTop = false },
+  ref,
+) {
+  const insets = useSafeAreaInsets();
+  const scroller = useRef<ScrollView>(null);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      scrollToTop: () => scroller.current?.scrollTo({ y: 0, animated: true }),
+    }),
+    [],
   );
 
-  if (!scroll) {
-    return <View style={[styles.screen, { backgroundColor: theme.background }]}>{body}</View>;
-  }
+  const body = <View style={styles.screenInner}>{children}</View>;
+
   return (
-    <ScrollView
-      style={{ backgroundColor: theme.background }}
-      contentContainerStyle={styles.screenScroll}
-      keyboardShouldPersistTaps="handled">
-      {body}
-    </ScrollView>
-  );
-}
+    <KeyboardAvoidingView
+      style={styles.screen}
+      /* iOS 는 키보드가 화면을 덮으므로 밀어 올립니다. 안드로이드는 창
+         크기가 줄어드는 방식이라 건드리지 않는 편이 낫습니다. */
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      {header ? (
+        <View style={[styles.header, { paddingTop: (safeTop ? insets.top : 0) + Spacing.lg }]}>
+          <View style={styles.headerInner}>{header}</View>
+        </View>
+      ) : null}
 
+      {scroll ? (
+        <ScrollView
+          ref={scroller}
+          contentContainerStyle={[
+            styles.scrollBody,
+            {
+              paddingTop: header ? Spacing.lg : (safeTop ? insets.top : 0) + Spacing.xxl,
+              /* 아래 버튼이 있으면 그 높이만큼, 없으면 홈 인디케이터만큼 띄웁니다. */
+              paddingBottom: footer ? Spacing.xl : insets.bottom + Spacing.huge,
+            },
+          ]}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          showsVerticalScrollIndicator={false}>
+          {body}
+        </ScrollView>
+      ) : (
+        <View
+          style={[
+            styles.staticBody,
+            { paddingTop: (safeTop ? insets.top : 0) + Spacing.xxl },
+          ]}>
+          {body}
+        </View>
+      )}
+
+      {footer ? (
+        <View style={[styles.footer, { paddingBottom: insets.bottom + Spacing.md }]}>
+          <View style={styles.footerInner}>{footer}</View>
+        </View>
+      ) : null}
+    </KeyboardAvoidingView>
+  );
+});
+
+/** 흰 판. 관련 있는 것들을 하나로 묶습니다. */
 export function Card({ children, style, ...rest }: ViewProps) {
-  const theme = useTheme();
   return (
-    <View
-      style={[
-        styles.card,
-        { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-        style,
-      ]}
-      {...rest}>
+    <View style={[styles.card, style]} {...rest}>
       {children}
     </View>
   );
 }
 
-export function Row({ children, style, gap = Spacing.two, ...rest }: ViewProps & { gap?: number }) {
+/**
+ * 눌러서 들어가는 줄.
+ *
+ * 줄 전체가 눌리는 자리입니다. 안에 작은 버튼을 넣으면 어디를 누르는지
+ * 헷갈리므로, 곁다리 동작은 right 에 표시만 두고 상세 화면에서 다룹니다.
+ */
+export function ListRow({
+  title,
+  subtitle,
+  right,
+  onPress,
+}: {
+  title: React.ReactNode;
+  subtitle?: React.ReactNode;
+  right?: React.ReactNode;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.listRow,
+        { backgroundColor: pressed ? Colors.fill : Colors.surface },
+      ]}>
+      <View style={styles.listRowText}>
+        <Text style={styles.listRowTitle} numberOfLines={1}>
+          {title}
+        </Text>
+        {subtitle ? <Text style={styles.listRowSubtitle}>{subtitle}</Text> : null}
+      </View>
+      {right}
+    </Pressable>
+  );
+}
+
+export function Row({ children, style, gap = Spacing.sm, ...rest }: ViewProps & { gap?: number }) {
   return (
     <View style={[styles.row, { gap }, style]} {...rest}>
       {children}
@@ -71,42 +186,70 @@ export function Row({ children, style, gap = Spacing.two, ...rest }: ViewProps &
   );
 }
 
-/* ------------------------------------------------------------------ 글씨 */
-
-type TextTone = 'default' | 'secondary' | 'muted' | 'danger' | 'success' | 'accent';
-
-const toneColor = (theme: Theme, tone: TextTone) =>
-  ({
-    default: theme.text,
-    secondary: theme.textSecondary,
-    muted: theme.textMuted,
-    danger: theme.danger,
-    success: theme.success,
-    accent: theme.accent,
-  })[tone];
-
-export function Title({ children }: { children: React.ReactNode }) {
-  const theme = useTheme();
-  return <Text style={[styles.title, { color: theme.text }]}>{children}</Text>;
+/** 카드 안에서 내용을 가르는 얇은 선. */
+export function Divider() {
+  return <View style={styles.divider} />;
 }
 
+/* ------------------------------------------------------------------ 글씨 */
+
+type Tone = 'default' | 'secondary' | 'muted' | 'danger' | 'success' | 'accent' | 'warning';
+
+const toneColor: Record<Tone, string> = {
+  default: Colors.text,
+  secondary: Colors.textSecondary,
+  muted: Colors.textMuted,
+  danger: Colors.danger,
+  success: Colors.success,
+  accent: Colors.accent,
+  warning: Colors.warning,
+};
+
+const toneSoft: Record<Tone, string> = {
+  default: Colors.fill,
+  secondary: Colors.fill,
+  muted: Colors.fill,
+  danger: Colors.dangerSoft,
+  success: Colors.successSoft,
+  accent: Colors.accentSoft,
+  warning: Colors.warningSoft,
+};
+
+/** 화면의 제목. 한 화면에 하나만. */
+export function Title({ children }: { children: React.ReactNode }) {
+  return <Text style={styles.title}>{children}</Text>;
+}
+
+/** 카드나 묶음의 제목. */
 export function Subtitle({ children }: { children: React.ReactNode }) {
-  const theme = useTheme();
-  return <Text style={[styles.subtitle, { color: theme.text }]}>{children}</Text>;
+  return <Text style={styles.subtitle}>{children}</Text>;
 }
 
 export function Body({
   children,
   tone = 'default',
+  strong,
+  small,
   numberOfLines,
+  style,
 }: {
   children: React.ReactNode;
-  tone?: TextTone;
+  tone?: Tone;
+  strong?: boolean;
+  small?: boolean;
   numberOfLines?: number;
+  /** 색을 계산해서 넣어야 할 때만. 여백은 감싸는 쪽에서 잡습니다. */
+  style?: StyleProp<TextStyle>;
 }) {
-  const theme = useTheme();
   return (
-    <Text style={[styles.body, { color: toneColor(theme, tone) }]} numberOfLines={numberOfLines}>
+    <Text
+      style={[
+        small ? styles.bodySmall : styles.body,
+        strong && styles.strong,
+        { color: toneColor[tone] },
+        style,
+      ]}
+      numberOfLines={numberOfLines}>
       {children}
     </Text>
   );
@@ -115,12 +258,21 @@ export function Body({
 export function Caption({
   children,
   tone = 'muted',
+  strong,
+  numberOfLines,
 }: {
   children: React.ReactNode;
-  tone?: TextTone;
+  tone?: Tone;
+  strong?: boolean;
+  numberOfLines?: number;
 }) {
-  const theme = useTheme();
-  return <Text style={[styles.caption, { color: toneColor(theme, tone) }]}>{children}</Text>;
+  return (
+    <Text
+      style={[styles.caption, strong && styles.strong, { color: toneColor[tone] }]}
+      numberOfLines={numberOfLines}>
+      {children}
+    </Text>
+  );
 }
 
 /* ------------------------------------------------------------------ 입력 */
@@ -128,23 +280,45 @@ export function Caption({
 export function Field({
   label,
   hint,
+  error,
   style,
+  multiline,
+  onFocus,
+  onBlur,
   ...rest
-}: TextInputProps & { label: string; hint?: string }) {
-  const theme = useTheme();
+}: TextInputProps & { label: string; hint?: string; error?: string }) {
+  /* 지금 쓰고 있는 칸이 어디인지 보이게 합니다. 회색 칸이 여럿 붙어 있으면
+     커서만으로는 눈에 잘 띄지 않습니다. */
+  const [focused, setFocused] = useState(false);
+
   return (
     <View style={styles.field}>
-      <Text style={[styles.label, { color: theme.textSecondary }]}>{label}</Text>
+      <Text style={styles.label}>{label}</Text>
       <TextInput
-        placeholderTextColor={theme.textMuted}
+        placeholderTextColor={Colors.textDisabled}
+        multiline={multiline}
+        onFocus={(e) => {
+          setFocused(true);
+          onFocus?.(e);
+        }}
+        onBlur={(e) => {
+          setFocused(false);
+          onBlur?.(e);
+        }}
         style={[
           styles.input,
-          { color: theme.text, backgroundColor: theme.background, borderColor: theme.border },
+          multiline && styles.inputMultiline,
+          focused && styles.inputFocused,
+          error ? styles.inputError : null,
           style,
         ]}
         {...rest}
       />
-      {hint ? <Text style={[styles.hint, { color: theme.textMuted }]}>{hint}</Text> : null}
+      {error ? (
+        <Text style={styles.errorText}>{error}</Text>
+      ) : hint ? (
+        <Text style={styles.hint}>{hint}</Text>
+      ) : null}
     </View>
   );
 }
@@ -164,32 +338,44 @@ export function Button({
   variant?: ButtonVariant;
   disabled?: boolean;
   busy?: boolean;
+  /** 줄 안에 들어가는 작은 버튼. 보이는 높이만 줄이고 누르는 넓이는 그대로입니다. */
   compact?: boolean;
 }) {
-  const theme = useTheme();
   const off = disabled || busy;
 
-  const palette: Record<ButtonVariant, { bg: string; fg: string; border: string }> = {
-    primary: { bg: theme.accent, fg: theme.accentText, border: theme.accent },
-    secondary: { bg: theme.backgroundElement, fg: theme.text, border: theme.border },
-    danger: { bg: theme.dangerSoft, fg: theme.danger, border: theme.dangerSoft },
-    ghost: { bg: 'transparent', fg: theme.textSecondary, border: 'transparent' },
+  /* 못 누르는 버튼은 흐리게 만드는 대신 아예 다른 색으로 둡니다. 투명도만
+     낮추면 그 아래 배경이 비쳐 글자가 읽기 어려워집니다. */
+  const palette: Record<ButtonVariant, { bg: string; pressed: string; fg: string }> = {
+    primary: { bg: Colors.accent, pressed: Colors.accentPressed, fg: Colors.accentText },
+    secondary: { bg: Colors.fill, pressed: Colors.fillPressed, fg: Colors.textSecondary },
+    danger: { bg: Colors.dangerSoft, pressed: Colors.dangerSoftPressed, fg: Colors.danger },
+    ghost: { bg: 'transparent', pressed: Colors.fill, fg: Colors.textSecondary },
   };
   const c = palette[variant];
+  const offBg = variant === 'ghost' ? 'transparent' : Colors.fill;
 
   return (
     <Pressable
       onPress={onPress}
       disabled={off}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: !!off, busy: !!busy }}
+      /* 보이는 높이가 44 보다 작으면 그만큼 누르는 넓이를 넓혀 줍니다. */
+      hitSlop={compact ? Tap.compactSlop : undefined}
       style={({ pressed }) => [
         styles.button,
-        compact && styles.buttonCompact,
-        { backgroundColor: c.bg, borderColor: c.border, opacity: off ? 0.5 : pressed ? 0.8 : 1 },
+        compact ? styles.buttonCompact : styles.buttonFull,
+        { backgroundColor: off ? offBg : pressed ? c.pressed : c.bg },
       ]}>
       {busy ? (
-        <ActivityIndicator color={c.fg} size="small" />
+        <ActivityIndicator color={off ? Colors.textDisabled : c.fg} size="small" />
       ) : (
-        <Text style={[styles.buttonLabel, compact && styles.buttonLabelCompact, { color: c.fg }]}>
+        <Text
+          style={[
+            compact ? styles.buttonLabelCompact : styles.buttonLabel,
+            { color: off ? Colors.textDisabled : c.fg },
+          ]}
+          numberOfLines={1}>
           {label}
         </Text>
       )}
@@ -207,52 +393,258 @@ export function Chip({
   selected: boolean;
   onPress: () => void;
 }) {
-  const theme = useTheme();
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      hitSlop={Tap.compactSlop}
       style={({ pressed }) => [
         styles.chip,
         {
-          backgroundColor: selected ? theme.accent : theme.backgroundElement,
-          borderColor: selected ? theme.accent : theme.border,
-          opacity: pressed ? 0.8 : 1,
+          backgroundColor: selected
+            ? Colors.accent
+            : pressed
+              ? Colors.fillPressed
+              : Colors.fill,
         },
       ]}>
-      <Text style={[styles.chipLabel, { color: selected ? theme.accentText : theme.textSecondary }]}>
+      <Text
+        style={[styles.chipLabel, { color: selected ? Colors.accentText : Colors.textSecondary }]}>
         {label}
       </Text>
     </Pressable>
   );
 }
 
-/** 상태를 한눈에 보여 주는 작은 표식. */
-export function Badge({ label, tone = 'muted' }: { label: string; tone?: TextTone }) {
-  const theme = useTheme();
+/** 상태를 한눈에 보여 주는 작은 표식. 누르는 것이 아닙니다. */
+export function Badge({ label, tone = 'muted' }: { label: string; tone?: Tone }) {
   return (
-    <View style={[styles.badge, { borderColor: toneColor(theme, tone) }]}>
-      <Text style={[styles.badgeLabel, { color: toneColor(theme, tone) }]}>{label}</Text>
+    <View style={[styles.badge, { backgroundColor: toneSoft[tone] }]}>
+      <Text style={[styles.badgeLabel, { color: toneColor[tone] }]}>{label}</Text>
     </View>
+  );
+}
+
+/**
+ * 두어 개 중 하나를 고르는 띠.
+ *
+ * 로그인/회원가입처럼 서로 대신하는 화면을 오갈 때 씁니다. 링크로 두면
+ * 눌러 본 뒤에야 무엇이 있는지 알지만, 띠로 두면 고를 수 있는 것이 처음부터
+ * 다 보입니다.
+ */
+export function SegmentedTabs<T extends string>({
+  items,
+  value,
+  onChange,
+}: {
+  items: { value: T; label: string }[];
+  value: T;
+  onChange: (value: T) => void;
+}) {
+  return (
+    <View style={styles.segment} accessibilityRole="tablist">
+      {items.map((item) => {
+        const selected = item.value === value;
+        return (
+          <Pressable
+            key={item.value}
+            onPress={() => onChange(item.value)}
+            accessibilityRole="tab"
+            accessibilityState={{ selected }}
+            style={[styles.segmentItem, selected && styles.segmentItemOn]}>
+            <Text style={[styles.segmentLabel, selected && styles.segmentLabelOn]}>
+              {item.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+/**
+ * 첫 화면에 늘어놓는 메뉴 카드.
+ *
+ * <p>두 칸씩 나란히 섭니다(`wide` 면 한 줄 전체). 좁은 폰에서도 두 칸이
+ * 들어가도록 폭을 비율로 잡습니다.
+ *
+ * <p>그림 없이 글자만 씁니다. 뜻이 분명한 아이콘 묶음이 없는 상태에서
+ * 아무 그림이나 붙이면 뜻을 돕지 못하고 장식만 됩니다.
+ *
+ * <p>아직 만들지 않은 것은 `soon` 으로 둡니다. 눌러도 아무 일이 없으면
+ * 고장 난 것처럼 보이므로 아예 누를 수 없게 하고 그렇다고 적어 둡니다.
+ */
+export function MenuCard({
+  title,
+  caption,
+  wide,
+  soon,
+  onPress,
+}: {
+  title: string;
+  caption: string;
+  wide?: boolean;
+  soon?: boolean;
+  onPress?: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={soon || !onPress}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: !!soon }}
+      style={({ pressed }) => [
+        styles.menuCard,
+        wide ? styles.menuCardWide : styles.menuCardHalf,
+        { backgroundColor: pressed ? Colors.fill : Colors.surface },
+      ]}>
+      <View style={styles.menuText}>
+        <Row gap={Spacing.sm}>
+          <Text style={[styles.menuTitle, soon && styles.menuTitleSoon]}>{title}</Text>
+          {soon ? <Badge label="준비 중" tone="muted" /> : null}
+        </Row>
+        <Text style={styles.menuCaption}>{caption}</Text>
+      </View>
+      {wide && !soon ? <Text style={styles.menuChevron}>›</Text> : null}
+    </Pressable>
+  );
+}
+
+/* ------------------------------------------------------------------ 아이콘 */
+
+/** 쓰는 아이콘 이름만 열어 둡니다. 아무거나 부르면 화면마다 결이 흐트러집니다. */
+export type IconName = 'check' | 'edit-2' | 'trash-2' | 'settings' | 'maximize' | 'minimize';
+
+export function Icon({
+  name,
+  size = 18,
+  tone = 'default',
+}: {
+  name: IconName;
+  size?: number;
+  tone?: Tone;
+}) {
+  return <Feather name={name} size={size} color={toneColor[tone]} />;
+}
+
+/**
+ * 아이콘만 있는 단추.
+ *
+ * 글자가 없으므로 화면을 읽어 주는 기기를 위해 이름을 반드시 답니다.
+ * 보이는 크기는 작아도 누르는 넓이는 44 를 채웁니다.
+ */
+export function IconButton({
+  name,
+  label,
+  onPress,
+  tone = 'secondary',
+  active,
+  disabled,
+}: {
+  name: IconName;
+  /** 무엇을 하는 단추인지. 눈에는 안 보이고 읽어 주는 기기만 씁니다. */
+  label: string;
+  onPress: () => void;
+  tone?: Tone;
+  /** 켜진 상태(예: 다녀옴). 눌러 둔 것처럼 보이게 합니다. */
+  active?: boolean;
+  disabled?: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: !!disabled, selected: !!active }}
+      style={({ pressed }) => [
+        styles.iconButton,
+        {
+          backgroundColor: active
+            ? toneSoft[tone]
+            : pressed
+              ? Colors.fillPressed
+              : Colors.fill,
+        },
+      ]}>
+      <Icon name={name} tone={disabled ? 'muted' : active ? tone : 'secondary'} />
+    </Pressable>
+  );
+}
+
+/**
+ * 되돌릴 수 없는 일을 묻는 창.
+ *
+ * 화면 안에서 두 번 누르게 하는 방식은 실수로 연달아 누르면 그냥 지나갑니다.
+ * 창을 띄워 손을 한 번 멈추게 합니다.
+ */
+export function ConfirmDialog({
+  visible,
+  title,
+  message,
+  confirmLabel = '확인',
+  cancelLabel = '취소',
+  danger,
+  busy,
+  onConfirm,
+  onCancel,
+}: {
+  visible: boolean;
+  title: string;
+  message?: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  danger?: boolean;
+  busy?: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
+      <Pressable style={styles.dialogBackdrop} onPress={onCancel}>
+        {/* 안쪽을 눌렀다고 닫히면 안 됩니다. */}
+        <Pressable style={styles.dialog} onPress={() => {}}>
+          <Subtitle>{title}</Subtitle>
+          {message ? (
+            <Body small tone="secondary">
+              {message}
+            </Body>
+          ) : null}
+          <Row gap={Spacing.sm} style={styles.dialogActions}>
+            <View style={styles.dialogButton}>
+              <Button label={cancelLabel} variant="secondary" onPress={onCancel} />
+            </View>
+            <View style={styles.dialogButton}>
+              <Button
+                label={confirmLabel}
+                variant={danger ? 'danger' : 'primary'}
+                busy={busy}
+                onPress={onConfirm}
+              />
+            </View>
+          </Row>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
 
 /* ------------------------------------------------------------------ 상태 */
 
-export function Loading({ label = '불러오는 중…' }: { label?: string }) {
-  const theme = useTheme();
+export function Loading({ label = '불러오는 중' }: { label?: string }) {
   return (
     <View style={styles.center}>
-      <ActivityIndicator color={theme.accent} />
+      <ActivityIndicator color={Colors.accent} />
       <Caption>{label}</Caption>
     </View>
   );
 }
 
 export function ErrorNote({ message, onRetry }: { message: string; onRetry?: () => void }) {
-  const theme = useTheme();
   return (
-    <View style={[styles.note, { backgroundColor: theme.dangerSoft, borderColor: theme.danger }]}>
-      <Text style={[styles.body, { color: theme.danger }]}>{message}</Text>
+    <View style={styles.note}>
+      <Text style={styles.noteText}>{message}</Text>
       {onRetry ? <Button label="다시 시도" variant="ghost" compact onPress={onRetry} /> : null}
     </View>
   );
@@ -302,7 +694,7 @@ export function ConfirmButton({
     );
   }
   return (
-    <Row gap={Spacing.one}>
+    <Row gap={Spacing.xs}>
       <Button
         label={confirmLabel}
         variant={variant}
@@ -321,115 +713,317 @@ export function ConfirmButton({
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    alignItems: 'center',
+    backgroundColor: Colors.background,
   },
-  screenScroll: {
+  scrollBody: {
     alignItems: 'center',
-    padding: Spacing.three,
-    paddingBottom: Spacing.six,
+    paddingHorizontal: Gutter,
+  },
+  staticBody: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Gutter,
   },
   screenInner: {
     width: '100%',
-    gap: Spacing.three,
+    maxWidth: MaxContentWidth,
+    gap: ScreenGap,
   },
+
+  header: {
+    paddingHorizontal: Gutter,
+    paddingBottom: Spacing.lg,
+    backgroundColor: Colors.background,
+    alignItems: 'center',
+  },
+  headerInner: {
+    width: '100%',
+    maxWidth: MaxContentWidth,
+    gap: Spacing.md,
+  },
+  footer: {
+    paddingHorizontal: Gutter,
+    paddingTop: Spacing.md,
+    backgroundColor: Colors.background,
+    /* 스크롤되는 내용과 붙어 보이지 않게 실선 하나만 둡니다. */
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.border,
+  },
+  footerInner: {
+    width: '100%',
+    maxWidth: MaxContentWidth,
+    alignSelf: 'center',
+    gap: Spacing.sm,
+  },
+
   card: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: Radius.medium,
-    padding: Spacing.three,
-    gap: Spacing.two,
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.lg,
+    padding: Spacing.xl,
+    gap: Spacing.md,
   },
+
+  listRow: {
+    borderRadius: Radius.lg,
+    paddingVertical: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
+    minHeight: Tap.min + Spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.md,
+  },
+  listRowText: {
+    flexShrink: 1,
+    gap: Spacing.xs,
+  },
+  listRowTitle: {
+    ...Type.body,
+    fontWeight: Weight.semibold,
+    color: Colors.text,
+  },
+  listRowSubtitle: {
+    ...Type.caption,
+    color: Colors.textMuted,
+  },
+
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
   },
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: Colors.border,
+  },
+
   title: {
-    fontSize: 28,
-    lineHeight: 36,
-    fontWeight: '700',
+    ...Type.title,
+    fontWeight: Weight.bold,
+    color: Colors.text,
   },
   subtitle: {
-    fontSize: 20,
-    lineHeight: 28,
-    fontWeight: '600',
+    ...Type.body,
+    fontWeight: Weight.bold,
+    color: Colors.text,
   },
   body: {
-    fontSize: 15,
-    lineHeight: 22,
+    ...Type.body,
+    fontWeight: Weight.regular,
+  },
+  bodySmall: {
+    ...Type.bodySmall,
+    fontWeight: Weight.regular,
   },
   caption: {
-    fontSize: 13,
-    lineHeight: 18,
+    ...Type.caption,
+    fontWeight: Weight.regular,
   },
+  strong: {
+    fontWeight: Weight.semibold,
+  },
+
   field: {
-    gap: Spacing.one,
+    gap: Spacing.sm,
   },
   label: {
-    fontSize: 13,
-    fontWeight: '600',
+    ...Type.caption,
+    fontWeight: Weight.semibold,
+    color: Colors.textSecondary,
   },
   input: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: Radius.small,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two + 2,
-    fontSize: 16,
+    height: Tap.control,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.fill,
+    paddingHorizontal: Spacing.lg,
+    ...Type.body,
+    color: Colors.text,
+    /* 자리를 미리 잡아 둡니다. 눌렸을 때 테두리가 생기며 글자가 밀리지 않게. */
+    borderWidth: 1.5,
+    borderColor: Colors.fill,
+  },
+  inputMultiline: {
+    height: 104,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.md,
+    textAlignVertical: 'top',
+  },
+  inputFocused: {
+    backgroundColor: Colors.surface,
+    borderColor: Colors.accent,
+  },
+  inputError: {
+    backgroundColor: Colors.surface,
+    borderColor: Colors.danger,
   },
   hint: {
-    fontSize: 12,
-    lineHeight: 16,
+    ...Type.caption,
+    color: Colors.textMuted,
   },
+  errorText: {
+    ...Type.caption,
+    color: Colors.danger,
+  },
+
   button: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: Radius.small,
-    paddingVertical: Spacing.two + 2,
-    paddingHorizontal: Spacing.three,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 44,
+  },
+  buttonFull: {
+    height: Tap.control,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.xl,
   },
   buttonCompact: {
-    paddingVertical: Spacing.one,
-    paddingHorizontal: Spacing.two,
-    minHeight: 32,
+    height: Tap.compact,
+    borderRadius: Radius.sm,
+    paddingHorizontal: Spacing.md,
   },
   buttonLabel: {
-    fontSize: 16,
-    fontWeight: '600',
+    ...Type.body,
+    fontWeight: Weight.semibold,
   },
   buttonLabelCompact: {
-    fontSize: 13,
+    ...Type.bodySmall,
+    fontWeight: Weight.semibold,
   },
+
   chip: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: Radius.large,
-    paddingVertical: Spacing.one,
-    paddingHorizontal: Spacing.two + 2,
+    height: Tap.compact,
+    borderRadius: Radius.full,
+    paddingHorizontal: Spacing.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   chipLabel: {
-    fontSize: 13,
-    fontWeight: '600',
+    ...Type.bodySmall,
+    fontWeight: Weight.semibold,
   },
+
+  segment: {
+    flexDirection: 'row',
+    /* 페이지 바탕(fill)과 같은 색을 쓰면 띠가 보이지 않습니다. 한 단계 진하게. */
+    backgroundColor: Colors.fillPressed,
+    borderRadius: Radius.md,
+    padding: Spacing.xs,
+    gap: Spacing.xs,
+  },
+  segmentItem: {
+    flex: 1,
+    height: Tap.min,
+    borderRadius: Radius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  segmentItemOn: {
+    backgroundColor: Colors.surface,
+  },
+  segmentLabel: {
+    ...Type.bodySmall,
+    fontWeight: Weight.semibold,
+    color: Colors.textMuted,
+  },
+  segmentLabelOn: {
+    color: Colors.text,
+  },
+
+  menuCard: {
+    borderRadius: Radius.lg,
+    padding: Spacing.xl,
+    minHeight: 96,
+    justifyContent: 'center',
+  },
+  menuCardHalf: {
+    /* 두 칸씩. 사이 간격(md)을 빼고 반씩 나눠 가집니다. */
+    flexGrow: 1,
+    flexBasis: '46%',
+  },
+  menuCardWide: {
+    width: '100%',
+    minHeight: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.lg,
+  },
+  menuText: {
+    gap: Spacing.xs,
+    flexShrink: 1,
+  },
+  menuTitle: {
+    ...Type.body,
+    fontWeight: Weight.bold,
+    color: Colors.text,
+  },
+  menuTitleSoon: {
+    color: Colors.textMuted,
+  },
+  menuChevron: {
+    fontSize: 22,
+    lineHeight: 22,
+    color: Colors.textDisabled,
+  },
+  menuCaption: {
+    ...Type.caption,
+    color: Colors.textMuted,
+  },
+
   badge: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: Radius.small,
-    paddingVertical: 1,
-    paddingHorizontal: Spacing.one + 2,
+    borderRadius: Radius.full,
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.md - 2,
   },
   badgeLabel: {
-    fontSize: 11,
-    fontWeight: '700',
+    ...Type.caption,
+    fontWeight: Weight.bold,
   },
+
+  iconButton: {
+    width: Tap.min,
+    height: Tap.min,
+    borderRadius: Radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  dialogBackdrop: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: Gutter,
+    backgroundColor: 'rgba(25, 31, 40, 0.45)',
+  },
+  dialog: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.xl,
+    padding: Spacing.xl,
+    gap: Spacing.md,
+  },
+  dialogActions: {
+    marginTop: Spacing.sm,
+  },
+  dialogButton: {
+    flexGrow: 1,
+    flexBasis: 100,
+  },
+
   center: {
     alignItems: 'center',
     justifyContent: 'center',
-    padding: Spacing.four,
-    gap: Spacing.two,
+    paddingVertical: Spacing.huge,
+    gap: Spacing.sm,
   },
   note: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: Radius.small,
-    padding: Spacing.two + 2,
-    gap: Spacing.one,
+    backgroundColor: Colors.dangerSoft,
+    borderRadius: Radius.md,
+    padding: Spacing.lg,
+    gap: Spacing.xs,
+  },
+  noteText: {
+    ...Type.bodySmall,
+    color: Colors.danger,
   },
 });

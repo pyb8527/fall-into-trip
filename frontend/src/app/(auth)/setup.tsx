@@ -1,9 +1,14 @@
 import { Link } from 'expo-router';
 import { useState } from 'react';
+import { StyleSheet, View } from 'react-native';
 
 import { ApiError } from '@/api/client';
 import { useAuth } from '@/auth/auth-provider';
-import { Body, Button, Card, Caption, ErrorNote, Field, Screen, Title } from '@/ui';
+import { Spacing } from '@/constants/theme';
+import { Body, Button, Card, Caption, Divider, ErrorNote, Field, Row, Screen, Title } from '@/ui';
+import { LogoMark } from '@/ui/logo';
+
+const PASSWORD_MIN = 8;
 
 /**
  * 최초 운영자 만들기.
@@ -21,7 +26,23 @@ export default function Setup() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  const passwordError =
+    password.length > 0 && password.length < PASSWORD_MIN
+      ? `${PASSWORD_MIN}자 이상이어야 합니다.`
+      : undefined;
+
   async function submit() {
+    if (busy) {
+      return;
+    }
+    if (!email.trim() || !name.trim() || !token.trim()) {
+      setError('이메일·이름·설치 토큰을 모두 입력해 주세요.');
+      return;
+    }
+    if (password.length < PASSWORD_MIN) {
+      setError(`비밀번호는 ${PASSWORD_MIN}자 이상이어야 합니다.`);
+      return;
+    }
     setError(null);
     setBusy(true);
     try {
@@ -34,11 +55,16 @@ export default function Setup() {
   }
 
   return (
-    <Screen>
-      <Title>최초 설치</Title>
-      <Body tone="secondary">
-        이 서버에는 아직 운영자가 없습니다. 첫 운영자 계정을 만들어 주세요.
-      </Body>
+    <Screen
+      safeTop
+      footer={<Button label="운영자 만들기" onPress={submit} busy={busy} />}>
+      <View style={styles.head}>
+        <LogoMark size={34} />
+        <Title>최초 설치</Title>
+        <Body tone="secondary">
+          이 서버에는 아직 운영자가 없습니다. 첫 운영자 계정을 만들어 주세요.
+        </Body>
+      </View>
 
       <Card>
         <Field
@@ -46,40 +72,63 @@ export default function Setup() {
           value={email}
           onChangeText={setEmail}
           autoCapitalize="none"
+          autoCorrect={false}
           autoComplete="email"
           keyboardType="email-address"
           inputMode="email"
+          placeholder="you@example.com"
+          returnKeyType="next"
         />
-        <Field label="이름" value={name} onChangeText={setName} maxLength={80} />
+        <Field
+          label="이름"
+          value={name}
+          onChangeText={setName}
+          maxLength={80}
+          returnKeyType="next"
+        />
         <Field
           label="비밀번호"
           value={password}
           onChangeText={setPassword}
           secureTextEntry
           autoComplete="new-password"
-          hint="8자 이상"
+          hint={`${PASSWORD_MIN}자 이상`}
+          error={passwordError}
+          returnKeyType="next"
         />
         <Field
           label="설치 토큰"
           value={token}
           onChangeText={setToken}
           autoCapitalize="none"
+          autoCorrect={false}
           secureTextEntry
           hint="서버의 SETUP_TOKEN 환경변수에 넣어 둔 값입니다."
+          returnKeyType="done"
           onSubmitEditing={submit}
         />
         {error ? <ErrorNote message={error} /> : null}
-        <Button
-          label="운영자 만들기"
-          onPress={submit}
-          busy={busy}
-          disabled={!email || !name || password.length < 8 || !token}
-        />
-      </Card>
 
-      <Link href="/(auth)/login">
-        <Caption tone="accent">이미 계정이 있다면 로그인</Caption>
-      </Link>
+        <Divider />
+        <Row style={styles.footNote}>
+          <Link href="/(auth)/login">
+            <Caption tone="accent" strong>
+              이미 계정이 있다면 로그인
+            </Caption>
+          </Link>
+        </Row>
+      </Card>
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  head: {
+    gap: Spacing.sm,
+    paddingTop: Spacing.lg,
+  },
+  footNote: {
+    justifyContent: 'center',
+    paddingTop: Spacing.xs,
+  },
+});

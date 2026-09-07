@@ -1,9 +1,28 @@
+/*
+ * 웹에서만 쓰이는 글꼴 묶음.
+ *
+ * 웹 폰트를 받아 오지 않습니다. 받아 오면 글자가 한 번 바뀌어 보이고,
+ * 인터넷이 느린 곳에서는 한동안 아무것도 안 보입니다. 기기에 이미 있는
+ * 것 중에서 한글이 가장 또렷한 순서로 씁니다.
+ */
 :root {
-  --font-display:
-    Spline Sans, Inter, ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji,
-    Segoe UI Symbol, Noto Color Emoji;
-  --font-mono:
-    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace;
-  --font-rounded: 'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif;
-  --font-serif: Georgia, 'Times New Roman', serif;
+  --font-sans:
+    Pretendard, -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Segoe UI',
+    'Malgun Gothic', 'Noto Sans KR', system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  background-color: #f9fafb;
+}
+
+body {
+  margin: 0;
+  /* 화면을 밝은 쪽 한 벌로만 그립니다. 기기가 어두운 모드여도 바뀌지 않습니다. */
+  color-scheme: light;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
