@@ -68,13 +68,45 @@ services:
       args:
         # 비워 두면 브라우저가 자기 주소로 /api 를 부릅니다. nginx 가 넘깁니다.
         EXPO_PUBLIC_API_BASE: ""
+        # 지도 키는 번들에 박히므로 여기서 넣어야 합니다. 바꾸면 다시 빌드해야
+        # 반영됩니다(--build).
+        EXPO_PUBLIC_GMAPS_KEY: ${EXPO_PUBLIC_GMAPS_KEY:-}
     container_name: fit-web
     restart: unless-stopped
     depends_on:
       api:
         condition: service_healthy
     ports:
-      - "${WEB_PORT:-8080}:80"
+      # 터널로 열 때는 WEB_BIND 를 127.0.0.1 로 두세요. 바깥에서 들어오는 길은
+      # 터널 하나로 좁히고, 이 포트는 서버 안에서만 씁니다.
+      - "${WEB_BIND:-0.0.0.0}:${WEB_PORT:-8080}:80"
+
+  # --------------------------------------------------------------------------
+  #  Cloudflare 터널 (선택)
+  #  --------------------------------------------------------------------------
+  #    docker compose --profile tunnel up -d --build
+  #
+  #  공유기 포트를 열지 않고 밖에서 들어올 수 있게 합니다. 이 컨테이너가
+  #  Cloudflare 로 나가는 연결을 직접 맺고, 들어온 요청을 web 으로 넘깁니다.
+  #  방화벽에 구멍을 내지 않으므로 서버 주소가 드러나지 않습니다.
+  #
+  #  대시보드에서 터널을 만들고 받은 토큰을 .env 의 TUNNEL_TOKEN 에 넣으세요.
+  #  공개 주소와 서비스(http://web:80) 연결도 대시보드에서 정합니다.
+  # --------------------------------------------------------------------------
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: fit-tunnel
+    profiles: ["tunnel"]
+    restart: unless-stopped
+    depends_on:
+      web:
+        condition: service_healthy
+    # 자동 갱신은 컨테이너에서 의미가 없습니다. 이미지를 새로 받는 편이 낫습니다.
+    #
+    # 값이 없으면 여기서 막지 않고 cloudflared 가 로그로 알려 줍니다. 프로필
+    # 밖에 있어도 compose 는 파일 전체를 먼저 읽기 때문에, 여기서 필수로 걸면
+    # 터널을 안 쓸 때도 up 이 실패합니다.
+    command: tunnel --no-autoupdate run --token ${TUNNEL_TOKEN:-}
 
 volumes:
   fit-db:

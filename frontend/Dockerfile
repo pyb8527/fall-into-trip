@@ -22,6 +22,11 @@ COPY . .
 ARG EXPO_PUBLIC_API_BASE=""
 ENV EXPO_PUBLIC_API_BASE=$EXPO_PUBLIC_API_BASE
 
+# 지도 키도 번들에 박히므로 빌드할 때 들어와야 합니다. 비워 두면 지도와
+# 장소 검색이 조용히 빠지고 나머지는 그대로 돕니다.
+ARG EXPO_PUBLIC_GMAPS_KEY=""
+ENV EXPO_PUBLIC_GMAPS_KEY=$EXPO_PUBLIC_GMAPS_KEY
+
 RUN npx expo export --platform web
 
 # --------------------------------------------------------------------- 실행

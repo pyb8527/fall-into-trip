@@ -36,6 +36,77 @@ docker compose up -d --build
 > `SECURE_COOKIE` 는 HTTPS 뒤에 둘 때 반드시 `true` 로 바꾸세요.
 > `false` 인 채로 인터넷에 올리면 리프레시 토큰이 평문으로 오갑니다.
 
+## 내 서버에 올리기 — Cloudflare 터널
+
+공유기 포트를 열지 않고 밖에서 들어오게 합니다. `cloudflared` 가 서버 안에서
+Cloudflare 로 나가는 연결을 직접 맺고, 들어온 요청을 `web` 으로 넘깁니다.
+방화벽에 구멍을 내지 않으므로 서버 주소가 드러나지 않습니다.
+
+### 1. 터널 만들기
+
+Zero Trust 대시보드 → **Networks → Tunnels → Create a tunnel** → 이름을 짓고
+**Cloudflared** 를 고릅니다. 설치 명령에 들어 있는 **토큰**만 복사하세요
+(명령 자체는 쓰지 않습니다. 우리는 compose 로 띄웁니다).
+
+이어서 **Routes → Published application** 에서 공개 주소와 서비스를 잇습니다.
+
+| 칸 | 값 |
+|---|---|
+| Subdomain / Domain | 예: `fit` / `weenie-beenie.net` |
+| Type | `HTTP` |
+| URL | `web:80` |
+
+`web:80` 은 compose 네트워크 안의 이름입니다. `localhost` 를 적으면
+cloudflared 컨테이너 자기 자신을 가리켜 연결되지 않습니다.
+
+### 2. `.env` 채우기
+
+```bash
+cp .env.example .env
+```
+
+| 값 | 넣을 것 |
+|---|---|
+| `TUNNEL_TOKEN` | 1번에서 복사한 토큰 |
+| `SECURE_COOKIE` | **`true`** — 이제 HTTPS 로 들어옵니다 |
+| `WEB_BIND` | **`127.0.0.1`** — 바깥으로 나가는 길을 터널 하나로 좁힙니다 |
+| `CORS_ORIGINS` | `https://fit.weenie-beenie.net` |
+| `JWT_SECRET`·`DB_PASSWORD`·`SETUP_TOKEN` | 각각 새로 만든 값 |
+| `EXPO_PUBLIC_GMAPS_KEY` | 지도를 쓸 때만 |
+
+### 3. 띄우기
+
+```bash
+docker compose --profile tunnel up -d --build
+docker compose --profile tunnel logs -f cloudflared   # 연결 확인
+```
+
+`Registered tunnel connection` 이 보이면 붙은 것입니다. 대시보드의 터널
+상태도 **HEALTHY** 로 바뀝니다.
+
+### 꼭 함께 할 것
+
+- **`SECURE_COOKIE=true`** — 안 바꾸면 리프레시 쿠키에 `Secure` 가 빠집니다.
+- **구글 지도 키 리퍼러에 공개 도메인 추가** — `fit.weenie-beenie.net/*`.
+  키는 번들에 박히므로 **바꾼 뒤 `--build` 로 다시 빌드**해야 반영됩니다.
+- **최초 운영자를 만든 뒤 `SETUP_TOKEN` 을 비우고** 다시 띄우세요. 그 토큰이
+  살아 있는 한 그것을 아는 사람은 운영자 자리를 노릴 수 있습니다.
+
+### 운영 화면을 한 겹 더 잠그고 싶다면
+
+Zero Trust → **Access → Applications** 에서 `fit.weenie-beenie.net/admin` 을
+자체 호스팅 앱으로 등록하고 이메일 정책을 걸면, 로그인 화면에 닿기 전에
+Cloudflare 가 먼저 막습니다. 앱 안의 운영자 권한 검사와 별개로 한 겹 더입니다.
+
+### 알아 둘 것
+
+- 터널은 **한 방향(서버 → Cloudflare)** 으로만 나갑니다. 공유기에 포트를
+  열지 않아도 되고, 열려 있다면 닫아도 됩니다.
+- `restart: unless-stopped` 라 서버를 다시 켜면 알아서 붙습니다.
+- 토큰은 그 자체로 이 터널에 붙을 수 있는 자격입니다. 비밀번호처럼 다루세요.
+  샜다고 생각되면 대시보드에서 터널을 지우고 다시 만드는 편이 빠릅니다.
+
+
 ## 개발하며 띄우기
 
 DB 만 컨테이너로 띄우고 나머지는 로컬에서 돌립니다. 그래야 고치는 즉시
