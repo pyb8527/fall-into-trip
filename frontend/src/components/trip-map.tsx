@@ -23,6 +23,14 @@ const FOCUS_SPAN = 0.006;
 /** 여러 곳을 한 화면에 담을 때 가장자리에 두는 여유. */
 const PAD = 1.35;
 
+/**
+ * 핀을 그림으로 굽는 동안 열어 두는 시간.
+ *
+ * 글꼴이 늦게 잡히는 기기까지 여유를 두되, 이 시간 동안은 핀마다 매 프레임
+ * 다시 구우므로 길게 잡으면 지도가 무거워집니다.
+ */
+const DRAW_MS = 400;
+
 export type { MapPlace } from '@/components/map-types';
 
 export function TripMap({ places, activeId, onSelect, height = 300 }: TripMapProps) {
@@ -115,6 +123,10 @@ export function TripMap({ places, activeId, onSelect, height = 300 }: TripMapPro
       /* 안드로이드는 구글 지도로 통일합니다. 기기마다 다른 지도가 뜨면
          같은 화면을 설명하기 어렵습니다. iOS 는 애플 지도를 그대로 씁니다. */
       provider={PROVIDER_GOOGLE}
+      /* 구글은 기기가 어두운 테마면 지도도 어둡게 칠합니다. 웹에는 그런
+         동작이 없어 같은 화면이 둘로 갈립니다. 밝은 쪽으로 못박습니다.
+         이 값은 지도를 만들 때 한 번만 읽히므로 첫 그림부터 넘겨야 합니다. */
+      userInterfaceStyle="light"
       initialRegion={region}
       showsPointsOfInterests={false}
       toolbarEnabled={false}
@@ -144,15 +156,7 @@ export function TripMap({ places, activeId, onSelect, height = 300 }: TripMapPro
       )}
 
       {places.map((p) => (
-        <Marker
-          key={p.id}
-          coordinate={{ latitude: p.lat, longitude: p.lng }}
-          title={p.name}
-          onPress={() => pick(p.id)}
-          tracksViewChanges={false}
-          anchor={{ x: 0.5, y: 1 }}>
-          <Pin place={p} active={p.id === activeId} />
-        </Marker>
+        <PlacePin key={p.id} place={p} active={p.id === activeId} onPress={pick} />
       ))}
     </MapView>
   );
@@ -197,32 +201,90 @@ export function TripMap({ places, activeId, onSelect, height = 300 }: TripMapPro
 }
 
 /**
- * 핀.
+ * 핀 하나.
  *
- * 날짜 색 방울 안에 순번. 겹쳐 있어도 몇 번째인지 읽히도록 흰 테두리를
- * 두릅니다. 고른 것은 조금 키웁니다.
+ * <p>지도는 화면 요소로 만든 핀을 그림 한 장으로 구워 얹습니다. 언제 구울지는
+ * tracksViewChanges 가 정합니다. 계속 켜 두면 핀 수만큼 매 프레임 다시 구워
+ * 지도가 버벅이고, 처음부터 꺼 두면 아직 자리도 못 잡은 빈 그림이 구워져
+ * 핀이 반쪽으로 나옵니다. 그래서 잠깐 켰다 끕니다.
+ *
+ * <p>고른 핀은 커지므로 그때도 다시 구워야 합니다.
+ */
+function PlacePin({
+  place,
+  active,
+  onPress,
+}: {
+  place: MapPlace;
+  active: boolean;
+  onPress: (id: string) => void;
+}) {
+  const [drawing, setDrawing] = useState(true);
+
+  useEffect(() => {
+    setDrawing(true);
+    const timer = setTimeout(() => setDrawing(false), DRAW_MS);
+    return () => clearTimeout(timer);
+  }, [active, place.color, place.order]);
+
+  return (
+    <Marker
+      coordinate={{ latitude: place.lat, longitude: place.lng }}
+      title={place.name}
+      onPress={() => onPress(place.id)}
+      tracksViewChanges={drawing}
+      /* 물방울 아래 뾰족한 끝이 실제 좌표를 가리킵니다. */
+      anchor={{ x: 0.5, y: 1 }}>
+      <Pin place={place} active={active} />
+    </Marker>
+  );
+}
+
+/**
+ * 핀 모양.
+ *
+ * <p>웹은 SVG 로 물방울을 그립니다. 여기서는 SVG 를 쓸 수 없어, 정사각형의
+ * 네 귀퉁이 중 하나만 깎지 않고 둥글린 뒤 45도 돌려 같은 모양을 만듭니다.
+ * 남겨 둔 귀퉁이가 아래를 가리키는 끝이 됩니다.
+ *
+ * <p>돌린 각도는 안에 든 숫자에도 그대로 옮겨붙으므로, 숫자는 돌아가지 않는
+ * 층에 따로 얹습니다.
  */
 function Pin({ place, active }: { place: MapPlace; active: boolean }) {
-  const size = active ? 34 : 28;
+  const size = active ? 36 : 30;
+  const border = active ? 3 : 2.5;
+  /* 45도 돌리면 대각선이 가로가 됩니다. 잘리지 않게 그만큼 자리를 잡아 둡니다. */
+  const box = Math.ceil(size * 1.42);
+  /* 방울 한가운데에서 아래 끝까지. 이 끝이 좌표에 닿습니다. */
+  const tall = Math.ceil(size * 1.21);
+  const dot = Math.round(size * 0.58);
+
   return (
-    <View style={styles.pinWrap}>
+    <View style={{ width: box, height: tall }}>
       <View
         style={[
           styles.pin,
           {
             width: size,
             height: size,
+            left: (box - size) / 2,
             borderRadius: size / 2,
+            borderBottomRightRadius: 2,
             backgroundColor: place.color,
-            borderWidth: active ? 3 : 2,
+            borderWidth: border,
+            /* 고른 것을 조금 더 띄웁니다. */
+            elevation: active ? 6 : 3,
+            shadowOpacity: active ? 0.32 : 0.2,
           },
-        ]}>
-        <Body small strong style={styles.pinText}>
-          {place.order}
-        </Body>
+        ]}
+      />
+      <View style={[styles.pinFace, { height: size, width: box }]}>
+        <View style={[styles.dot, { width: dot, height: dot, borderRadius: dot / 2 }]}>
+          <Body small strong style={{ color: place.color }}>
+            {place.order}
+          </Body>
+        </View>
       </View>
-      {/* 방울 아래 꼬리. 정확히 어느 점을 가리키는지 보이게 합니다. */}
-      <View style={[styles.pinTail, { borderTopColor: place.color }]} />
     </View>
   );
 }
@@ -301,26 +363,31 @@ const styles = StyleSheet.create({
     right: Spacing.md,
   },
 
-  pinWrap: {
-    alignItems: 'center',
-  },
   pin: {
+    position: 'absolute',
+    top: 0,
+    borderColor: '#FFFFFF',
+    /* 남겨 둔 귀퉁이가 아래를 향하도록 돌립니다. */
+    transform: [{ rotate: '45deg' }],
+    shadowColor: '#191F28',
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 3,
+  },
+  /* 돌아간 방울 위에 얹는, 돌아가지 않는 층. */
+  pinFace: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    borderColor: '#FFFFFF',
+  },
+  dot: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
   },
   pinText: {
     color: '#FFFFFF',
-  },
-  pinTail: {
-    width: 0,
-    height: 0,
-    marginTop: -2,
-    borderLeftWidth: 4,
-    borderRightWidth: 4,
-    borderTopWidth: 7,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
   },
 
   sheet: {
