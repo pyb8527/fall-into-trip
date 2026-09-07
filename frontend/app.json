@@ -9,14 +9,16 @@
     "userInterfaceStyle": "light",
     "backgroundColor": "#F2F4F6",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "net.weeniebeenie.fit"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundColor": "#FFFFFF"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "net.weeniebeenie.fit"
     },
     "androidStatusBar": {
       "barStyle": "dark-content",

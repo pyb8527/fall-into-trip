@@ -147,6 +147,65 @@ cd frontend && npx expo start
 EXPO_PUBLIC_API_BASE=http://192.168.0.10:8080 npx expo start
 ```
 
+## 앱으로 빌드하기
+
+Expo 앱은 **EAS Build** 로 만듭니다. 실제 컴파일은 Expo 클라우드에서 일어나므로
+맥 없이도 iOS 빌드가 되고, 서버에서 돌릴 이유도 없습니다 — 어느 컴퓨터에서
+해도 결과는 같습니다.
+
+```bash
+cd frontend
+npx eas-cli@latest login       # expo.dev 계정
+npx eas-cli@latest init        # app.json 에 projectId 를 넣어 줍니다
+```
+
+전역 설치가 편하면 `npm i -g eas-cli` 뒤 `eas` 로 부르면 됩니다.
+
+### 지도 키는 파일에 넣지 않습니다
+
+`eas.json` 은 깃에 올라갑니다. 키를 적어 두면 저장소에 그대로 박힙니다.
+EAS 쪽에 따로 넣어 두고 빌드할 때 꺼내 쓰게 합니다.
+
+```bash
+npx eas-cli@latest env:create --name EXPO_PUBLIC_GMAPS_KEY --value "…" --visibility sensitive
+```
+
+`EXPO_PUBLIC_API_BASE` 는 비밀이 아니라 그냥 주소이므로 `eas.json` 에 적어
+두었습니다. 앱은 자기 주소가 없어서 서버를 명시해야 합니다 — 웹처럼 비워
+두면 아무 데도 못 붙습니다.
+
+### 빌드
+
+```bash
+# 폰에 바로 설치해서 볼 APK
+npx eas-cli@latest build --profile preview --platform android
+
+# 스토어용
+npx eas-cli@latest build --profile production --platform android
+npx eas-cli@latest build --profile production --platform ios    # 애플 개발자 계정 필요
+```
+
+끝나면 링크와 QR 이 나옵니다. APK 는 폰에서 받아 바로 설치하면 됩니다.
+
+### 앱에서 빠지는 것
+
+| | 앱 |
+|---|---|
+| 로그인·여행·일정·장소 편집 | 됩니다 |
+| 날짜 고르기 | 됩니다 (기기 기본 달력) |
+| **지도** | **안 나옵니다** |
+| **장소 검색** | **안 나옵니다** (좌표 직접 입력 칸이 대신 열립니다) |
+
+지도는 네이티브 지도 SDK(`react-native-maps`)가, 장소 검색은 키를 앱 번들에
+심지 않으려면 백엔드 프록시가 필요합니다. 둘 다 아직 만들지 않았습니다.
+
+### 한 번 정하면 바꾸기 어려운 것
+
+`app.json` 의 `ios.bundleIdentifier` 와 `android.package` 를
+`net.weeniebeenie.fit` 로 두었습니다. 스토어와 기기가 앱을 알아보는 이름이라,
+나중에 바꾸면 **다른 앱**이 됩니다. 설치된 앱이 갱신되지 않고 따로 깔립니다.
+
+
 ## 운영 화면
 
 운영자(`ADMIN`)로 로그인하면 **내 계정 → 운영 화면 열기** 가 보입니다.
