@@ -18,8 +18,8 @@ frontend/   Expo(React Native) 57 · expo-router · react-native-web
             같은 코드가 iOS·Android 앱이 되고, 웹으로도 뽑힙니다.
 ```
 
-컨테이너는 셋을 따로 띄웁니다 — **db**, **api**, **web**.
-밖으로 열리는 문은 web(nginx) 하나뿐이고, nginx 가 `/api` 를 api 로 넘깁니다.
+컨테이너는 셋을 따로 띄웁니다 — **db**, **api**, **fit**(웹).
+밖으로 열리는 문은 fit(nginx) 하나뿐이고, nginx 가 `/api` 를 api 로 넘깁니다.
 브라우저 입장에서 화면과 API 가 같은 주소라 CORS 를 타지 않고, 리프레시
 쿠키도 `SameSite=Lax` 로 안전하게 실립니다.
 
@@ -54,10 +54,14 @@ Zero Trust 대시보드 → **Networks → Tunnels → Create a tunnel** → 이
 |---|---|
 | Subdomain / Domain | 예: `fit` / `weenie-beenie.net` |
 | Type | `HTTP` |
-| URL | `web:80` |
+| URL | `fit:80` |
 
-`web:80` 은 compose 네트워크 안의 이름입니다. `localhost` 를 적으면
-cloudflared 컨테이너 자기 자신을 가리켜 연결되지 않습니다.
+`fit` 은 compose 안의 서비스 이름이자 그 네트워크에서의 주소입니다.
+`localhost` 를 적으면 cloudflared 컨테이너 자기 자신을 가리켜 연결되지 않습니다.
+
+cloudflared 를 이 compose 밖에서 따로 돌리고 있다면 이 이름으로는 닿지
+않습니다. 같은 네트워크에 있어야 합니다 — `--profile tunnel` 로 함께 띄우는
+편이 간단합니다.
 
 ### 2. `.env` 채우기
 

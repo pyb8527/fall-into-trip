@@ -3,7 +3,7 @@
 #  ---------------------------------------------------------------------------
 #    docker compose up -d --build
 #
-#  · 밖으로 열리는 문은 web(nginx) 하나뿐입니다. api 와 db 는 컨테이너
+#  · 밖으로 열리는 문은 fit(nginx) 하나뿐입니다. api 와 db 는 컨테이너
 #    네트워크 안에서만 서로를 봅니다. DB 포트가 인터넷에 열려 있는 것만큼
 #    위험한 것도 드뭅니다.
 #  · 브라우저에서 보면 화면과 API 가 같은 주소입니다. nginx 가 /api 를
@@ -62,7 +62,9 @@ services:
     expose:
       - "8080"
 
-  web:
+  # 이름이 곧 컨테이너 네트워크 안의 주소입니다. 터널 라우트가 http://fit:80 을
+  # 가리키므로 서비스 이름을 fit 으로 둡니다.
+  fit:
     build:
       context: ./frontend
       args:
@@ -91,7 +93,7 @@ services:
   #  방화벽에 구멍을 내지 않으므로 서버 주소가 드러나지 않습니다.
   #
   #  대시보드에서 터널을 만들고 받은 토큰을 .env 의 TUNNEL_TOKEN 에 넣으세요.
-  #  공개 주소와 서비스(http://web:80) 연결도 대시보드에서 정합니다.
+  #  공개 주소와 서비스(http://fit:80) 연결도 대시보드에서 정합니다.
   # --------------------------------------------------------------------------
   cloudflared:
     image: cloudflare/cloudflared:latest
@@ -99,7 +101,7 @@ services:
     profiles: ["tunnel"]
     restart: unless-stopped
     depends_on:
-      web:
+      fit:
         condition: service_healthy
     # 자동 갱신은 컨테이너에서 의미가 없습니다. 이미지를 새로 받는 편이 낫습니다.
     #
