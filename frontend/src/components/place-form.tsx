@@ -140,7 +140,7 @@ export function PlaceForm({
 
       {/* 검색을 쓸 수 없을 때만 직접 넣습니다. */}
       {hasPlaceSearch() ? null : (
-        <Row gap={Spacing.sm}>
+        <Row gap={Spacing.sm} style={styles.pair}>
           <View style={styles.half}>
             <Field
               label="위도"
@@ -174,9 +174,9 @@ export function PlaceForm({
         hint="찾은 이름을 그대로 써도 되고, 부르기 쉽게 바꿔도 됩니다."
       />
 
-      <Row gap={Spacing.sm}>
+      <Row gap={Spacing.sm} style={styles.pair}>
         <View style={styles.half}>
-          <Field label="시간" value={time} onChangeText={setTime} placeholder="13:30" hint="HH:MM" />
+          <Field label="시간" value={time} onChangeText={setTime} placeholder="13:30" />
         </View>
         <View style={styles.half}>
           <Field label="분류" value={cat} onChangeText={setCat} placeholder="식사 / 관광" />
@@ -201,6 +201,11 @@ export function PlaceForm({
 }
 
 const styles = StyleSheet.create({
+  /* 나란한 두 칸은 위쪽으로 맞춥니다. 한쪽에만 힌트가 붙어 키가 달라져도
+     입력 상자끼리는 한 줄에 서야 합니다. */
+  pair: {
+    alignItems: 'flex-start',
+  },
   spot: {
     flexDirection: 'row',
     alignItems: 'center',
