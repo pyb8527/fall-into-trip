@@ -30,9 +30,16 @@ export function loadMaps(): Promise<void> {
       return;
     }
     const script = document.createElement('script');
+    /*
+      loading=async 를 쓰지 않습니다.
+      그 방식은 스크립트를 받은 뒤에도 실제 라이브러리를 나중에 채우므로,
+      onload 시점에 google.maps.Map 이 아직 없을 수 있습니다. 빠른 기기에서는
+      우연히 맞아떨어지고 느린 기기(폰)에서는 어긋납니다. 한 번에 다 받아
+      오는 쪽이 몇십 밀리초 느린 대신 확실합니다.
+    */
     script.src =
       `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(GMAPS_KEY)}` +
-      '&libraries=places&language=ko&region=KR&loading=async';
+      '&libraries=places&language=ko&region=KR';
     script.async = true;
     script.onload = () => resolve();
     script.onerror = () => {

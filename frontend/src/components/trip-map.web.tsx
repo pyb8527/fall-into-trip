@@ -96,6 +96,10 @@ export function TripMap({ places, activeId, onSelect, height = 300 }: TripMapPro
           gestureHandling: 'greedy',
           maxZoom: 18,
         });
+        /* 첫 배치가 늦게 잡히는 기기를 위해 한 박자 뒤 한 번 더 재게 합니다. */
+        gmaps().event.addListenerOnce(map.current, 'idle', () => {
+          gmaps().event.trigger(map.current, 'resize');
+        });
         setReady(true);
       })
       .catch(() => {
@@ -107,6 +111,32 @@ export function TripMap({ places, activeId, onSelect, height = 300 }: TripMapPro
       alive = false;
     };
   }, []);
+
+  /*
+    지도가 붙은 자리의 크기가 바뀌면 다시 재라고 알려 줍니다.
+
+    지도는 만들어질 때의 크기를 기억합니다. 그때 자리가 아직 0 이면 타일을
+    한 장도 그리지 않고, 나중에 자리가 생겨도 스스로는 알아채지 못합니다.
+    폰에서는 글꼴·안전영역 때문에 첫 배치가 한 박자 늦게 잡혀 이 일이
+    자주 생깁니다. 회전이나 주소창이 접힐 때도 마찬가지입니다.
+  */
+  useEffect(() => {
+    if (!ready || !host.current || typeof ResizeObserver === 'undefined') {
+      return;
+    }
+    const observer = new ResizeObserver(() => {
+      if (!map.current) {
+        return;
+      }
+      const center = map.current.getCenter();
+      gmaps().event.trigger(map.current, 'resize');
+      if (center) {
+        map.current.setCenter(center);
+      }
+    });
+    observer.observe(host.current);
+    return () => observer.disconnect();
+  }, [ready]);
 
   /* 브라우저가 알려 주는 전체화면 상태를 따라갑니다. ESC 로 빠져나가는 것도
      여기로 들어옵니다. 크기가 바뀌었으니 지도에 다시 재라고 알려 줍니다. */
