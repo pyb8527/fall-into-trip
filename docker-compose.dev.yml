@@ -1,9 +1,41 @@
-# 개발용 — DB 만 컨테이너로 띄우고 애플리케이션은 로컬에서 실행합니다.
-#   docker compose -f docker-compose.dev.yml up -d
+# ============================================================================
+#  개발용 — DB 만 컨테이너로 띄웁니다.
+#  ---------------------------------------------------------------------------
+#    docker compose -f docker-compose.dev.yml up -d
+#
+#  API 와 화면은 로컬에서 직접 돌립니다. 그래야 코드를 고치는 즉시 반영되고,
+#  디버거를 붙일 수 있습니다.
+#
+#  ※ docker-compose.yml(전체 실행)과 동시에 띄우지 마세요. 같은 폴더에서
+#     부르면 도커가 둘을 한 프로젝트로 보고, 서비스 이름 db 가 겹쳐서
+#     나중에 부른 쪽이 앞의 DB 컨테이너를 갈아 끼웁니다. 함께 띄워야 하면
+#     `docker compose -p fit-prod up -d` 처럼 프로젝트를 나누세요.
+#
+#    backend   cd backend  && ./gradlew bootRun
+#    화면(웹)  cd frontend && npx expo start --web
+#    화면(앱)  cd frontend && npx expo start        # Expo Go 로 스캔
+#
+#  로컬 API 를 띄울 때 넣어 줄 값(기본값이 있어 없어도 뜨지만, 아래 둘은
+#  넣어야 설치·로그인이 됩니다):
+#
+#    SETUP_TOKEN=devtoken    최초 운영자를 만들 때 쓰는 값
+#    SECURE_COOKIE=false     http://localhost 에서는 Secure 쿠키가 안 실립니다
+#    DB_URL=jdbc:postgresql://localhost:5433/fit
+#
+#  PowerShell 예:
+#    $env:SETUP_TOKEN="devtoken"; $env:SECURE_COOKIE="false"
+#    $env:DB_URL="jdbc:postgresql://localhost:5433/fit"
+#    ./gradlew bootRun
+#
+#  앱(실기기)에서 로컬 API 를 부르려면 localhost 가 폰 자신을 가리키므로
+#  개발 PC 의 LAN 주소를 넣어 주세요:
+#    cd frontend && EXPO_PUBLIC_API_BASE=http://192.168.0.10:8080 npx expo start
+# ============================================================================
+
 services:
   db:
     image: postgres:16-alpine
-    container_name: fit-db
+    container_name: fit-db-dev
     environment:
       POSTGRES_DB: fit
       POSTGRES_USER: fit
@@ -13,7 +45,7 @@ services:
     ports:
       - "5433:5432"          # 로컬에 다른 postgres 가 있어도 부딪히지 않게
     volumes:
-      - fit-db:/var/lib/postgresql/data
+      - fit-db-dev:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U fit -d fit"]
       interval: 5s
@@ -21,4 +53,4 @@ services:
       retries: 10
 
 volumes:
-  fit-db:
+  fit-db-dev:

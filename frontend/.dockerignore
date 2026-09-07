@@ -1,0 +1,15 @@
+# 이미지 안에서 npm ci 로 다시 설치합니다. 호스트(Windows)에서 만든 것을
+# 그대로 넣으면 플랫폼용 바이너리가 어긋납니다.
+node_modules/
+
+# 빌드 산출물
+dist/
+web-build/
+.expo/
+
+# 네이티브 프로젝트는 웹 번들과 무관합니다.
+ios/
+android/
+
+.git/
+npm-debug.*
