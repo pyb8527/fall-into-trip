@@ -79,10 +79,18 @@ public class MemberController {
         return Map.of("ok", true);
     }
 
+    /**
+     * @param days 며칠 동안 쓸 수 있게 할지. 0 이면 기한을 두지 않고, 아예
+     *             주지 않으면 기본 기한이 붙습니다.
+     */
     public record InviteRequest(TripRole role, Integer days, Integer maxUses) {
     }
 
-    /** 목록에는 토큰을 싣지 않습니다. 만들 때 한 번 준 것이 전부입니다. */
+    /**
+     * 목록에는 토큰을 싣지 않습니다. 만들 때 한 번 준 것이 전부입니다.
+     *
+     * <p>expiresAt 은 비어 있을 수 있습니다. 기한 없는 링크라는 뜻입니다.
+     */
     public record InviteView(String id, TripRole role, Instant createdAt, Instant expiresAt,
                              int maxUses, int usedCount, boolean revoked) {
 

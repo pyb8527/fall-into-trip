@@ -131,7 +131,18 @@ T("주인이 동행자를 내보냄", r.status === 200, r.data);
 r = await call("GET", "/api/trip?trip=" + tripId, { token: jun });
 T("내보낸 뒤에는 못 봄", r.status === 404, r.data);
 
-console.log("\n[10] 여행 삭제는 주인만");
+console.log("\n[10] 기한 없는 초대");
+r = await call("POST", "/api/trips/" + tripId + "/invites", { token: mina, body: { role: "VIEWER", days: 0 } });
+T("기한 없이 만들어짐", r.status === 200 && r.data.invite.expiresAt === null, r.data);
+const forever = r.data.invite.token;
+r = await call("GET", "/api/invites/" + forever + "/preview");
+T("미리보기도 기한이 비어 있음", r.status === 200 && r.data.invite.expiresAt === null, r.data);
+r = await call("POST", "/api/invites/" + forever + "/accept", { token: nam });
+T("기한 없는 링크로 들어감", r.status === 200, r.data);
+r = await call("GET", "/api/trips/" + tripId + "/invites", { token: mina });
+T("목록에도 기한이 비어 있음", r.data.invites.some((i) => i.expiresAt === null), r.data.invites);
+
+console.log("\n[11] 여행 삭제는 주인만");
 r = await call("DELETE", "/api/trips/" + tripId, { token: mina });
 T("주인이 지움", r.status === 200, r.data);
 r = await call("GET", "/api/trips", { token: mina });

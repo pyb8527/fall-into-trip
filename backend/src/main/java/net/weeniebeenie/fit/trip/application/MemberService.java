@@ -66,9 +66,20 @@ public class MemberService {
     public NewInvite invite(AuthPrincipal me, String tripId, TripRole role, Integer days, Integer maxUses) {
         Trip trip = access.requireOwner(tripId, me.id());
 
-        Duration ttl = days == null ? DEFAULT_TTL : Duration.ofDays(Math.max(1, days));
-        if (ttl.compareTo(MAX_TTL) > 0) {
-            ttl = MAX_TTL;
+        /*
+          days 를 0 으로 주면 기한을 두지 않습니다. 여행이 끝날 때까지 같은
+          링크를 계속 쓰는 경우가 있어서입니다. 대신 계속 열려 있는 열쇠가
+          되므로, 새어 나갔다 싶으면 취소로 닫아야 합니다.
+
+          아예 안 주면(null) 예전처럼 기본 기한이 붙습니다.
+        */
+        Instant expiresAt = null;
+        if (days == null || days > 0) {
+            Duration ttl = days == null ? DEFAULT_TTL : Duration.ofDays(days);
+            if (ttl.compareTo(MAX_TTL) > 0) {
+                ttl = MAX_TTL;
+            }
+            expiresAt = Instant.now().plus(ttl);
         }
         int uses = maxUses == null ? 1 : Math.max(1, Math.min(MAX_USES_LIMIT, maxUses));
 
@@ -78,7 +89,7 @@ public class MemberService {
                 .tokenHash(sha256(raw))
                 .role(role == null ? TripRole.EDITOR : role)
                 .createdBy(me.id())
-                .expiresAt(Instant.now().plus(ttl))
+                .expiresAt(expiresAt)
                 .maxUses(uses)
                 .build());
 

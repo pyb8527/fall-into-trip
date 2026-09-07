@@ -43,7 +43,8 @@ public class TripInvite {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
-    @Column(name = "expires_at", nullable = false)
+    /** 비어 있으면 기한이 없다는 뜻입니다. 인원 제한과 취소로만 닫힙니다. */
+    @Column(name = "expires_at")
     private Instant expiresAt;
 
     @Column(name = "max_uses", nullable = false)
@@ -69,7 +70,9 @@ public class TripInvite {
     }
 
     public boolean isUsable(Instant at) {
-        return revokedAt == null && expiresAt.isAfter(at) && usedCount < maxUses;
+        return revokedAt == null
+                && (expiresAt == null || expiresAt.isAfter(at))
+                && usedCount < maxUses;
     }
 
     public void use() {

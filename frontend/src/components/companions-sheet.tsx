@@ -215,6 +215,9 @@ function InviteSection({ tripId }: { tripId: string }) {
   );
 
   const [role, setRole] = useState<TripRole>('EDITOR');
+  /* 기한을 둘지부터 고릅니다. 0 을 고르게 두면 "0일" 이라는 이상한 말이
+     화면에 남습니다. */
+  const [dated, setDated] = useState(true);
   const [days, setDays] = useState(7);
   const [uses, setUses] = useState(1);
   const [made, setMade] = useState<NewInvite | null>(null);
@@ -240,7 +243,8 @@ function InviteSection({ tripId }: { tripId: string }) {
     try {
       const res = await api.post<{ invite: NewInvite }>(`/api/trips/${tripId}/invites`, {
         role,
-        days,
+        /* 0 은 기한을 두지 말라는 뜻입니다. */
+        days: dated ? days : 0,
         maxUses: uses,
       });
       setMade(res.invite);
@@ -272,14 +276,25 @@ function InviteSection({ tripId }: { tripId: string }) {
         <Chip label="보기만" selected={role === 'VIEWER'} onPress={() => setRole('VIEWER')} />
       </Row>
 
-      <Stepper
-        label="며칠 동안 쓸 수 있게"
-        value={days}
-        onChange={setDays}
-        min={1}
-        max={MAX_DAYS}
-        unit="일"
-      />
+      <Row gap={Spacing.xs}>
+        <Chip label="기한 두기" selected={dated} onPress={() => setDated(true)} />
+        <Chip label="기한 없음" selected={!dated} onPress={() => setDated(false)} />
+      </Row>
+
+      {dated ? (
+        <Stepper
+          label="며칠 동안 쓸 수 있게"
+          value={days}
+          onChange={setDays}
+          min={1}
+          max={MAX_DAYS}
+          unit="일"
+        />
+      ) : (
+        <Caption tone="secondary">
+          닫을 때까지 계속 열려 있습니다. 링크가 새어 나갔다 싶으면 취소해 주세요.
+        </Caption>
+      )}
       <Stepper
         label="몇 명까지"
         value={uses}
@@ -329,7 +344,8 @@ function InviteRowView({ invite, onChanged }: { invite: InviteRow; onChanged: ()
   const [failed, setFailed] = useState<string | null>(null);
   const [asking, setAsking] = useState(false);
 
-  const expired = new Date(invite.expiresAt).getTime() < Date.now();
+  const expired =
+    invite.expiresAt !== null && new Date(invite.expiresAt).getTime() < Date.now();
   const spent = invite.usedCount >= invite.maxUses;
   const dead = invite.revoked || expired || spent;
 
@@ -352,7 +368,8 @@ function InviteRowView({ invite, onChanged }: { invite: InviteRow; onChanged: ()
         <View style={styles.who}>
           <Caption strong>{invite.role === 'EDITOR' ? '같이 고침' : '보기만'}</Caption>
           <Caption tone="secondary">
-            {invite.usedCount}/{invite.maxUses}명 · {invite.expiresAt.slice(0, 10)}까지
+            {invite.usedCount}/{invite.maxUses}명 ·{' '}
+            {invite.expiresAt ? `${invite.expiresAt.slice(0, 10)}까지` : '기한 없음'}
           </Caption>
         </View>
 

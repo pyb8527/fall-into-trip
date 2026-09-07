@@ -84,7 +84,11 @@ export default function InviteScreen() {
                 ? '일정을 같이 고칠 수 있습니다.'
                 : '일정을 볼 수 있습니다. 고치지는 못합니다.'}
             </Caption>
-            <Caption tone="secondary">{invite.expiresAt.slice(0, 10)}까지 쓸 수 있는 링크입니다.</Caption>
+            <Caption tone="secondary">
+              {invite.expiresAt
+                ? `${invite.expiresAt.slice(0, 10)}까지 쓸 수 있는 링크입니다.`
+                : '기한이 없는 링크입니다.'}
+            </Caption>
           </Card>
 
           {failed ? <ErrorNote message={failed} /> : null}

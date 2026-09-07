@@ -158,7 +158,8 @@ export type NewInvite = {
   id: string;
   token: string;
   role: TripRole;
-  expiresAt: string;
+  /** 비어 있으면 기한 없는 링크입니다. */
+  expiresAt: string | null;
   maxUses: number;
 };
 
@@ -167,7 +168,8 @@ export type InviteRow = {
   id: string;
   role: TripRole;
   createdAt: string;
-  expiresAt: string;
+  /** 비어 있으면 기한 없는 링크입니다. */
+  expiresAt: string | null;
   maxUses: number;
   usedCount: number;
   revoked: boolean;
@@ -178,5 +180,6 @@ export type InvitePreview = {
   tripTitle: string;
   ownerName: string | null;
   role: TripRole;
-  expiresAt: string;
+  /** 비어 있으면 기한 없는 링크입니다. */
+  expiresAt: string | null;
 };
