@@ -3,3 +3,6 @@ build/
 !gradle/wrapper/gradle-wrapper.jar
 *.log
 .env
+
+# 도구가 만드는 작업 상태 — 저장소에 남길 것이 아닙니다
+.omc/
