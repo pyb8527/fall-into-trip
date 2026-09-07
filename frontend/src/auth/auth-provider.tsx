@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
-import { api, request, setAccessToken, setSessionEndedHandler } from '@/api/client';
+import { api, refreshSession, request, setAccessToken, setSessionEndedHandler } from '@/api/client';
 import type { AuthState, TokenResponse, User } from '@/api/types';
 
 /**
@@ -67,17 +67,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let alive = true;
 
     (async () => {
-      try {
-        const res = await request<TokenResponse>('/api/auth/refresh', {
-          method: 'POST',
-          anonymous: true,
-        });
+      /* 재발급은 client 가 하나만 돌립니다. 여기서 직접 부르면 개발 모드에서
+         효과가 두 번 실행될 때 같은 리프레시 토큰이 두 번 나가고, 서버가
+         그것을 탈취로 보고 로그인을 끊어 버립니다. */
+      const revived = await refreshSession();
+      if (revived) {
         if (alive) {
-          accept(res);
+          accept(revived as unknown as TokenResponse);
         }
         return;
-      } catch {
-        /* 아직 로그인한 적이 없거나 쿠키가 만료됐습니다. 정상적인 흐름입니다. */
       }
 
       try {

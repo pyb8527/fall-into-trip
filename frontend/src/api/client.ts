@@ -70,16 +70,27 @@ type Options = {
   signal?: AbortSignal;
 };
 
+/** 재발급이 돌려주는 것. 화면이 "나는 누구인가" 를 다시 세울 때 씁니다. */
+export type RefreshedSession = {
+  accessToken: string;
+  expiresIn: number;
+  user: unknown;
+};
+
 /**
  * 재발급은 한 번에 하나만.
  *
- * 화면 하나가 여러 요청을 동시에 던지면 401 도 동시에 옵니다. 각자 재발급을
- * 부르면 서버는 이미 쓴 리프레시 토큰이 또 왔다고 보고(회전 규칙) 그 로그인
- * 전체를 끊어 버립니다. 그래서 진행 중인 약속을 하나만 두고 나눠 씁니다.
+ * <p>리프레시 토큰은 쓸 때마다 새 것으로 갈아 끼워집니다(회전). 그래서 같은
+ * 토큰으로 두 번 부르면 서버는 이미 쓴 것이 또 왔다고 보고 탈취로 판단해
+ * 그 로그인 전체를 끊습니다.
+ *
+ * <p>겹칠 일이 생각보다 많습니다. 화면 하나가 여러 요청을 던져 401 이 동시에
+ * 오기도 하고, 개발 모드에서는 React 가 효과를 두 번 실행해 앱이 뜨자마자
+ * 두 번 부르기도 합니다. 그래서 어디서 부르든 이 하나를 나눠 씁니다.
  */
-let refreshing: Promise<boolean> | null = null;
+let refreshing: Promise<RefreshedSession | null> | null = null;
 
-async function refreshOnce(): Promise<boolean> {
+export function refreshSession(): Promise<RefreshedSession | null> {
   if (!refreshing) {
     refreshing = (async () => {
       try {
@@ -88,20 +99,20 @@ async function refreshOnce(): Promise<boolean> {
           credentials: 'include',
         });
         if (!res.ok) {
-          return false;
+          return null;
         }
-        const data = (await res.json()) as { accessToken?: string };
-        if (!data.accessToken) {
-          return false;
+        const data = (await res.json()) as RefreshedSession;
+        if (!data?.accessToken) {
+          return null;
         }
         accessToken = data.accessToken;
-        return true;
+        return data;
       } catch {
         /* 네트워크가 끊긴 것과 토큰이 죽은 것을 여기서는 구분하지 않습니다.
-           어느 쪽이든 이번 요청은 실패로 돌려보냅니다. */
-        return false;
+           어느 쪽이든 이번에는 되살리지 못한 것으로 봅니다. */
+        return null;
       } finally {
-        /* 다음 401 때 다시 시도할 수 있게 비웁니다. */
+        /* 다음에 다시 시도할 수 있게 비웁니다. */
         refreshing = null;
       }
     })();
@@ -155,7 +166,7 @@ export async function request<T>(path: string, options: Options = {}): Promise<T
 
   /* 액세스 토큰이 만료됐을 뿐일 수 있습니다. 한 번만 되살려 보고 다시 던집니다. */
   if (res.status === 401 && !options.anonymous) {
-    const revived = await refreshOnce();
+    const revived = await refreshSession();
     if (!revived) {
       accessToken = null;
       onSessionEnded();
