@@ -12,6 +12,10 @@ import { LogoMark } from '@/ui/logo';
  * <p>할 수 있는 일을 카드로 늘어놓습니다. 메뉴를 숨겨 두면 있는 줄도 모르고
  * 지나갑니다. 아직 만들지 않은 것도 "준비 중" 으로 함께 보여 줍니다 —
  * 없는 척하는 것보다 언제 오는지 아는 편이 낫습니다.
+ *
+ * <p>다만 "준비 중" 은 정말 없는 것에만 붙입니다. 지도와 동행자는 여행
+ * 안에서 이미 되는데도 자리 채우기로 남아 있어, 되는 것을 안 된다고
+ * 말하고 있었습니다. 뺐습니다.
  */
 export default function Home() {
   const router = useRouter();
@@ -40,25 +44,14 @@ export default function Home() {
           caption="일정 짜고 동행자 부르기"
           onPress={() => router.push('/(app)/trips')}
         />
-        <MenuCard
-          title="가계부"
-          caption="쓴 돈 적고 정산하기"
-          soon
-        />
-        <MenuCard
-          title="지도"
-          caption="하루 동선 한눈에 보기"
-          soon
-        />
+        <MenuCard title="가계부" caption="쓴 돈 적고 정산하기" soon />
         {user?.role === 'ADMIN' ? (
           <MenuCard
             title="운영"
             caption="계정 관리·감사 로그"
             onPress={() => router.push('/admin')}
           />
-        ) : (
-          <MenuCard title="동행자" caption="함께 간 사람 모아 보기" soon />
-        )}
+        ) : null}
       </Row>
     </Screen>
   );
