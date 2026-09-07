@@ -50,7 +50,7 @@ function pinIcon(color: string, n: number, active: boolean) {
   return 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
 }
 
-export function TripMap({ places, activeId, onSelect, height = 300 }: TripMapProps) {
+export function TripMap({ places, activeId, onSelect, routes, height = 300 }: TripMapProps) {
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
   const [full, setFull] = useState(false);
@@ -222,40 +222,62 @@ export function TripMap({ places, activeId, onSelect, height = 300 }: TripMapPro
       }
     });
 
-    /* 같은 날끼리 이어 동선을 그립니다. 점선으로 둬야 실제 도로 경로와
-       헷갈리지 않습니다. */
-    const byDay = new Map<number, MapPlace[]>();
-    places.forEach((p) => {
-      const list = byDay.get(p.dayIndex) ?? [];
-      list.push(p);
-      byDay.set(p.dayIndex, list);
-    });
-    byDay.forEach((list) => {
-      if (list.length < 2) {
-        return;
-      }
-      lines.current.push(
-        new g.Polyline({
-          path: list.map((p) => ({ lat: p.lat, lng: p.lng })),
-          map: map.current,
-          strokeOpacity: 0,
-          zIndex: 2,
-          icons: [
-            {
-              icon: {
-                path: 'M 0,-1 0,1',
-                strokeColor: list[0].color,
-                strokeOpacity: 0.85,
-                strokeWeight: 2.4,
-                scale: 3,
+    /*
+      실제 경로를 받았으면 그것을 그리고 끝냅니다. 아래 점선은 "이 순서로
+      간다" 는 뜻일 뿐 지나는 길이 아니라, 둘을 겹쳐 그리면 어느 쪽이 진짜
+      길인지 알 수 없게 됩니다.
+    */
+    const drawn = (routes ?? []).filter((r) => r.points.length > 1);
+    if (drawn.length > 0) {
+      drawn.forEach((line) => {
+        lines.current.push(
+          new g.Polyline({
+            path: line.points,
+            map: map.current,
+            strokeColor: line.color,
+            strokeOpacity: 0.9,
+            strokeWeight: 4,
+            zIndex: 2,
+          }),
+        );
+      });
+    } else {
+
+      /* 실제 경로가 없을 때만 같은 날끼리 잇습니다. 점선으로 둬야 도로와
+         헷갈리지 않습니다. */
+      const byDay = new Map<number, MapPlace[]>();
+      places.forEach((p) => {
+        const list = byDay.get(p.dayIndex) ?? [];
+        list.push(p);
+        byDay.set(p.dayIndex, list);
+      });
+      byDay.forEach((list) => {
+        if (list.length < 2) {
+          return;
+        }
+        lines.current.push(
+          new g.Polyline({
+            path: list.map((p) => ({ lat: p.lat, lng: p.lng })),
+            map: map.current,
+            strokeOpacity: 0,
+            zIndex: 2,
+            icons: [
+              {
+                icon: {
+                  path: 'M 0,-1 0,1',
+                  strokeColor: list[0].color,
+                  strokeOpacity: 0.85,
+                  strokeWeight: 2.4,
+                  scale: 3,
+                },
+                offset: '0',
+                repeat: '13px',
               },
-              offset: '0',
-              repeat: '13px',
-            },
-          ],
-        }),
-      );
-    });
+            ],
+          }),
+        );
+      });
+    }
 
     /*
       보이는 곳이 모두 들어오게 맞춥니다.
@@ -280,7 +302,7 @@ export function TripMap({ places, activeId, onSelect, height = 300 }: TripMapPro
       target.forEach((p) => bounds.extend({ lat: p.lat, lng: p.lng }));
       map.current.fitBounds(bounds, { top: 48, right: 40, bottom: 40, left: 40 });
     }
-  }, [ready, places]);
+  }, [ready, places, routes]);
 
   /* 고른 장소를 크게 하고, 그 자리로 옮기면서 들여다볼 만큼 당깁니다. */
   useEffect(() => {

@@ -31,6 +31,8 @@ export type MapPlace = {
 };
 
 export type TripMapProps = {
+  /** 있으면 점선 대신 이것을 그립니다. */
+  routes?: RouteLine[];
   places: MapPlace[];
   activeId: string | null;
   onSelect: (id: string) => void;
@@ -47,4 +49,16 @@ export type Found = {
 
 export type PlaceSearchProps = {
   onPick: (found: Found) => void;
+};
+
+/**
+ * 지도에 그릴 실제 이동 경로.
+ *
+ * <p>없으면 지도는 장소끼리 점선으로 잇습니다. 그건 "이 순서로 간다" 는 뜻일
+ * 뿐 실제로 지나는 길이 아닙니다.
+ */
+export type RouteLine = {
+  id: string;
+  color: string;
+  points: { lat: number; lng: number }[];
 };

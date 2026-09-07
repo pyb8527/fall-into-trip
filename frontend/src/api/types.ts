@@ -183,3 +183,28 @@ export type InvitePreview = {
   /** 비어 있으면 기한 없는 링크입니다. */
   expiresAt: string | null;
 };
+
+/* ------------------------------------------------------------ 이동 경로 */
+
+/** 서버 RouteService.Mode 와 같아야 합니다. */
+export type TravelMode = 'WALK' | 'TRANSIT' | 'DRIVE';
+
+export type RouteLeg = {
+  fromId: string;
+  toId: string;
+  seconds: number;
+  meters: number;
+  /** 지도에 그릴 길. 이어지지 않는 구간이면 비어 있습니다. */
+  polyline: string | null;
+  /** 그 수단으로 갈 수 있는지. 섬과 뭍 사이 같은 경우가 있습니다. */
+  reachable: boolean;
+};
+
+export type DayRoute = {
+  mode: TravelMode;
+  legs: RouteLeg[];
+  totalSeconds: number;
+  totalMeters: number;
+  /** 장소가 너무 많아 뒷부분을 계산하지 않았는지. */
+  trimmed: boolean;
+};

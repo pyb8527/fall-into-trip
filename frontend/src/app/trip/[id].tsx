@@ -3,11 +3,13 @@ import { useCallback, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { api, ApiError } from '@/api/client';
-import type { Day, Place, TripDetail } from '@/api/types';
+import type { Day, DayRoute, Place, RouteLeg, TravelMode, TripDetail } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { CompanionsSheet } from '@/components/companions-sheet';
+import type { RouteLine } from '@/components/map-types';
 import { PlaceForm } from '@/components/place-form';
 import { TripMap, type MapPlace } from '@/components/trip-map';
+import { decodePolyline } from '@/lib/polyline';
 import { Colors, dayColor, Radius, Spacing, Tap } from '@/constants/theme';
 import {
   Badge,
@@ -30,6 +32,13 @@ import {
 /** 전체를 보는 상태. 특정 날짜가 아니라는 뜻입니다. */
 const ALL = -1;
 
+/** 고를 수 있는 이동 수단. 서버가 받는 이름을 그대로 씁니다. */
+const MODES: { value: TravelMode; label: string }[] = [
+  { value: 'WALK', label: '도보' },
+  { value: 'TRANSIT', label: '대중교통' },
+  { value: 'DRIVE', label: '자동차' },
+];
+
 /**
  * 일정 화면.
  *
@@ -50,6 +59,13 @@ export default function TripScreen() {
   );
 
   const [companions, setCompanions] = useState(false);
+  /*
+    이동 수단. 처음에는 아무것도 고르지 않습니다.
+
+    구간마다 구글에 묻고 그만큼 요금이 붙습니다. 화면을 열기만 해도 나가면
+    보지도 않은 것에 돈을 냅니다. 눌렀을 때만 묻습니다.
+  */
+  const [mode, setMode] = useState<TravelMode | null>(null);
   const [activeDay, setActiveDay] = useState<number>(ALL);
   const [activePlaceId, setActivePlaceId] = useState<string | null>(null);
 
@@ -154,6 +170,49 @@ export default function TripScreen() {
     [refresh],
   );
 
+  /*
+    고른 날짜의 이동 경로.
+
+    "전체" 를 보고 있을 때는 계산하지 않습니다. 날짜 수만큼 구글에 묻게 되고
+    구간마다 요금이 붙습니다. 한 날을 골라야 보여 줍니다.
+  */
+  const routeDayId = activeDay === ALL ? null : (days[activeDay]?.id ?? null);
+  const {
+    data: route,
+    loading: routing,
+    error: routeError,
+  } = useAsync<DayRoute | null>(
+    (signal) =>
+      mode && routeDayId
+        ? api
+            .get<{ route: DayRoute }>(`/api/days/${routeDayId}/route?mode=${mode}`, signal)
+            .then((res) => res.route)
+        : /* 고르기 전에는 부르지 않습니다. */ Promise.resolve(null),
+    [routeDayId, mode],
+  );
+
+  /** 받은 길을 지도가 그릴 수 있는 좌표로 풉니다. */
+  const routeLines = useMemo<RouteLine[]>(() => {
+    if (!route || activeDay === ALL) {
+      return [];
+    }
+    const color = days[activeDay]?.color || dayColor(activeDay);
+    return route.legs
+      .filter((leg) => leg.polyline)
+      .map((leg) => ({
+        id: `${leg.fromId}-${leg.toId}`,
+        color,
+        points: decodePolyline(leg.polyline),
+      }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route, activeDay, days]);
+
+  /** 장소 뒤에 붙는 구간을 목록에서 바로 찾기 위해. */
+  const legAfter = useMemo(
+    () => new Map((route?.legs ?? []).map((leg) => [leg.fromId, leg])),
+    [route],
+  );
+
   if (loading && !data) {
     return (
       <Screen scroll={false}>
@@ -190,6 +249,7 @@ export default function TripScreen() {
             places={mapPlaces}
             activeId={activePlaceId}
             onSelect={setActivePlaceId}
+            routes={routeLines}
             height={260}
           />
 
@@ -216,6 +276,20 @@ export default function TripScreen() {
               ))}
             </Row>
           ) : null}
+
+          <Row gap={Spacing.xs}>
+            <Chip label="안 보기" selected={mode === null} onPress={() => setMode(null)} />
+            {MODES.map((m) => (
+              <Chip
+                key={m.value}
+                label={m.label}
+                selected={mode === m.value}
+                onPress={() => setMode(m.value)}
+              />
+            ))}
+          </Row>
+
+          {mode ? <RouteNote day={activeDay} route={route} busy={routing} error={routeError} /> : null}
 
           {total > 0 ? <Progress done={done} total={total} /> : null}
         </>
@@ -274,6 +348,7 @@ export default function TripScreen() {
             onFocus={setActivePlaceId}
             onChanged={refresh}
             onRemove={remove}
+            legAfter={legAfter}
           />
         ) : null,
       )}
@@ -318,6 +393,7 @@ function DayCard({
   onFocus,
   onChanged,
   onRemove,
+  legAfter,
 }: {
   day: Day;
   index: number;
@@ -329,6 +405,8 @@ function DayCard({
   onFocus: (placeId: string) => void;
   onChanged: () => void;
   onRemove: (placeId: string) => void;
+  /** 이 장소를 떠나 다음 장소로 가는 구간. 수단을 안 골랐으면 비어 있습니다. */
+  legAfter: Map<string, RouteLeg>;
 }) {
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<Place | null>(null);
@@ -362,20 +440,23 @@ function DayCard({
       ) : (
         <View style={styles.places}>
           {day.places.map((place, i) => (
-            <PlaceRow
-              key={place.id}
-              place={place}
-              order={i + 1}
-              color={color}
-              visited={visited.has(place.id)}
-              busy={pending.has(place.id)}
-              active={activePlaceId === place.id}
-              canEdit={canEdit}
-              onToggle={() => onToggle(place.id)}
-              onFocus={() => onFocus(place.id)}
-              onEdit={() => setEditing(place)}
-              onRemove={() => onRemove(place.id)}
-            />
+            <View key={place.id}>
+              <PlaceRow
+                place={place}
+                order={i + 1}
+                color={color}
+                visited={visited.has(place.id)}
+                busy={pending.has(place.id)}
+                active={activePlaceId === place.id}
+                canEdit={canEdit}
+                onToggle={() => onToggle(place.id)}
+                onFocus={() => onFocus(place.id)}
+                onEdit={() => setEditing(place)}
+                onRemove={() => onRemove(place.id)}
+              />
+              {/* 다음 장소까지 얼마나 걸리는지. 마지막 장소 뒤에는 없습니다. */}
+              {i < day.places.length - 1 ? <Hop leg={legAfter.get(place.id)} /> : null}
+            </View>
           ))}
         </View>
       )}
@@ -525,7 +606,89 @@ function OrderLabel({ n }: { n: number }) {
   return <Body small strong style={styles.orderText}>{n}</Body>;
 }
 
+
+/** "1시간 12분" 처럼. 초는 버립니다 — 이동 시간에서 초는 뜻이 없습니다. */
+function asDuration(seconds: number) {
+  const minutes = Math.max(1, Math.round(seconds / 60));
+  if (minutes < 60) {
+    return `${minutes}분`;
+  }
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest === 0 ? `${hours}시간` : `${hours}시간 ${rest}분`;
+}
+
+/** 가까우면 미터로, 멀면 킬로미터로. */
+function asDistance(meters: number) {
+  return meters < 1000 ? `${meters}m` : `${(meters / 1000).toFixed(1)}km`;
+}
+
+/**
+ * 장소와 장소 사이에 끼는 줄.
+ *
+ * <p>아직 못 받았으면 아무것도 그리지 않습니다. 자리만 잡아 두면 목록이
+ * 계산 전후로 들썩입니다.
+ */
+function Hop({ leg }: { leg?: RouteLeg }) {
+  if (!leg) {
+    return null;
+  }
+  return (
+    <Row gap={Spacing.xs} style={styles.hop}>
+      <View style={styles.hopLine} />
+      <Caption tone="secondary">
+        {leg.reachable
+          ? `${asDuration(leg.seconds)} · ${asDistance(leg.meters)}`
+          : '이 수단으로는 길이 없습니다'}
+      </Caption>
+    </Row>
+  );
+}
+
+/** 수단을 고른 뒤 위쪽에 뜨는 한 줄. */
+function RouteNote({
+  day,
+  route,
+  busy,
+  error,
+}: {
+  day: number;
+  route: DayRoute | null;
+  busy: boolean;
+  error: string | null;
+}) {
+  if (day === ALL) {
+    return <Caption tone="secondary">날짜를 하나 고르면 이동 시간을 보여 줍니다.</Caption>;
+  }
+  if (error) {
+    return <Caption tone="danger">{error}</Caption>;
+  }
+  if (busy) {
+    return <Caption tone="secondary">이동 시간을 알아보는 중…</Caption>;
+  }
+  if (!route || route.legs.length === 0) {
+    return null;
+  }
+  return (
+    <Caption tone="secondary">
+      총 이동 {asDuration(route.totalSeconds)} · {asDistance(route.totalMeters)}
+      {route.trimmed ? ' · 장소가 많아 앞부분만 계산했습니다' : ''}
+    </Caption>
+  );
+}
+
 const styles = StyleSheet.create({
+  hop: {
+    alignItems: 'center',
+    paddingLeft: Spacing.md,
+    paddingVertical: Spacing.xs,
+  },
+  /* 앞 장소에서 이어진다는 것을 눈으로 잇습니다. */
+  hopLine: {
+    width: StyleSheet.hairlineWidth,
+    height: 14,
+    backgroundColor: Colors.border,
+  },
   head: {
     gap: Spacing.lg,
   },

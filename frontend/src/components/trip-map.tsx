@@ -33,7 +33,7 @@ const DRAW_MS = 400;
 
 export type { MapPlace } from '@/components/map-types';
 
-export function TripMap({ places, activeId, onSelect, height = 300 }: TripMapProps) {
+export function TripMap({ places, activeId, onSelect, routes, height = 300 }: TripMapProps) {
   const map = useRef<MapView | null>(null);
   const [full, setFull] = useState(false);
   /* 전체화면에서 핀을 눌렀을 때 아래에 뜨는 카드. 목록의 선택과 따로 둡니다. */
@@ -66,8 +66,11 @@ export function TripMap({ places, activeId, onSelect, height = 300 }: TripMapPro
     };
   }, [places]);
 
-  /** 같은 날끼리 이어 동선을 그립니다. */
-  const routes = useMemo(() => {
+  /** 받은 경로 중 그릴 수 있는 것만. */
+  const drawn = useMemo(() => (routes ?? []).filter((r) => r.points.length > 1), [routes]);
+
+  /** 실제 경로가 없을 때 같은 날끼리 이어 두는 선. */
+  const hops = useMemo(() => {
     const byDay = new Map<number, MapPlace[]>();
     places.forEach((p) => {
       const list = byDay.get(p.dayIndex) ?? [];
@@ -131,16 +134,29 @@ export function TripMap({ places, activeId, onSelect, height = 300 }: TripMapPro
       showsPointsOfInterests={false}
       toolbarEnabled={false}
       moveOnMarkerPress={false}>
-      {routes.map((list) => (
-        <Polyline
-          key={`route-${list[0].dayIndex}`}
-          coordinates={list.map((p) => ({ latitude: p.lat, longitude: p.lng }))}
-          strokeColor={list[0].color}
-          strokeWidth={3}
-          /* 점선으로 둬야 실제 도로 경로와 헷갈리지 않습니다. */
-          lineDashPattern={[6, 8]}
-        />
-      ))}
+      {/*
+        실제 경로를 받았으면 그것을 그립니다. 없을 때만 장소끼리 잇습니다.
+        그 선은 "이 순서로 간다" 는 뜻일 뿐 지나는 길이 아니므로, 실제 길과
+        헷갈리지 않게 점선으로 둡니다.
+      */}
+      {drawn.length > 0
+        ? drawn.map((line) => (
+            <Polyline
+              key={line.id}
+              coordinates={line.points.map((p) => ({ latitude: p.lat, longitude: p.lng }))}
+              strokeColor={line.color}
+              strokeWidth={4}
+            />
+          ))
+        : hops.map((list) => (
+            <Polyline
+              key={`hop-${list[0].dayIndex}`}
+              coordinates={list.map((p) => ({ latitude: p.lat, longitude: p.lng }))}
+              strokeColor={list[0].color}
+              strokeWidth={3}
+              lineDashPattern={[6, 8]}
+            />
+          ))}
 
       {places.map((p) =>
         p.radius ? (
