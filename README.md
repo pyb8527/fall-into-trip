@@ -166,9 +166,15 @@ npx eas-cli@latest init        # app.json 에 projectId 를 넣어 줍니다
 `eas.json` 과 `app.json` 은 깃에 올라갑니다. 키를 적어 두면 저장소에 그대로
 박힙니다. EAS 쪽에 넣어 두고 빌드할 때 꺼내 쓰게 합니다.
 
+환경마다 따로 넣습니다. 이름은 `eas.json` 의 프로필과 짝입니다.
+
 ```bash
-npx eas-cli@latest env:create --name GOOGLE_MAPS_ANDROID_KEY --value "…" --visibility sensitive
+npx eas-cli@latest env:set --name GOOGLE_MAPS_ANDROID_KEY --value "…" --environment preview --visibility sensitive
+
+npx eas-cli@latest env:list --environment preview   # 들어갔는지 확인
 ```
+
+`sensitive` 로 두면 대시보드에서 값이 가려집니다.
 
 **웹에서 쓰는 키와 다른 것이어야 합니다.** 제한 방식도, 켜야 하는 API 도
 다릅니다.
@@ -179,11 +185,20 @@ npx eas-cli@latest env:create --name GOOGLE_MAPS_ANDROID_KEY --value "…" --vis
 | 제한 | HTTP 리퍼러 | 패키지명 + SHA-1 | 서버 IP |
 | 들어가는 곳 | 브라우저 번들 | 앱 번들 | 서버에만 |
 
-패키지명은 `net.weeniebeenie.fit` 입니다. SHA-1 은 EAS 가 만든 키스토어에서
-꺼냅니다.
+안드로이드 키에 걸 제한은 이렇게 잡습니다.
+
+| 항목 | 값 |
+|---|---|
+| 애플리케이션 제한 | Android 앱 |
+| 패키지 이름 | `net.weeniebeenie.fit` |
+| SHA-1 인증서 지문 | 아래에서 확인 |
+| API 제한 | Maps SDK for Android |
+
+SHA-1 은 EAS 가 만들어 보관하는 키스토어에 있습니다.
 
 ```bash
 npx eas-cli@latest credentials
+# Android → 프로필 고르기 → Keystore → SHA1 Fingerprint
 ```
 
 `EXPO_PUBLIC_API_BASE` 는 비밀이 아니라 그냥 주소이므로 `eas.json` 에 적어
