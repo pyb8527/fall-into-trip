@@ -1,7 +1,8 @@
 import Feather from '@expo/vector-icons/Feather';
-import { forwardRef, useImperativeHandle, useRef, useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -70,11 +71,34 @@ type ScreenProps = {
   safeTop?: boolean;
 };
 
+/**
+ * 자판이 올라와 있는가.
+ *
+ * <p>화면 맨 아래에는 홈 인디케이터를 피하려고 안전영역만큼 여백을 둡니다.
+ * 자판이 올라오면 그 자리를 자판이 차지하므로, 여백을 그대로 두면 자판과
+ * 버튼 사이가 뜬금없이 벌어집니다. 올라와 있는 동안만 여백을 걷습니다.
+ */
+function useKeyboardUp() {
+  const [up, setUp] = useState(false);
+
+  useEffect(() => {
+    const shown = Keyboard.addListener('keyboardDidShow', () => setUp(true));
+    const hidden = Keyboard.addListener('keyboardDidHide', () => setUp(false));
+    return () => {
+      shown.remove();
+      hidden.remove();
+    };
+  }, []);
+
+  return up;
+}
+
 export const Screen = forwardRef<ScreenHandle, ScreenProps>(function Screen(
   { children, header, footer, scroll = true, safeTop = false },
   ref,
 ) {
   const insets = useSafeAreaInsets();
+  const keyboardUp = useKeyboardUp();
   const scroller = useRef<ScrollView>(null);
 
   useImperativeHandle(
@@ -90,9 +114,12 @@ export const Screen = forwardRef<ScreenHandle, ScreenProps>(function Screen(
   return (
     <KeyboardAvoidingView
       style={styles.screen}
-      /* iOS 는 키보드가 화면을 덮으므로 밀어 올립니다. 안드로이드는 창
-         크기가 줄어드는 방식이라 건드리지 않는 편이 낫습니다. */
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      /* 자판이 가리는 만큼 아래에서 밀어 올립니다.
+
+         안드로이드는 예전에 창 자체가 줄어들어 손댈 일이 없었지만,
+         Expo 54 부터 화면 끝까지 그리는 방식이 기본이라 이제 줄지 않습니다.
+         두 쪽 다 직접 밀어야 합니다. */
+      behavior="padding">
       {header ? (
         <View style={[styles.header, { paddingTop: (safeTop ? insets.top : 0) + Spacing.lg }]}>
           <View style={styles.headerInner}>{header}</View>
@@ -126,7 +153,11 @@ export const Screen = forwardRef<ScreenHandle, ScreenProps>(function Screen(
       )}
 
       {footer ? (
-        <View style={[styles.footer, { paddingBottom: insets.bottom + Spacing.md }]}>
+        <View
+          style={[
+            styles.footer,
+            { paddingBottom: (keyboardUp ? 0 : insets.bottom) + Spacing.md },
+          ]}>
           <View style={styles.footerInner}>{footer}</View>
         </View>
       ) : null}
@@ -667,16 +698,24 @@ export function BottomSheet({
   footer?: React.ReactNode;
 }) {
   const insets = useSafeAreaInsets();
+  const keyboardUp = useKeyboardUp();
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView
         style={styles.sheetWrap}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        /* 판은 화면 아래에 붙어 있어 자판이 그대로 덮습니다. 게다가 Modal
+           안에는 창을 줄여 주는 동작이 미치지 않습니다. 직접 밀어 올립니다.
+           판의 최대 높이가 비율(88%)이라 밀린 만큼 판도 같이 낮아집니다. */
+        behavior="padding">
         {/* 바깥을 누르면 닫힙니다. */}
         <Pressable style={styles.sheetBackdrop} onPress={onClose} accessibilityLabel="닫기" />
 
-        <View style={[styles.sheet, { paddingBottom: insets.bottom + Spacing.md }]}>
+        <View
+          style={[
+            styles.sheet,
+            { paddingBottom: (keyboardUp ? 0 : insets.bottom) + Spacing.md },
+          ]}>
           <View style={styles.sheetGrip} />
 
           <View style={styles.sheetHead}>

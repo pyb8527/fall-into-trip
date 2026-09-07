@@ -171,3 +171,62 @@
 - [TDS React Native — Typography](https://tossmini-docs.toss.im/tds-react-native/foundation/typography/)
 - [TDS React Native — Colors](https://tossmini-docs.toss.im/tds-react-native/foundation/colors/)
 - [The Thumb Zone: Designing For Mobile Users — Smashing Magazine](https://www.smashingmagazine.com/2016/09/the-thumb-zone-designing-for-mobile-users/)
+
+## 7. 앱에서 미뤄 둔 것
+
+### 지도 핀 모양
+
+웹은 SVG 로 물방울을 그립니다 (`trip-map.web.tsx` 의 `pinIcon`). 곡선이
+살아 있고 안쪽 흰 원에 숫자가 들어갑니다.
+
+앱에는 SVG 를 그릴 수단이 없어 **CSS 도형으로 흉내 냈습니다.** 정사각형의
+네 귀퉁이 중 셋만 둥글게 깎고 오른쪽 아래 하나를 남긴 뒤 45도 돌립니다.
+남긴 귀퉁이가 아래를 가리키는 뾰족한 끝이 됩니다. 돌린 각도는 안에 든
+숫자에도 옮겨붙으므로 숫자는 돌아가지 않는 층에 따로 얹습니다.
+
+그래서 **웹과 곡선이 다릅니다.** 물방울이라기보다 모서리 하나가 뾰족한
+동그라미에 가깝습니다.
+
+제대로 맞추려면 `react-native-svg` 가 필요합니다. **네이티브 모듈이라
+OTA 로는 못 나가고 APK 를 다시 빌드해야 합니다.** 지금 APK 에는 안 들어
+있습니다 (`react-native-reanimated` 가 peer 로 적어 두었을 뿐 설치되어
+있지 않습니다). 다음에 네이티브를 다시 빌드할 일이 생길 때 같이 넣는 것이
+낫습니다.
+
+넣게 되면 `pinIcon` 의 `path` 를 그대로 옮겨 쓸 수 있습니다. 웹과 앱이
+같은 좌표계(44×54)를 쓰므로 색과 번호만 넘기면 됩니다.
+
+### 핀을 굽는 시점
+
+지도는 화면 요소로 만든 핀을 그림 한 장으로 구워 얹습니다. 언제 구울지는
+`tracksViewChanges` 가 정합니다.
+
+- 계속 켜 두면 핀 수만큼 매 프레임 다시 구워 지도가 버벅입니다.
+- 처음부터 꺼 두면 아직 자리를 못 잡은 빈 그림이 구워져 핀이 반쪽으로
+  나오고, 고른 핀이 커져도 다시 굽지 않아 선택이 눈에 안 보입니다.
+
+그래서 핀마다 잠깐(`DRAW_MS`) 켰다 끕니다. 고른 상태가 바뀔 때도 다시
+켭니다.
+
+### 지도 밝기
+
+구글은 기기가 어두운 테마면 안드로이드 지도도 어둡게 칠합니다. 웹에는 그런
+동작이 없어 같은 화면이 둘로 갈립니다. `userInterfaceStyle="light"` 로
+밝은 쪽에 못박습니다 (`react-native-maps` 1.29 가 안드로이드에서
+`MapColorScheme.LIGHT` 로 넘깁니다).
+
+이 값은 **지도를 만들 때 한 번만** 읽히므로 첫 렌더부터 넘겨야 합니다.
+나중에 바꿔도 안 먹습니다.
+
+### 자판이 화면을 가리던 것
+
+`KeyboardAvoidingView` 의 `behavior` 를 iOS 에만 걸어 두었었습니다.
+안드로이드는 창 자체가 줄어들어 손댈 일이 없다는 것이 예전 상식이었지만,
+**Expo 54 부터 화면 끝까지 그리는 방식이 기본이라 창이 줄지 않습니다.**
+게다가 `Modal` 안에는 그 동작이 원래 미치지 않아 바텀시트가 그대로 덮였습니다.
+
+두 쪽 다 `behavior="padding"` 으로 직접 밉니다. 바텀시트는 최대 높이가
+비율(88%)이라 밀린 만큼 판도 같이 낮아집니다.
+
+화면 맨 아래 안전영역 여백은 자판이 올라와 있는 동안 걷습니다. 그대로 두면
+자판과 버튼 사이가 뜬금없이 벌어집니다 (`useKeyboardUp`).
