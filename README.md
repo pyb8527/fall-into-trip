@@ -231,6 +231,7 @@ node backend/src/test/http/auth.test.mjs      # 인증·토큰
 node backend/src/test/http/invite.test.mjs    # 가입·초대·공동 편집
 node backend/src/test/http/trip.test.mjs      # 여행·날짜·장소
 node backend/src/test/http/admin.test.mjs     # 운영자 계정 관리·감사 로그
+node backend/src/test/http/place.test.mjs     # 장소 찾기
 ```
 
 각 묶음은 깨끗한 DB 에서 하나씩 돌려야 합니다. 서로의 계정과 여행이 남아

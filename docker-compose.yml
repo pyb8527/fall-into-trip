@@ -58,6 +58,9 @@ services:
       # 브라우저는 nginx 를 거쳐 같은 주소로 오므로 CORS 를 타지 않습니다.
       # 이 값은 따로 띄운 화면(예: expo start --web)에서 부를 때만 쓰입니다.
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8081}
+
+      # 장소 검색을 서버가 대신 합니다. 키가 앱·브라우저로 나가지 않습니다.
+      GOOGLE_MAPS_KEY: ${GOOGLE_MAPS_KEY:-}
     # 포트를 밖으로 열지 않습니다. web 이 대신 받습니다.
     expose:
       - "8080"

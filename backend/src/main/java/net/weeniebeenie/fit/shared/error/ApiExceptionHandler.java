@@ -7,6 +7,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
@@ -36,6 +37,18 @@ public class ApiExceptionHandler {
                 .findFirst()
                 .orElse("입력값이 올바르지 않습니다.");
         return ResponseEntity.badRequest().body(Map.of("error", message));
+    }
+
+    /**
+     * 본문을 읽지 못했습니다 — 깨진 JSON, 잘못된 인코딩, 빈 본문.
+     *
+     * 보낸 쪽이 잘못한 것이므로 400 입니다. 500 으로 두면 서버가 고장 난 줄
+     * 알고 엉뚱한 데를 뒤지게 됩니다.
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<Map<String, Object>> onUnreadable(HttpMessageNotReadableException e) {
+        log.warn("본문을 읽지 못했습니다: {}", e.getMessage());
+        return ResponseEntity.badRequest().body(Map.of("error", "요청 내용을 읽지 못했습니다."));
     }
 
     @ExceptionHandler(AccessDeniedException.class)

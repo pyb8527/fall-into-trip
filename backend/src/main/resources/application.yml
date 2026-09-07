@@ -43,6 +43,12 @@ fit:
     allowed-origins: ${CORS_ORIGINS:http://localhost:5173}
   setup-token: ${SETUP_TOKEN:}
 
+  google:
+    # 장소 검색용 서버 키. 웹에서 쓰는 키와 달라야 합니다 — 그쪽은 리퍼러로
+    # 묶여 있는데 서버가 부를 때는 리퍼러가 없어 거절당합니다.
+    # 비워 두면 검색이 꺼지고 좌표를 직접 넣는 길만 남습니다.
+    maps-key: ${GOOGLE_MAPS_KEY:}
+
 logging:
   level:
     net.weeniebeenie.fit: INFO

@@ -1,16 +1,107 @@
-import type { PlaceSearchProps } from '@/components/map-types';
+import { useCallback, useState } from 'react';
+import { Pressable, StyleSheet, View } from 'react-native';
+
+import { api, ApiError } from '@/api/client';
+import type { Found, PlaceSearchProps } from '@/components/map-types';
+import { Colors, Radius, Spacing, Tap } from '@/constants/theme';
+import { Body, Caption, Divider, Field, Loading } from '@/ui';
 
 /**
- * 장소 검색 (앱).
+ * 이름으로 장소 찾기.
  *
- * 웹은 place-search.web.tsx 가 구글 장소 검색을 씁니다. 앱에서는 아직
- * 자리를 비우고, 이름과 좌표를 직접 넣는 길만 둡니다.
+ * <p>구글에 직접 묻지 않고 우리 서버에 묻습니다. 키가 서버에만 있으면
+ * 앱 번들에서 꺼내 갈 수 없고, 브라우저에서 부를 때 CORS 로 막히는 일도
+ * 없습니다. 웹과 앱이 같은 길을 쓰므로 결과 모양도 갈리지 않습니다.
+ *
+ * <p>고르면 좌표가 뒤에서 채워집니다. 쓰는 사람은 위도·경도를 볼 일이
+ * 없습니다.
  */
+export function PlaceSearch({ onPick }: PlaceSearchProps) {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<Found[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-/** 이 환경에서 장소 검색이 되는지. 안 되면 화면이 좌표 칸을 대신 엽니다. */
-export const hasPlaceSearch = () => false;
+  const search = useCallback(async () => {
+    const q = query.trim();
+    if (!q || busy) {
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await api.get<{ places: Found[] }>(
+        `/api/places/search?q=${encodeURIComponent(q)}`,
+      );
+      setResults(res.places ?? []);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : '찾지 못했습니다.');
+      setResults(null);
+    } finally {
+      setBusy(false);
+    }
+  }, [query, busy]);
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function PlaceSearch(_props: PlaceSearchProps) {
-  return null;
+  return (
+    <View style={styles.wrap}>
+      <Field
+        label="장소 찾기"
+        value={query}
+        onChangeText={setQuery}
+        placeholder="난바 파크스, 도쿄역…"
+        autoCorrect={false}
+        returnKeyType="search"
+        onSubmitEditing={search}
+        hint="이름을 넣고 확인을 누르면 자리가 잡힙니다."
+      />
+
+      {busy ? <Loading label="찾는 중" /> : null}
+      {error ? <Caption tone="danger">{error}</Caption> : null}
+
+      {results && results.length === 0 ? <Caption>찾지 못했습니다.</Caption> : null}
+
+      {results && results.length > 0 ? (
+        <View style={styles.results}>
+          {results.map((r, i) => (
+            <View key={`${r.lat},${r.lng},${i}`}>
+              {i > 0 ? <Divider /> : null}
+              <Pressable
+                onPress={() => {
+                  onPick(r);
+                  setResults(null);
+                  setQuery('');
+                }}
+                style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
+                <Body strong numberOfLines={1}>
+                  {r.name}
+                </Body>
+                {r.address ? <Caption numberOfLines={1}>{r.address}</Caption> : null}
+              </Pressable>
+            </View>
+          ))}
+        </View>
+      ) : null}
+    </View>
+  );
 }
+
+const styles = StyleSheet.create({
+  wrap: {
+    gap: Spacing.md,
+  },
+  results: {
+    backgroundColor: Colors.fill,
+    borderRadius: Radius.md,
+    overflow: 'hidden',
+  },
+  row: {
+    minHeight: Tap.min,
+    justifyContent: 'center',
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    gap: 2,
+  },
+  rowPressed: {
+    backgroundColor: Colors.fillPressed,
+  },
+});

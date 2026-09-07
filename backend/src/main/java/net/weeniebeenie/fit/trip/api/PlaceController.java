@@ -8,6 +8,7 @@ import net.weeniebeenie.fit.account.infrastructure.security.CurrentUser;
 import net.weeniebeenie.fit.shared.error.ApiException;
 import net.weeniebeenie.fit.trip.api.dto.TripDtos;
 import net.weeniebeenie.fit.trip.api.dto.TripDtos.ReorderRequest;
+import net.weeniebeenie.fit.trip.application.PlaceSearchService;
 import net.weeniebeenie.fit.trip.application.PlaceService;
 import net.weeniebeenie.fit.trip.application.PlaceService.PlaceDraft;
 import net.weeniebeenie.fit.trip.domain.Place;
@@ -21,7 +22,20 @@ import java.util.Map;
 public class PlaceController {
 
     private final PlaceService places;
+    private final PlaceSearchService search;
     private final ObjectMapper mapper;
+
+    /**
+     * 이름으로 장소 찾기.
+     *
+     * 좌표를 손으로 적게 두면 지도를 따로 켜서 숫자를 옮겨 적어야 하고, 한
+     * 자리 틀리면 엉뚱한 나라에 점이 찍힙니다. 서버가 구글에 대신 물어보고
+     * 이름·주소·좌표만 돌려줍니다. 키는 서버에만 있습니다.
+     */
+    @GetMapping("/search")
+    public Map<String, Object> search(@RequestParam(name = "q") String query) {
+        return Map.of("places", search.search(query));
+    }
 
     @PostMapping
     public Map<String, Object> create(@CurrentUser AuthPrincipal me,

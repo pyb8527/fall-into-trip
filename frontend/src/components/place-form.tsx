@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { api, ApiError } from '@/api/client';
 import type { Place } from '@/api/types';
-import { hasPlaceSearch, PlaceSearch } from '@/components/place-search';
+import { PlaceSearch } from '@/components/place-search';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import {
   Badge,
@@ -137,32 +137,6 @@ export function PlaceForm({
           <Badge label="완료" tone="accent" />
         </View>
       ) : null}
-
-      {/* 검색을 쓸 수 없을 때만 직접 넣습니다. */}
-      {hasPlaceSearch() ? null : (
-        <Row gap={Spacing.sm} style={styles.pair}>
-          <View style={styles.half}>
-            <Field
-              label="위도"
-              value={lat}
-              onChangeText={setLat}
-              placeholder="34.6613"
-              inputMode="decimal"
-              keyboardType="numbers-and-punctuation"
-            />
-          </View>
-          <View style={styles.half}>
-            <Field
-              label="경도"
-              value={lng}
-              onChangeText={setLng}
-              placeholder="135.5023"
-              inputMode="decimal"
-              keyboardType="numbers-and-punctuation"
-            />
-          </View>
-        </Row>
-      )}
 
       {/* 2. 나머지는 부르고 싶은 대로. */}
       <Field

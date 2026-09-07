@@ -5,6 +5,9 @@
  * 장소 검색이 조용히 빠지고, 나머지 화면은 그대로 씁니다. 쓰는 사람에게
  * 키를 물어보는 일은 없습니다 — 그건 만드는 사람이 넣어 둘 값입니다.
  *
+ * <p>지도를 그리는 데만 씁니다. 장소 검색은 서버가 대신 하므로 places
+ * 라이브러리를 받아 오지 않습니다.
+ *
  * <p>웹 전용입니다. 앱에서는 이 파일이 잡히지 않습니다.
  */
 
@@ -39,7 +42,7 @@ export function loadMaps(): Promise<void> {
     */
     script.src =
       `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(GMAPS_KEY)}` +
-      '&libraries=places&language=ko&region=KR';
+      '&language=ko&region=KR';
     script.async = true;
     script.onload = () => resolve();
     script.onerror = () => {
