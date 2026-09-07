@@ -1,17 +1,5 @@
-# OMC 운영 산출물 (프로젝트 스킬 .omc/skills 만 예외)
-.omc/
-!.omc/skills/
-
-# IDE / 에디터
-.idea/
-.vscode/
-*.iml
-
-# OS
-.DS_Store
-Thumbs.db
-
-# 로컬 환경변수
+build/
+.gradle/
+!gradle/wrapper/gradle-wrapper.jar
+*.log
 .env
-.env.local
-*.local

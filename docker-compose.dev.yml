@@ -3,7 +3,7 @@
 services:
   db:
     image: postgres:16-alpine
-    container_name: fit-db-dev
+    container_name: fit-db
     environment:
       POSTGRES_DB: fit
       POSTGRES_USER: fit
@@ -13,7 +13,7 @@ services:
     ports:
       - "5433:5432"          # 로컬에 다른 postgres 가 있어도 부딪히지 않게
     volumes:
-      - fit-db-dev:/var/lib/postgresql/data
+      - fit-db:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U fit -d fit"]
       interval: 5s
@@ -21,4 +21,4 @@ services:
       retries: 10
 
 volumes:
-  fit-db-dev:
+  fit-db:

@@ -66,9 +66,13 @@ public class SecurityConfig {
                                 "/api/health",
                                 "/api/auth/state",
                                 "/api/auth/setup",
+                                "/api/auth/register",
                                 "/api/auth/login",
                                 "/api/auth/refresh",
                                 "/api/auth/logout").permitAll()
+                        /* 링크를 받은 사람이 가입 전에도 어떤 여행인지 볼 수 있게 합니다.
+                           참여 자체는 로그인해야 합니다. */
+                        .requestMatchers(HttpMethod.GET, "/api/invites/*/preview").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().denyAll())

@@ -58,6 +58,14 @@ public class AuthController {
         return Map.of("user", UserView.of(user));
     }
 
+    /** 누구나 가입합니다. 가입하면 바로 로그인된 상태가 됩니다. */
+    @PostMapping("/register")
+    public ResponseEntity<TokenResponse> register(@Valid @RequestBody RegisterRequest req,
+                                                  HttpServletRequest http) {
+        User user = auth.register(req.email(), req.name(), req.password());
+        return withNewSession(user, http);
+    }
+
     @PostMapping("/setup")
     public ResponseEntity<TokenResponse> setup(@Valid @RequestBody SetupRequest req,
                                                HttpServletRequest http) {
