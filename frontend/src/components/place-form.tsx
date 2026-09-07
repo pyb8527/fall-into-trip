@@ -3,14 +3,16 @@ import { View } from 'react-native';
 
 import { api, ApiError } from '@/api/client';
 import type { Place } from '@/api/types';
+import { PlaceSearch } from '@/components/place-search';
 import { Spacing } from '@/constants/theme';
-import { Button, Card, ErrorNote, Field, Row, Subtitle } from '@/ui';
+import { Button, Card, Divider, ErrorNote, Field, Row, Subtitle } from '@/ui';
 
 /**
  * 장소 하나를 넣거나 고치는 자리.
  *
  * <p>좌표는 서버가 반드시 요구합니다. 지도에 찍으려면 있어야 하고, 나중에
- * 채우게 두면 좌표 없는 장소가 쌓여 동선이 끊깁니다.
+ * 채우게 두면 좌표 없는 장소가 쌓여 동선이 끊깁니다. 그래서 이름으로 찾아
+ * 고르면 좌표가 저절로 채워지게 두고, 손으로 넣는 길도 함께 남깁니다.
  *
  * <p>고칠 때는 version 을 함께 보냅니다. 내가 화면을 열어 둔 사이 동행자가
  * 먼저 고쳤으면 서버가 409 로 되돌립니다. 조용히 덮어쓰면 앞사람이 쓴 것이
@@ -82,9 +84,22 @@ export function PlaceForm({
     <Card>
       <Subtitle>{place ? '장소 고치기' : '장소 넣기'}</Subtitle>
 
+      <PlaceSearch
+        onPick={(found) => {
+          /* 이름을 이미 적어 뒀으면 건드리지 않습니다. 찾은 이름이 늘
+             쓰고 싶은 이름은 아닙니다("스타벅스 OO점"). */
+          if (!name.trim()) {
+            setName(found.name);
+          }
+          setLat(String(found.lat));
+          setLng(String(found.lng));
+        }}
+      />
+      <Divider />
+
       <Field label="이름" value={name} onChangeText={setName} placeholder="난바 파크스" maxLength={120} />
 
-      <Row gap={Spacing.two}>
+      <Row gap={Spacing.sm}>
         <View style={{ flexGrow: 1, flexBasis: 120 }}>
           <Field
             label="위도"
@@ -107,7 +122,7 @@ export function PlaceForm({
         </View>
       </Row>
 
-      <Row gap={Spacing.two}>
+      <Row gap={Spacing.sm}>
         <View style={{ flexGrow: 1, flexBasis: 100 }}>
           <Field label="시간" value={time} onChangeText={setTime} placeholder="13:30" hint="HH:MM" />
         </View>
@@ -132,7 +147,7 @@ export function PlaceForm({
       ) : null}
       {error ? <ErrorNote message={error} /> : null}
 
-      <Row gap={Spacing.two}>
+      <Row gap={Spacing.sm}>
         <Button
           label={place ? '저장' : '넣기'}
           onPress={submit}
