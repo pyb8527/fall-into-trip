@@ -1,0 +1,24 @@
+# 개발용 — DB 만 컨테이너로 띄우고 애플리케이션은 로컬에서 실행합니다.
+#   docker compose -f docker-compose.dev.yml up -d
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: fit-db-dev
+    environment:
+      POSTGRES_DB: fit
+      POSTGRES_USER: fit
+      POSTGRES_PASSWORD: fit
+      # 한글 정렬·비교가 어긋나지 않게 초기화 때 로케일을 맞춰 둡니다.
+      LANG: ko_KR.utf8
+    ports:
+      - "5433:5432"          # 로컬에 다른 postgres 가 있어도 부딪히지 않게
+    volumes:
+      - fit-db-dev:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fit -d fit"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  fit-db-dev:

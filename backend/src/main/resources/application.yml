@@ -1,0 +1,48 @@
+spring:
+  application:
+    name: fit-api
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/fit}
+    username: ${DB_USER:fit}
+    password: ${DB_PASSWORD:fit}
+
+  jpa:
+    hibernate:
+      # 스키마는 Flyway 가 만듭니다. Hibernate 가 손대면 안 됩니다.
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+
+  jackson:
+    default-property-inclusion: non_null
+
+server:
+  port: ${PORT:8080}
+  # nginx·Cloudflare 뒤에 있으므로 원래 프로토콜·주소를 헤더에서 읽습니다.
+  forward-headers-strategy: framework
+  error:
+    include-message: never
+    include-stacktrace: never
+
+fit:
+  # 운영에서는 반드시 환경변수로 넣습니다. 32바이트 이상이어야 합니다.
+  jwt:
+    secret: ${JWT_SECRET:dev-only-secret-please-change-me-32b+}
+    access-ttl: ${JWT_ACCESS_TTL:15m}
+    refresh-ttl: ${JWT_REFRESH_TTL:30d}
+    secure-cookie: ${SECURE_COOKIE:true}
+  cors:
+    allowed-origins: ${CORS_ORIGINS:http://localhost:5173}
+  setup-token: ${SETUP_TOKEN:}
+
+logging:
+  level:
+    net.weeniebeenie.fit: INFO
