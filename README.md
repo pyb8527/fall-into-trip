@@ -163,11 +163,27 @@ npx eas-cli@latest init        # app.json 에 projectId 를 넣어 줍니다
 
 ### 지도 키는 파일에 넣지 않습니다
 
-`eas.json` 은 깃에 올라갑니다. 키를 적어 두면 저장소에 그대로 박힙니다.
-EAS 쪽에 따로 넣어 두고 빌드할 때 꺼내 쓰게 합니다.
+`eas.json` 과 `app.json` 은 깃에 올라갑니다. 키를 적어 두면 저장소에 그대로
+박힙니다. EAS 쪽에 넣어 두고 빌드할 때 꺼내 쓰게 합니다.
 
 ```bash
-npx eas-cli@latest env:create --name EXPO_PUBLIC_GMAPS_KEY --value "…" --visibility sensitive
+npx eas-cli@latest env:create --name GOOGLE_MAPS_ANDROID_KEY --value "…" --visibility sensitive
+```
+
+**웹에서 쓰는 키와 다른 것이어야 합니다.** 제한 방식도, 켜야 하는 API 도
+다릅니다.
+
+| | 웹 | 안드로이드 앱 | 서버(장소 찾기) |
+|---|---|---|---|
+| 켤 API | Maps **JavaScript** API | Maps **SDK for Android** | **Places** API |
+| 제한 | HTTP 리퍼러 | 패키지명 + SHA-1 | 서버 IP |
+| 들어가는 곳 | 브라우저 번들 | 앱 번들 | 서버에만 |
+
+패키지명은 `net.weeniebeenie.fit` 입니다. SHA-1 은 EAS 가 만든 키스토어에서
+꺼냅니다.
+
+```bash
+npx eas-cli@latest credentials
 ```
 
 `EXPO_PUBLIC_API_BASE` 는 비밀이 아니라 그냥 주소이므로 `eas.json` 에 적어
@@ -187,17 +203,26 @@ npx eas-cli@latest build --profile production --platform ios    # 애플 개발�
 
 끝나면 링크와 QR 이 나옵니다. APK 는 폰에서 받아 바로 설치하면 됩니다.
 
-### 앱에서 빠지는 것
+### 고친 뒤 다시 빌드하지 않아도 되는 것
 
-| | 앱 |
-|---|---|
-| 로그인·여행·일정·장소 편집 | 됩니다 |
-| 날짜 고르기 | 됩니다 (기기 기본 달력) |
-| **지도** | **안 나옵니다** |
-| **장소 검색** | **안 나옵니다** (좌표 직접 입력 칸이 대신 열립니다) |
+`expo-updates` 를 붙여 두었습니다. **화면 코드와 이미지 변경은 재빌드 없이**
+밀어 넣을 수 있습니다.
 
-지도는 네이티브 지도 SDK(`react-native-maps`)가, 장소 검색은 키를 앱 번들에
-심지 않으려면 백엔드 프록시가 필요합니다. 둘 다 아직 만들지 않았습니다.
+```bash
+npx eas-cli@latest update --branch preview --message "무엇을 고쳤는지"
+```
+
+앱을 껐다 켜면 새 것을 받아 옵니다. 스토어 심사도 필요 없습니다.
+
+**다만 JS 만 됩니다.** 이런 것은 여전히 다시 빌드해야 합니다.
+
+- 새 네이티브 모듈 (예: 지도, 달력 같은 것을 새로 붙일 때)
+- `app.json` 의 네이티브 설정 (아이콘, 권한, 패키지 이름, 지도 키)
+- Expo SDK 올리기
+
+`runtimeVersion` 을 앱 버전에 묶어 두었습니다. 네이티브가 바뀌어 버전을
+올리면 옛 빌드에는 새 JS 가 내려가지 않습니다 — 맞지 않는 짝이 만나 죽는
+것을 막습니다.
 
 ### 한 번 정하면 바꾸기 어려운 것
 
