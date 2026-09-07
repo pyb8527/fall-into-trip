@@ -7,6 +7,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 public interface RefreshTokenRepository extends JpaRepository<RefreshToken, String> {
@@ -26,4 +28,19 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Stri
     @Modifying
     @Query("DELETE FROM RefreshToken t WHERE t.expiresAt < :at")
     int deleteExpired(@Param("at") Instant at);
+
+    /** 아직 살아 있는 로그인 수. 운영 화면에서 "어디선가 로그인 중" 을 보여 줍니다. */
+    @Query("""
+           SELECT count(t) FROM RefreshToken t
+           WHERE t.userId = :userId AND t.revokedAt IS NULL AND t.expiresAt > :at
+           """)
+    long countActive(@Param("userId") String userId, @Param("at") Instant at);
+
+    /* 위와 같은 셈이되 한 페이지를 한 번에. */
+    @Query("""
+           SELECT t.userId, count(t) FROM RefreshToken t
+           WHERE t.userId IN :ids AND t.revokedAt IS NULL AND t.expiresAt > :at
+           GROUP BY t.userId
+           """)
+    List<Object[]> countActiveByUserIds(@Param("ids") Collection<String> ids, @Param("at") Instant at);
 }
