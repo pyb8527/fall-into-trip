@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { api, ApiError } from '@/api/client';
 import type { Trip } from '@/api/types';
@@ -31,6 +31,19 @@ export function TripForm({
   const [nights, setNights] = useState(2);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  /* 판은 닫혀도 화면에 남아 있어(닫히는 동안 미끄러져 내려가야 합니다)
+     처음 잡은 값이 다음에 열 때도 그대로입니다. 열릴 때마다 비웁니다. */
+  useEffect(() => {
+    if (!visible) {
+      return;
+    }
+    setTitle('');
+    setStartIso(today());
+    setNights(2);
+    setError(null);
+    setBusy(false);
+  }, [visible]);
 
   async function submit() {
     if (busy) {

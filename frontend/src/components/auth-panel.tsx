@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
@@ -38,6 +38,9 @@ const TABS: { value: AuthMode; label: string }[] = [
  */
 export function AuthPanel({ mode }: { mode: AuthMode }) {
   const router = useRouter();
+  /* 초대 링크에서 넘어왔다면 로그인 뒤 그리로 돌아가야 합니다.
+     띠를 눌러 가입 쪽으로 갈아탈 때도 잃어버리면 안 됩니다. */
+  const { next: back } = useLocalSearchParams<{ next?: string }>();
   const { login, register } = useAuth();
 
   const [email, setEmail] = useState('');
@@ -55,7 +58,8 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
     setError(null);
     /* 뒤로 가기에 쌓이지 않게 갈아 끼웁니다. 띠를 몇 번 눌렀다고 그만큼
        뒤로 가야 하면 답답합니다. */
-    router.replace(next === 'login' ? '/(auth)/login' : '/(auth)/register');
+    const to = next === 'login' ? '/(auth)/login' : '/(auth)/register';
+    router.replace(back ? `${to}?next=${encodeURIComponent(back)}` : to);
   }
 
   /* 비었다고 버튼을 잠그지 않습니다. 브라우저가 자동완성으로 칸을 채울 때

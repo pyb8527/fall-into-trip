@@ -137,3 +137,46 @@ export type AdminStats = {
   auditLast24h: number;
   topActions: Record<string, number>;
 };
+
+/* ------------------------------------------------------- 동행자와 초대 */
+
+/** 여행을 같이 보는 사람. */
+export type Companion = {
+  id: string;
+  name: string;
+  email: string;
+  role: TripRole;
+  owner: boolean;
+};
+
+/**
+ * 막 만든 초대.
+ *
+ * 서버에는 해시만 남으므로 token 은 이때 한 번만 옵니다. 목록에는 없습니다.
+ */
+export type NewInvite = {
+  id: string;
+  token: string;
+  role: TripRole;
+  expiresAt: string;
+  maxUses: number;
+};
+
+/** 발급해 둔 초대. 토큰은 실리지 않습니다. */
+export type InviteRow = {
+  id: string;
+  role: TripRole;
+  createdAt: string;
+  expiresAt: string;
+  maxUses: number;
+  usedCount: number;
+  revoked: boolean;
+};
+
+/** 링크를 받은 사람이 들어가기 전에 보는 것. 로그인 없이도 볼 수 있습니다. */
+export type InvitePreview = {
+  tripTitle: string;
+  ownerName: string | null;
+  role: TripRole;
+  expiresAt: string;
+};

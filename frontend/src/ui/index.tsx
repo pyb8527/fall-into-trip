@@ -262,6 +262,7 @@ export function Body({
   strong,
   small,
   numberOfLines,
+  selectable,
   style,
 }: {
   children: React.ReactNode;
@@ -269,6 +270,8 @@ export function Body({
   strong?: boolean;
   small?: boolean;
   numberOfLines?: number;
+  /** 주소처럼 사람이 긁어 가야 하는 글. */
+  selectable?: boolean;
   /** 색을 계산해서 넣어야 할 때만. 여백은 감싸는 쪽에서 잡습니다. */
   style?: StyleProp<TextStyle>;
 }) {
@@ -280,7 +283,7 @@ export function Body({
         { color: toneColor[tone] },
         style,
       ]}
-      numberOfLines={numberOfLines}>
+      numberOfLines={numberOfLines} selectable={selectable}>
       {children}
     </Text>
   );
@@ -557,7 +560,11 @@ export type IconName =
   | 'minus'
   | 'search'
   | 'map-pin'
-  | 'calendar';
+  | 'calendar'
+  | 'users'
+  | 'share-2'
+  | 'log-out'
+  | 'user-minus';
 
 export function Icon({
   name,

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { api, ApiError } from '@/api/client';
@@ -56,6 +56,35 @@ export function PlaceForm({
 
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  /*
+    판은 닫혀도 화면에서 사라지지 않습니다. 닫히는 동안 아래로 미끄러져
+    내려가야 하기 때문입니다. 그래서 useState 가 처음 붙을 때 잡은 값이
+    다음에 열 때도 그대로 남아, 새로 넣으려고 열면 지난번에 치던 것이
+    들어 있고, 다른 장소를 고치려고 열면 앞엣것이 보입니다.
+
+    열릴 때마다 다시 채웁니다. 여는 순간과 대상이 바뀔 때만 하므로, 열어
+    놓고 치는 동안에는 건드리지 않습니다.
+  */
+  useEffect(() => {
+    if (!visible) {
+      return;
+    }
+    setName(place?.name ?? '');
+    setLat(place ? String(place.lat) : '');
+    setLng(place ? String(place.lng) : '');
+    setPicked(place?.ja ?? place?.en ?? null);
+    setTime(place?.time ?? '');
+    setCat(place?.cat ?? '');
+    setCost(place?.cost ?? '');
+    setNote(place?.note ?? '');
+    setUrl(place?.url ?? '');
+    setError(null);
+    setBusy(false);
+    /* place 는 새로 고칠 때마다 다른 객체가 되지만 가리키는 곳은 같습니다.
+       객체 자체를 보면 열어 놓고 치던 것이 지워집니다. id 만 봅니다. */
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, place?.id]);
 
   const latNum = Number.parseFloat(lat);
   const lngNum = Number.parseFloat(lng);

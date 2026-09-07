@@ -1,10 +1,11 @@
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { api, ApiError } from '@/api/client';
 import type { Day, Place, TripDetail } from '@/api/types';
 import { useAsync } from '@/api/use-async';
+import { CompanionsSheet } from '@/components/companions-sheet';
 import { PlaceForm } from '@/components/place-form';
 import { TripMap, type MapPlace } from '@/components/trip-map';
 import { Colors, dayColor, Radius, Spacing, Tap } from '@/constants/theme';
@@ -41,11 +42,13 @@ const ALL = -1;
  */
 export default function TripScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
   const { data, error, loading, reload } = useAsync<TripDetail>(
     (signal) => api.get(`/api/trip?trip=${encodeURIComponent(id)}`, signal),
     [id],
   );
 
+  const [companions, setCompanions] = useState(false);
   const [activeDay, setActiveDay] = useState<number>(ALL);
   const [activePlaceId, setActivePlaceId] = useState<string | null>(null);
 
@@ -216,7 +219,24 @@ export default function TripScreen() {
           {total > 0 ? <Progress done={done} total={total} /> : null}
         </>
       }>
-      <Stack.Screen options={{ title: data.trip.title }} />
+      <Stack.Screen
+        options={{
+          title: data.trip.title,
+          /* 동행자는 가끔 여는 것이라 화면을 차지하지 않게 막대에 둡니다. */
+          headerRight: () => (
+            <IconButton name="users" label="동행자" onPress={() => setCompanions(true)} />
+          ),
+        }}
+      />
+
+      <CompanionsSheet
+        visible={companions}
+        tripId={data.trip.id}
+        ownerId={data.trip.ownerId}
+        onClose={() => setCompanions(false)}
+        /* 스스로 나갔으면 이 여행은 더 못 봅니다. 목록으로 돌려보냅니다. */
+        onLeft={() => router.replace('/(app)/trips')}
+      />
 
       {actionError ? <ErrorNote message={actionError} /> : null}
 
