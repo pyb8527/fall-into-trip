@@ -17,6 +17,9 @@ import { Body, Caption, Divider, Field, Loading } from '@/ui';
  * 직접 넣습니다.
  */
 
+/** 이 환경에서 장소 검색이 되는지. 안 되면 화면이 좌표 칸을 대신 엽니다. */
+export const hasPlaceSearch = () => hasMaps();
+
 export function PlaceSearch({ onPick }: PlaceSearchProps) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Found[] | null>(null);

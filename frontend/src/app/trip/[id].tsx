@@ -292,8 +292,8 @@ function DayCard({
   onChanged: () => void;
   onRemove: (placeId: string) => void;
 }) {
-  /* null 이면 닫힘, '' 이면 새로 넣는 중, 그 밖에는 그 장소를 고치는 중. */
-  const [editing, setEditing] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<Place | null>(null);
   const done = day.places.filter((p) => visited.has(p.id)).length;
   const color = day.color || dayColor(index);
 
@@ -323,54 +323,53 @@ function DayCard({
         <Caption>이 날에는 아직 장소가 없습니다.</Caption>
       ) : (
         <View style={styles.places}>
-          {day.places.map((place, i) =>
-            editing === place.id ? (
-              <PlaceForm
-                key={place.id}
-                dayId={day.id}
-                place={place}
-                onDone={() => {
-                  setEditing(null);
-                  onChanged();
-                }}
-                onCancel={() => setEditing(null)}
-              />
-            ) : (
-              <PlaceRow
-                key={place.id}
-                place={place}
-                order={i + 1}
-                color={color}
-                visited={visited.has(place.id)}
-                busy={pending.has(place.id)}
-                active={activePlaceId === place.id}
-                canEdit={canEdit}
-                onToggle={() => onToggle(place.id)}
-                onFocus={() => onFocus(place.id)}
-                onEdit={() => setEditing(place.id)}
-                onRemove={() => onRemove(place.id)}
-              />
-            ),
-          )}
+          {day.places.map((place, i) => (
+            <PlaceRow
+              key={place.id}
+              place={place}
+              order={i + 1}
+              color={color}
+              visited={visited.has(place.id)}
+              busy={pending.has(place.id)}
+              active={activePlaceId === place.id}
+              canEdit={canEdit}
+              onToggle={() => onToggle(place.id)}
+              onFocus={() => onFocus(place.id)}
+              onEdit={() => setEditing(place)}
+              onRemove={() => onRemove(place.id)}
+            />
+          ))}
         </View>
       )}
 
-      {canEdit && editing === '' ? (
+      {canEdit ? (
+        <>
+          <Divider />
+          <Button label="장소 넣기" variant="secondary" onPress={() => setAdding(true)} />
+        </>
+      ) : null}
+
+      {/* 넣기와 고치기 모두 아래에서 올라오는 판으로 합니다. */}
+      <PlaceForm
+        visible={adding}
+        dayId={day.id}
+        onDone={() => {
+          setAdding(false);
+          onChanged();
+        }}
+        onCancel={() => setAdding(false)}
+      />
+      {editing ? (
         <PlaceForm
+          visible
           dayId={day.id}
+          place={editing}
           onDone={() => {
             setEditing(null);
             onChanged();
           }}
           onCancel={() => setEditing(null)}
         />
-      ) : null}
-
-      {canEdit && editing === null ? (
-        <>
-          <Divider />
-          <Button label="장소 넣기" variant="secondary" onPress={() => setEditing('')} />
-        </>
       ) : null}
 
       {day.budget ? <Caption tone="secondary">예산 {day.budget}</Caption> : null}

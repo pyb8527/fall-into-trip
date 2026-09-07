@@ -514,7 +514,19 @@ export function MenuCard({
 /* ------------------------------------------------------------------ 아이콘 */
 
 /** 쓰는 아이콘 이름만 열어 둡니다. 아무거나 부르면 화면마다 결이 흐트러집니다. */
-export type IconName = 'check' | 'edit-2' | 'trash-2' | 'settings' | 'maximize' | 'minimize';
+export type IconName =
+  | 'check'
+  | 'edit-2'
+  | 'trash-2'
+  | 'settings'
+  | 'maximize'
+  | 'minimize'
+  | 'x'
+  | 'plus'
+  | 'minus'
+  | 'search'
+  | 'map-pin'
+  | 'calendar';
 
 export function Icon({
   name,
@@ -627,6 +639,112 @@ export function ConfirmDialog({
         </Pressable>
       </Pressable>
     </Modal>
+  );
+}
+
+/**
+ * 아래에서 올라오는 판.
+ *
+ * <p>무언가를 넣거나 고치는 일은 화면을 갈아 끼우지 않고 여기서 끝냅니다.
+ * 페이지를 옮기면 보고 있던 목록과 지도를 잃고, 끝내고 나면 다시 찾아
+ * 들어와야 합니다.
+ *
+ * <p>키보드가 올라와도 입력칸이 가리지 않게 밀어 올립니다. 내용이 길면
+ * 판 안에서만 흐르고 뒤 화면은 움직이지 않습니다.
+ */
+export function BottomSheet({
+  visible,
+  title,
+  onClose,
+  children,
+  footer,
+}: {
+  visible: boolean;
+  title: string;
+  onClose: () => void;
+  children: React.ReactNode;
+  /** 완료·취소처럼 늘 손이 닿아야 하는 것. 판 아래에 붙습니다. */
+  footer?: React.ReactNode;
+}) {
+  const insets = useSafeAreaInsets();
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        style={styles.sheetWrap}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        {/* 바깥을 누르면 닫힙니다. */}
+        <Pressable style={styles.sheetBackdrop} onPress={onClose} accessibilityLabel="닫기" />
+
+        <View style={[styles.sheet, { paddingBottom: insets.bottom + Spacing.md }]}>
+          <View style={styles.sheetGrip} />
+
+          <View style={styles.sheetHead}>
+            <Subtitle>{title}</Subtitle>
+            <IconButton name="x" label="닫기" onPress={onClose} />
+          </View>
+
+          <ScrollView
+            style={styles.sheetBody}
+            contentContainerStyle={styles.sheetBodyInner}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}>
+            {children}
+          </ScrollView>
+
+          {footer ? <View style={styles.sheetFoot}>{footer}</View> : null}
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
+/**
+ * 숫자를 눌러서 고르는 칸.
+ *
+ * 직접 치게 두면 "3박" 을 적는 사람과 "3" 을 적는 사람이 갈리고, 폰에서는
+ * 숫자 자판을 부르는 것부터 번거롭습니다.
+ */
+export function Stepper({
+  label,
+  value,
+  onChange,
+  min = 0,
+  max = 30,
+  unit,
+  hint,
+}: {
+  label: string;
+  value: number;
+  onChange: (next: number) => void;
+  min?: number;
+  max?: number;
+  unit?: string;
+  hint?: string;
+}) {
+  return (
+    <View style={styles.field}>
+      <Text style={styles.label}>{label}</Text>
+      <View style={styles.stepper}>
+        <IconButton
+          name="minus"
+          label={`${label} 줄이기`}
+          disabled={value <= min}
+          onPress={() => onChange(Math.max(min, value - 1))}
+        />
+        <Text style={styles.stepperValue}>
+          {value}
+          {unit ?? ''}
+        </Text>
+        <IconButton
+          name="plus"
+          label={`${label} 늘리기`}
+          disabled={value >= max}
+          onPress={() => onChange(Math.min(max, value + 1))}
+        />
+      </View>
+      {hint ? <Text style={styles.hint}>{hint}</Text> : null}
+    </View>
   );
 }
 
@@ -1008,6 +1126,72 @@ const styles = StyleSheet.create({
   dialogButton: {
     flexGrow: 1,
     flexBasis: 100,
+  },
+
+  sheetWrap: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  sheetBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(25, 31, 40, 0.45)',
+  },
+  sheet: {
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: Radius.xl,
+    borderTopRightRadius: Radius.xl,
+    paddingTop: Spacing.md,
+    /* 화면을 다 덮지 않습니다. 뒤가 조금 보여야 어디로 돌아가는지 압니다. */
+    maxHeight: '88%',
+  },
+  sheetGrip: {
+    alignSelf: 'center',
+    width: 40,
+    height: 4,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.fillPressed,
+  },
+  sheetHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Gutter,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.sm,
+  },
+  sheetBody: {
+    flexGrow: 0,
+  },
+  sheetBodyInner: {
+    paddingHorizontal: Gutter,
+    paddingBottom: Spacing.lg,
+    gap: Spacing.lg,
+  },
+  sheetFoot: {
+    paddingHorizontal: Gutter,
+    paddingTop: Spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.border,
+    gap: Spacing.sm,
+  },
+
+  stepper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Colors.fill,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.sm,
+    height: Tap.control,
+  },
+  stepperValue: {
+    ...Type.body,
+    fontWeight: Weight.bold,
+    color: Colors.text,
   },
 
   center: {
