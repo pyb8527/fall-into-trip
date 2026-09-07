@@ -1,4 +1,4 @@
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
@@ -43,6 +43,7 @@ const ALL = -1;
 export default function TripScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const navigation = useNavigation();
   const { data, error, loading, reload } = useAsync<TripDetail>(
     (signal) => api.get(`/api/trip?trip=${encodeURIComponent(id)}`, signal),
     [id],
@@ -222,6 +223,23 @@ export default function TripScreen() {
       <Stack.Screen
         options={{
           title: data.trip.title,
+          /*
+            이 화면으로 곧장 들어오는 길이 여럿입니다. 주소를 새로고침하거나,
+            초대 링크로 들어오거나, 앱이 업데이트를 받아 다시 뜰 때입니다.
+            그때는 쌓인 기록이 없어 돌아갈 화살표가 아예 안 생깁니다.
+
+            그런 경우에만 우리가 하나 답니다. 기록이 있으면 손대지 않고
+            네비게이션이 만든 것을 그대로 씁니다.
+          */
+          headerLeft: navigation.canGoBack()
+            ? undefined
+            : () => (
+                <IconButton
+                  name="chevron-left"
+                  label="내 여행으로"
+                  onPress={() => router.replace('/(app)/trips')}
+                />
+              ),
           /* 동행자는 가끔 여는 것이라 화면을 차지하지 않게 막대에 둡니다. */
           headerRight: () => (
             <IconButton name="users" label="동행자" onPress={() => setCompanions(true)} />
