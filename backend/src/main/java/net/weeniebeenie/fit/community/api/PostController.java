@@ -1,0 +1,110 @@
+package net.weeniebeenie.fit.community.api;
+
+import lombok.RequiredArgsConstructor;
+import net.weeniebeenie.fit.account.infrastructure.security.AuthPrincipal;
+import net.weeniebeenie.fit.account.infrastructure.security.CurrentUser;
+import net.weeniebeenie.fit.community.application.PostService;
+import net.weeniebeenie.fit.community.domain.TripPost;
+import net.weeniebeenie.fit.shared.error.ApiException;
+import net.weeniebeenie.fit.trip.domain.Trip;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+/**
+ * 게시판.
+ *
+ * <p>목록과 글 보기는 로그인 없이 열립니다. 남의 일정을 구경하러 왔다가
+ * 가입하는 흐름이라, 처음부터 가입을 요구하면 아무도 안 들어옵니다.
+ *
+ * <p>추천·복제·신고는 로그인해야 합니다. 누가 눌렀는지 세야 하고, 한 사람이
+ * 한 번만 눌러야 하기 때문입니다.
+ */
+@RestController
+@RequestMapping("/api/posts")
+@RequiredArgsConstructor
+public class PostController {
+
+    /** 한 쪽에 보여 줄 글의 수. */
+    private static final int SIZE = 20;
+
+    private final PostService posts;
+
+    @GetMapping
+    public Map<String, Object> list(@CurrentUser AuthPrincipal me,
+                                    @RequestParam(name = "sort", defaultValue = "hot") String sort,
+                                    @RequestParam(name = "page", defaultValue = "0") int page) {
+        Page<TripPost> found = posts.list(sort, PageRequest.of(Math.max(0, page), SIZE));
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("posts", posts.cardsOf(found.getContent(), me == null ? null : me.id()));
+        out.put("page", found.getNumber());
+        out.put("totalPages", found.getTotalPages());
+        out.put("total", found.getTotalElements());
+        return out;
+    }
+
+    @GetMapping("/{postId}")
+    public Map<String, Object> read(@CurrentUser AuthPrincipal me, @PathVariable String postId) {
+        TripPost post = posts.read(postId);
+        if (me != null) {
+            posts.countView(postId, me.id());
+        }
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("id", post.getId());
+        out.put("title", post.getTitle());
+        out.put("summary", post.getSummary());
+        out.put("authorName", posts.authorNameOf(post));
+        out.put("dayCount", post.getDayCount());
+        out.put("placeCount", post.getPlaceCount());
+        out.put("likeCount", post.getLikeCount());
+        out.put("viewCount", post.getViewCount());
+        out.put("liked", me != null && !posts.likedBy(me.id(), java.util.List.of(postId)).isEmpty());
+        out.put("mine", me != null && post.getAuthorId().equals(me.id()));
+        out.put("createdAt", post.getCreatedAt());
+        out.put("itinerary", posts.snapshotOf(post));
+        return out;
+    }
+
+    @PostMapping("/{postId}/like")
+    public Map<String, Object> like(@CurrentUser AuthPrincipal me,
+                                    @PathVariable String postId,
+                                    @RequestParam(name = "on", defaultValue = "true") boolean on) {
+        return Map.of("liked", posts.like(me, postId, on));
+    }
+
+    /** 남의 일정을 내 것으로 가져옵니다. 첫날은 새로 정합니다. */
+    @PostMapping("/{postId}/copy")
+    public Map<String, Object> copy(@CurrentUser AuthPrincipal me,
+                                    @PathVariable String postId,
+                                    @RequestBody(required = false) CopyRequest req) {
+        if (req == null || req.startIso() == null || req.startIso().isBlank()) {
+            throw ApiException.badRequest("언제 떠날지 정해 주세요.");
+        }
+        Trip trip = posts.copy(me, postId, req.startIso());
+        return Map.of("tripId", trip.getId());
+    }
+
+    @PostMapping("/{postId}/report")
+    public Map<String, Object> report(@CurrentUser AuthPrincipal me,
+                                      @PathVariable String postId,
+                                      @RequestBody(required = false) ReportRequest req) {
+        posts.report(me, postId, req == null ? null : req.reason());
+        return Map.of("ok", true);
+    }
+
+    @DeleteMapping("/{postId}")
+    public Map<String, Object> remove(@CurrentUser AuthPrincipal me, @PathVariable String postId) {
+        posts.remove(me, postId);
+        return Map.of("ok", true);
+    }
+
+    public record CopyRequest(String startIso) {
+    }
+
+    public record ReportRequest(String reason) {
+    }
+}

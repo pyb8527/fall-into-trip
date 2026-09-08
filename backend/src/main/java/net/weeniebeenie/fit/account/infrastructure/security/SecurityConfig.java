@@ -73,6 +73,11 @@ public class SecurityConfig {
                         /* 링크를 받은 사람이 가입 전에도 어떤 여행인지 볼 수 있게 합니다.
                            참여 자체는 로그인해야 합니다. */
                         .requestMatchers(HttpMethod.GET, "/api/invites/*/preview").permitAll()
+                        /* 게시판은 구경부터 됩니다. 남의 일정을 보러 왔다가
+                           가입하는 흐름이라, 처음부터 로그인을 요구하면 아무도
+                           들어오지 않습니다. 추천·복제·신고는 POST 라 아래
+                           규칙에 걸려 로그인이 필요합니다. */
+                        .requestMatchers(HttpMethod.GET, "/api/posts", "/api/posts/*").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().denyAll())
