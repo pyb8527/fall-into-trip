@@ -145,6 +145,15 @@ export type AdminStats = {
   topActions: Record<string, number>;
 };
 
+/**
+ * 비어 있을 수 있는 값.
+ *
+ * <p>서버는 비어 있는 필드를 null 로 보내지 않고 <b>아예 빼고</b> 보냅니다
+ * (spring.jackson.default-property-inclusion: non_null). 그래서 받는 쪽에서는
+ * 없는 것과 null 을 가르면 안 됩니다. `x != null` 로 한 번에 봅니다.
+ */
+export type Maybe<T> = T | null | undefined;
+
 /* ------------------------------------------------------- 동행자와 초대 */
 
 /** 여행을 같이 보는 사람. */
@@ -166,7 +175,7 @@ export type NewInvite = {
   token: string;
   role: TripRole;
   /** 비어 있으면 기한 없는 링크입니다. */
-  expiresAt: string | null;
+  expiresAt: Maybe<string>;
   maxUses: number;
 };
 
@@ -176,7 +185,7 @@ export type InviteRow = {
   role: TripRole;
   createdAt: string;
   /** 비어 있으면 기한 없는 링크입니다. */
-  expiresAt: string | null;
+  expiresAt: Maybe<string>;
   maxUses: number;
   usedCount: number;
   revoked: boolean;
@@ -188,7 +197,7 @@ export type InvitePreview = {
   ownerName: string | null;
   role: TripRole;
   /** 비어 있으면 기한 없는 링크입니다. */
-  expiresAt: string | null;
+  expiresAt: Maybe<string>;
 };
 
 /* ------------------------------------------------------------ 이동 경로 */

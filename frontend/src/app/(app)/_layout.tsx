@@ -1,7 +1,7 @@
-import { Redirect, Stack } from 'expo-router';
+import { Redirect, Stack, useRouter } from 'expo-router';
 
 import { useAuth } from '@/auth/auth-provider';
-import { Loading, Screen } from '@/ui';
+import { IconButton, Loading, Screen } from '@/ui';
 
 /**
  * 주소로 곧장 들어왔을 때 밑에 깔아 둘 화면.
@@ -23,6 +23,7 @@ export const unstable_settings = { anchor: 'home' };
  */
 export default function AppLayout() {
   const { ready, user } = useAuth();
+  const router = useRouter();
 
   if (!ready) {
     return (
@@ -35,12 +36,36 @@ export default function AppLayout() {
     return <Redirect href="/(auth)/login" />;
   }
 
+  /**
+   * 돌아갈 데가 없을 때만 화살표를 답니다.
+   *
+   * <p>anchor 로 대개는 밑에 첫 화면이 깔리지만, 다른 화면에서 이리로
+   * 갈아치우며 들어오면(예: 여행을 지우고 목록으로) 그 층에 이것 하나만
+   * 남습니다. 그때는 화살표가 아예 생기지 않습니다.
+   *
+   * <p>기록이 있으면 손대지 않고 네비게이션이 만든 것을 그대로 씁니다.
+   */
+  function backTo(title: string) {
+    return ({ navigation }: { navigation: { canGoBack: () => boolean } }) => ({
+      title,
+      headerLeft: navigation.canGoBack()
+        ? undefined
+        : () => (
+            <IconButton
+              name="chevron-left"
+              label="처음으로"
+              onPress={() => router.replace('/(app)/home')}
+            />
+          ),
+    });
+  }
+
   return (
     <Stack>
       {/* 첫 화면은 제목 대신 로고를 본문 안에 두므로 막대를 감춥니다. */}
       <Stack.Screen name="home" options={{ headerShown: false }} />
-      <Stack.Screen name="trips" options={{ title: '내 여행' }} />
-      <Stack.Screen name="settings" options={{ title: '내 계정' }} />
+      <Stack.Screen name="trips" options={backTo('내 여행')} />
+      <Stack.Screen name="settings" options={backTo('내 계정')} />
     </Stack>
   );
 }

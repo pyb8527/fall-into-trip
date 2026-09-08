@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.Locale;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -96,7 +97,7 @@ public class PostService {
                 .title(clean)
                 .summary(summary == null || summary.isBlank() ? null : summary.trim())
                 /* 목록에 없는 값이 들어오면 아무것도 안 걸리는 글이 됩니다. 버립니다. */
-                .region(REGIONS.contains(region) ? region : null)
+                .region(known(region))
                 .snapshot(snapshotOf(clean, dayList, placeList))
                 .dayCount(dayList.size())
                 .placeCount(placeList.size())
@@ -164,10 +165,11 @@ public class PostService {
      */
     @Transactional(readOnly = true)
     public Page<TripPost> list(String sort, String region, String days, String q, Pageable pageable) {
-        String cleanRegion = REGIONS.contains(region) ? region : null;
-        String cleanQ = q == null || q.isBlank() ? null : q.trim();
-        Integer minDays = null;
-        Integer maxDays = null;
+        /* 비어 있는 조건에도 NULL 을 보내지 않습니다. 값이 NULL 로만 오면
+           PostgreSQL 이 그 자리의 형을 알 수 없다고 거절합니다. */
+        String cleanRegion = known(region) == null ? "" : region;
+        int minDays = 0;
+        int maxDays = Integer.MAX_VALUE;
         if (days != null) {
             switch (days) {
                 case "1" -> maxDays = 1;
@@ -189,8 +191,34 @@ public class PostService {
 
         /* 인기 순은 나이로 나눈 값이라 정렬을 질의 안에 박아 두었습니다. */
         return "new".equals(sort) || "top".equals(sort)
-                ? posts.search(cleanRegion, minDays, maxDays, cleanQ, paged)
-                : posts.findHot(cleanRegion, minDays, maxDays, cleanQ, pageable);
+                ? posts.search(cleanRegion, minDays, maxDays, likePattern(q), paged)
+                : posts.findHot(cleanRegion, minDays, maxDays, likePattern(q), pageable);
+    }
+
+    /**
+     * 찾을 글자를 LIKE 무늬로.
+     *
+     * <p>비어 있으면 %% 가 되어 무엇에나 걸립니다. 조건을 빼는 것과 같은
+     * 뜻이면서 NULL 을 보내지 않습니다.
+     *
+     * <p>사람이 친 % 나 _ 는 글자 그대로 찾아야 합니다. 그냥 두면 "50%" 를
+     * 찾을 때 그 자리가 아무거나가 되어 엉뚱한 것이 걸립니다.
+     */
+    private static String likePattern(String q) {
+        String clean = q == null ? "" : q.trim().toLowerCase(Locale.ROOT);
+        String escaped = clean.replace("!", "!!").replace("%", "!%").replace("_", "!_");
+        return "%" + escaped + "%";
+    }
+
+    /**
+     * 아는 지역이면 그대로, 아니면 없는 것으로.
+     *
+     * <p>null 을 따로 걸러야 합니다. List.of 로 만든 목록은 contains(null) 에
+     * NullPointerException 을 던집니다 — 담을 수 없는 값을 찾는 것부터가
+     * 잘못이라고 보기 때문입니다.
+     */
+    private static String known(String region) {
+        return region != null && REGIONS.contains(region) ? region : null;
     }
 
     private static Pageable withSort(Pageable page, Sort sort) {

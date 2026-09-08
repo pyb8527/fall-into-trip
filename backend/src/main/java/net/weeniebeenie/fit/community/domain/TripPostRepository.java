@@ -15,7 +15,16 @@ public interface TripPostRepository extends JpaRepository<TripPost, String> {
      * 걸러 보기.
      *
      * <p>지역·기간·글자를 한 질의로 받습니다. 조건마다 메서드를 따로 두면
-     * 조합이 늘 때마다 배로 늘어납니다. 비어 있는 조건은 통과시킵니다.
+     * 조합이 늘 때마다 배로 늘어납니다.
+     *
+     * <p><b>비어 있는 조건에도 NULL 을 보내지 않습니다.</b> 값이 NULL 로만 오면
+     * PostgreSQL 이 그 자리의 형을 알 수 없다고 거절합니다. 그래서 "아무거나"
+     * 를 뜻하는 값을 대신 넣습니다. 지역은 빈 문자열, 기간은 아무 날짜나 담는
+     * 범위, 글자는 무엇에나 걸리는 %% 입니다.
+     *
+     * <p>소개가 비어 있는 글도 제목으로는 찾혀야 하므로 NULL 을 빈 문자열로
+     * 바꿔 놓고 봅니다. NULL 은 LIKE 에서 참도 거짓도 아니라 그 줄이 통째로
+     * 빠집니다.
      *
      * <p>글자는 제목과 소개에서만 찾습니다. 일정 안쪽(장소 이름)까지 뒤지려면
      * jsonb 를 훑어야 하는데, 그건 인덱스가 안 먹어 글이 늘수록 느려집니다.
@@ -23,17 +32,16 @@ public interface TripPostRepository extends JpaRepository<TripPost, String> {
     @Query("""
            SELECT p FROM TripPost p
            WHERE p.hidden = false
-             AND (:region IS NULL OR p.region = :region)
-             AND (:minDays IS NULL OR p.dayCount >= :minDays)
-             AND (:maxDays IS NULL OR p.dayCount <= :maxDays)
-             AND (:q IS NULL
-                  OR LOWER(p.title) LIKE LOWER(CONCAT('%', :q, '%'))
-                  OR LOWER(p.summary) LIKE LOWER(CONCAT('%', :q, '%')))
+             AND (:region = '' OR p.region = :region)
+             AND p.dayCount >= :minDays
+             AND p.dayCount <= :maxDays
+             AND (LOWER(p.title) LIKE :pattern
+                  OR LOWER(COALESCE(p.summary, '')) LIKE :pattern)
            """)
     Page<TripPost> search(@Param("region") String region,
-                          @Param("minDays") Integer minDays,
-                          @Param("maxDays") Integer maxDays,
-                          @Param("q") String q,
+                          @Param("minDays") int minDays,
+                          @Param("maxDays") int maxDays,
+                          @Param("pattern") String pattern,
                           Pageable pageable);
 
     /**
@@ -52,19 +60,15 @@ public interface TripPostRepository extends JpaRepository<TripPost, String> {
      *
      * <p>거르는 조건은 위 search 와 같아야 합니다. 정렬만 다르고 보는 범위가
      * 달라지면 띠를 바꿀 때마다 결과가 널뜁니다.
-     *
-     * <p>비어 있는 조건에 형을 붙여 둡니다. 네이티브 질의에서 값이 NULL 로만
-     * 오면 PostgreSQL 이 그 자리의 형을 알 수 없다고 거절합니다.
      */
     @Query(value = """
            SELECT * FROM trip_posts p
            WHERE p.hidden = false
-             AND (CAST(:region AS varchar) IS NULL OR p.region = CAST(:region AS varchar))
-             AND (CAST(:minDays AS integer) IS NULL OR p.day_count >= CAST(:minDays AS integer))
-             AND (CAST(:maxDays AS integer) IS NULL OR p.day_count <= CAST(:maxDays AS integer))
-             AND (CAST(:q AS varchar) IS NULL
-                  OR p.title ILIKE CONCAT('%', CAST(:q AS varchar), '%')
-                  OR p.summary ILIKE CONCAT('%', CAST(:q AS varchar), '%'))
+             AND (:region = '' OR p.region = :region)
+             AND p.day_count >= :minDays
+             AND p.day_count <= :maxDays
+             AND (LOWER(p.title) LIKE :pattern
+                  OR LOWER(COALESCE(p.summary, '')) LIKE :pattern)
            ORDER BY (p.like_count + 1)
                     / POWER(EXTRACT(EPOCH FROM (now() - p.created_at)) / 3600 + 2, 1.5) DESC,
                     p.created_at DESC
@@ -72,18 +76,17 @@ public interface TripPostRepository extends JpaRepository<TripPost, String> {
            countQuery = """
            SELECT count(*) FROM trip_posts p
            WHERE p.hidden = false
-             AND (CAST(:region AS varchar) IS NULL OR p.region = CAST(:region AS varchar))
-             AND (CAST(:minDays AS integer) IS NULL OR p.day_count >= CAST(:minDays AS integer))
-             AND (CAST(:maxDays AS integer) IS NULL OR p.day_count <= CAST(:maxDays AS integer))
-             AND (CAST(:q AS varchar) IS NULL
-                  OR p.title ILIKE CONCAT('%', CAST(:q AS varchar), '%')
-                  OR p.summary ILIKE CONCAT('%', CAST(:q AS varchar), '%'))
+             AND (:region = '' OR p.region = :region)
+             AND p.day_count >= :minDays
+             AND p.day_count <= :maxDays
+             AND (LOWER(p.title) LIKE :pattern
+                  OR LOWER(COALESCE(p.summary, '')) LIKE :pattern)
            """,
            nativeQuery = true)
     Page<TripPost> findHot(@Param("region") String region,
-                           @Param("minDays") Integer minDays,
-                           @Param("maxDays") Integer maxDays,
-                           @Param("q") String q,
+                           @Param("minDays") int minDays,
+                           @Param("maxDays") int maxDays,
+                           @Param("pattern") String pattern,
                            Pageable pageable);
 
     /**

@@ -344,8 +344,9 @@ function InviteRowView({ invite, onChanged }: { invite: InviteRow; onChanged: ()
   const [failed, setFailed] = useState<string | null>(null);
   const [asking, setAsking] = useState(false);
 
-  const expired =
-    invite.expiresAt !== null && new Date(invite.expiresAt).getTime() < Date.now();
+  /* 서버는 비어 있는 값을 아예 빼고 보냅니다(non_null). null 인지 없는지를
+     가르지 않아야 "기한 없음" 이 제대로 읽힙니다. */
+  const expired = invite.expiresAt != null && new Date(invite.expiresAt).getTime() < Date.now();
   const spent = invite.usedCount >= invite.maxUses;
   const dead = invite.revoked || expired || spent;
 
