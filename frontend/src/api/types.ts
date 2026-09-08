@@ -215,3 +215,27 @@ export type DayRoute = {
   /** 장소가 너무 많아 뒷부분을 계산하지 않았는지. */
   trimmed: boolean;
 };
+
+/* ------------------------------------------------------------ 장소 정보 */
+
+/**
+ * 구글이 알려 주는 가게 정보.
+ *
+ * 우리 DB 에 쌓지 않고 볼 때마다 받아 옵니다(구글 약관). 그래서 화면에는
+ * 출처를 함께 띄워야 합니다.
+ */
+export type PlaceInfo = {
+  /** 우리 쪽 장소 id */
+  id: string;
+  /** 그 장소가 있는 곳 기준 오늘의 영업시간 */
+  today: string | null;
+  /** 요일별. 월요일부터입니다. */
+  hours: string[];
+  phone: string | null;
+  website: string | null;
+  rating: number | null;
+  ratingCount: number | null;
+  /** 아예 문을 닫은 가게 */
+  permanentlyClosed: boolean;
+  mapUrl: string | null;
+};

@@ -3,7 +3,15 @@ import { useCallback, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { api, ApiError } from '@/api/client';
-import type { Day, DayRoute, Place, RouteLeg, TravelMode, TripDetail } from '@/api/types';
+import type {
+  Day,
+  DayRoute,
+  Place,
+  PlaceInfo,
+  RouteLeg,
+  TravelMode,
+  TripDetail,
+} from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { CompanionsSheet } from '@/components/companions-sheet';
 import type { RouteLine } from '@/components/map-types';
@@ -208,6 +216,28 @@ export default function TripScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [route, activeDay, days]);
 
+  /*
+    이 날 장소들이 언제 문을 여는지.
+
+    월요일 휴관을 모르고 갔다가 하루를 날리는 일이 흔합니다. 날짜를 고르면
+    자동으로 받아 옵니다. 경로와 달리 수단을 고를 것이 없어 따로 켜고 끄지
+    않습니다. 다만 "전체" 를 보고 있을 때는 날짜 수만큼 나가므로 쉽니다.
+  */
+  const { data: placeInfo } = useAsync<PlaceInfo[]>(
+    (signal) =>
+      routeDayId
+        ? api
+            .get<{ info: PlaceInfo[] }>(`/api/days/${routeDayId}/places-info`, signal)
+            .then((res) => res.info)
+        : Promise.resolve([]),
+    [routeDayId],
+  );
+
+  const infoOf = useMemo(
+    () => new Map((placeInfo ?? []).map((i) => [i.id, i])),
+    [placeInfo],
+  );
+
   /** 장소 뒤에 붙는 구간을 목록에서 바로 찾기 위해. */
   const legAfter = useMemo(
     () => new Map((route?.legs ?? []).map((leg) => [leg.fromId, leg])),
@@ -351,6 +381,7 @@ export default function TripScreen() {
             onRemove={remove}
             legAfter={legAfter}
             mode={mode}
+            infoOf={infoOf}
           />
         ) : null,
       )}
@@ -397,6 +428,7 @@ function DayCard({
   onRemove,
   legAfter,
   mode,
+  infoOf,
 }: {
   day: Day;
   index: number;
@@ -412,6 +444,8 @@ function DayCard({
   legAfter: Map<string, RouteLeg>;
   /** 길찾기를 넘길 때 어떤 수단으로 열지. 안 골랐으면 대중교통입니다. */
   mode: TravelMode | null;
+  /** 장소별 영업시간 등. 좌표만 직접 넣은 곳에는 없습니다. */
+  infoOf: Map<string, PlaceInfo>;
 }) {
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<Place | null>(null);
@@ -459,6 +493,7 @@ function DayCard({
                 onEdit={() => setEditing(place)}
                 onRemove={() => onRemove(place.id)}
                 mode={mode}
+                info={infoOf.get(place.id)}
               />
               {/* 다음 장소까지 얼마나 걸리는지. 마지막 장소 뒤에는 없습니다. */}
               {i < day.places.length - 1 ? <Hop leg={legAfter.get(place.id)} /> : null}
@@ -466,6 +501,15 @@ function DayCard({
           ))}
         </View>
       )}
+
+      {/*
+        영업시간과 평점은 구글에서 온 것이라, 어디서 왔는지 밝혀야 합니다.
+        약관 의무라 지우면 안 됩니다. 지도 위에 얹은 것이 아니라 목록이라
+        글자로 답니다.
+      */}
+      {day.places.some((p) => infoOf.has(p.id)) ? (
+        <Caption tone="muted">영업시간 · 평점 제공: Google</Caption>
+      ) : null}
 
       {canEdit ? (
         <>
@@ -511,6 +555,7 @@ function PlaceRow({
   active,
   canEdit,
   mode,
+  info,
   onToggle,
   onFocus,
   onEdit,
@@ -524,6 +569,7 @@ function PlaceRow({
   active: boolean;
   canEdit: boolean;
   mode: TravelMode | null;
+  info?: PlaceInfo;
   onToggle: () => void;
   onFocus: () => void;
   onEdit: () => void;
@@ -558,6 +604,7 @@ function PlaceRow({
             </Row>
             {place.ja || place.en ? <Caption>{place.ja ?? place.en}</Caption> : null}
             {place.note ? <Caption tone="secondary">{place.note}</Caption> : null}
+            {info ? <PlaceHours info={info} /> : null}
             {place.cat || place.cost || place.move?.min ? (
               <Row gap={Spacing.sm}>
                 {place.cat ? <Caption>{place.cat}</Caption> : null}
@@ -694,6 +741,48 @@ function RouteNote({
       총 이동 {asDuration(route.totalSeconds)} · {asDistance(route.totalMeters)}
       {route.trimmed ? ' · 장소가 많아 앞부분만 계산했습니다' : ''}
     </Caption>
+  );
+}
+
+
+/**
+ * 장소 밑에 붙는 영업시간 한 줄.
+ *
+ * <p>월요일 휴관을 모르고 갔다가 하루를 날리는 일이 흔합니다. 오늘 기준으로
+ * 한 줄만 보여 줍니다. 요일 일곱 줄을 다 늘어놓으면 목록이 읽히지 않습니다.
+ *
+ * <p>시간은 그 장소가 있는 곳 기준입니다. 서울이 화요일 아침일 때 파리는 아직
+ * 월요일 밤이라, 여기 시계로 세면 엉뚱한 요일을 보여 주게 됩니다. 그 계산은
+ * 서버가 합니다.
+ */
+function PlaceHours({ info }: { info: PlaceInfo }) {
+  if (info.permanentlyClosed) {
+    return (
+      <Caption tone="danger" strong>
+        문을 닫은 곳입니다
+      </Caption>
+    );
+  }
+  if (!info.today) {
+    return null;
+  }
+  /* 구글이 "월요일: 오전 9:00~오후 6:00" 처럼 요일까지 붙여 보냅니다.
+     어차피 오늘 것만 띄우므로 요일은 덜어 냅니다. */
+  const hours = info.today.replace(/^[^:]+:\s*/, '');
+  const closed = /휴무|closed/i.test(hours);
+
+  return (
+    <Row gap={Spacing.sm}>
+      <Caption tone={closed ? 'danger' : 'secondary'} strong={closed}>
+        오늘 {hours}
+      </Caption>
+      {info.rating ? (
+        <Caption tone="secondary">
+          ★ {info.rating.toFixed(1)}
+          {info.ratingCount ? ` (${info.ratingCount.toLocaleString()})` : ''}
+        </Caption>
+      ) : null}
+    </Row>
   );
 }
 
