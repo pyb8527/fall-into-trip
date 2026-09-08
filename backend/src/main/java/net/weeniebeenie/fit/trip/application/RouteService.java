@@ -206,8 +206,21 @@ public class RouteService {
 
             JsonNode route = res == null ? null : res.path("routes").path(0);
             if (route == null || route.isMissingNode() || route.isEmpty()) {
-                /* 섬과 뭍처럼 그 수단으로는 이어지지 않는 구간이 있습니다.
-                   오류가 아니라 "그 길은 없다" 입니다. */
+                /*
+                  섬과 뭍처럼 그 수단으로는 이어지지 않는 구간이 있습니다.
+                  오류가 아니라 "그 길은 없다" 입니다.
+
+                  대중교통에서는 자주 일어납니다. 두 곳이 몇 백 미터밖에 안
+                  떨어져 있으면 구글은 버스나 지하철을 태울 이유가 없다고 보고
+                  아무 경로도 주지 않습니다. 그래서 짧은 구간만 있는 하루는
+                  대중교통으로 아무것도 안 나오는 것처럼 보입니다.
+
+                  왜 비었는지 뒤에서 알아볼 수 있게 남깁니다. 조용히 넘기면
+                  키 문제인지 거리 문제인지 구별할 방법이 없습니다.
+                */
+                log.info("경로가 비었습니다: mode={} {},{} -> {},{} 응답={}",
+                        mode, from.getLat(), from.getLng(), to.getLat(), to.getLng(),
+                        res == null ? "null" : res.toString());
                 return Leg.unreachable(from.getId(), to.getId());
             }
 

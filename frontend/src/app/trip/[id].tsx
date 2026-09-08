@@ -34,6 +34,7 @@ import {
   Divider,
   Empty,
   ErrorNote,
+  Icon,
   IconButton,
   Loading,
   Row,
@@ -73,6 +74,7 @@ export default function TripScreen() {
 
   const [companions, setCompanions] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [dropping, setDropping] = useState(false);
   /*
     이동 수단. 처음에는 아무것도 고르지 않습니다.
 
@@ -193,7 +195,17 @@ export default function TripScreen() {
     "전체" 를 보고 있을 때는 계산하지 않습니다. 날짜 수만큼 구글에 묻게 되고
     구간마다 요금이 붙습니다. 한 날을 골라야 보여 줍니다.
   */
-  const routeDayId = activeDay === ALL ? null : (days[activeDay]?.id ?? null);
+  /*
+    하루짜리 여행에서는 날짜를 고르는 칩 자체가 뜨지 않아 늘 "전체" 로 남습니다.
+    그래서 이동 시간이 한 번도 나오지 않았습니다. 날이 하나뿐이면 전체가 곧 그
+    날이므로 고른 것으로 봅니다.
+  */
+  const routeDayId =
+    activeDay === ALL
+      ? days.length === 1
+        ? (days[0]?.id ?? null)
+        : null
+      : (days[activeDay]?.id ?? null);
   const {
     data: route,
     loading: routing,
@@ -370,13 +382,6 @@ export default function TripScreen() {
               />
             ))}
 
-            {me.supported ? (
-              <Chip
-                label={me.watching ? '내 위치 끄기' : '내 위치'}
-                selected={me.watching}
-                onPress={() => (me.watching ? me.stop() : me.start())}
-              />
-            ) : null}
           </Row>
 
           {me.error ? <Caption tone="danger">{me.error}</Caption> : null}
@@ -389,7 +394,14 @@ export default function TripScreen() {
             </Caption>
           ) : null}
 
-          {mode ? <RouteNote day={activeDay} route={route} busy={routing} error={routeError} /> : null}
+          {mode ? (
+            <RouteNote
+              picked={routeDayId !== null}
+              route={route}
+              busy={routing}
+              error={routeError}
+            />
+          ) : null}
 
           {total > 0 ? <Progress done={done} total={total} /> : null}
         </>
@@ -440,6 +452,24 @@ export default function TripScreen() {
         onLeft={() => router.replace('/(app)/trips')}
       />
 
+      <ConfirmDialog
+        visible={dropping}
+        title="이 여행을 지울까요?"
+        message="날짜와 장소가 모두 사라집니다. 동행자도 더 볼 수 없게 됩니다. 되돌릴 수 없습니다."
+        confirmLabel="지우기"
+        danger
+        onCancel={() => setDropping(false)}
+        onConfirm={async () => {
+          setDropping(false);
+          try {
+            await api.delete(`/api/trips/${data.trip.id}`);
+            router.replace('/(app)/trips');
+          } catch (e) {
+            setActionError(e instanceof ApiError ? e.message : '지우지 못했습니다.');
+          }
+        }}
+      />
+
       <PublishForm
         visible={publishing}
         tripId={data.trip.id}
@@ -475,6 +505,15 @@ export default function TripScreen() {
           />
         ) : null,
       )}
+
+      {/* 지우는 것은 주인만. 되돌릴 수 없는 일이라 목록 맨 아래, 손이 잘
+          닿지 않는 자리에 둡니다. */}
+      {data.trip.ownerId === user?.id ? (
+        <>
+          <Divider />
+          <Button label="여행 지우기" variant="danger" onPress={() => setDropping(true)} />
+        </>
+      ) : null}
     </Screen>
   );
 }
@@ -539,25 +578,58 @@ function DayCard({
 }) {
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<Place | null>(null);
+  /*
+    긴 여행은 카드가 그만큼 길어져 아래 날짜로 가려면 한참 굴려야 합니다.
+    접어 두면 날짜만 훑다가 볼 것만 펼 수 있습니다.
+
+    처음에는 펼쳐 둡니다. 접힌 채로 열리면 장소가 있는지조차 안 보입니다.
+  */
+  const [folded, setFolded] = useState(false);
   const done = day.places.filter((p) => visited.has(p.id)).length;
   const color = day.color || dayColor(index);
 
   return (
     <Card>
       <Row style={styles.dayHeader}>
-        <Row gap={Spacing.md} style={styles.dayTitle}>
-          <View style={[styles.dayDot, { backgroundColor: color }]} />
-          {/* 위 칩이 이미 날짜로 고르게 하므로 'Day 1' 은 같은 말을 한 번 더
-              하는 셈입니다. 날짜만 남깁니다. */}
-          <Subtitle>{day.date || day.label}</Subtitle>
+        {/* 머리 전체가 접었다 펴는 자리입니다. 작은 화살표만 누르게 하면
+            손가락으로는 잘 안 맞습니다. */}
+        <Pressable
+          onPress={() => setFolded((v) => !v)}
+          accessibilityRole="button"
+          accessibilityLabel={`${day.date || day.label} ${folded ? '펴기' : '접기'}`}
+          style={styles.dayTap}>
+          <Row gap={Spacing.md} style={styles.dayTitle}>
+            <View style={[styles.dayDot, { backgroundColor: color }]} />
+            {/* 위 칩이 이미 날짜로 고르게 하므로 'Day 1' 은 같은 말을 한 번 더
+                하는 셈입니다. 날짜만 남깁니다. */}
+            <Subtitle>{day.date || day.label}</Subtitle>
+            <Icon name={folded ? 'chevron-down' : 'chevron-up'} size={16} tone="muted" />
+          </Row>
+        </Pressable>
+
+        <Row gap={Spacing.sm}>
+          {day.places.length > 0 ? (
+            <Caption tone={done === day.places.length ? 'success' : 'muted'} strong>
+              {done}/{day.places.length}
+            </Caption>
+          ) : null}
+          {/* 넣기 단추가 카드 맨 아래에 있으면 장소가 많을수록 굴려야 닿습니다.
+              늘 같은 자리(머리 오른쪽)에 둡니다. */}
+          {canEdit ? (
+            <IconButton
+              name="plus"
+              label={`${day.date || day.label}에 장소 넣기`}
+              onPress={() => {
+                setFolded(false);
+                setAdding(true);
+              }}
+            />
+          ) : null}
         </Row>
-        {day.places.length > 0 ? (
-          <Caption tone={done === day.places.length ? 'success' : 'muted'} strong>
-            {done}/{day.places.length}
-          </Caption>
-        ) : null}
       </Row>
 
+      {folded ? null : (
+        <>
       {day.theme ? (
         <Body small tone="secondary">
           {day.theme}
@@ -601,12 +673,8 @@ function DayCard({
         <Caption tone="muted">영업시간 · 평점 제공: Google</Caption>
       ) : null}
 
-      {canEdit ? (
-        <>
-          <Divider />
-          <Button label="장소 넣기" variant="secondary" onPress={() => setAdding(true)} />
         </>
-      ) : null}
+      )}
 
       {/* 넣기와 고치기 모두 아래에서 올라오는 판으로 합니다. */}
       <PlaceForm
@@ -804,17 +872,18 @@ function Hop({ leg }: { leg?: RouteLeg }) {
 
 /** 수단을 고른 뒤 위쪽에 뜨는 한 줄. */
 function RouteNote({
-  day,
+  picked,
   route,
   busy,
   error,
 }: {
-  day: number;
+  /** 계산할 날짜가 정해졌는지. 여러 날 중 "전체" 를 보고 있으면 아닙니다. */
+  picked: boolean;
   route: DayRoute | null;
   busy: boolean;
   error: string | null;
 }) {
-  if (day === ALL) {
+  if (!picked) {
     return <Caption tone="secondary">날짜를 하나 고르면 이동 시간을 보여 줍니다.</Caption>;
   }
   if (error) {
@@ -908,6 +977,11 @@ const styles = StyleSheet.create({
     borderRadius: Radius.full,
   },
 
+  /* 누르는 자리를 넓게 잡아 손가락으로 맞추기 쉽게 합니다. */
+  dayTap: {
+    flexShrink: 1,
+    paddingVertical: Spacing.xs,
+  },
   dayHeader: {
     justifyContent: 'space-between',
     alignItems: 'flex-start',

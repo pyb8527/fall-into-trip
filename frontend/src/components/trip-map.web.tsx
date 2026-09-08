@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import type { MapPlace, TripMapProps } from '@/components/map-types';
 import { gmaps, hasMaps, loadMaps } from '@/lib/gmaps.web';
 import { Colors, Radius, Spacing, Tap } from '@/constants/theme';
-import { Badge, Body, Caption, Row, Subtitle } from '@/ui';
+import { Badge, Body, Caption, IconButton, Row, Subtitle } from '@/ui';
 
 /**
  * 지도 (웹).
@@ -98,7 +98,9 @@ export function TripMap({
           center: { lat: 37.5665, lng: 126.978 },
           zoom: 12,
           disableDefaultUI: true,
-          zoomControl: true,
+          /* 확대·축소 단추는 두지 않습니다. 손가락으로 벌리고 오므리는 것이
+             더 빠르고, 그 자리를 내 위치 단추에 씁니다. */
+          zoomControl: false,
           clickableIcons: false,
           gestureHandling: 'greedy',
           maxZoom: 18,
@@ -403,6 +405,18 @@ export function TripMap({
     return null;
   }
 
+  /** 내가 있는 자리로 지도를 옮깁니다. 어디까지 갔는지 놓쳤을 때 쓰는 단추입니다. */
+  const goHere = useCallback(() => {
+    if (!map.current || !here) {
+      return;
+    }
+    map.current.panTo({ lat: here.lat, lng: here.lng });
+    /* 이미 가까이 보고 있으면 그대로 둡니다. 누를 때마다 확대되면 답답합니다. */
+    if ((map.current.getZoom() ?? 0) < 15) {
+      map.current.setZoom(16);
+    }
+  }, [here]);
+
   const chosen = full && sheetId ? (places.find((p) => p.id === sheetId) ?? null) : null;
 
   return (
@@ -418,16 +432,16 @@ export function TripMap({
       }}>
       <div ref={host} style={{ width: '100%', height: '100%' }} />
 
+      {/* 글자 대신 모양으로 둡니다. 앱 쪽과 같아야 같은 화면으로 읽힙니다. */}
       <View style={styles.overlay}>
-        <Pressable
+        {here ? (
+          <IconButton name="crosshair" label="내 위치로" onPress={goHere} />
+        ) : null}
+        <IconButton
+          name={full ? 'minimize' : 'maximize'}
+          label={full ? '전체화면 닫기' : '전체화면으로 보기'}
           onPress={toggleFull}
-          accessibilityRole="button"
-          accessibilityLabel={full ? '전체화면 닫기' : '전체화면으로 보기'}
-          style={({ pressed }) => [styles.chip, pressed && styles.chipPressed]}>
-          <Body small strong>
-            {full ? '닫기' : '전체화면'}
-          </Body>
-        </Pressable>
+        />
       </View>
 
       {chosen ? <PlaceSheet place={chosen} onClose={() => setSheetId(null)} /> : null}
@@ -491,6 +505,8 @@ function PlaceSheet({ place, onClose }: { place: MapPlace; onClose: () => void }
 
 const styles = StyleSheet.create({
   overlay: {
+    flexDirection: 'row',
+    gap: Spacing.xs,
     position: 'absolute',
     top: Spacing.md,
     right: Spacing.md,

@@ -569,7 +569,10 @@ export type IconName =
   | 'navigation'
   | 'clock'
   | 'phone'
-  | 'external-link';
+  | 'external-link'
+  | 'crosshair'
+  | 'chevron-down'
+  | 'chevron-up';
 
 export function Icon({
   name,
