@@ -53,6 +53,22 @@ T("글이 열림", r.status === 200 && r.data.title === "오사카 2박 3일", r
 T("일정이 함께 옴", r.data.itinerary?.days?.[0]?.places?.length === 2, r.data.itinerary?.days?.[0]);
 T("남의 방문 기록은 안 실림", JSON.stringify(r.data.itinerary).includes("visited") === false, null);
 
+console.log("\n[4-2] 골라 보기");
+r = await call("GET", "/api/posts/regions");
+T("지역 목록이 열림", r.status === 200 && r.data.regions.includes("일본"), r.data);
+r = await call("GET", "/api/posts?region=" + encodeURIComponent("일본"));
+T("지역을 안 골랐으면 안 걸림", !r.data.posts.some(p => p.id === postId), r.data.posts?.[0]);
+r = await call("GET", "/api/posts?q=" + encodeURIComponent("오사카"));
+T("제목으로 찾음", r.data.posts.some(p => p.id === postId), r.data.posts?.[0]);
+r = await call("GET", "/api/posts?q=" + encodeURIComponent("없는말없는말"));
+T("없는 말은 안 걸림", r.data.posts.length === 0, r.data);
+r = await call("GET", "/api/posts?days=1");
+T("당일치기로 거르면 사흘짜리는 빠짐", !r.data.posts.some(p => p.id === postId), r.data);
+r = await call("GET", "/api/posts?days=2-4&sort=new");
+T("기간이 맞으면 걸림", r.data.posts.some(p => p.id === postId), r.data);
+r = await call("GET", "/api/posts?sort=top&q=" + encodeURIComponent("오사카"));
+T("정렬을 바꿔도 보는 범위는 같음", r.data.posts.some(p => p.id === postId), r.data);
+
 console.log("\n[5] 추천은 한 사람이 한 번");
 r = await call("POST", `/api/posts/${postId}/like`, { token: reader });
 T("추천", r.status === 200 && r.data.liked === true, r.data);
@@ -72,6 +88,14 @@ const seen = r.data.viewCount;
 await call("GET", "/api/posts/" + postId, { token: reader });
 r = await call("GET", "/api/posts/" + postId, { token: reader });
 T("새로고침해도 안 늘어남", r.data.viewCount === seen, { seen, now: r.data.viewCount });
+
+console.log("\n[6-2] 내가 쓴 글");
+r = await call("GET", "/api/posts/mine", { token: author });
+T("내 글이 보임", r.status === 200 && r.data.posts.some(p => p.id === postId), r.data);
+r = await call("GET", "/api/posts/mine", { token: reader });
+T("남의 글은 안 보임", r.data.posts.length === 0, r.data);
+r = await call("GET", "/api/posts/mine");
+T("로그인 없이는 못 봄", r.status === 401 || r.status === 403, r.data);
 
 console.log("\n[7] 남의 일정을 내 것으로 가져온다");
 r = await call("POST", `/api/posts/${postId}/copy`, { token: reader, body: {} });
