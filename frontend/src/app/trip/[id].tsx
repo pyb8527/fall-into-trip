@@ -1,5 +1,5 @@
 import { Stack, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { api, ApiError } from '@/api/client';
@@ -18,6 +18,7 @@ import type { RouteLine } from '@/components/map-types';
 import { PlaceForm } from '@/components/place-form';
 import { TripMap, type MapPlace } from '@/components/trip-map';
 import { openDirections } from '@/lib/directions';
+import { useHere } from '@/lib/here';
 import { decodePolyline } from '@/lib/polyline';
 import { Colors, dayColor, Radius, Spacing, Tap } from '@/constants/theme';
 import {
@@ -75,6 +76,9 @@ export default function TripScreen() {
     보지도 않은 것에 돈을 냅니다. 눌렀을 때만 묻습니다.
   */
   const [mode, setMode] = useState<TravelMode | null>(null);
+  const me = useHere();
+  /* 지금 자리에서 고른 장소까지. 위치를 켜고 장소를 골랐을 때만 있습니다. */
+  const [fromHere, setFromHere] = useState<RouteLeg | null>(null);
   const [activeDay, setActiveDay] = useState<number>(ALL);
   const [activePlaceId, setActivePlaceId] = useState<string | null>(null);
 
@@ -238,6 +242,48 @@ export default function TripScreen() {
     [placeInfo],
   );
 
+  /*
+    지금 자리에서 고른 장소까지.
+
+    좌표는 본문으로 보냅니다. 쿼리스트링은 접근 기록과 방문 기록에 남는데,
+    사람이 지금 어디 있는지는 거기 남길 값이 아닙니다.
+
+    걸을 때마다 다시 묻지는 않습니다. 다른 장소를 고르거나 수단을 바꿀 때만
+    묻습니다. 몇 걸음 옮겼다고 소요 시간이 달라지지도 않고, 그때마다 물으면
+    요금이 계속 나갑니다.
+  */
+  const herePoint = me.here ? `${me.here.lat.toFixed(4)},${me.here.lng.toFixed(4)}` : null;
+  useEffect(() => {
+    const spot = me.here;
+    if (!spot || !activePlaceId) {
+      setFromHere(null);
+      return;
+    }
+    let alive = true;
+    api
+      .post<{ leg: RouteLeg }>(`/api/places/${activePlaceId}/route`, {
+        lat: spot.lat,
+        lng: spot.lng,
+        mode: mode ?? 'TRANSIT',
+      })
+      .then((res) => {
+        if (alive) {
+          setFromHere(res.leg);
+        }
+      })
+      .catch(() => {
+        if (alive) {
+          setFromHere(null);
+        }
+      });
+    return () => {
+      alive = false;
+    };
+    /* 자리는 소수 넷째 자리(십여 미터)까지만 봅니다. 그보다 잘게 보면
+       가만히 서 있어도 값이 떨려 계속 다시 묻습니다. */
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activePlaceId, mode, herePoint]);
+
   /** 장소 뒤에 붙는 구간을 목록에서 바로 찾기 위해. */
   const legAfter = useMemo(
     () => new Map((route?.legs ?? []).map((leg) => [leg.fromId, leg])),
@@ -281,6 +327,7 @@ export default function TripScreen() {
             activeId={activePlaceId}
             onSelect={setActivePlaceId}
             routes={routeLines}
+            here={me.here}
             height={260}
           />
 
@@ -318,7 +365,25 @@ export default function TripScreen() {
                 onPress={() => setMode(m.value)}
               />
             ))}
+
+            {me.supported ? (
+              <Chip
+                label={me.watching ? '내 위치 끄기' : '내 위치'}
+                selected={me.watching}
+                onPress={() => (me.watching ? me.stop() : me.start())}
+              />
+            ) : null}
           </Row>
+
+          {me.error ? <Caption tone="danger">{me.error}</Caption> : null}
+          {fromHere ? (
+            <Caption tone="accent" strong>
+              여기서{' '}
+              {fromHere.reachable
+                ? `${asDuration(fromHere.seconds)} · ${asDistance(fromHere.meters)}`
+                : '갈 수 있는 길을 찾지 못했습니다'}
+            </Caption>
+          ) : null}
 
           {mode ? <RouteNote day={activeDay} route={route} busy={routing} error={routeError} /> : null}
 

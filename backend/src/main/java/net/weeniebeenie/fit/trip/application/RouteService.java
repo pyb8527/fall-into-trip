@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.weeniebeenie.fit.account.infrastructure.security.AuthPrincipal;
+import net.weeniebeenie.fit.shared.domain.Coordinates;
 import net.weeniebeenie.fit.shared.error.ApiException;
 import net.weeniebeenie.fit.trip.domain.Day;
 import net.weeniebeenie.fit.trip.domain.DayRepository;
@@ -128,6 +129,32 @@ public class RouteService {
         }
 
         return new DayRoute(mode, legs, seconds, meters, trimmed);
+    }
+
+    /**
+     * 지금 서 있는 자리에서 그 장소까지.
+     *
+     * <p>일정에 적힌 순서가 아니라 <b>내가 있는 곳</b>이 출발점입니다. 길 위에서
+     * 궁금한 것은 대개 이쪽입니다.
+     *
+     * <p>보낸 좌표는 어디에도 남기지 않습니다. 이 요청을 처리하는 동안만 씁니다.
+     * 아래 캐시에도 넣지 않습니다 — 사람이 움직이므로 다음에 물을 때는 이미
+     * 다른 자리이고, 무엇보다 남의 위치를 서버가 들고 있을 이유가 없습니다.
+     */
+    public Leg fromHere(AuthPrincipal me, String placeId, double lat, double lng, Mode mode) {
+        Place to = places.findById(placeId)
+                .orElseThrow(() -> ApiException.notFound("장소를 찾을 수 없습니다."));
+        Day day = days.findById(to.getDayId())
+                .orElseThrow(() -> ApiException.notFound("날짜를 찾을 수 없습니다."));
+        access.requireCanRead(day.getTripId(), me.id());
+
+        if (!enabled()) {
+            throw ApiException.badRequest("경로 안내가 꺼져 있습니다.");
+        }
+
+        Coordinates at = Coordinates.of(lat, lng);
+        Place here = Place.builder().name("여기").lat(at.lat()).lng(at.lng()).build();
+        return ask(here, to, mode).withEnds("me", to.getId());
     }
 
     private Leg leg(Place from, Place to, Mode mode) {

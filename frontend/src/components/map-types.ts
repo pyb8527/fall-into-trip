@@ -31,6 +31,8 @@ export type MapPlace = {
 };
 
 export type TripMapProps = {
+  /** 지금 내가 있는 자리. 켰을 때만 옵니다. */
+  here?: { lat: number; lng: number; accuracy: number } | null;
   /** 있으면 점선 대신 이것을 그립니다. */
   routes?: RouteLine[];
   places: MapPlace[];

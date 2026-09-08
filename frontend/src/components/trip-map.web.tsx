@@ -50,7 +50,14 @@ function pinIcon(color: string, n: number, active: boolean) {
   return 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
 }
 
-export function TripMap({ places, activeId, onSelect, routes, height = 300 }: TripMapProps) {
+export function TripMap({
+  places,
+  activeId,
+  onSelect,
+  routes,
+  here,
+  height = 300,
+}: TripMapProps) {
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
   const [full, setFull] = useState(false);
@@ -173,6 +180,65 @@ export function TripMap({ places, activeId, onSelect, routes, height = 300 }: Tr
 
   /* 장소가 바뀌면 마커·원·동선을 통째로 다시 만듭니다. 몇십 개 수준이라
      하나씩 맞춰 고치는 것보다 지우고 다시 그리는 편이 단순하고 안전합니다. */
+  /*
+    지금 내 자리.
+
+    장소 핀과 따로 그립니다. 장소가 바뀔 때마다 위치까지 다시 그리면 걸어
+    다니는 동안 화면이 쉴 새 없이 깜빡입니다.
+  */
+  const meDot = useRef<any>(null);
+  const meRing = useRef<any>(null);
+
+  useEffect(() => {
+    if (!ready || !map.current) {
+      return;
+    }
+    const g = gmaps();
+
+    if (!here) {
+      meDot.current?.setMap(null);
+      meRing.current?.setMap(null);
+      meDot.current = null;
+      meRing.current = null;
+      return;
+    }
+
+    const at = { lat: here.lat, lng: here.lng };
+    if (meDot.current) {
+      meDot.current.setPosition(at);
+      meRing.current.setCenter(at);
+      meRing.current.setRadius(here.accuracy);
+      return;
+    }
+
+    /* 바깥 원은 "이 안쪽 어딘가" 라는 뜻입니다. 실내나 지하에서는 꽤 큽니다. */
+    meRing.current = new g.Circle({
+      center: at,
+      radius: here.accuracy,
+      map: map.current,
+      strokeColor: '#3182F6',
+      strokeOpacity: 0.35,
+      strokeWeight: 1,
+      fillColor: '#3182F6',
+      fillOpacity: 0.12,
+      zIndex: 1,
+    });
+    meDot.current = new g.Marker({
+      position: at,
+      map: map.current,
+      zIndex: 999,
+      title: '지금 내 위치',
+      icon: {
+        path: g.SymbolPath.CIRCLE,
+        scale: 7,
+        fillColor: '#3182F6',
+        fillOpacity: 1,
+        strokeColor: '#FFFFFF',
+        strokeWeight: 2.5,
+      },
+    });
+  }, [ready, here]);
+
   useEffect(() => {
     if (!ready || !map.current) {
       return;
