@@ -3,6 +3,8 @@ package net.weeniebeenie.fit.community.domain;
 import jakarta.persistence.*;
 import lombok.*;
 import net.weeniebeenie.fit.shared.domain.Ids;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 
@@ -41,7 +43,14 @@ public class TripPost {
     @Column(length = 300)
     private String summary;
 
-    /** 올릴 때의 일정 전체. 날짜와 장소가 그대로 들어 있습니다. */
+    /**
+     * 올릴 때의 일정 전체. 날짜와 장소가 그대로 들어 있습니다.
+     *
+     * <p>자바에서는 그냥 문자열이지만 데이터베이스에서는 jsonb 입니다. 이것을
+     * 알려 주지 않으면 하이버네이트가 문자열로 밀어 넣고 PostgreSQL 이
+     * 거절합니다.
+     */
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(nullable = false, columnDefinition = "jsonb")
     private String snapshot;
 
