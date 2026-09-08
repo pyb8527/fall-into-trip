@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { api, query } from '@/api/client';
-import type { PostCard, PostPage, PostSort } from '@/api/types';
+import type { PostCard, PostDays, PostPage, PostSort } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
 import { Spacing } from '@/constants/theme';
@@ -12,8 +12,10 @@ import {
   Button,
   Caption,
   Card,
+  Chip,
   Empty,
   ErrorNote,
+  Field,
   Loading,
   Row,
   Screen,
@@ -36,6 +38,18 @@ import {
  */
 type Tab = PostSort | 'mine';
 
+/**
+ * 거를 수 있는 기간.
+ *
+ * 날짜 수를 그대로 묻지 않습니다. "3박4일" 을 찾는 사람이 4를 넣어야 하는지
+ * 3을 넣어야 하는지 헷갈립니다.
+ */
+const DAYS: { value: PostDays; label: string }[] = [
+  { value: '1', label: '당일' },
+  { value: '2-4', label: '1~3박' },
+  { value: '5', label: '4박 이상' },
+];
+
 const TABS: { value: Tab; label: string }[] = [
   { value: 'hot', label: '인기' },
   { value: 'new', label: '최신' },
@@ -49,13 +63,35 @@ export default function Community() {
   const [view, setView] = useState<Tab>('hot');
   const [page, setPage] = useState(0);
 
+  /* 글자를 칠 때마다 부르면 요청이 쏟아집니다. 확인 버튼으로만 보냅니다. */
+  const [typed, setTyped] = useState('');
+  const [q, setQ] = useState('');
+  const [region, setRegion] = useState<string | null>(null);
+  const [days, setDays] = useState<PostDays | null>(null);
+
+  /* 고를 수 있는 지역은 서버가 정합니다. 화면에 따로 적어 두면 언젠가
+     어긋나고, 어긋나면 고른 값이 아무것도 안 걸립니다. */
+  const { data: regionList } = useAsync<{ regions: string[] }>(
+    (signal) => api.get('/api/posts/regions', signal),
+    [],
+  );
+
+  /** 무엇으로든 거르고 있는지. 아무것도 안 걸렸을 때만 안내를 띄웁니다. */
+  const filtered = q !== '' || region !== null || days !== null;
+
   const { data, error, loading, reload, setData } = useAsync<PostPage>(
     (signal) =>
       view === 'mine'
         ? api.get(`/api/posts/mine${query({ page })}`, signal)
-        : api.get(`/api/posts${query({ sort: view, page })}`, signal),
-    [view, page],
+        : api.get(`/api/posts${query({ sort: view, region, days, q, page })}`, signal),
+    [view, page, region, days, q],
   );
+
+  /** 조건을 바꾸면 첫 쪽부터 다시 봅니다. 3쪽에서 걸면 빈 화면이 됩니다. */
+  function refilter(change: () => void) {
+    change();
+    setPage(0);
+  }
 
   /**
    * 추천을 누르면 서버를 기다리지 않고 먼저 칠합니다.
@@ -103,6 +139,55 @@ export default function Community() {
         }}
       />
 
+      {/* 내 글에는 거르기를 두지 않습니다. 몇 개 안 되는 것을 또 거를 이유가
+          없고, 서버도 내 글에는 조건을 받지 않습니다. */}
+      {view === 'mine' ? null : (
+        <View style={styles.filters}>
+          <Field
+            label="찾기"
+            value={typed}
+            onChangeText={setTyped}
+            placeholder="도쿄, 온천, 아이와 함께"
+            returnKeyType="search"
+            onSubmitEditing={() => refilter(() => setQ(typed.trim()))}
+          />
+
+          <Row gap={Spacing.xs}>
+            <Chip
+              label="어디든"
+              selected={region === null}
+              onPress={() => refilter(() => setRegion(null))}
+            />
+            {regionList?.regions.map((r) => (
+              <Chip
+                key={r}
+                label={r}
+                selected={region === r}
+                onPress={() => refilter(() => setRegion(region === r ? null : r))}
+              />
+            ))}
+          </Row>
+
+          <Row gap={Spacing.xs}>
+            <Chip
+              label="며칠이든"
+              selected={days === null}
+              onPress={() => refilter(() => setDays(null))}
+            />
+            {DAYS.map((d) => (
+              <Chip
+                key={d.value}
+                label={d.label}
+                selected={days === d.value}
+                onPress={() => refilter(() => setDays(days === d.value ? null : d.value))}
+              />
+            ))}
+          </Row>
+
+          {data ? <Caption tone="secondary">{data.total.toLocaleString()}개</Caption> : null}
+        </View>
+      )}
+
       {loading && !data ? <Loading /> : null}
       {error ? <ErrorNote message={error} onRetry={reload} /> : null}
 
@@ -111,7 +196,9 @@ export default function Community() {
           message={
             view === 'mine'
               ? '아직 올린 일정이 없습니다. 여행 화면에서 올릴 수 있습니다.'
-              : '아직 올라온 일정이 없습니다. 첫 번째가 되어 보세요.'
+              : filtered
+                ? '조건에 맞는 일정이 없습니다. 조건을 줄여 보세요.'
+                : '아직 올라온 일정이 없습니다. 첫 번째가 되어 보세요.'
           }
         />
       ) : null}
@@ -171,6 +258,7 @@ function PostRow({
           </Body>
         ) : null}
         <Caption tone="secondary">
+          {post.region ? `${post.region} · ` : ''}
           {post.authorName} · {post.dayCount}일 · {post.placeCount}곳
         </Caption>
       </Pressable>
@@ -193,6 +281,9 @@ function PostRow({
 const styles = StyleSheet.create({
   head: {
     gap: Spacing.xs,
+  },
+  filters: {
+    gap: Spacing.sm,
   },
   tap: {
     gap: Spacing.xs,

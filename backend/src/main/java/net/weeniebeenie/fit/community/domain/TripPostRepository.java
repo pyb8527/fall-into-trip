@@ -9,11 +9,32 @@ import org.springframework.data.repository.query.Param;
 
 public interface TripPostRepository extends JpaRepository<TripPost, String> {
 
-    Page<TripPost> findAllByHiddenFalseOrderByCreatedAtDesc(Pageable pageable);
-
-    Page<TripPost> findAllByHiddenFalseOrderByLikeCountDescCreatedAtDesc(Pageable pageable);
-
     Page<TripPost> findAllByAuthorIdOrderByCreatedAtDesc(String authorId, Pageable pageable);
+
+    /**
+     * 걸러 보기.
+     *
+     * <p>지역·기간·글자를 한 질의로 받습니다. 조건마다 메서드를 따로 두면
+     * 조합이 늘 때마다 배로 늘어납니다. 비어 있는 조건은 통과시킵니다.
+     *
+     * <p>글자는 제목과 소개에서만 찾습니다. 일정 안쪽(장소 이름)까지 뒤지려면
+     * jsonb 를 훑어야 하는데, 그건 인덱스가 안 먹어 글이 늘수록 느려집니다.
+     */
+    @Query("""
+           SELECT p FROM TripPost p
+           WHERE p.hidden = false
+             AND (:region IS NULL OR p.region = :region)
+             AND (:minDays IS NULL OR p.dayCount >= :minDays)
+             AND (:maxDays IS NULL OR p.dayCount <= :maxDays)
+             AND (:q IS NULL
+                  OR LOWER(p.title) LIKE LOWER(CONCAT('%', :q, '%'))
+                  OR LOWER(p.summary) LIKE LOWER(CONCAT('%', :q, '%')))
+           """)
+    Page<TripPost> search(@Param("region") String region,
+                          @Param("minDays") Integer minDays,
+                          @Param("maxDays") Integer maxDays,
+                          @Param("q") String q,
+                          Pageable pageable);
 
     /**
      * 인기 순.
@@ -28,17 +49,42 @@ public interface TripPostRepository extends JpaRepository<TripPost, String> {
      *
      * <p>조회수는 넣지 않았습니다. 조회는 제목이 자극적이면 올라가지만 추천은
      * 끝까지 읽어야 누릅니다. 둘을 섞으면 자극적인 제목이 이깁니다.
+     *
+     * <p>거르는 조건은 위 search 와 같아야 합니다. 정렬만 다르고 보는 범위가
+     * 달라지면 띠를 바꿀 때마다 결과가 널뜁니다.
+     *
+     * <p>비어 있는 조건에 형을 붙여 둡니다. 네이티브 질의에서 값이 NULL 로만
+     * 오면 PostgreSQL 이 그 자리의 형을 알 수 없다고 거절합니다.
      */
     @Query(value = """
            SELECT * FROM trip_posts p
            WHERE p.hidden = false
+             AND (CAST(:region AS varchar) IS NULL OR p.region = CAST(:region AS varchar))
+             AND (CAST(:minDays AS integer) IS NULL OR p.day_count >= CAST(:minDays AS integer))
+             AND (CAST(:maxDays AS integer) IS NULL OR p.day_count <= CAST(:maxDays AS integer))
+             AND (CAST(:q AS varchar) IS NULL
+                  OR p.title ILIKE CONCAT('%', CAST(:q AS varchar), '%')
+                  OR p.summary ILIKE CONCAT('%', CAST(:q AS varchar), '%'))
            ORDER BY (p.like_count + 1)
                     / POWER(EXTRACT(EPOCH FROM (now() - p.created_at)) / 3600 + 2, 1.5) DESC,
                     p.created_at DESC
            """,
-           countQuery = "SELECT count(*) FROM trip_posts WHERE hidden = false",
+           countQuery = """
+           SELECT count(*) FROM trip_posts p
+           WHERE p.hidden = false
+             AND (CAST(:region AS varchar) IS NULL OR p.region = CAST(:region AS varchar))
+             AND (CAST(:minDays AS integer) IS NULL OR p.day_count >= CAST(:minDays AS integer))
+             AND (CAST(:maxDays AS integer) IS NULL OR p.day_count <= CAST(:maxDays AS integer))
+             AND (CAST(:q AS varchar) IS NULL
+                  OR p.title ILIKE CONCAT('%', CAST(:q AS varchar), '%')
+                  OR p.summary ILIKE CONCAT('%', CAST(:q AS varchar), '%'))
+           """,
            nativeQuery = true)
-    Page<TripPost> findHot(Pageable pageable);
+    Page<TripPost> findHot(@Param("region") String region,
+                           @Param("minDays") Integer minDays,
+                           @Param("maxDays") Integer maxDays,
+                           @Param("q") String q,
+                           Pageable pageable);
 
     /**
      * 운영자가 봐야 할 글.

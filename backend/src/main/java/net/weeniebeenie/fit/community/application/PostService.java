@@ -14,6 +14,8 @@ import net.weeniebeenie.fit.shared.error.ApiException;
 import net.weeniebeenie.fit.support.audit.AuditService;
 import net.weeniebeenie.fit.trip.domain.*;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,6 +43,19 @@ public class PostService {
     /** 이만큼 신고가 쌓이면 사람이 볼 때까지 감춥니다. */
     private static final long HIDE_AT_REPORTS = 3;
 
+    /**
+     * 고를 수 있는 지역.
+     *
+     * <p>나라 단위로 쪼개면 목록이 길어져 고르기가 일이 되고, 대륙 단위면
+     * "유럽" 하나에 다 들어가 거르는 뜻이 없어집니다. 여행지로 실제 묶이는
+     * 단위로 나눕니다.
+     *
+     * <p>화면에도 이 목록을 그대로 씁니다. 두 곳에서 따로 적으면 언젠가
+     * 어긋나고, 어긋나면 고른 값이 저장은 되는데 아무것도 안 걸립니다.
+     */
+    public static final List<String> REGIONS = List.of(
+            "국내", "일본", "중화권", "동남아", "유럽", "미주", "오세아니아", "그 밖");
+
     private final TripPostRepository posts;
     private final PostLikeRepository likes;
     private final PostViewRepository views;
@@ -59,7 +74,8 @@ public class PostService {
     /* ------------------------------------------------------------ 올리기 */
 
     @Transactional
-    public TripPost publish(AuthPrincipal me, String tripId, String title, String summary) {
+    public TripPost publish(AuthPrincipal me, String tripId, String title, String summary,
+                            String region) {
         Trip trip = access.requireOwner(tripId, me.id());
 
         if (posts.findAllByAuthorIdOrderByCreatedAtDesc(me.id(), Pageable.ofSize(1))
@@ -79,6 +95,8 @@ public class PostService {
                 .authorId(me.id())
                 .title(clean)
                 .summary(summary == null || summary.isBlank() ? null : summary.trim())
+                /* 목록에 없는 값이 들어오면 아무것도 안 걸리는 글이 됩니다. 버립니다. */
+                .region(REGIONS.contains(region) ? region : null)
                 .snapshot(snapshotOf(clean, dayList, placeList))
                 .dayCount(dayList.size())
                 .placeCount(placeList.size())
@@ -136,13 +154,47 @@ public class PostService {
 
     /* ------------------------------------------------------------- 읽기 */
 
+    /**
+     * 골라 보기.
+     *
+     * <p>거르는 조건은 정렬과 무관하게 같습니다. 띠를 바꿨다고 보는 범위까지
+     * 달라지면 결과가 널뜁니다.
+     *
+     * @param days 며칠짜리인지. "1" 은 당일치기, "2-4" 는 1~3박, "5" 는 그 이상.
+     */
     @Transactional(readOnly = true)
-    public Page<TripPost> list(String sort, Pageable pageable) {
-        return switch (sort == null ? "hot" : sort) {
-            case "new" -> posts.findAllByHiddenFalseOrderByCreatedAtDesc(pageable);
-            case "top" -> posts.findAllByHiddenFalseOrderByLikeCountDescCreatedAtDesc(pageable);
-            default -> posts.findHot(pageable);
+    public Page<TripPost> list(String sort, String region, String days, String q, Pageable pageable) {
+        String cleanRegion = REGIONS.contains(region) ? region : null;
+        String cleanQ = q == null || q.isBlank() ? null : q.trim();
+        Integer minDays = null;
+        Integer maxDays = null;
+        if (days != null) {
+            switch (days) {
+                case "1" -> maxDays = 1;
+                case "2-4" -> {
+                    minDays = 2;
+                    maxDays = 4;
+                }
+                case "5" -> minDays = 5;
+                default -> { /* 모르는 값은 거르지 않는 것으로 봅니다. */ }
+            }
+        }
+
+        Pageable paged = switch (sort == null ? "hot" : sort) {
+            case "new" -> withSort(pageable, Sort.by(Sort.Direction.DESC, "createdAt"));
+            case "top" -> withSort(pageable,
+                    Sort.by(Sort.Direction.DESC, "likeCount").and(Sort.by(Sort.Direction.DESC, "createdAt")));
+            default -> pageable;
         };
+
+        /* 인기 순은 나이로 나눈 값이라 정렬을 질의 안에 박아 두었습니다. */
+        return "new".equals(sort) || "top".equals(sort)
+                ? posts.search(cleanRegion, minDays, maxDays, cleanQ, paged)
+                : posts.findHot(cleanRegion, minDays, maxDays, cleanQ, pageable);
+    }
+
+    private static Pageable withSort(Pageable page, Sort sort) {
+        return PageRequest.of(page.getPageNumber(), page.getPageSize(), sort);
     }
 
     @Transactional(readOnly = true)
@@ -354,7 +406,7 @@ public class PostService {
     }
 
     /** 목록 한 줄. 사본 전체는 싣지 않습니다 — 목록에서는 쓰지 않습니다. */
-    public record Card(String id, String title, String summary, String authorName,
+    public record Card(String id, String title, String summary, String region, String authorName,
                        int dayCount, int placeCount, int likeCount, int viewCount,
                        boolean liked, java.time.Instant createdAt) {
     }
@@ -363,7 +415,7 @@ public class PostService {
         Set<String> mine = likedBy(userId, list.stream().map(TripPost::getId).toList());
         List<Card> out = new ArrayList<>(list.size());
         for (TripPost p : list) {
-            out.add(new Card(p.getId(), p.getTitle(), p.getSummary(), authorNameOf(p),
+            out.add(new Card(p.getId(), p.getTitle(), p.getSummary(), p.getRegion(), authorNameOf(p),
                     p.getDayCount(), p.getPlaceCount(), p.getLikeCount(), p.getViewCount(),
                     mine.contains(p.getId()), p.getCreatedAt()));
         }

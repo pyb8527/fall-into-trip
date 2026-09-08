@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 
 import { api, ApiError } from '@/api/client';
-import { BottomSheet, Button, Caption, ErrorNote, Field } from '@/ui';
+import { useAsync } from '@/api/use-async';
+import { Spacing } from '@/constants/theme';
+import { BottomSheet, Button, Caption, Chip, ErrorNote, Field, Row } from '@/ui';
 
 /**
  * 내 일정을 게시판에 올립니다.
@@ -26,8 +28,16 @@ export function PublishForm({
 }) {
   const [title, setTitle] = useState(tripTitle);
   const [summary, setSummary] = useState('');
+  const [region, setRegion] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
+
+  /* 고를 수 있는 지역은 서버가 정합니다. 여기 따로 적어 두면 언젠가 어긋나고,
+     어긋나면 고른 값이 저장은 되는데 목록에서 아무것도 안 걸립니다. */
+  const { data: regionList } = useAsync<{ regions: string[] }>(
+    (signal) => api.get('/api/posts/regions', signal),
+    [],
+  );
 
   /* 판은 닫혀도 화면에 남아 있어 처음 잡은 값이 다음에 열 때도 그대로입니다. */
   useEffect(() => {
@@ -36,6 +46,7 @@ export function PublishForm({
     }
     setTitle(tripTitle);
     setSummary('');
+    setRegion(null);
     setFailed(null);
     setBusy(false);
   }, [visible, tripTitle]);
@@ -54,6 +65,7 @@ export function PublishForm({
       const res = await api.post<{ postId: string }>(`/api/trips/${tripId}/publish`, {
         title: title.trim(),
         summary: summary.trim(),
+        region,
       });
       onDone(res.postId);
     } catch (e) {
@@ -85,6 +97,19 @@ export function PublishForm({
         placeholder="먹으러만 다닌 일정입니다"
         hint="목록에서 이 줄이 보입니다. 비워도 됩니다."
       />
+
+      {/* 지역은 안 골라도 올라갑니다. 다만 지역으로 거를 때 안 걸립니다. */}
+      <Caption tone="secondary">어디로 다녀오셨나요?</Caption>
+      <Row gap={Spacing.xs}>
+        {regionList?.regions.map((r) => (
+          <Chip
+            key={r}
+            label={r}
+            selected={region === r}
+            onPress={() => setRegion(region === r ? null : r)}
+          />
+        ))}
+      </Row>
 
       {failed ? <ErrorNote message={failed} /> : null}
     </BottomSheet>

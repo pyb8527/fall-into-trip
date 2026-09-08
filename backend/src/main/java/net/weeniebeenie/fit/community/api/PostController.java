@@ -33,11 +33,20 @@ public class PostController {
 
     private final PostService posts;
 
+    /**
+     * @param region 지역. 고를 수 있는 값은 /api/posts/regions 에 있습니다.
+     * @param days   기간. "1"(당일), "2-4"(1~3박), "5"(그 이상)
+     * @param q      제목과 소개에서 찾을 글자
+     */
     @GetMapping
     public Map<String, Object> list(@CurrentUser AuthPrincipal me,
                                     @RequestParam(name = "sort", defaultValue = "hot") String sort,
+                                    @RequestParam(name = "region", required = false) String region,
+                                    @RequestParam(name = "days", required = false) String days,
+                                    @RequestParam(name = "q", required = false) String q,
                                     @RequestParam(name = "page", defaultValue = "0") int page) {
-        Page<TripPost> found = posts.list(sort, PageRequest.of(Math.max(0, page), SIZE));
+        Page<TripPost> found =
+                posts.list(sort, region, days, q, PageRequest.of(Math.max(0, page), SIZE));
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("posts", posts.cardsOf(found.getContent(), me == null ? null : me.id()));
         out.put("page", found.getNumber());
@@ -54,6 +63,12 @@ public class PostController {
      *
      * <p>감춰진 글도 함께 보여 줍니다. 내 글이 왜 목록에 없는지는 알아야 합니다.
      */
+    /** 고를 수 있는 지역. 화면이 이 목록으로 띠를 그립니다. */
+    @GetMapping("/regions")
+    public Map<String, Object> regions() {
+        return Map.of("regions", PostService.REGIONS);
+    }
+
     @GetMapping("/mine")
     public Map<String, Object> mine(@CurrentUser AuthPrincipal me,
                                     @RequestParam(name = "page", defaultValue = "0") int page) {

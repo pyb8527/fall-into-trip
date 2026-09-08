@@ -27,14 +27,16 @@ public class PublishController {
                                        @RequestBody(required = false) PublishRequest req) {
         TripPost post = posts.publish(me, tripId,
                 req == null ? null : req.title(),
-                req == null ? null : req.summary());
+                req == null ? null : req.summary(),
+                req == null ? null : req.region());
         return Map.of("postId", post.getId());
     }
 
     /**
      * @param title   비우면 여행 이름을 그대로 씁니다.
      * @param summary 목록에서 보이는 한 줄 소개
+     * @param region  어느 지역 여행인지. 목록에 없는 값은 버립니다.
      */
-    public record PublishRequest(String title, String summary) {
+    public record PublishRequest(String title, String summary, String region) {
     }
 }

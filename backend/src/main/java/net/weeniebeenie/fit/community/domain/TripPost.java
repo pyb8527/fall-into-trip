@@ -44,6 +44,16 @@ public class TripPost {
     private String summary;
 
     /**
+     * 어느 지역 여행인지. 올릴 때 글쓴이가 고릅니다.
+     *
+     * <p>좌표는 이미 있지만 그것이 어느 나라인지는 모릅니다. 알아내려면 장소마다
+     * 역지오코딩을 돌려야 하고 그만큼 요금이 붙습니다. 고르는 것은 한 번이고
+     * 글쓴이가 제일 잘 압니다.
+     */
+    @Column(length = 24)
+    private String region;
+
+    /**
      * 올릴 때의 일정 전체. 날짜와 장소가 그대로 들어 있습니다.
      *
      * <p>자바에서는 그냥 문자열이지만 데이터베이스에서는 jsonb 입니다. 이것을
@@ -84,12 +94,13 @@ public class TripPost {
 
     @Builder
     public TripPost(String tripId, String authorId, String title, String summary,
-                    String snapshot, int dayCount, int placeCount) {
+                    String region, String snapshot, int dayCount, int placeCount) {
         this.id = Ids.next();
         this.tripId = tripId;
         this.authorId = authorId;
         this.title = title;
         this.summary = summary;
+        this.region = region;
         this.snapshot = snapshot;
         this.dayCount = dayCount;
         this.placeCount = placeCount;

@@ -247,6 +247,8 @@ export type PostCard = {
   id: string;
   title: string;
   summary: string | null;
+  /** 어느 지역 여행인지. 안 고르고 올린 예전 글에는 없습니다. */
+  region: string | null;
   authorName: string;
   dayCount: number;
   placeCount: number;
@@ -307,3 +309,11 @@ export type PostPage = {
 
 /** 목록 정렬. 서버가 받는 이름과 같아야 합니다. */
 export type PostSort = 'hot' | 'new' | 'top';
+
+/**
+ * 기간으로 거르기. 서버가 받는 이름과 같아야 합니다.
+ *
+ * 날짜 수를 그대로 받지 않고 묶어 둡니다. "3박4일" 을 찾는 사람이 4를 넣어야
+ * 하는지 3을 넣어야 하는지 헷갈리기 때문입니다.
+ */
+export type PostDays = '1' | '2-4' | '5';
