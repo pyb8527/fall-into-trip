@@ -46,6 +46,26 @@ public class PostController {
         return out;
     }
 
+    /**
+     * 내가 올린 글.
+     *
+     * <p>올리고 나면 목록에서 스스로 찾아야 했습니다. 몇 개까지 올릴 수 있다는
+     * 제한도 있는데 몇 개 올렸는지 볼 데가 없었습니다.
+     *
+     * <p>감춰진 글도 함께 보여 줍니다. 내 글이 왜 목록에 없는지는 알아야 합니다.
+     */
+    @GetMapping("/mine")
+    public Map<String, Object> mine(@CurrentUser AuthPrincipal me,
+                                    @RequestParam(name = "page", defaultValue = "0") int page) {
+        Page<TripPost> found = posts.mine(me, PageRequest.of(Math.max(0, page), SIZE));
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("posts", posts.cardsOf(found.getContent(), me.id()));
+        out.put("page", found.getNumber());
+        out.put("totalPages", found.getTotalPages());
+        out.put("total", found.getTotalElements());
+        return out;
+    }
+
     @GetMapping("/{postId}")
     public Map<String, Object> read(@CurrentUser AuthPrincipal me, @PathVariable String postId) {
         TripPost post = posts.read(postId);

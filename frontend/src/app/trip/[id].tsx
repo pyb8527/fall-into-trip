@@ -585,6 +585,31 @@ function DayCard({
     처음에는 펼쳐 둡니다. 접힌 채로 열리면 장소가 있는지조차 안 보입니다.
   */
   const [folded, setFolded] = useState(false);
+  const [moving, setMoving] = useState(false);
+
+  /**
+   * 장소 순서를 한 칸 옮깁니다.
+   *
+   * <p>끌어서 옮기는 편이 보기에는 좋지만, 목록 안에서 끌면 화면 굴리기와
+   * 다투게 됩니다. 손가락으로는 그 둘을 구별하기 어려워 옮기려다 스크롤되고
+   * 굴리려다 옮겨집니다. 화살표는 못생겼어도 헷갈리지 않습니다.
+   */
+  async function move(index: number, by: number) {
+    const next = index + by;
+    if (moving || next < 0 || next >= day.places.length) {
+      return;
+    }
+    const ids = day.places.map((p) => p.id);
+    [ids[index], ids[next]] = [ids[next], ids[index]];
+
+    setMoving(true);
+    try {
+      await api.post('/api/places/reorder', { dayId: day.id, placeIds: ids });
+      onChanged();
+    } finally {
+      setMoving(false);
+    }
+  }
   const done = day.places.filter((p) => visited.has(p.id)).length;
   const color = day.color || dayColor(index);
 
@@ -656,6 +681,9 @@ function DayCard({
                 onRemove={() => onRemove(place.id)}
                 mode={mode}
                 info={infoOf.get(place.id)}
+                onUp={i > 0 ? () => move(i, -1) : undefined}
+                onDown={i < day.places.length - 1 ? () => move(i, 1) : undefined}
+                moving={moving}
               />
               {/* 다음 장소까지 얼마나 걸리는지. 마지막 장소 뒤에는 없습니다. */}
               {i < day.places.length - 1 ? <Hop leg={legAfter.get(place.id)} /> : null}
@@ -714,6 +742,9 @@ function PlaceRow({
   canEdit,
   mode,
   info,
+  onUp,
+  onDown,
+  moving,
   onToggle,
   onFocus,
   onEdit,
@@ -728,6 +759,10 @@ function PlaceRow({
   canEdit: boolean;
   mode: TravelMode | null;
   info?: PlaceInfo;
+  /** 맨 위·맨 아래 장소에는 갈 데가 없어 넘어오지 않습니다. */
+  onUp?: () => void;
+  onDown?: () => void;
+  moving: boolean;
   onToggle: () => void;
   onFocus: () => void;
   onEdit: () => void;
@@ -779,6 +814,22 @@ function PlaceRow({
       <Row gap={Spacing.xs} style={styles.placeActions}>
         {/* 실제 안내는 구글 지도에 넘깁니다. 음성 안내도 환승 정보도 그쪽이 낫고,
             어차피 켤 것을 주소 옮겨 적게 만들 이유가 없습니다. */}
+        {canEdit ? (
+          <>
+            <IconButton
+              name="arrow-up"
+              label="위로 옮기기"
+              disabled={!onUp || moving}
+              onPress={() => onUp?.()}
+            />
+            <IconButton
+              name="arrow-down"
+              label="아래로 옮기기"
+              disabled={!onDown || moving}
+              onPress={() => onDown?.()}
+            />
+          </>
+        ) : null}
         <IconButton
           name="navigation"
           label={`${place.name} 길찾기`}

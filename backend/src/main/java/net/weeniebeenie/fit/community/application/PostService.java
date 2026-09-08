@@ -314,14 +314,39 @@ public class PostService {
         audit.log(me.id(), "post.report", postId);
     }
 
-    /** 운영자가 다시 올립니다. */
+    /* ------------------------------------------------------------- 운영 */
+
+    /**
+     * 운영자가 봐야 할 글.
+     *
+     * <p>신고가 들어온 글과 그래서 감춰진 글입니다. 자동으로 감추는 규칙이
+     * 있는 이상 되돌릴 통로도 있어야 합니다. 몇 사람이 짜면 멀쩡한 글도
+     * 내려가는데, 그것을 되살릴 수 없으면 신고가 곧 삭제가 됩니다.
+     */
+    @Transactional(readOnly = true)
+    public Page<TripPost> needingReview(Pageable pageable) {
+        return posts.findNeedingReview(pageable);
+    }
+
+    public long reportCountOf(String postId) {
+        return reports.countByPostId(postId);
+    }
+
+    /** 운영자가 감추거나 다시 올립니다. */
     @Transactional
-    public void unhide(AuthPrincipal me, String postId) {
+    public void setHidden(AuthPrincipal me, String postId, boolean hidden) {
         TripPost post = posts.findById(postId)
                 .orElseThrow(() -> ApiException.notFound("글을 찾을 수 없습니다."));
-        post.setHidden(false);
+        post.setHidden(hidden);
         post.touch();
-        audit.log(me.id(), "post.unhide", postId);
+        audit.log(me.id(), hidden ? "post.hide" : "post.unhide", postId);
+    }
+
+    /* ------------------------------------------------------- 내가 쓴 글 */
+
+    @Transactional(readOnly = true)
+    public Page<TripPost> mine(AuthPrincipal me, Pageable pageable) {
+        return posts.findAllByAuthorIdOrderByCreatedAtDesc(me.id(), pageable);
     }
 
     private static String text(JsonNode node, String field) {

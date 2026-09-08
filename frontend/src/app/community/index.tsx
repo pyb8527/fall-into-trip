@@ -28,21 +28,33 @@ import {
  * <p>로그인 없이도 열립니다. 추천을 누르거나 가져가려 할 때만 로그인을
  * 요구합니다.
  */
-const SORTS: { value: PostSort; label: string }[] = [
+/**
+ * 무엇을 볼지.
+ *
+ * 정렬과 "내 글" 은 성격이 다르지만 한 줄에 둡니다. 내 글을 보러 화면을 따로
+ * 만들면 올리고 나서 그것을 어디서 찾는지가 또 하나의 질문이 됩니다.
+ */
+type Tab = PostSort | 'mine';
+
+const TABS: { value: Tab; label: string }[] = [
   { value: 'hot', label: '인기' },
   { value: 'new', label: '최신' },
   { value: 'top', label: '추천순' },
+  { value: 'mine', label: '내 글' },
 ];
 
 export default function Community() {
   const router = useRouter();
   const { user } = useAuth();
-  const [sort, setSort] = useState<PostSort>('hot');
+  const [view, setView] = useState<Tab>('hot');
   const [page, setPage] = useState(0);
 
   const { data, error, loading, reload, setData } = useAsync<PostPage>(
-    (signal) => api.get(`/api/posts${query({ sort, page })}`, signal),
-    [sort, page],
+    (signal) =>
+      view === 'mine'
+        ? api.get(`/api/posts/mine${query({ page })}`, signal)
+        : api.get(`/api/posts${query({ sort: view, page })}`, signal),
+    [view, page],
   );
 
   /**
@@ -83,10 +95,10 @@ export default function Community() {
       </View>
 
       <SegmentedTabs
-        items={SORTS}
-        value={sort}
+        items={user ? TABS : TABS.filter((t) => t.value !== 'mine')}
+        value={view}
         onChange={(next) => {
-          setSort(next);
+          setView(next);
           setPage(0);
         }}
       />
@@ -95,7 +107,13 @@ export default function Community() {
       {error ? <ErrorNote message={error} onRetry={reload} /> : null}
 
       {data && data.posts.length === 0 ? (
-        <Empty message="아직 올라온 일정이 없습니다. 첫 번째가 되어 보세요." />
+        <Empty
+          message={
+            view === 'mine'
+              ? '아직 올린 일정이 없습니다. 여행 화면에서 올릴 수 있습니다.'
+              : '아직 올라온 일정이 없습니다. 첫 번째가 되어 보세요.'
+          }
+        />
       ) : null}
 
       {data?.posts.map((post) => (

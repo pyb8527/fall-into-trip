@@ -40,6 +40,20 @@ public interface TripPostRepository extends JpaRepository<TripPost, String> {
            nativeQuery = true)
     Page<TripPost> findHot(Pageable pageable);
 
+    /**
+     * 운영자가 봐야 할 글.
+     *
+     * <p>신고가 들어온 글과 그래서 감춰진 글입니다. 감춰진 것이 먼저 옵니다 —
+     * 지금 안 보이는 상태라 되돌릴지 말지를 먼저 정해야 합니다.
+     */
+    @Query("""
+           SELECT p FROM TripPost p
+           WHERE p.hidden = true
+              OR EXISTS (SELECT 1 FROM PostReport r WHERE r.postId = p.id)
+           ORDER BY p.hidden DESC, p.updatedAt DESC
+           """)
+    Page<TripPost> findNeedingReview(Pageable pageable);
+
     /*
       세어 둔 값은 읽고 쓰는 사이에 남이 끼어들 수 있습니다. 두 사람이 동시에
       추천하면 하나가 사라집니다. 데이터베이스가 직접 더하게 맡깁니다.

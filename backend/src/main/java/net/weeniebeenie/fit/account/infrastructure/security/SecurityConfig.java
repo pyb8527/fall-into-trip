@@ -77,6 +77,9 @@ public class SecurityConfig {
                            가입하는 흐름이라, 처음부터 로그인을 요구하면 아무도
                            들어오지 않습니다. 추천·복제·신고는 POST 라 아래
                            규칙에 걸려 로그인이 필요합니다. */
+                        /* 내 글 목록만은 누구 것인지 알아야 하므로 로그인이
+                           필요합니다. 아래 공개 규칙보다 먼저 걸어야 합니다. */
+                        .requestMatchers(HttpMethod.GET, "/api/posts/mine").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/posts", "/api/posts/*").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/**").authenticated()

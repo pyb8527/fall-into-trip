@@ -572,7 +572,9 @@ export type IconName =
   | 'external-link'
   | 'crosshair'
   | 'chevron-down'
-  | 'chevron-up';
+  | 'chevron-up'
+  | 'arrow-up'
+  | 'arrow-down';
 
 export function Icon({
   name,

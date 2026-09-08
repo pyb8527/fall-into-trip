@@ -89,6 +89,12 @@ export default function AdminHome() {
         onPress={() => router.push('/admin/audit')}
       />
 
+      <ListRow
+        title="신고된 글"
+        subtitle="감춰진 글을 되돌리거나 감춥니다"
+        onPress={() => router.push('/admin/posts')}
+      />
+
       <Button label="처음으로" variant="ghost" onPress={() => router.push('/(app)/home')} />
     </Screen>
   );
