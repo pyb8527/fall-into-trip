@@ -44,6 +44,11 @@ export default function Home() {
           caption="일정 짜고 동행자 부르기"
           onPress={() => router.push('/(app)/trips')}
         />
+        <MenuCard
+          title="여행 이야기"
+          caption="남의 일정 구경하고 가져오기"
+          onPress={() => router.push('/community')}
+        />
         <MenuCard title="가계부" caption="쓴 돈 적고 정산하기" soon />
         {user?.role === 'ADMIN' ? (
           <MenuCard

@@ -13,9 +13,11 @@ import type {
   TripDetail,
 } from '@/api/types';
 import { useAsync } from '@/api/use-async';
+import { useAuth } from '@/auth/auth-provider';
 import { CompanionsSheet } from '@/components/companions-sheet';
 import type { RouteLine } from '@/components/map-types';
 import { PlaceForm } from '@/components/place-form';
+import { PublishForm } from '@/components/publish-form';
 import { TripMap, type MapPlace } from '@/components/trip-map';
 import { openDirections } from '@/lib/directions';
 import { useHere } from '@/lib/here';
@@ -63,12 +65,14 @@ export default function TripScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const navigation = useNavigation();
+  const { user } = useAuth();
   const { data, error, loading, reload } = useAsync<TripDetail>(
     (signal) => api.get(`/api/trip?trip=${encodeURIComponent(id)}`, signal),
     [id],
   );
 
   const [companions, setCompanions] = useState(false);
+  const [publishing, setPublishing] = useState(false);
   /*
     이동 수단. 처음에는 아무것도 고르지 않습니다.
 
@@ -412,7 +416,17 @@ export default function TripScreen() {
               ),
           /* 동행자는 가끔 여는 것이라 화면을 차지하지 않게 막대에 둡니다. */
           headerRight: () => (
-            <IconButton name="users" label="동행자" onPress={() => setCompanions(true)} />
+            <Row gap={Spacing.xs}>
+              {/* 올리는 것은 주인만 할 수 있습니다. 서버도 그렇게 막습니다. */}
+              {data.trip.ownerId === user?.id ? (
+                <IconButton
+                  name="share-2"
+                  label="게시판에 올리기"
+                  onPress={() => setPublishing(true)}
+                />
+              ) : null}
+              <IconButton name="users" label="동행자" onPress={() => setCompanions(true)} />
+            </Row>
           ),
         }}
       />
@@ -424,6 +438,17 @@ export default function TripScreen() {
         onClose={() => setCompanions(false)}
         /* 스스로 나갔으면 이 여행은 더 못 봅니다. 목록으로 돌려보냅니다. */
         onLeft={() => router.replace('/(app)/trips')}
+      />
+
+      <PublishForm
+        visible={publishing}
+        tripId={data.trip.id}
+        tripTitle={data.trip.title}
+        onCancel={() => setPublishing(false)}
+        onDone={(postId) => {
+          setPublishing(false);
+          router.push({ pathname: '/community/[id]', params: { id: postId } });
+        }}
       />
 
       {actionError ? <ErrorNote message={actionError} /> : null}

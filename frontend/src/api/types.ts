@@ -239,3 +239,71 @@ export type PlaceInfo = {
   permanentlyClosed: boolean;
   mapUrl: string | null;
 };
+
+/* -------------------------------------------------------------- 게시판 */
+
+/** 목록에 뜨는 한 줄. 일정 전체는 들어 있지 않습니다. */
+export type PostCard = {
+  id: string;
+  title: string;
+  summary: string | null;
+  authorName: string;
+  dayCount: number;
+  placeCount: number;
+  likeCount: number;
+  viewCount: number;
+  /** 내가 추천했는지. 로그인 안 했으면 항상 false 입니다. */
+  liked: boolean;
+  createdAt: string;
+};
+
+/**
+ * 올릴 때 떠 둔 일정 사본.
+ *
+ * 원본 여행이 아니라 그때의 모습입니다. 그래서 작성자가 나중에 일정을 고쳐도
+ * 이 글은 바뀌지 않고, 여행을 지워도 남습니다.
+ */
+export type Itinerary = {
+  title: string;
+  days: ItineraryDay[];
+};
+
+export type ItineraryDay = {
+  label: string | null;
+  shortName: string | null;
+  theme: string | null;
+  color: string | null;
+  budget: string | null;
+  places: ItineraryPlace[];
+};
+
+export type ItineraryPlace = {
+  name: string;
+  ja: string | null;
+  en: string | null;
+  lat: number;
+  lng: number;
+  cat: string | null;
+  time: string | null;
+  cost: string | null;
+  note: string | null;
+  url: string | null;
+  placeId: string | null;
+};
+
+export type PostDetail = Omit<PostCard, 'summary'> & {
+  summary: string | null;
+  /** 내가 쓴 글인지. 내릴 수 있는지를 이걸로 정합니다. */
+  mine: boolean;
+  itinerary: Itinerary;
+};
+
+export type PostPage = {
+  posts: PostCard[];
+  page: number;
+  totalPages: number;
+  total: number;
+};
+
+/** 목록 정렬. 서버가 받는 이름과 같아야 합니다. */
+export type PostSort = 'hot' | 'new' | 'top';
