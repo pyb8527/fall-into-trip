@@ -9,6 +9,7 @@ import { CompanionsSheet } from '@/components/companions-sheet';
 import type { RouteLine } from '@/components/map-types';
 import { PlaceForm } from '@/components/place-form';
 import { TripMap, type MapPlace } from '@/components/trip-map';
+import { openDirections } from '@/lib/directions';
 import { decodePolyline } from '@/lib/polyline';
 import { Colors, dayColor, Radius, Spacing, Tap } from '@/constants/theme';
 import {
@@ -349,6 +350,7 @@ export default function TripScreen() {
             onChanged={refresh}
             onRemove={remove}
             legAfter={legAfter}
+            mode={mode}
           />
         ) : null,
       )}
@@ -394,6 +396,7 @@ function DayCard({
   onChanged,
   onRemove,
   legAfter,
+  mode,
 }: {
   day: Day;
   index: number;
@@ -407,6 +410,8 @@ function DayCard({
   onRemove: (placeId: string) => void;
   /** 이 장소를 떠나 다음 장소로 가는 구간. 수단을 안 골랐으면 비어 있습니다. */
   legAfter: Map<string, RouteLeg>;
+  /** 길찾기를 넘길 때 어떤 수단으로 열지. 안 골랐으면 대중교통입니다. */
+  mode: TravelMode | null;
 }) {
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<Place | null>(null);
@@ -453,6 +458,7 @@ function DayCard({
                 onFocus={() => onFocus(place.id)}
                 onEdit={() => setEditing(place)}
                 onRemove={() => onRemove(place.id)}
+                mode={mode}
               />
               {/* 다음 장소까지 얼마나 걸리는지. 마지막 장소 뒤에는 없습니다. */}
               {i < day.places.length - 1 ? <Hop leg={legAfter.get(place.id)} /> : null}
@@ -504,6 +510,7 @@ function PlaceRow({
   busy,
   active,
   canEdit,
+  mode,
   onToggle,
   onFocus,
   onEdit,
@@ -516,6 +523,7 @@ function PlaceRow({
   busy: boolean;
   active: boolean;
   canEdit: boolean;
+  mode: TravelMode | null;
   onToggle: () => void;
   onFocus: () => void;
   onEdit: () => void;
@@ -564,6 +572,18 @@ function PlaceRow({
       </Pressable>
 
       <Row gap={Spacing.xs} style={styles.placeActions}>
+        {/* 실제 안내는 구글 지도에 넘깁니다. 음성 안내도 환승 정보도 그쪽이 낫고,
+            어차피 켤 것을 주소 옮겨 적게 만들 이유가 없습니다. */}
+        <IconButton
+          name="navigation"
+          label={`${place.name} 길찾기`}
+          onPress={() => {
+            openDirections(
+              { name: place.name, lat: place.lat, lng: place.lng, placeId: place.placeId },
+              mode,
+            );
+          }}
+        />
         <IconButton
           name="check"
           label={visited ? '다녀옴 취소' : '다녀옴으로 표시'}

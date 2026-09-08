@@ -54,6 +54,7 @@ public class PlaceService {
                 .radius(draft.radius())
                 .fit(draft.fit())
                 .move(blankToNull(draft.move()))
+                .placeId(blankToNull(draft.placeId()))
                 .updatedBy(me.id())
                 .build());
 
@@ -83,6 +84,9 @@ public class PlaceService {
         if (draft.ja() != null) place.setJa(blankToNull(draft.ja()));
         if (draft.en() != null) place.setEn(blankToNull(draft.en()));
         if (draft.cat() != null) place.setCat(blankToNull(draft.cat()));
+        /* 다른 곳을 다시 고르면 번호도 따라 바뀌어야 합니다. 그래야 영업시간을
+           엉뚱한 가게 것으로 보여 주지 않습니다. */
+        if (draft.placeId() != null) place.setPlaceId(blankToNull(draft.placeId()));
         if (draft.cost() != null) place.setCost(blankToNull(draft.cost()));
         if (draft.note() != null) place.setNote(blankToNull(draft.note()));
         if (draft.url() != null) place.setUrl(blankToNull(draft.url()));
@@ -186,6 +190,6 @@ public class PlaceService {
     public record PlaceDraft(String dayId, String name, Double lat, Double lng,
                              String ja, String en, String cat, String time, String cost,
                              String note, String url, Integer radius, Boolean fit, String move,
-                             Long version) {
+                             String placeId, Long version) {
     }
 }

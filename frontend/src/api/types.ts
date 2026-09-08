@@ -71,6 +71,13 @@ export type Place = {
   updatedAt: string;
   updatedBy: string | null;
   version: number;
+  /**
+   * 구글이 아는 이 장소의 번호.
+   *
+   * 영업시간 같은 내용은 저장이 막혀 있어(구글 약관) 번호만 들고 있다가
+   * 필요할 때 이걸로 물어봅니다. 좌표를 직접 넣은 장소에는 없습니다.
+   */
+  placeId: string | null;
 };
 
 export type Day = {

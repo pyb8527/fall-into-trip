@@ -45,6 +45,8 @@ export type Found = {
   address: string;
   lat: number;
   lng: number;
+  /** 구글이 아는 번호. 나중에 영업시간을 물어볼 때 씁니다. */
+  placeId: string | null;
 };
 
 export type PlaceSearchProps = {

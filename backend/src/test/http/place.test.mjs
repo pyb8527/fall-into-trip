@@ -49,7 +49,7 @@ if (r.status === 200) {
     r.data.places.every(p => typeof p.lat === "number" && typeof p.lng === "number"),
     r.data.places?.[0]);
   T("이름·주소만 내보냄(구글 응답을 그대로 흘리지 않음)",
-    r.data.places.every(p => Object.keys(p).sort().join() === "address,lat,lng,name"),
+    r.data.places.every(p => Object.keys(p).sort().join() === "address,lat,lng,name,placeId"),
     r.data.places?.[0]);
   T("키가 새어 나가지 않음", !JSON.stringify(r.data).includes("AIza"), null);
 } else {

@@ -565,7 +565,11 @@ export type IconName =
   | 'share-2'
   | 'log-out'
   | 'user-minus'
-  | 'chevron-left';
+  | 'chevron-left'
+  | 'navigation'
+  | 'clock'
+  | 'phone'
+  | 'external-link';
 
 export function Icon({
   name,

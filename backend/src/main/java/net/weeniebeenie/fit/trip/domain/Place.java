@@ -22,6 +22,16 @@ public class Place {
     @Column(name = "day_id", nullable = false, length = 16)
     private String dayId;
 
+    /**
+     * 구글이 아는 이 장소의 번호.
+     *
+     * <p>영업시간·전화번호 같은 내용은 우리가 쌓아 두면 안 됩니다(구글 약관).
+     * 번호만은 영구 저장이 허용되므로, 내용 대신 이것만 들고 있다가 필요할 때
+     * 이 번호로 물어봅니다. 직접 좌표를 넣은 장소에는 없습니다.
+     */
+    @Column(name = "place_id", length = 255)
+    private String placeId;
+
     @Column(nullable = false)
     private int sort;
 
@@ -87,7 +97,7 @@ public class Place {
     public Place(String dayId, int sort, String name, String ja, String en,
                  double lat, double lng, String cat, String time, String cost,
                  String note, String url, Integer radius, Boolean fit, String move,
-                 String updatedBy) {
+                 String placeId, String updatedBy) {
         this.id = Ids.next();
         this.dayId = dayId;
         this.sort = sort;
@@ -104,6 +114,7 @@ public class Place {
         this.radius = radius;
         this.fit = fit == null || fit;
         this.move = move;
+        this.placeId = placeId;
         this.updatedAt = Instant.now();
         this.updatedBy = updatedBy;
     }

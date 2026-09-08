@@ -102,7 +102,8 @@ public class PlaceSearchService {
                     r.path("name").asText(q),
                     r.path("formatted_address").asText(""),
                     at.path("lat").asDouble(),
-                    at.path("lng").asDouble()));
+                    at.path("lng").asDouble(),
+                    r.path("place_id").asText(null)));
             if (out.size() >= LIMIT) {
                 break;
             }
@@ -111,6 +112,10 @@ public class PlaceSearchService {
     }
 
     /** 화면이 쓰는 만큼만. 구글 응답을 그대로 흘려보내지 않습니다. */
-    public record Found(String name, String address, double lat, double lng) {
+    /**
+     * @param placeId 구글이 아는 번호. 이것만 저장이 허용됩니다. 나머지 내용은
+     *                필요할 때마다 이 번호로 다시 물어봅니다.
+     */
+    public record Found(String name, String address, double lat, double lng, String placeId) {
     }
 }

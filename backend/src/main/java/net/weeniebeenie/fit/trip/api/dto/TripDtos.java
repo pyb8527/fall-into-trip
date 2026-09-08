@@ -87,7 +87,8 @@ public final class TripDtos {
     public record PlaceView(String id, int sort, String name, String ja, String en,
                             double lat, double lng, String cat, String time, String cost,
                             String note, String url, Integer radius, boolean fit,
-                            Object move, Instant updatedAt, String updatedBy, long version) {
+                            Object move, String placeId,
+                            Instant updatedAt, String updatedBy, long version) {
     }
 
     /* JSON 으로 저장된 칸은 문자열이 아니라 객체로 내보냅니다. 프론트가 다시
@@ -103,6 +104,7 @@ public final class TripDtos {
         return new PlaceView(p.getId(), p.getSort(), p.getName(), p.getJa(), p.getEn(),
                 p.getLat(), p.getLng(), p.getCat(), p.getTime(), p.getCost(), p.getNote(),
                 p.getUrl(), p.getRadius(), p.isFit(), json(p.getMove(), mapper),
+                p.getPlaceId(),
                 p.getUpdatedAt(), p.getUpdatedBy(), p.getVersion());
     }
 

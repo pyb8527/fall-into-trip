@@ -48,6 +48,9 @@ export function PlaceForm({
   const [lng, setLng] = useState(place ? String(place.lng) : '');
   /** 고른 곳이 어디인지 사람 말로. 좌표 대신 이것을 보여 줍니다. */
   const [picked, setPicked] = useState<string | null>(place?.ja ?? place?.en ?? null);
+  /* 고른 곳이 구글의 어느 장소인지. 저장해 두면 나중에 영업시간을 물어볼 수
+     있습니다. 좌표를 직접 넣으면 비어 있습니다. */
+  const [placeId, setPlaceId] = useState<string | null>(place?.placeId ?? null);
   const [time, setTime] = useState(place?.time ?? '');
   const [cat, setCat] = useState(place?.cat ?? '');
   const [cost, setCost] = useState(place?.cost ?? '');
@@ -74,6 +77,7 @@ export function PlaceForm({
     setLat(place ? String(place.lat) : '');
     setLng(place ? String(place.lng) : '');
     setPicked(place?.ja ?? place?.en ?? null);
+    setPlaceId(place?.placeId ?? null);
     setTime(place?.time ?? '');
     setCat(place?.cat ?? '');
     setCost(place?.cost ?? '');
@@ -116,6 +120,7 @@ export function PlaceForm({
         note: note.trim(),
         url: url.trim(),
         fit: place?.fit ?? true,
+        placeId,
         version: place?.version,
       };
       if (place) {
@@ -147,6 +152,7 @@ export function PlaceForm({
           if (!name.trim()) {
             setName(found.name);
           }
+          setPlaceId(found.placeId);
           setLat(String(found.lat));
           setLng(String(found.lng));
           setPicked(found.address || found.name);
