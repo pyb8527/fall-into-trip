@@ -765,6 +765,7 @@ export function IconButton({
   active,
   disabled,
   onMap,
+  bare,
 }: {
   name: IconName;
   /** 무엇을 하는 단추인지. 눈에는 안 보이고 읽어 주는 기기만 씁니다. */
@@ -782,6 +783,14 @@ export function IconButton({
    * 만듭니다. 지도를 쓰는 앱이라면 어디서나 그렇게 생겼습니다.
    */
   onMap?: boolean;
+  /**
+   * 바탕 없이 그림만.
+   *
+   * <p>위쪽 막대에 얹을 때 씁니다. 막대 바탕과 단추 바탕은 밝기가 한 단
+   * 차이라, 채워 두면 막대에 회색 조각을 덧댄 것처럼 보입니다. 막대 안에서는
+   * 무엇이 눌리는 것인지 자리로 이미 알 수 있어 바탕이 필요 없습니다.
+   */
+  bare?: boolean;
 }) {
   return (
     <Press
@@ -796,9 +805,11 @@ export function IconButton({
         {
           backgroundColor: active
             ? toneSoft[tone]
-            : onMap
-              ? Colors.surface
-              : Colors.fill,
+            : bare
+              ? 'transparent'
+              : onMap
+                ? Colors.surface
+                : Colors.fill,
         },
         active && onMap ? { borderColor: toneColor[tone] } : null,
       ]}>

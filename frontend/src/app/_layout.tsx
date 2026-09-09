@@ -80,6 +80,7 @@ function ToTrip({ route }: { route: { params?: object } }) {
     <IconButton
       name="chevron-left"
       label="일정으로"
+      bare
       onPress={() =>
         id
           ? router.replace({ pathname: '/trip/[id]', params: { id } })

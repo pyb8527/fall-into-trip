@@ -54,6 +54,7 @@ export default function AppLayout() {
             <IconButton
               name="chevron-left"
               label="처음으로"
+              bare
               onPress={() => router.replace('/(app)/home')}
             />
           ),

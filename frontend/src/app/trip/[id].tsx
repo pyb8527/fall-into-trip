@@ -479,13 +479,14 @@ export default function TripScreen() {
                 <IconButton
                   name="chevron-left"
                   label="내 여행으로"
+                  bare
                   onPress={() => router.replace('/(app)/trips')}
                 />
               ),
           /* 길 위에서 가장 자주 여는 하나만 둡니다. 나머지는 판 안에 글자로
              있습니다 — 그림만 늘어놓으면 눌러 보기 전에는 뜻을 모릅니다. */
           headerRight: () => (
-            <IconButton name="users" label="동행자" onPress={() => setCompanions(true)} />
+            <IconButton name="users" label="동행자" bare onPress={() => setCompanions(true)} />
           ),
         }}
       />
@@ -561,7 +562,7 @@ export default function TripScreen() {
         자리가 있는 판 안으로 내렸습니다.
       */}
       {me.supported ? (
-        <View style={[styles.floatRight, { bottom: covered + Spacing.xxl }]}>
+        <View style={[styles.floatRight, { bottom: covered + Spacing.md }]}>
           <IconButton
             name="crosshair"
             label={me.watching ? '내 위치로' : '내 위치 보기'}
