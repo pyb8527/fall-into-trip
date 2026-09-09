@@ -600,6 +600,16 @@ export function TripMap({
     다른데, 같은 모양으로 두면 지도만 보고는 구별이 안 됩니다.
   */
   const mateMarks = useRef<any[]>([]);
+  /*
+    이미 본 깃발.
+
+    새로 꽂힌 것만 떨어뜨립니다. 전부 떨어뜨리면 이십 초마다 지도의 깃발이
+    다 같이 튀어, 무엇이 방금 생긴 것인지 알 수 없습니다.
+
+    처음 화면을 열 때는 아무것도 떨어뜨리지 않습니다. 여섯 시간 전에 꽂아 둔
+    것까지 방금 생긴 것처럼 보일 이유가 없습니다.
+  */
+  const seenNotes = useRef<Set<string> | null>(null);
 
   useEffect(() => {
     if (!ready || !map.current) {
@@ -634,9 +644,16 @@ export function TripMap({
           /* 꽂는 단추가 깃발인데 지도에는 네모가 찍히고 있었습니다. 누른
              것과 찍힌 것이 다르면 그것이 그것인 줄 알 수가 없습니다. */
           icon: flagIcon(g, Colors.warning),
+          /* 방금 꽂힌 것만 위에서 떨어집니다. 내가 꽂은 것도, 동행자가 꽂은
+             것도 마찬가지라 "저기 뭔가 생겼다" 가 눈에 들어옵니다. */
+          animation: seenNotes.current && !seenNotes.current.has(note.id)
+            ? g.Animation.DROP
+            : undefined,
         }),
       );
     }
+
+    seenNotes.current = new Set((notes ?? []).map((n) => n.id));
   }, [ready, mates, notes]);
 
   /** 내가 있는 자리로 지도를 옮깁니다. 어디까지 갔는지 놓쳤을 때 쓰는 단추입니다. */

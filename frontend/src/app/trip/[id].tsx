@@ -1,6 +1,14 @@
 import { Stack, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, PanResponder, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import {
+  Animated,
+  PanResponder,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Vibration,
+  View,
+} from 'react-native';
 
 import { api, ApiError } from '@/api/client';
 import type {
@@ -106,6 +114,17 @@ export default function TripScreen() {
   const [flags, setFlags] = useState(false);
   /** 지도를 옮겨 달라고 가리키는 자리. 일정에 없는 것(깃발)을 볼 때 씁니다. */
   const [lookAt, setLookAt] = useState<{ lat: number; lng: number; at: number } | null>(null);
+  /* 방금 꽂았다는 표시. 잠깐 뒤 스스로 사라집니다 — 오래 남아 있으면 다음에
+     열었을 때 방금 꽂은 줄 압니다. */
+  const [planted, setPlanted] = useState(0);
+
+  useEffect(() => {
+    if (!planted) {
+      return;
+    }
+    const timer = setTimeout(() => setPlanted(0), 2600);
+    return () => clearTimeout(timer);
+  }, [planted]);
 
   /* 방문 표시는 나만 보는 것이라, 서버 응답을 기다리지 않고 먼저 칠합니다.
      걸으면서 누르는 것이라 매번 기다리게 하면 손이 멎습니다. */
@@ -452,17 +471,30 @@ export default function TripScreen() {
     }
   }
 
-  /** 지금 자리에 "여기 있다" 를 찍어 둡니다. */
+  /**
+   * 지금 자리에 깃발을 꽂습니다.
+   *
+   * <p>눌러도 아무 일이 없으면 꽂힌 줄 알 수가 없습니다. 세 가지가 함께
+   * 일어납니다 — 손끝이 한 번 울리고, 지도가 그 자리로 가고, 깃발이 위에서
+   * 떨어집니다. 그러고 나서 한 줄로 말해 줍니다.
+   */
   async function dropPin() {
     if (!me.here) {
       return;
     }
     setActionError(null);
+    const at = me.here;
     try {
-      await api.post(`/api/trips/${id}/pins`, { lat: me.here.lat, lng: me.here.lng });
+      await api.post(`/api/trips/${id}/pins`, { lat: at.lat, lng: at.lng });
+      /* 짧게 한 번. 길게 울리면 알림처럼 느껴집니다. 안 되는 기기에서는
+         조용히 넘어갑니다. */
+      Vibration.vibrate(20);
+      /* 꽂은 자리를 보여 줍니다. 판에 가려 안 보이면 꽂은 보람이 없습니다. */
+      setLookAt({ lat: at.lat, lng: at.lng, at: Date.now() });
+      setPlanted(Date.now());
       pullLive();
     } catch (e) {
-      setActionError(e instanceof ApiError ? e.message : '찍지 못했습니다.');
+      setActionError(e instanceof ApiError ? e.message : '꽂지 못했습니다.');
     }
   }
 
@@ -687,6 +719,11 @@ export default function TripScreen() {
                 onPress={dropPin}
               />
             </Row>
+            {planted ? (
+              <Caption tone="hot" strong>
+                여기에 깃발을 꽂았습니다. 여섯 시간 뒤 저절로 사라집니다.
+              </Caption>
+            ) : null}
             {sharing ? (
               <Caption tone="success" strong>
                 지금 어디 있는지가 동행자에게 보입니다. 네 시간 뒤 저절로 꺼지고,
