@@ -224,7 +224,21 @@ export function Divider() {
 
 /* ------------------------------------------------------------------ 글씨 */
 
-type Tone = 'default' | 'secondary' | 'muted' | 'danger' | 'success' | 'accent' | 'warning';
+/**
+ * 글자와 아이콘의 색.
+ *
+ * inverse 는 색으로 채운 자리 위에 얹는 것입니다. 다녀온 핀 속의 표시처럼
+ * 바탕이 진할 때 씁니다.
+ */
+type Tone =
+  | 'default'
+  | 'secondary'
+  | 'muted'
+  | 'danger'
+  | 'success'
+  | 'accent'
+  | 'warning'
+  | 'inverse';
 
 const toneColor: Record<Tone, string> = {
   default: Colors.text,
@@ -234,6 +248,7 @@ const toneColor: Record<Tone, string> = {
   success: Colors.success,
   accent: Colors.accent,
   warning: Colors.warning,
+  inverse: '#FFFFFF',
 };
 
 const toneSoft: Record<Tone, string> = {
@@ -244,6 +259,8 @@ const toneSoft: Record<Tone, string> = {
   success: Colors.successSoft,
   accent: Colors.accentSoft,
   warning: Colors.warningSoft,
+  /* 바탕이 이미 진한 자리에 쓰므로 무른 배경은 두지 않습니다. */
+  inverse: 'transparent',
 };
 
 /** 화면의 제목. 한 화면에 하나만. */
@@ -577,7 +594,8 @@ export type IconName =
   | 'arrow-down'
   | 'folder'
   | 'star'
-  | 'bookmark';
+  | 'bookmark'
+  | 'compass';
 
 export function Icon({
   name,

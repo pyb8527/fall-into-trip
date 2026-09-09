@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { MapPlace, TripMapProps } from '@/components/map-types';
 import { Colors, Radius, Spacing, Tap } from '@/constants/theme';
-import { Badge, Body, Caption, IconButton, Row, Subtitle } from '@/ui';
+import { Badge, Body, Caption, Icon, IconButton, Row, Subtitle } from '@/ui';
 
 /**
  * 지도 (앱).
@@ -244,7 +244,7 @@ function PlacePin({
     setDrawing(true);
     const timer = setTimeout(() => setDrawing(false), DRAW_MS);
     return () => clearTimeout(timer);
-  }, [active, place.color, place.order]);
+  }, [active, place.color, place.order, place.detail.visited]);
 
   return (
     <Marker
@@ -272,6 +272,9 @@ function PlacePin({
 function Pin({ place, active }: { place: MapPlace; active: boolean }) {
   const size = active ? 36 : 30;
   const border = active ? 3 : 2.5;
+  /* 다녀온 곳은 속을 색으로 채우고 표시를 얹습니다. 아직인 곳은 흰 속에 번호.
+     지도가 체크리스트처럼 읽혀, 채워질수록 얼마나 돌았는지 보입니다. */
+  const visited = place.detail.visited;
   /* 45도 돌리면 대각선이 가로가 됩니다. 잘리지 않게 그만큼 자리를 잡아 둡니다. */
   const box = Math.ceil(size * 1.42);
   /* 방울 한가운데에서 아래 끝까지. 이 끝이 좌표에 닿습니다. */
@@ -298,10 +301,23 @@ function Pin({ place, active }: { place: MapPlace; active: boolean }) {
         ]}
       />
       <View style={[styles.pinFace, { height: size, width: box }]}>
-        <View style={[styles.dot, { width: dot, height: dot, borderRadius: dot / 2 }]}>
-          <Body small strong style={{ color: place.color }}>
-            {place.order}
-          </Body>
+        <View
+          style={[
+            styles.dot,
+            {
+              width: dot,
+              height: dot,
+              borderRadius: dot / 2,
+              backgroundColor: visited ? place.color : '#FFFFFF',
+            },
+          ]}>
+          {visited ? (
+            <Icon name="check" size={Math.round(dot * 0.72)} tone="inverse" />
+          ) : (
+            <Body small strong style={{ color: place.color }}>
+              {place.order}
+            </Body>
+          )}
         </View>
       </View>
     </View>

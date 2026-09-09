@@ -36,16 +36,38 @@ const FOCUS_ZOOM = 16;
  * 날짜 색 물방울 안에 흰 원, 그 안에 순번. 겹쳐 있어도 몇 번째인지 읽히도록
  * 숫자를 흰 바탕에 날짜 색으로 씁니다.
  */
-function pinIcon(color: string, n: number, active: boolean) {
+/**
+ * 핀 그림.
+ *
+ * <p>다녀온 곳은 속을 색으로 채우고 표시를 얹습니다. 아직 안 간 곳은 테두리만
+ * 두른 빈 방울입니다. 지도가 체크리스트처럼 읽혀, 채워질수록 얼마나 돌았는지가
+ * 한눈에 보입니다.
+ *
+ * <p>안 간 곳을 흑백으로 만들지는 않았습니다. 여행 전에는 아무 데도 안 갔으니
+ * 지도가 통째로 잿빛이 됩니다. 채워지는 쪽으로 달라지게 하는 편이 두 시기에
+ * 모두 맞습니다.
+ */
+function pinIcon(color: string, n: number, active: boolean, visited: boolean) {
+  const stroke = active ? 3.4 : 2.6;
+  const shadow = active ? 0.32 : 0.2;
+  /* 다녀온 곳은 방울 속이 색, 아직인 곳은 흰색입니다. */
+  const face = visited ? color : '#FFFFFF';
+  const ink = visited ? '#FFFFFF' : color;
+
+  const mark = visited
+    ? `<path d="M15.6 19.2 l3 3 5.8-6.4" fill="none" stroke="${ink}" stroke-width="2.6"
+         stroke-linecap="round" stroke-linejoin="round"/>`
+    : `<text x="20" y="19" dy=".36em" text-anchor="middle" font-family="Helvetica,Arial,sans-serif"
+         font-size="11" font-weight="700" fill="${ink}">${n}</text>`;
+
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="44" height="54" viewBox="0 0 44 54">
 <defs><filter id="s" x="-60%" y="-60%" width="220%" height="220%">
-<feDropShadow dx="0" dy="2" stdDeviation="1.6" flood-color="#191F28" flood-opacity="${active ? 0.32 : 0.2}"/>
+<feDropShadow dx="0" dy="2" stdDeviation="1.6" flood-color="#191F28" flood-opacity="${shadow}"/>
 </filter></defs>
 <path filter="url(#s)" d="M20 4C11.7 4 5 10.7 5 19c0 10.7 13.3 27 13.9 27.7a1.4 1.4 0 0 0 2.2 0C21.7 46 35 29.7 35 19 35 10.7 28.3 4 20 4z"
- fill="${color}" stroke="#ffffff" stroke-width="${active ? 3.4 : 2.6}"/>
-<circle cx="20" cy="19" r="8.6" fill="#ffffff"/>
-<text x="20" y="19" dy=".36em" text-anchor="middle" font-family="Helvetica,Arial,sans-serif"
- font-size="11" font-weight="700" fill="${color}">${n}</text>
+ fill="${color}" stroke="#ffffff" stroke-width="${stroke}"/>
+<circle cx="20" cy="19" r="8.6" fill="${face}"/>
+${mark}
 </svg>`;
   return 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
 }
@@ -261,7 +283,7 @@ export function TripMap({
         map: map.current,
         zIndex: 100 + p.order,
         icon: {
-          url: pinIcon(p.color, p.order, false),
+          url: pinIcon(p.color, p.order, false, p.detail.visited),
           scaledSize: new g.Size(40, 49),
           anchor: new g.Point(18, 49),
         },
@@ -385,7 +407,7 @@ export function TripMap({
       }
       const active = p.id === activeId;
       marker.setIcon({
-        url: pinIcon(p.color, p.order, active),
+        url: pinIcon(p.color, p.order, active, p.detail.visited),
         scaledSize: new g.Size(active ? 48 : 40, active ? 59 : 49),
         anchor: new g.Point(active ? 22 : 18, active ? 59 : 49),
       });

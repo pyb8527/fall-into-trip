@@ -460,6 +460,13 @@ export default function TripScreen() {
           /* 동행자는 가끔 여는 것이라 화면을 차지하지 않게 막대에 둡니다. */
           headerRight: () => (
             <Row gap={Spacing.xs}>
+              {/* 길 위에서는 짜는 화면이 방해입니다. 지금 갈 곳만 크게 보는
+                  쪽으로 넘어갑니다. */}
+              <IconButton
+                name="compass"
+                label="여행 중 화면"
+                onPress={() => router.push({ pathname: '/travel/[id]', params: { id } })}
+              />
               {/* 올리는 것은 주인만 할 수 있습니다. 서버도 그렇게 막습니다. */}
               {data.trip.ownerId === user?.id ? (
                 <IconButton
