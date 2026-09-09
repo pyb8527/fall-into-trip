@@ -229,26 +229,39 @@ export type DayRoute = {
 
 /* ------------------------------------------------------------ 장소 정보 */
 
+/** 여는 구간 하나. end 가 비어 있으면 그날 안 닫습니다. */
+export type OpenSpan = {
+  start: string;
+  end: Maybe<string>;
+};
+
 /**
  * 구글이 알려 주는 가게 정보.
  *
  * 우리 DB 에 쌓지 않고 볼 때마다 받아 옵니다(구글 약관). 그래서 화면에는
  * 출처를 함께 띄워야 합니다.
+ *
+ * 시간은 <b>오늘</b>이 아니라 <b>그 장소를 넣어 둔 날</b> 기준입니다. 10월
+ * 9일에 갈 곳이 그날 쉬는지가 궁금한 것이지 오늘 여는지가 아닙니다.
  */
 export type PlaceInfo = {
   /** 우리 쪽 장소 id */
   id: string;
-  /** 그 장소가 있는 곳 기준 오늘의 영업시간 */
-  today: string | null;
-  /** 요일별. 월요일부터입니다. */
+  /** 넣어 둔 날의 영업시간 */
+  onDay: Maybe<string>;
+  /** 그날 쉬는지 */
+  closedOnDay: boolean;
+  /** 그날 여는 구간들. 둘 이상이면 사이가 브레이크 타임입니다. */
+  spans: OpenSpan[];
+  /** 요일별 전체. 월요일부터입니다. */
   hours: string[];
-  phone: string | null;
-  website: string | null;
-  rating: number | null;
-  ratingCount: number | null;
+  phone: Maybe<string>;
+  website: Maybe<string>;
+  rating: Maybe<number>;
+  ratingCount: Maybe<number>;
   /** 아예 문을 닫은 가게 */
   permanentlyClosed: boolean;
-  mapUrl: string | null;
+  mapUrl: Maybe<string>;
 };
 
 /* -------------------------------------------------------------- 게시판 */

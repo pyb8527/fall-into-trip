@@ -16,6 +16,7 @@ import org.springframework.web.client.RestClient;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -27,8 +28,9 @@ import java.util.Map;
 /**
  * 가게가 언제 여는지, 전화번호가 뭔지.
  *
- * <p>월요일 휴관을 모르고 갔다가 하루를 날리는 일이 흔합니다. 일정에 넣어 둔
- * 곳이 언제 문을 여는지는 짤 때도, 가서도 필요합니다.
+ * <p>월요일 휴관을 모르고 갔다가 하루를 날리는 일이 흔합니다. 그래서 <b>오늘</b>
+ * 이 아니라 <b>그 장소를 넣어 둔 날</b> 기준으로 봅니다. 10월 9일에 갈 곳이
+ * 그날 쉬는지가 궁금한 것이지, 오늘 여는지가 궁금한 것이 아닙니다.
  *
  * <p><b>내용을 우리 DB 에 쌓지 않습니다.</b> 구글 약관이 막습니다. 영구 저장이
  * 허용된 것은 장소 번호(place_id) 하나뿐이라, 번호만 들고 있다가 화면이 열릴
@@ -66,9 +68,14 @@ public class PlaceInfoService {
      * <p>넓게 적으면 더 비싼 등급으로 넘어갑니다. 화면에 실제로 띄우는 것만
      * 적습니다. 사진과 후기는 넣지 않았습니다 — 그쪽은 글쓴이 이름과 프로필을
      * 함께 띄워야 하는 별도의 의무가 따라붙습니다.
+     *
+     * <p>periods 는 브레이크 타임을 알기 위해 받습니다. weekday_text 는
+     * "11:00~15:00, 17:00~22:00" 처럼 한 줄로 오는데, 그 줄을 말로 쪼개면
+     * 나라마다 표기가 달라 깨집니다.
      */
     private static final String FIELDS = String.join(",",
             "opening_hours/weekday_text",
+            "opening_hours/periods",
             "utc_offset_minutes",
             "formatted_phone_number",
             "website",
@@ -88,6 +95,12 @@ public class PlaceInfoService {
     @Value("${fit.google.maps-key:}")
     private String key;
 
+    /**
+     * 주간 원본만 들고 있습니다.
+     *
+     * <p>"그날 여는가" 는 날짜마다 다른 값이라 여기 넣으면 안 됩니다. 같은
+     * 가게가 이틀에 걸쳐 있으면 한쪽 답이 다른 쪽에 새어 나갑니다.
+     */
     private final Map<String, Cached> cache = Collections.synchronizedMap(
             new LinkedHashMap<String, Cached>(128, 0.75f, true) {
                 @Override
@@ -120,9 +133,9 @@ public class PlaceInfoService {
             if (place.getPlaceId() == null || place.getPlaceId().isBlank()) {
                 continue;
             }
-            Info info = lookup(place.getId(), place.getPlaceId());
-            if (info != null) {
-                out.add(info);
+            Raw raw = lookup(place.getPlaceId());
+            if (raw != null) {
+                out.add(viewOf(place.getId(), raw, day.getIso()));
             }
             if (out.size() >= MAX_PLACES) {
                 break;
@@ -131,18 +144,64 @@ public class PlaceInfoService {
         return out;
     }
 
-    private Info lookup(String ourId, String googleId) {
+    private Raw lookup(String googleId) {
         Cached hit = cache.get(googleId);
         if (hit != null && hit.until().isAfter(Instant.now())) {
-            return hit.info() == null ? null : hit.info().withId(ourId);
+            return hit.raw();
         }
-
-        Info fresh = ask(ourId, googleId);
+        Raw fresh = ask(googleId);
         cache.put(googleId, new Cached(fresh, Instant.now().plus(KEEP)));
         return fresh;
     }
 
-    private Info ask(String ourId, String googleId) {
+    /**
+     * 그 장소를 넣어 둔 날 기준으로 추립니다.
+     *
+     * <p>날짜가 없는 여행이면 그 장소가 있는 곳의 오늘로 봅니다. 여기 서버의
+     * 오늘이 아닙니다 — 서울이 화요일 아침일 때 파리는 아직 월요일 밤입니다.
+     */
+    private static Info viewOf(String placeId, Raw raw, LocalDate on) {
+        LocalDate target = on;
+        if (target == null && raw.utcOffsetMinutes() != null) {
+            ZoneOffset zone = ZoneOffset.ofTotalSeconds(raw.utcOffsetMinutes() * 60);
+            target = OffsetDateTime.now(zone).toLocalDate();
+        }
+
+        String text = null;
+        List<Span> spans = List.of();
+        boolean closed = false;
+
+        if (target != null) {
+            int weekday = target.getDayOfWeek().getValue();      // 월=1 … 일=7
+            if (raw.hours().size() == 7) {
+                /* 구글의 요일 목록은 월요일부터 시작합니다. */
+                text = raw.hours().get(weekday - 1);
+            }
+            /* 그런데 periods 쪽은 일요일이 0 입니다. 같은 응답 안에서 기준이
+               다르므로 각각 맞춰 세야 합니다. */
+            int googleDay = weekday == 7 ? 0 : weekday;
+            spans = raw.spansByDay().getOrDefault(googleDay, List.of());
+            closed = spans.isEmpty() && text != null && looksClosed(text);
+        }
+
+        return new Info(placeId, text, closed, spans, raw.hours(),
+                raw.phone(), raw.website(), raw.rating(), raw.ratingCount(),
+                raw.permanentlyClosed(), raw.mapUrl());
+    }
+
+    /**
+     * 그 줄이 "쉼" 을 뜻하는지.
+     *
+     * <p>여는 구간이 하나도 없으면 대개 쉬는 날이지만, 구글이 시간을 모르는
+     * 경우도 같은 모양입니다. 글에 쉰다고 적혀 있을 때만 쉰다고 말합니다 —
+     * 모르는 것을 쉰다고 하면 멀쩡한 가게를 지나칩니다.
+     */
+    private static boolean looksClosed(String text) {
+        String lower = text.toLowerCase();
+        return lower.contains("휴무") || lower.contains("휴업") || lower.contains("closed");
+    }
+
+    private Raw ask(String googleId) {
         JsonNode body;
         try {
             body = client.get()
@@ -165,8 +224,6 @@ public class PlaceInfoService {
         }
         String status = body.path("status").asText("");
         if (!"OK".equals(status)) {
-            /* 가게가 없어졌으면 NOT_FOUND 가 옵니다. 그것도 정보이긴 하지만
-               번호가 낡은 것인지 가게가 닫힌 것인지 구별할 수 없어 비워 둡니다. */
             log.warn("장소 정보가 거절됐습니다: status={} message={}",
                     status, body.path("error_message").asText(""));
             return null;
@@ -178,10 +235,10 @@ public class PlaceInfoService {
             hours.add(line.asText());
         }
 
-        return new Info(
-                ourId,
-                todayOf(hours, r.path("utc_offset_minutes")),
+        return new Raw(
                 hours,
+                spansOf(r.path("opening_hours").path("periods")),
+                r.hasNonNull("utc_offset_minutes") ? r.path("utc_offset_minutes").asInt() : null,
                 text(r, "formatted_phone_number"),
                 text(r, "website"),
                 r.hasNonNull("rating") ? r.path("rating").asDouble() : null,
@@ -191,47 +248,66 @@ public class PlaceInfoService {
     }
 
     /**
-     * 오늘 몇 시에 여는지.
+     * 여는 구간을 요일별로 모읍니다.
      *
-     * <p>여기 서버의 오늘이 아니라 <b>그 가게가 있는 곳의 오늘</b>이어야 합니다.
-     * 서울이 화요일 아침일 때 파리는 아직 월요일 밤입니다. 구글이 그 장소의
-     * 시차를 함께 주므로 그것으로 요일을 셉니다.
+     * <p>한 요일에 구간이 둘이면 그 사이가 브레이크 타임입니다. 점심만 하고
+     * 닫았다가 저녁에 다시 여는 가게가 그렇습니다.
      *
-     * <p>구글의 요일 목록은 월요일부터 시작합니다.
+     * <p>여기서 요일은 <b>일요일이 0</b> 입니다. 같은 응답의 weekday_text 는
+     * 월요일부터인데 이쪽만 다릅니다.
      */
-    private static String todayOf(List<String> hours, JsonNode offsetMinutes) {
-        if (hours.size() != 7 || !offsetMinutes.isNumber()) {
+    private static Map<Integer, List<Span>> spansOf(JsonNode periods) {
+        Map<Integer, List<Span>> byDay = new LinkedHashMap<>();
+        for (JsonNode period : periods) {
+            JsonNode open = period.path("open");
+            if (!open.hasNonNull("day") || !open.hasNonNull("time")) {
+                continue;
+            }
+            /* 닫는 시각이 없으면 24시간 영업입니다. */
+            String close = period.path("close").path("time").asText(null);
+            byDay.computeIfAbsent(open.path("day").asInt(), d -> new ArrayList<>())
+                    .add(new Span(clock(open.path("time").asText()), clock(close)));
+        }
+        return byDay;
+    }
+
+    /** 구글은 "1130" 처럼 붙여 보냅니다. 사람이 읽는 모양으로 바꿉니다. */
+    private static String clock(String raw) {
+        if (raw == null || raw.length() != 4) {
             return null;
         }
-        ZoneOffset zone = ZoneOffset.ofTotalSeconds(offsetMinutes.asInt() * 60);
-        int weekday = OffsetDateTime.now(zone).getDayOfWeek().getValue();   // 월=1
-        return hours.get(weekday - 1);
+        return raw.substring(0, 2) + ":" + raw.substring(2);
     }
 
     private static String text(JsonNode node, String field) {
         return node.hasNonNull(field) ? node.path(field).asText() : null;
     }
 
-    /**
-     * 한 장소에 대해 화면이 띄우는 것.
-     *
-     * @param id                우리 쪽 장소 id
-     * @param today             그 장소가 있는 곳 기준 오늘의 영업시간
-     * @param hours             요일별 영업시간. 월요일부터입니다.
-     * @param permanentlyClosed 아예 문을 닫은 가게
-     * @param mapUrl            구글 지도에서 이 장소를 여는 주소
-     */
-    public record Info(String id, String today, List<String> hours,
-                       String phone, String website,
-                       Double rating, Integer ratingCount,
-                       boolean permanentlyClosed, String mapUrl) {
-
-        Info withId(String id) {
-            return new Info(id, today, hours, phone, website,
-                    rating, ratingCount, permanentlyClosed, mapUrl);
-        }
+    /** 여는 구간 하나. end 가 비어 있으면 그날 안 닫습니다. */
+    public record Span(String start, String end) {
     }
 
-    private record Cached(Info info, Instant until) {
+    /**
+     * 화면이 띄우는 것.
+     *
+     * @param onDay        그 장소를 넣어 둔 날의 영업시간
+     * @param closedOnDay  그날 쉬는지
+     * @param spans        그날 여는 구간들. 둘 이상이면 사이가 브레이크 타임입니다.
+     * @param hours        요일별 전체. 월요일부터입니다.
+     */
+    public record Info(String id, String onDay, boolean closedOnDay, List<Span> spans,
+                       List<String> hours, String phone, String website,
+                       Double rating, Integer ratingCount,
+                       boolean permanentlyClosed, String mapUrl) {
+    }
+
+    /** 구글에서 받은 주간 원본. 날짜에 매이지 않아 캐시에 둘 수 있습니다. */
+    private record Raw(List<String> hours, Map<Integer, List<Span>> spansByDay,
+                       Integer utcOffsetMinutes, String phone, String website,
+                       Double rating, Integer ratingCount,
+                       boolean permanentlyClosed, String mapUrl) {
+    }
+
+    private record Cached(Raw raw, Instant until) {
     }
 }

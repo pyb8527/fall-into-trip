@@ -828,7 +828,7 @@ function PlaceRow({
             </Row>
             {place.ja || place.en ? <Caption>{place.ja ?? place.en}</Caption> : null}
             {place.note ? <Caption tone="secondary">{place.note}</Caption> : null}
-            {info ? <PlaceHours info={info} /> : null}
+            {info ? <PlaceHours info={info} at={place.time} /> : null}
             {place.cat || place.cost || place.move?.min ? (
               <Row gap={Spacing.sm}>
                 {place.cat ? <Caption>{place.cat}</Caption> : null}
@@ -996,14 +996,14 @@ function RouteNote({
 /**
  * 장소 밑에 붙는 영업시간 한 줄.
  *
- * <p>월요일 휴관을 모르고 갔다가 하루를 날리는 일이 흔합니다. 오늘 기준으로
- * 한 줄만 보여 줍니다. 요일 일곱 줄을 다 늘어놓으면 목록이 읽히지 않습니다.
+ * <p><b>오늘</b>이 아니라 <b>그 장소를 넣어 둔 날</b> 기준입니다. 10월 9일에
+ * 갈 곳이 그날 쉬는지가 궁금한 것이지 오늘 여는지가 아닙니다. 월요일 휴관을
+ * 모르고 갔다가 하루를 날리는 일이 흔합니다.
  *
- * <p>시간은 그 장소가 있는 곳 기준입니다. 서울이 화요일 아침일 때 파리는 아직
- * 월요일 밤이라, 여기 시계로 세면 엉뚱한 요일을 보여 주게 됩니다. 그 계산은
- * 서버가 합니다.
+ * <p>적어 둔 시각이 영업시간 밖이면 그것도 말해 줍니다. 브레이크 타임에 맞춰
+ * 가면 문 앞에서 돌아섭니다.
  */
-function PlaceHours({ info }: { info: PlaceInfo }) {
+function PlaceHours({ info, at }: { info: PlaceInfo; at?: string | null }) {
   if (info.permanentlyClosed) {
     return (
       <Caption tone="danger" strong>
@@ -1011,19 +1011,36 @@ function PlaceHours({ info }: { info: PlaceInfo }) {
       </Caption>
     );
   }
-  if (!info.today) {
+  if (info.closedOnDay) {
+    return (
+      <Caption tone="danger" strong>
+        이 날은 휴무입니다
+      </Caption>
+    );
+  }
+  if (!info.onDay && info.spans.length === 0) {
     return null;
   }
+
   /* 구글이 "월요일: 오전 9:00~오후 6:00" 처럼 요일까지 붙여 보냅니다.
-     어차피 오늘 것만 띄우므로 요일은 덜어 냅니다. */
-  const hours = info.today.replace(/^[^:]+:\s*/, '');
-  const closed = /휴무|closed/i.test(hours);
+     어느 날 것인지는 카드가 이미 말하고 있으므로 요일은 덜어 냅니다. */
+  const text =
+    info.spans.length > 0
+      ? info.spans.map((s) => (s.end ? `${s.start}~${s.end}` : `${s.start}~`)).join(' · ')
+      : (info.onDay ?? '').replace(/^[^:]+:\s*/, '');
+  const off = at ? outsideHours(at, info.spans) : false;
 
   return (
     <Row gap={Spacing.sm}>
-      <Caption tone={closed ? 'danger' : 'secondary'} strong={closed}>
-        오늘 {hours}
+      <Caption tone={off ? 'danger' : 'secondary'} strong={off}>
+        {text}
+        {info.spans.length > 1 ? ' (브레이크 타임 있음)' : ''}
       </Caption>
+      {off ? (
+        <Caption tone="danger" strong>
+          적어 둔 시각에 안 엽니다
+        </Caption>
+      ) : null}
       {info.rating ? (
         <Caption tone="secondary">
           ★ {info.rating.toFixed(1)}
@@ -1032,6 +1049,29 @@ function PlaceHours({ info }: { info: PlaceInfo }) {
       ) : null}
     </Row>
   );
+}
+
+/**
+ * 적어 둔 시각이 여는 구간 밖인지.
+ *
+ * <p>구간을 모르면 아무 말도 하지 않습니다. 모르는 것을 "안 연다" 고 하면
+ * 멀쩡한 계획을 흔듭니다.
+ *
+ * <p>새벽까지 하는 가게는 닫는 시각이 여는 시각보다 앞섭니다(23:00~02:00).
+ * 그때는 자정을 넘긴 것으로 봅니다.
+ */
+function outsideHours(at: string, spans: { start: string; end?: string | null }[]) {
+  if (spans.length === 0 || !/^\d{2}:\d{2}$/.test(at)) {
+    return false;
+  }
+  return !spans.some((span) => {
+    if (!span.end) {
+      return at >= span.start;
+    }
+    return span.end > span.start
+      ? at >= span.start && at <= span.end
+      : at >= span.start || at <= span.end;
+  });
 }
 
 const styles = StyleSheet.create({
