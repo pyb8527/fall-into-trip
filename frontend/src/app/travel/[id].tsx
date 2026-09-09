@@ -174,7 +174,7 @@ export default function Travel() {
       </View>
 
       {places.length === 0 ? (
-        <Empty message="이 날에는 넣어 둔 곳이 없습니다." />
+        <Empty message="이 날은 아직 비어 있습니다." />
       ) : (
         <ScrollView
           horizontal

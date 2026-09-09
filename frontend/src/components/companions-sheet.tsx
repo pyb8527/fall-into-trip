@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { api, API_BASE, ApiError } from '@/api/client';
+import { api, API_BASE, ApiError, UNEXPECTED } from '@/api/client';
 import type { Companion, InviteRow, NewInvite, TripRole } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
@@ -96,7 +96,7 @@ function Inner({
       await action();
       after ? after() : reload();
     } catch (e) {
-      setActionError(e instanceof ApiError ? e.message : '처리하지 못했습니다.');
+      setActionError(e instanceof ApiError ? e.message : UNEXPECTED);
     } finally {
       setBusy(false);
     }
@@ -254,7 +254,7 @@ function InviteSection({ tripId }: { tripId: string }) {
       setMade(res.invite);
       reload();
     } catch (e) {
-      setFailed(e instanceof ApiError ? e.message : '만들지 못했습니다.');
+      setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
     } finally {
       setBusy(false);
     }
@@ -266,7 +266,7 @@ function InviteSection({ tripId }: { tripId: string }) {
       how === 'copied'
         ? '링크를 복사했습니다.'
         : how === 'failed'
-          ? '보내지 못했습니다. 아래 주소를 직접 붙여 넣어 주세요.'
+          ? '보내기가 열리지 않았습니다. 아래 주소를 직접 붙여 넣어 주세요.'
           : null,
     );
   }
@@ -363,7 +363,7 @@ function InviteRowView({ invite, onChanged }: { invite: InviteRow; onChanged: ()
       await api.delete(`/api/invites/${invite.id}`);
       onChanged();
     } catch (e) {
-      setFailed(e instanceof ApiError ? e.message : '취소하지 못했습니다.');
+      setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
     } finally {
       setBusy(false);
     }

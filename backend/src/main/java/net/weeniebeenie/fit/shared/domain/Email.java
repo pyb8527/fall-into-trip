@@ -18,7 +18,7 @@ public record Email(String value) {
 
     public Email {
         if (value == null || value.isBlank()) {
-            throw ApiException.badRequest("이메일을 입력해 주세요.");
+            throw ApiException.badRequest("이메일을 넣어 주세요.");
         }
         value = value.trim().toLowerCase();
         if (value.length() > MAX) {

@@ -21,7 +21,6 @@ import {
   Screen,
   SegmentedTabs,
   Subtitle,
-  Title,
 } from '@/ui';
 
 /**
@@ -131,12 +130,10 @@ export default function Community() {
 
   return (
     <Screen>
-      <View style={styles.head}>
-        <Title>여행 이야기</Title>
-        <Body tone="secondary">
-          다른 사람이 다녀온 일정을 구경하고, 마음에 들면 그대로 가져오세요.
-        </Body>
-      </View>
+      {/* 위 막대가 이미 이름을 적고 있습니다. */}
+      <Body tone="secondary">
+        남이 다녀온 길을 구경하고, 탐나면 통째로 가져오세요.
+      </Body>
 
       <SegmentedTabs
         items={user ? TABS : TABS.filter((t) => !PRIVATE.includes(t.value))}
@@ -225,12 +222,12 @@ export default function Community() {
         <Empty
           message={
             view === 'mine'
-              ? '아직 올린 일정이 없습니다. 여행 화면에서 올릴 수 있습니다.'
+              ? '아직 내놓은 길이 없습니다. 여행 화면에서 내놓을 수 있습니다.'
               : view === 'liked'
-                ? '아직 눌러 둔 글이 없습니다. 마음에 드는 일정에 하트를 눌러 두세요.'
+                ? '아직 하트를 누른 글이 없습니다. 마음에 드는 길에 눌러 두세요.'
                 : filtered
-                ? '조건에 맞는 일정이 없습니다. 조건을 줄여 보세요.'
-                : '아직 올라온 일정이 없습니다. 첫 번째가 되어 보세요.'
+                ? '조건에 맞는 길이 없습니다. 조건을 줄여 보세요.'
+                : '아직 올라온 길이 없습니다. 첫 번째가 되어 보세요.'
           }
         />
       ) : null}
@@ -339,9 +336,6 @@ function PostMap({ postId, title, height }: { postId: string; title: string; hei
 }
 
 const styles = StyleSheet.create({
-  head: {
-    gap: Spacing.xs,
-  },
   filters: {
     gap: Spacing.sm,
   },

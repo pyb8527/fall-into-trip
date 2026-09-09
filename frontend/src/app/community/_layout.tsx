@@ -19,7 +19,7 @@ export const unstable_settings = { anchor: 'index' };
 export default function CommunityLayout() {
   return (
     <Stack>
-      <Stack.Screen name="index" options={{ title: '여행 이야기' }} />
+      <Stack.Screen name="index" options={{ title: '여행 둘러보기' }} />
       <Stack.Screen name="[id]" options={{ title: '' }} />
     </Stack>
   );

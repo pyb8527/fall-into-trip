@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { api, ApiError } from '@/api/client';
+import { api, ApiError, UNEXPECTED } from '@/api/client';
 import type { SavedPlace, TripDetail, TripSummary } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { IconPicker } from '@/components/icon-picker';
@@ -26,14 +26,13 @@ import {
   Row,
   Screen,
   Subtitle,
-  Title,
 } from '@/ui';
 
 /** 그림을 아직 안 고른 곳. 지도에서는 별로 찍힙니다. */
 const STAR = '⭐';
 
 /**
- * 보관함.
+ * 보석함.
  *
  * <p>남의 일정에서, 검색에서 눈에 띄는 곳을 담아 두었다가 내 일정 아무 날에나
  * 꺼내 넣습니다.
@@ -101,7 +100,7 @@ export default function Saved() {
           cost: null,
           note: place.note ?? null,
           sub: null,
-          dayLabel: labelOf(place.icon) || '담아 둔 곳',
+          dayLabel: labelOf(place.icon) || '주워 둔 곳',
           visited: false,
         },
       })),
@@ -127,7 +126,7 @@ export default function Saved() {
       });
       reload();
     } catch (e) {
-      setFailed(e instanceof ApiError ? e.message : '지우지 못했습니다.');
+      setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
     }
   }
 
@@ -142,7 +141,7 @@ export default function Saved() {
     try {
       await api.patch(`/api/saved/${place.id}`, { icon: icon ?? '' });
     } catch (e) {
-      setFailed(e instanceof ApiError ? e.message : '바꾸지 못했습니다.');
+      setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
       reload();
     }
   }
@@ -154,17 +153,16 @@ export default function Saved() {
           <Button label={`${picked.size}곳 일정에 넣기`} onPress={() => setPouring(true)} />
         ) : undefined
       }>
-      <View style={styles.head}>
-        <Title>보관함</Title>
-        <Body tone="secondary">담아 둔 곳을 골라 일정에 넣습니다.</Body>
-      </View>
+      {/* 위 막대가 이미 이름을 적고 있습니다. 두 번 쓰면 볼 것이 그만큼
+          아래로 밀립니다. */}
+      <Body tone="secondary">주워 둔 곳을 골라 일정에 얹습니다.</Body>
 
       {loading && !data ? <Loading /> : null}
       {error ? <ErrorNote message={error} onRetry={reload} /> : null}
       {failed ? <ErrorNote message={failed} /> : null}
 
       {data && all.length === 0 ? (
-        <Empty message="아직 담아 둔 곳이 없습니다. 여행 이야기나 장소 찾기에서 별을 누르면 여기 쌓입니다." />
+        <Empty message="아직 주워 둔 보석이 없습니다. 여행 둘러보기나 장소 찾기에서 별을 누르면 여기 쌓입니다." />
       ) : null}
 
       {/* 어디에 무엇이 모여 있는지. 목록보다 이쪽이 먼저 답이 됩니다. */}
@@ -197,7 +195,7 @@ export default function Saved() {
       ) : null}
 
       {data && all.length > 0 && shown.length === 0 ? (
-        <Empty message="이 갈래로 담아 둔 곳이 없습니다." />
+        <Empty message="이 갈래에는 아직 없습니다." />
       ) : null}
 
       {/*
@@ -261,7 +259,7 @@ export default function Saved() {
               />
               <IconButton
                 name="trash-2"
-                label={`${place.name} 지우기`}
+                label={`${place.name} 보석함에서 빼기`}
                 tone="danger"
                 onPress={() => drop(place.id)}
               />
@@ -343,7 +341,7 @@ function PourSheet({
       await api.post(`/api/days/${dayId}/places/from-saved`, { savedIds });
       onDone(trip!.id);
     } catch (e) {
-      setFailed(e instanceof ApiError ? e.message : '넣지 못했습니다.');
+      setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
     } finally {
       setBusy(false);
     }
@@ -395,9 +393,6 @@ function PourSheet({
 }
 
 const styles = StyleSheet.create({
-  head: {
-    gap: Spacing.xs,
-  },
   list: {
     gap: Spacing.xs,
   },

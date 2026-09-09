@@ -75,7 +75,7 @@ public class TripService {
     public Trip create(AuthPrincipal me, String title, String startIso, int nights) {
         String cleanTitle = title == null ? "" : title.trim();
         if (cleanTitle.isEmpty()) {
-            throw ApiException.badRequest("여행 이름을 입력해 주세요.");
+            throw ApiException.badRequest("여행 이름을 지어 주세요.");
         }
         LocalDate start = DayLabels.parse(startIso);
         int nightCount = Math.max(0, Math.min(MAX_NIGHTS, nights));

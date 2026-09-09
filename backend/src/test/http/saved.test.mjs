@@ -37,7 +37,7 @@ r = await call("POST", "/api/saved", { token: me,
   body: { name: "이치란 라멘(다른이름)", lat: 34.6688, lng: 135.5019, placeId: "gplace-ichiran" } });
 T("같은 가게는 두 번 안 쌓임", r.data.place.id === savedA, r.data.place);
 r = await call("GET", "/api/saved", { token: me });
-T("보관함에 하나", r.data.places.length === 1, r.data.places);
+T("보석함에 하나", r.data.places.length === 1, r.data.places);
 T("담을 때 값이 그대로", r.data.places[0].name === "이치란 라멘", r.data.places[0]);
 
 r = await call("POST", "/api/saved", { token: me,
@@ -50,7 +50,7 @@ T("이름이 없으면 거절", r.status === 400, r.data);
 r = await call("POST", "/api/saved", { token: me, body: { name: "엉뚱한 곳", lat: 999, lng: 999 } });
 T("좌표가 이상하면 거절", r.status === 400, r.data);
 
-console.log("\n[3] 남의 보관함은 안 보인다");
+console.log("\n[3] 남의 보석함은 안 보인다");
 r = await call("GET", "/api/saved", { token: other });
 T("남에게는 비어 있음", r.data.places.length === 0, r.data.places);
 r = await call("DELETE", "/api/saved/" + savedA, { token: other });
@@ -65,7 +65,7 @@ T("일정에 보임", put.length === 2, put);
 T("구글 번호도 따라옴", put.some(p => p.placeId === "gplace-ichiran"), put);
 
 r = await call("GET", "/api/saved", { token: me });
-T("보관함에는 그대로 남음", r.data.places.length === 2, r.data.places);
+T("보석함에는 그대로 남음", r.data.places.length === 2, r.data.places);
 
 r = await call("POST", `/api/days/${dayId}/places/from-saved`, { token: me, body: { savedIds: [] } });
 T("아무것도 안 고르면 거절", r.status === 400, r.data);

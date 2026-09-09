@@ -2,7 +2,7 @@ import { Link } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { ApiError } from '@/api/client';
+import { ApiError, UNEXPECTED } from '@/api/client';
 import { useAuth } from '@/auth/auth-provider';
 import { Spacing } from '@/constants/theme';
 import { Body, Button, Card, Caption, Divider, ErrorNote, Field, Row, Screen, Title } from '@/ui';
@@ -48,7 +48,7 @@ export default function Setup() {
     try {
       await setup(email.trim(), name.trim(), password, token.trim());
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : '설치하지 못했습니다.');
+      setError(e instanceof ApiError ? e.message : UNEXPECTED);
     } finally {
       setBusy(false);
     }

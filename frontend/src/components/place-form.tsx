@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { api, ApiError } from '@/api/client';
+import { api, ApiError, UNEXPECTED } from '@/api/client';
 import type { Place } from '@/api/types';
 import { PlaceSearch } from '@/components/place-search';
 import { IconPicker } from '@/components/icon-picker';
@@ -103,11 +103,11 @@ export function PlaceForm({
       return;
     }
     if (!name.trim()) {
-      setError('장소 이름을 넣어 주세요.');
+      setError('이름이 있어야 합니다. 부르기 쉬운 것으로 넣어 주세요.');
       return;
     }
     if (!hasSpot) {
-      setError('장소를 찾아서 골라 주세요. 지도에 찍을 자리가 필요합니다.');
+      setError('먼저 찾아서 골라 주세요. 지도에 찍을 자리가 있어야 합니다.');
       return;
     }
     setError(null);
@@ -140,7 +140,7 @@ export function PlaceForm({
       if (e instanceof ApiError && e.code === 'STALE') {
         setError('동행자가 먼저 고쳤습니다. 화면을 새로 불러온 뒤 다시 저장해 주세요.');
       } else {
-        setError(e instanceof ApiError ? e.message : '저장하지 못했습니다.');
+        setError(e instanceof ApiError ? e.message : UNEXPECTED);
       }
     } finally {
       setBusy(false);
@@ -189,7 +189,7 @@ export function PlaceForm({
         onChangeText={setName}
         placeholder="난바 파크스"
         maxLength={120}
-        hint="찾은 이름을 그대로 써도 되고, 부르기 쉽게 바꿔도 됩니다."
+        hint="찾은 이름 그대로도 좋고, 우리끼리 부르는 이름도 좋습니다."
       />
 
       {/*

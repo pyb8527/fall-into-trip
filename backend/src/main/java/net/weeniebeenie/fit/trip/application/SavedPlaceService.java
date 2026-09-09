@@ -34,7 +34,7 @@ public class SavedPlaceService {
     /**
      * 담아 둘 수 있는 개수.
      *
-     * <p>보관함은 훑어보는 곳이라 화면을 여러 장 넘겨야 하면 담아 둔 것을
+     * <p>보석함은 훑어보는 곳이라 화면을 여러 장 넘겨야 하면 담아 둔 것을
      * 잊습니다. 넘치면 안 쓰는 것부터 지우게 합니다.
      */
     private static final int MAX_SAVED = 300;
@@ -56,7 +56,7 @@ public class SavedPlaceService {
      * 담습니다.
      *
      * <p>같은 가게를 두 번 담아도 하나로 둡니다. 여기저기서 눈에 띌 때마다
-     * 누르게 되는데 그때마다 쌓이면 보관함이 같은 것으로 채워집니다.
+     * 누르게 되는데 그때마다 쌓이면 보석함이 같은 것으로 채워집니다.
      *
      * <p>구글 번호를 아는 것만 같은 곳인지 판단합니다. 직접 찍은 좌표는
      * 이름이 달라도 같은 곳인지 알 수 없습니다.
@@ -78,7 +78,7 @@ public class SavedPlaceService {
         }
         if (saved.countByUserId(me.id()) >= MAX_SAVED) {
             throw ApiException.badRequest(
-                    "보관함이 가득 찼습니다. 안 쓰는 것을 지우고 담아 주세요.");
+                    "보석함이 가득 찼습니다. 안 쓰는 것을 지우고 담아 주세요.");
         }
 
         return saved.save(SavedPlace.builder()
@@ -104,7 +104,7 @@ public class SavedPlaceService {
         SavedPlace item = saved.findById(savedId)
                 .orElseThrow(() -> ApiException.notFound("담아 둔 장소를 찾을 수 없습니다."));
         if (!item.getUserId().equals(me.id())) {
-            /* 남의 보관함이 있다는 것 자체를 알릴 이유가 없습니다. */
+            /* 남의 보석함이 있다는 것 자체를 알릴 이유가 없습니다. */
             throw ApiException.notFound("담아 둔 장소를 찾을 수 없습니다.");
         }
         item.setIcon(PlaceKind.clean(icon));
@@ -116,7 +116,7 @@ public class SavedPlaceService {
         SavedPlace item = saved.findById(savedId)
                 .orElseThrow(() -> ApiException.notFound("담아 둔 장소를 찾을 수 없습니다."));
         if (!item.getUserId().equals(me.id())) {
-            /* 남의 보관함이 있다는 것 자체를 알릴 이유가 없습니다. */
+            /* 남의 보석함이 있다는 것 자체를 알릴 이유가 없습니다. */
             throw ApiException.notFound("담아 둔 장소를 찾을 수 없습니다.");
         }
         saved.delete(item);
@@ -125,7 +125,7 @@ public class SavedPlaceService {
     /**
      * 담아 둔 것을 일정에 넣습니다.
      *
-     * <p>보관함에서는 지우지 않습니다. 같은 곳을 여러 여행에 넣을 수 있고,
+     * <p>보석함에서는 지우지 않습니다. 같은 곳을 여러 여행에 넣을 수 있고,
      * 넣었다고 사라지면 다시 찾아야 합니다.
      */
     @Transactional
@@ -159,7 +159,7 @@ public class SavedPlaceService {
                     .lng(item.getLng())
                     .cat(item.getCat())
                     /* 담을 때 찍힌 그림이 일정까지 그대로 따라갑니다. 여기서
-                       끊기면 보관함을 거쳐 온 곳만 지도에서 민무늬가 됩니다. */
+                       끊기면 보석함을 거쳐 온 곳만 지도에서 민무늬가 됩니다. */
                     .icon(item.getIcon())
                     .note(item.getNote())
                     .placeId(item.getPlaceId())

@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 
-import { api, ApiError } from '@/api/client';
+import { api, ApiError, UNEXPECTED } from '@/api/client';
 import type {
   Day,
   Gap,
@@ -49,6 +49,7 @@ import {
   ConfirmDialog,
   Divider,
   DragSheet,
+  type DragSheetHandle,
   Empty,
   ErrorNote,
   Icon,
@@ -117,6 +118,30 @@ export default function TripScreen() {
   const [lookAt, setLookAt] = useState<{ lat: number; lng: number; at: number } | null>(null);
   /* 방금 꽂았다는 표시. 잠깐 뒤 스스로 사라집니다 — 오래 남아 있으면 다음에
      열었을 때 방금 꽂은 줄 압니다. */
+  /*
+    지도에서 핀을 누르면 그 줄로 목록을 굴립니다.
+
+    전에는 줄에 색만 들어왔습니다. 그 줄이 판 아래 어딘가에 있으면 눌러도
+    화면에는 아무 일도 안 일어난 것처럼 보이고, 몇 번째 곳인지 보려면 직접
+    찾아 내려가야 했습니다.
+
+    목록에서 누른 것은 굴리지 않습니다 — 이미 눈앞에 있는 줄을 움직이면
+    누른 자리가 발밑에서 빠져나갑니다.
+  */
+  const sheet = useRef<DragSheetHandle>(null);
+  const rowNodes = useRef(new Map<string, unknown>());
+  const holdRow = useCallback((placeId: string, node: unknown) => {
+    if (node) {
+      rowNodes.current.set(placeId, node);
+    } else {
+      rowNodes.current.delete(placeId);
+    }
+  }, []);
+  const pickOnMap = useCallback((placeId: string) => {
+    setActivePlaceId(placeId);
+    sheet.current?.reveal(rowNodes.current.get(placeId));
+  }, []);
+
   const [planted, setPlanted] = useState(0);
   /** 꽂은 자리에 이미 깃발을 꽂아 두고 있던 동행자. 없으면 null. */
   const [plantedWith, setPlantedWith] = useState<string | null>(null);
@@ -212,7 +237,7 @@ export default function TripScreen() {
         }
       } catch (e) {
         setVisited(marks);
-        setActionError(e instanceof ApiError ? e.message : '표시하지 못했습니다.');
+        setActionError(e instanceof ApiError ? e.message : UNEXPECTED);
       } finally {
         setPending((p) => {
           const copy = new Set(p);
@@ -236,7 +261,7 @@ export default function TripScreen() {
         await api.delete(`/api/places/${placeId}`);
         refresh();
       } catch (e) {
-        setActionError(e instanceof ApiError ? e.message : '지우지 못했습니다.');
+        setActionError(e instanceof ApiError ? e.message : UNEXPECTED);
       }
     },
     [refresh],
@@ -501,7 +526,7 @@ export default function TripScreen() {
       }
       pullLive();
     } catch (e) {
-      setActionError(e instanceof ApiError ? e.message : '바꾸지 못했습니다.');
+      setActionError(e instanceof ApiError ? e.message : UNEXPECTED);
     }
   }
 
@@ -532,7 +557,7 @@ export default function TripScreen() {
       await api.delete(`/api/pins/${pinId}`);
       pullLive();
     } catch (e) {
-      setActionError(e instanceof ApiError ? e.message : '빼지 못했습니다.');
+      setActionError(e instanceof ApiError ? e.message : UNEXPECTED);
     }
   }
 
@@ -569,7 +594,7 @@ export default function TripScreen() {
       setPlanted(Date.now());
       pullLive();
     } catch (e) {
-      setActionError(e instanceof ApiError ? e.message : '꽂지 못했습니다.');
+      setActionError(e instanceof ApiError ? e.message : UNEXPECTED);
     }
   }
 
@@ -593,7 +618,7 @@ export default function TripScreen() {
   if (!data) {
     return (
       <Screen>
-        <Empty message="여행을 찾지 못했습니다." />
+        <Empty message="그런 여행이 없습니다." />
       </Screen>
     );
   }
@@ -639,7 +664,7 @@ export default function TripScreen() {
       <TripMap
         places={mapPlaces}
         activeId={activePlaceId}
-        onSelect={setActivePlaceId}
+        onSelect={pickOnMap}
         routes={routeLines}
         here={me.here}
         mates={mates.map((m) => ({
@@ -752,6 +777,7 @@ export default function TripScreen() {
       ) : null}
 
       <DragSheet
+        ref={sheet}
         onHeightChange={setCovered}
         peek={
           <SheetHead
@@ -848,7 +874,7 @@ export default function TripScreen() {
           />
           {/* 올리는 것은 주인만 할 수 있습니다. 서버도 그렇게 막습니다. */}
           {mine ? (
-            <Shortcut icon="upload" label="포스팅" onPress={() => setPublishing(true)} />
+            <Shortcut icon="upload" label="내놓기" onPress={() => setPublishing(true)} />
           ) : null}
         </Row>
 
@@ -872,6 +898,7 @@ export default function TripScreen() {
               chosenOf={chosenOf}
               onPick={(fromId, mode) => setPicked((p) => ({ ...p, [fromId]: mode }))}
               infoOf={infoOf}
+              holdRow={holdRow}
               twiceIn={twiceIn}
               tipCounts={tipCounts}
               onTips={setTipFor}
@@ -960,7 +987,7 @@ export default function TripScreen() {
             await api.delete(`/api/trips/${data.trip.id}`);
             router.replace('/(app)/trips');
           } catch (e) {
-            setActionError(e instanceof ApiError ? e.message : '지우지 못했습니다.');
+            setActionError(e instanceof ApiError ? e.message : UNEXPECTED);
           }
         }}
       />
@@ -1069,6 +1096,7 @@ function DayCard({
   chosenOf,
   onPick,
   infoOf,
+  holdRow,
   twiceIn,
   tipCounts,
   onTips,
@@ -1089,6 +1117,8 @@ function DayCard({
   onPick: (fromId: string, mode: TravelMode) => void;
   /** 장소별 영업시간 등. 좌표만 직접 넣은 곳에는 없습니다. */
   infoOf: Map<string, PlaceInfo>;
+  /** 줄이 목록의 어디쯤인지 재려고 화면 요소를 붙들어 둡니다. */
+  holdRow: (placeId: string, node: unknown) => void;
   /** 두 날에 걸쳐 들어간 곳. 구글 번호 → 그 날들의 이름. */
   twiceIn: Map<string, string[]>;
   /** 구글 번호별 최근 팁 수. */
@@ -1214,6 +1244,7 @@ function DayCard({
               {order.map((place, i) => (
                 <Animated.View
                   key={place.id}
+                  ref={(node) => holdRow(place.id, node)}
                   onLayout={(e) => {
                     heights.current[i] = e.nativeEvent.layout.height;
                   }}

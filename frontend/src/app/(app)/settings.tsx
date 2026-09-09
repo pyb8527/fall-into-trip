@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { api, ApiError } from '@/api/client';
+import { api, ApiError, UNEXPECTED } from '@/api/client';
 import { useAuth } from '@/auth/auth-provider';
 import { USER_MARKS, markOf } from '@/constants/user-marks';
 import { Colors, Radius, Spacing } from '@/constants/theme';
@@ -20,7 +20,6 @@ import {
   Row,
   Screen,
   Subtitle,
-  Title,
 } from '@/ui';
 import { LogoMark } from '@/ui/logo';
 
@@ -32,7 +31,6 @@ export default function Settings() {
 
   return (
     <Screen safeTop>
-      <Title>내 계정</Title>
 
       <Card>
         <Row gap={Spacing.lg}>
@@ -115,7 +113,7 @@ function MarkCard() {
          받아 옵니다. 여기서만 바꿔 두면 지도는 옛 그림을 그립니다. */
       await refreshUser();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : '바꾸지 못했습니다.');
+      setError(e instanceof ApiError ? e.message : UNEXPECTED);
     } finally {
       setBusy(false);
     }
@@ -187,7 +185,7 @@ function PasswordCard() {
       setNext('');
       setDone(true);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : '바꾸지 못했습니다.');
+      setError(e instanceof ApiError ? e.message : UNEXPECTED);
     } finally {
       setBusy(false);
     }

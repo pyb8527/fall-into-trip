@@ -2,7 +2,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { api, ApiError } from '@/api/client';
+import { api, ApiError, UNEXPECTED } from '@/api/client';
 import type { InvitePreview } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
@@ -43,7 +43,7 @@ export default function InviteScreen() {
       /* 들어왔으면 초대 화면은 뒤로 가기에 남기지 않습니다. */
       router.replace(`/trip/${res.tripId}`);
     } catch (e) {
-      setFailed(e instanceof ApiError ? e.message : '들어가지 못했습니다.');
+      setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
       setJoining(false);
     }
   }

@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 보관함 — 나중에 쓰려고 담아 둔 장소.
+ * 보석함 — 나중에 쓰려고 담아 둔 장소.
  *
  * <p>남의 일정에서, 검색에서, 지도에서 눈에 띄는 곳을 담았다가 내 일정
  * 아무 날에나 꺼내 넣습니다.
@@ -62,7 +62,7 @@ public class SavedPlaceController {
     /**
      * 담아 둔 것을 하루에 넣습니다.
      *
-     * <p>보관함에서는 지우지 않습니다. 같은 곳을 여러 여행에 넣을 수 있고,
+     * <p>보석함에서는 지우지 않습니다. 같은 곳을 여러 여행에 넣을 수 있고,
      * 넣었다고 사라지면 다시 찾아야 합니다.
      */
     @PostMapping("/api/days/{dayId}/places/from-saved")

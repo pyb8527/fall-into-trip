@@ -27,7 +27,6 @@ import {
   Screen,
   SegmentedTabs,
   Subtitle,
-  Title,
 } from '@/ui';
 
 /**
@@ -72,7 +71,7 @@ export default function Trips() {
   /*
     이름으로 거르기.
 
-    게시판에는 찾기를 넣어 두고 정작 내 여행에는 없었습니다. 폴더로 묶는
+    둘러보기에는 찾기를 넣어 두고 정작 내 여행에는 없었습니다. 폴더로 묶는
     것만으로는 스무 개가 넘어가면 훑어 내려가야 합니다.
 
     친 대로 바로 거릅니다 — 서버를 부르는 것이 아니라 이미 받아 둔 목록에서
@@ -97,10 +96,9 @@ export default function Trips() {
       safeTop
       /* 주 동작은 아래에 붙입니다. 한 손으로 쥐었을 때 엄지가 닿는 자리입니다. */
       footer={<Button label="새 여행 만들기" onPress={() => setCreating(true)} />}>
-      <View style={styles.headText}>
-        <Title>내 여행</Title>
-        <Body tone="secondary">{user?.name ? `${user.name} 님의 일정` : '함께 짜는 일정'}</Body>
-      </View>
+      {/* 위 막대가 이미 "내 여행" 이라고 적고 있습니다. 본문에 한 번 더 쓰면
+          같은 말이 두 줄을 차지하고, 정작 볼 것은 그만큼 아래로 밀립니다. */}
+      <Body tone="secondary">{user?.name ? `${user.name} 님이 그리는 중` : '함께 그리는 길'}</Body>
 
       {/* 몇 개 안 될 때는 찾을 것이 없습니다. 칸만 자리를 차지합니다. */}
       {all.length > 4 ? (
@@ -118,10 +116,10 @@ export default function Trips() {
       {error ? <ErrorNote message={error} onRetry={reload} /> : null}
 
       {data && all.length === 0 ? (
-        <Empty message="아직 여행이 없습니다. 아래에서 하나 만들어 보세요." />
+        <Empty message="아직 그려 둔 여행이 없습니다. 아래에서 첫 줄을 그어 보세요." />
       ) : null}
       {data && all.length > 0 && trips.length === 0 ? (
-        <Empty message={`"${q.trim()}" 로 찾은 여행이 없습니다.`} />
+        <Empty message={`"${q.trim()}" 로는 찾은 것이 없습니다.`} />
       ) : null}
 
       {/* 폴더를 하나라도 만들었으면 여행이 하나뿐이어도 띠를 둡니다. 안 그러면
@@ -141,7 +139,7 @@ export default function Trips() {
       {group === 'folder' ? (
         <>
           {folders.length === 0 ? (
-            <Empty message="아직 폴더가 없습니다. 여행 오른쪽의 폴더 단추로 만들 수 있습니다." />
+            <Empty message="아직 폴더가 없습니다. 폴더별로 볼 때 여행 오른쪽의 폴더 단추로 만듭니다." />
           ) : null}
 
           <Row gap={Spacing.sm} style={styles.shelf}>
@@ -194,7 +192,6 @@ export default function Trips() {
               trip={trip}
               mine={trip.ownerId === user?.id}
               onOpen={() => router.push({ pathname: '/trip/[id]', params: { id: trip.id } })}
-              onFolder={() => setPlacing(trip)}
             />
           ))}
         </View>
@@ -214,7 +211,7 @@ export default function Trips() {
       {opened ? (
         <BottomSheet visible title={opened.name} onClose={() => setOpened(null)}>
           {trips.filter((t) => t.folderId === opened.id).length === 0 ? (
-            <Empty message="이 폴더는 비어 있습니다." />
+            <Empty message="이 폴더는 아직 비어 있습니다." />
           ) : null}
           {trips
             .filter((t) => t.folderId === opened.id)
@@ -268,7 +265,8 @@ function TripRow({
   trip: TripSummary;
   mine: boolean;
   onOpen: () => void;
-  onFolder: () => void;
+  /** 폴더에 넣는 단추. 폴더를 다루지 않는 자리에서는 넘기지 않습니다. */
+  onFolder?: () => void;
 }) {
   return (
     <Row style={styles.row}>
@@ -280,7 +278,12 @@ function TripRow({
           onPress={onOpen}
         />
       </View>
-      <IconButton name="folder" label={`${trip.title} 폴더에 넣기`} onPress={onFolder} />
+      {/* 일정순으로 볼 때는 폴더를 다루는 자리가 아닙니다. 줄마다 폴더
+          단추가 서 있으면 무엇을 하는 화면인지 흐려지고, 이름이 그만큼
+          좁아집니다. 폴더별로 볼 때만 냅니다. */}
+      {onFolder ? (
+        <IconButton name="folder" label={`${trip.title} 폴더에 넣기`} onPress={onFolder} />
+      ) : null}
     </Row>
   );
 }
@@ -320,9 +323,9 @@ function byWhen(trips: TripSummary[]): Section[] {
   done.sort((a, b) => (b.endIso ?? '').localeCompare(a.endIso ?? ''));
 
   return [
-    { title: '가는 중', trips: going },
-    { title: '다가올 여행', trips: coming },
-    { title: '다녀온 여행', trips: done },
+    { title: '지금 그 길 위', trips: going },
+    { title: '곧 떠납니다', trips: coming },
+    { title: '다녀왔습니다', trips: done },
   ].filter((s) => s.trips.length > 0);
 }
 
@@ -334,7 +337,7 @@ function todayIso() {
 
 function formatRange(start: string | null, end: string | null) {
   if (!start) {
-    return '날짜 미정';
+    return '아직 날짜 없음';
   }
   if (!end || end === start) {
     return start;
@@ -356,9 +359,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     borderRadius: Radius.lg,
     padding: Spacing.lg,
-  },
-  headText: {
-    gap: Spacing.xs,
   },
   section: {
     gap: Spacing.sm,

@@ -44,7 +44,7 @@ public final class AdminDtos {
      * 반드시 남깁니다.
      */
     public record PasswordResetRequest(
-            @NotBlank(message = "새 비밀번호를 입력해 주세요.")
+            @NotBlank(message = "새 비밀번호를 넣어 주세요.")
             String password) {
     }
 

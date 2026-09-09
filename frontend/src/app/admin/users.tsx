@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { api, ApiError, query } from '@/api/client';
+import { api, ApiError, query, UNEXPECTED } from '@/api/client';
 import type { AdminUser, PageView, Role } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
@@ -134,7 +134,7 @@ function UserCard({ user, onChanged }: { user: AdminUser; onChanged: () => void 
       }
       onChanged();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : '처리하지 못했습니다.');
+      setError(e instanceof ApiError ? e.message : UNEXPECTED);
     } finally {
       setBusy(false);
     }

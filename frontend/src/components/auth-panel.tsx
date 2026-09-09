@@ -2,7 +2,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { ApiError } from '@/api/client';
+import { ApiError, UNEXPECTED } from '@/api/client';
 import { useAuth } from '@/auth/auth-provider';
 import { Spacing } from '@/constants/theme';
 import {
@@ -96,22 +96,26 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
       }
       /* 성공하면 (auth)/_layout 이 알아서 여행 목록으로 보냅니다. */
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : '처리하지 못했습니다.');
+      setError(e instanceof ApiError ? e.message : UNEXPECTED);
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <Screen
-      safeTop
-      footer={
-        <Button
-          label={isRegister ? '가입하고 시작하기' : '로그인'}
-          onPress={submit}
-          busy={busy}
-        />
-      }>
+    /*
+      단추를 아래에 붙이지 않습니다.
+
+      붙여 두면 자판이 올라올 때 단추가 자판 바로 위로 따라 올라옵니다.
+      거기를 누르면 먼저 칸에서 손이 떠나면서 자판이 닫히고, 그 순간 화면이
+      도로 늘어나 단추가 손끝에서 달아납니다. 눌렀는데 아무 일도 안 일어난
+      것처럼 보이고, 자판만 닫힙니다.
+
+      본문 안에 두면 그럴 일이 없습니다. 스크롤 안에서는 자판이 올라와
+      있어도 누른 것이 그대로 전해집니다(keyboardShouldPersistTaps).
+      비밀번호 칸에서 자판의 완료를 눌러도 똑같이 들어갑니다.
+    */
+    <Screen safeTop>
       <View style={styles.brand}>
         <LogoLockup size={80} />
       </View>
@@ -162,6 +166,12 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
         />
 
         {error ? <ErrorNote message={error} /> : null}
+
+        <Button
+          label={isRegister ? '가입하고 시작하기' : '로그인'}
+          onPress={submit}
+          busy={busy}
+        />
       </Card>
     </Screen>
   );

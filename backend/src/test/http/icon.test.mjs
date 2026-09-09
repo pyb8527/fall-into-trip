@@ -57,13 +57,13 @@ r = await call("GET", `/api/trip?trip=${tripId}`, { token: me });
 const found = r.data.days[0].places.find(p => p.id === ramenId);
 T("조회에도 나옴", found?.icon === "onsen", found);
 
-console.log("\n[5] 보관함을 거쳐도 따라감");
+console.log("\n[5] 보석함을 거쳐도 따라감");
 r = await call("POST", "/api/saved", { token: me,
   body: { name: "구라시키 목욕탕", lat: 34.59, lng: 133.77, icon: "onsen" } });
 T("담을 때 붙음", r.data.place.icon === "onsen", r.data.place);
 const savedId = r.data.place.id;
 r = await call("GET", "/api/saved", { token: me });
-T("보관함 목록에도 나옴", r.data.places[0].icon === "onsen", r.data.places?.[0]);
+T("보석함 목록에도 나옴", r.data.places[0].icon === "onsen", r.data.places?.[0]);
 
 r = await call("POST", `/api/days/${dayId}/places/from-saved`, { token: me, body: { savedIds: [savedId] } });
 T("일정에 넣힘", r.status === 200, r.data);

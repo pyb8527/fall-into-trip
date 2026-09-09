@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { ApiError } from '@/api/client';
+import { ApiError, UNEXPECTED } from '@/api/client';
 
 /**
  * 서버에서 한 덩어리를 읽어 오는 화면들이 똑같이 필요로 하는 것.
@@ -45,7 +45,7 @@ export function useAsync<T>(load: (signal: AbortSignal) => Promise<T>, deps: unk
         if (!alive.current || seq !== latest.current) {
           return;
         }
-        setError(e instanceof ApiError ? e.message : '불러오지 못했습니다.');
+        setError(e instanceof ApiError ? e.message : UNEXPECTED);
       })
       .finally(() => {
         if (alive.current && seq === latest.current) {

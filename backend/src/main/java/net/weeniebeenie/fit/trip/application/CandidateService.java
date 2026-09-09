@@ -78,7 +78,7 @@ public class CandidateService {
     /**
      * 후보를 올립니다.
      *
-     * <p>보관함에서 가져올 수도, 검색해서 바로 올릴 수도 있습니다. 담아 둔
+     * <p>보석함에서 가져올 수도, 검색해서 바로 올릴 수도 있습니다. 담아 둔
      * 것을 다시 적게 하면 같은 일을 두 번 합니다.
      */
     @Transactional
@@ -208,7 +208,7 @@ public class CandidateService {
     /**
      * 올릴 때 받는 것.
      *
-     * @param savedId 보관함에서 가져올 때. 이것이 있으면 나머지는 보지 않습니다.
+     * @param savedId 보석함에서 가져올 때. 이것이 있으면 나머지는 보지 않습니다.
      */
     public record Draft(String name, Double lat, Double lng, String placeId,
                         String cat, String note, String savedId, String icon) {

@@ -2,7 +2,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { api, ApiError } from '@/api/client';
+import { api, ApiError, UNEXPECTED } from '@/api/client';
 import type { Candidate, SavedPlace, TripDetail } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { PlaceSearch } from '@/components/place-search';
@@ -67,7 +67,7 @@ export default function Vote() {
       await api.put(`/api/candidates/${candidate.id}/vote`, { yes });
       reload();
     } catch (e) {
-      setFailed(e instanceof ApiError ? e.message : '표를 넣지 못했습니다.');
+      setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
     }
   }
 
@@ -77,7 +77,7 @@ export default function Vote() {
       await api.delete(`/api/candidates/${candidate.id}`);
       reload();
     } catch (e) {
-      setFailed(e instanceof ApiError ? e.message : '내리지 못했습니다.');
+      setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
     }
   }
 
@@ -104,7 +104,7 @@ export default function Vote() {
       {failed ? <ErrorNote message={failed} /> : null}
 
       {data && data.candidates.length === 0 ? (
-        <Empty message="아직 올라온 곳이 없습니다. 아래에서 올려 보세요." />
+        <Empty message="아직 올라온 곳이 없습니다. 가고 싶은 데를 먼저 던져 보세요." />
       ) : null}
 
       {data?.candidates.map((candidate) => (
@@ -203,7 +203,7 @@ export default function Vote() {
 /**
  * 후보 올리기.
  *
- * <p>보관함에서 꺼내거나 바로 검색합니다. 담아 둔 것을 다시 적게 하면 같은
+ * <p>보석함에서 꺼내거나 바로 검색합니다. 담아 둔 것을 다시 적게 하면 같은
  * 일을 두 번 합니다.
  */
 function AddSheet({
@@ -229,7 +229,7 @@ function AddSheet({
       await api.post(`/api/trips/${tripId}/candidates`, body);
       onAdded();
     } catch (e) {
-      setFailed(e instanceof ApiError ? e.message : '올리지 못했습니다.');
+      setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
     }
   }
 
@@ -246,7 +246,7 @@ function AddSheet({
       {saved && saved.places.length > 0 ? (
         <>
           <Divider />
-          <Caption tone="secondary">보관함에서</Caption>
+          <Caption tone="secondary">보석함에서</Caption>
           {saved.places.map((place) => (
             <ListRow
               key={place.id}
@@ -285,7 +285,7 @@ function PourSheet({
       await api.post(`/api/days/${dayId}/places/from-candidates`, { candidateIds });
       onDone();
     } catch (e) {
-      setFailed(e instanceof ApiError ? e.message : '넣지 못했습니다.');
+      setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
     } finally {
       setBusy(false);
     }

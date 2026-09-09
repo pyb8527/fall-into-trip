@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { api, ApiError } from '@/api/client';
+import { api, ApiError, UNEXPECTED } from '@/api/client';
 import { useAsync } from '@/api/use-async';
 import { Spacing } from '@/constants/theme';
 import { BottomSheet, Button, Caption, Chip, ErrorNote, Field, Row } from '@/ui';
@@ -58,7 +58,7 @@ export function PublishForm({
       return;
     }
     if (!title.trim()) {
-      setFailed('제목을 넣어 주세요.');
+      setFailed('제목부터 지어 주세요. 목록에서 이것만 보입니다.');
       return;
     }
     setFailed(null);
@@ -72,7 +72,7 @@ export function PublishForm({
       });
       onDone(res.postId);
     } catch (e) {
-      setFailed(e instanceof ApiError ? e.message : '올리지 못했습니다.');
+      setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
     } finally {
       setBusy(false);
     }
@@ -81,9 +81,9 @@ export function PublishForm({
   return (
     <BottomSheet
       visible={visible}
-      title="게시판에 올리기"
+      title="둘러보기에 내놓기"
       onClose={onCancel}
-      footer={<Button label="올리기" onPress={submit} busy={busy} />}>
+      footer={<Button label="내놓기" onPress={submit} busy={busy} />}>
       <Caption tone="secondary">
         지금 일정이 그대로 복사되어 올라갑니다. 나중에 일정을 고쳐도 올린 글은 바뀌지 않습니다.
         고친 것을 보여 주려면 내리고 다시 올려 주세요.

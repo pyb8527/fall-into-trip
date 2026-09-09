@@ -28,11 +28,11 @@ public final class TripDtos {
     /* ------------------------------------------------------------ 요청 */
 
     public record CreateTripRequest(
-            @NotBlank(message = "여행 이름을 입력해 주세요.")
+            @NotBlank(message = "여행 이름을 지어 주세요.")
             @Size(max = 120, message = "여행 이름이 너무 깁니다.")
             String title,
 
-            @NotBlank(message = "시작일을 입력해 주세요.")
+            @NotBlank(message = "시작일을 넣어 주세요.")
             String startIso,
 
             @Min(value = 0, message = "숙박일은 0 이상이어야 합니다.")

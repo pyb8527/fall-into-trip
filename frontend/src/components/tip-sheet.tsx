@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { api, ApiError } from '@/api/client';
+import { api, ApiError, UNEXPECTED } from '@/api/client';
 import type { Tip } from '@/api/types';
 import { useAuth } from '@/auth/auth-provider';
 import { Spacing } from '@/constants/theme';
@@ -58,7 +58,7 @@ export function TipSheet({
       const res = await api.get<{ tips: Tip[] }>(`/api/places/${encodeURIComponent(placeId)}/tips`);
       setTips(res.tips);
     } catch (e) {
-      setFailed(e instanceof ApiError ? e.message : '불러오지 못했습니다.');
+      setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
     }
   }
 
@@ -87,7 +87,7 @@ export function TipSheet({
       onChanged();
       return true;
     } catch (e) {
-      setFailed(e instanceof ApiError ? e.message : '처리하지 못했습니다.');
+      setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
       return false;
     } finally {
       setBusy(false);
@@ -104,7 +104,7 @@ export function TipSheet({
       {failed ? <ErrorNote message={failed} /> : null}
       {tips === null ? <Loading /> : null}
       {tips && tips.length === 0 ? (
-        <Empty message="아직 남긴 사람이 없습니다. 다녀오셨다면 한 줄 남겨 주세요." />
+        <Empty message="아직 아무도 안 남겼습니다. 다녀오셨다면 첫 줄을 남겨 주세요." />
       ) : null}
 
       {tips?.map((tip) => (

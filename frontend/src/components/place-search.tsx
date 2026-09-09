@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { api, ApiError } from '@/api/client';
+import { api, ApiError, UNEXPECTED } from '@/api/client';
 import type { Found, PlaceSearchProps } from '@/components/map-types';
 import { Colors, Radius, Spacing, Tap } from '@/constants/theme';
 import { Body, Caption, Divider, Field, IconButton, Loading, Row } from '@/ui';
@@ -30,7 +30,7 @@ export function PlaceSearch({ onPick }: PlaceSearchProps) {
         lat: found.lat,
         lng: found.lng,
         placeId: found.placeId,
-        /* 서버가 구글 갈래로 미리 찍어 둔 핀 그림. 여기서 안 넘기면 보관함을
+        /* 서버가 구글 갈래로 미리 찍어 둔 핀 그림. 여기서 안 넘기면 보석함을
            거쳐 온 곳만 지도에서 민무늬가 됩니다. */
         icon: found.icon,
       });
@@ -56,7 +56,7 @@ export function PlaceSearch({ onPick }: PlaceSearchProps) {
       );
       setResults(res.places ?? []);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : '찾지 못했습니다.');
+      setError(e instanceof ApiError ? e.message : UNEXPECTED);
       setResults(null);
     } finally {
       setBusy(false);
@@ -75,7 +75,7 @@ export function PlaceSearch({ onPick }: PlaceSearchProps) {
         autoCorrect={false}
         returnKeyType="search"
         onSubmitEditing={search}
-        hint="이름을 넣고 찾아 주세요. 고르면 지도에 찍을 자리가 잡힙니다."
+        hint="이름을 넣고 찾아 주세요. 고르면 지도에 자리가 잡힙니다."
         action={{
           icon: 'search',
           label: '장소 찾기',
@@ -111,7 +111,7 @@ export function PlaceSearch({ onPick }: PlaceSearchProps) {
                 {/* 지금 넣지 않고 나중에 쓰려고 담아만 둘 수도 있습니다. */}
                 <IconButton
                   name="star"
-                  label={`${r.name} 담기`}
+                  label={`${r.name} 보석함에 담기`}
                   tone={kept.has(r.name) ? 'accent' : 'default'}
                   active={kept.has(r.name)}
                   onPress={() => keep(r)}

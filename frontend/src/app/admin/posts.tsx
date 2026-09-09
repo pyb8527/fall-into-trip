@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { api, ApiError, query } from '@/api/client';
+import { api, ApiError, query, UNEXPECTED } from '@/api/client';
 import type { PageView } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { Spacing } from '@/constants/theme';
@@ -138,7 +138,7 @@ function ReportedRow({
       await api.patch(`/api/admin/${kind}/${item.id}/hidden`, { hidden });
       onChanged();
     } catch (e) {
-      setFailed(e instanceof ApiError ? e.message : '처리하지 못했습니다.');
+      setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
     } finally {
       setBusy(false);
     }

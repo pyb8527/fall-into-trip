@@ -1,7 +1,7 @@
 {
   "name": "FIT — fall into trip",
   "short_name": "FIT",
-  "description": "일정을 짜고, 동행자와 함께 고치고, 다녀온 것을 남깁니다.",
+  "description": "함께 그리고, 주워 담고, 두고두고 꺼내 봅니다.",
   "lang": "ko",
   "dir": "ltr",
   "start_url": "/",
@@ -36,11 +36,11 @@
       "url": "/trips"
     },
     {
-      "name": "보관함",
+      "name": "보석함",
       "url": "/saved"
     },
     {
-      "name": "여행 이야기",
+      "name": "여행 둘러보기",
       "url": "/community"
     }
   ]

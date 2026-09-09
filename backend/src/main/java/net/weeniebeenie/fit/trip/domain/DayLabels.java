@@ -29,7 +29,7 @@ public final class DayLabels {
 
     public static LocalDate parse(String iso) {
         if (iso == null || iso.isBlank()) {
-            throw ApiException.badRequest("날짜를 입력해 주세요. (YYYY-MM-DD)");
+            throw ApiException.badRequest("날짜를 넣어 주세요. (YYYY-MM-DD)");
         }
         try {
             return LocalDate.parse(iso.trim());

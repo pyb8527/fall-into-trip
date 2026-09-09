@@ -48,12 +48,12 @@ T("남은 못 올림", r.status === 403 || r.status === 404, r.data);
 r = await call("POST", `/api/trips/${tripId}/candidates`, { token: host, body: { name: "  ", lat: 43, lng: 141 } });
 T("이름 없으면 거절", r.status === 400, r.data);
 
-console.log("\n[3] 보관함에서 가져와 올리기");
+console.log("\n[3] 보석함에서 가져와 올리기");
 r = await call("POST", "/api/saved", { token: host,
   body: { name: "스프카레 가게", lat: 43.0621, lng: 141.3544, placeId: "gplace-soup" } });
 const savedId = r.data.place.id;
 r = await call("POST", `/api/trips/${tripId}/candidates`, { token: host, body: { savedId } });
-T("보관함 것이 후보로", r.status === 200, r.data);
+T("보석함 것이 후보로", r.status === 200, r.data);
 const c = r.data.id;
 r = await call("GET", `/api/trips/${tripId}/candidates`, { token: host });
 T("이름·번호가 따라옴",

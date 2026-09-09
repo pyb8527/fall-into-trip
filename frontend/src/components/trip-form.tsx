@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { api, ApiError } from '@/api/client';
+import { api, ApiError, UNEXPECTED } from '@/api/client';
 import type { Trip } from '@/api/types';
 import { BottomSheet, Button, Caption, ErrorNote, Field, Stepper } from '@/ui';
 import { DateField } from '@/ui/date-field';
@@ -50,11 +50,11 @@ export function TripForm({
       return;
     }
     if (!title.trim()) {
-      setError('여행 이름을 넣어 주세요.');
+      setError('이름부터 지어 주세요. 나중에 바꿔도 됩니다.');
       return;
     }
     if (!startIso) {
-      setError('시작일을 골라 주세요.');
+      setError('언제 떠나는지 골라 주세요.');
       return;
     }
     setError(null);
@@ -67,7 +67,7 @@ export function TripForm({
       });
       onCreated(res.trip);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : '만들지 못했습니다.');
+      setError(e instanceof ApiError ? e.message : UNEXPECTED);
     } finally {
       setBusy(false);
     }

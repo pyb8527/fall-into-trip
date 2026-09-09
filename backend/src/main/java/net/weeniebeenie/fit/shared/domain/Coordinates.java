@@ -42,7 +42,7 @@ public record Coordinates(double lat, double lng) {
 
     public static Coordinates of(Double lat, Double lng) {
         if (lat == null || lng == null) {
-            throw ApiException.badRequest("좌표를 입력해 주세요.");
+            throw ApiException.badRequest("좌표를 넣어 주세요.");
         }
         return new Coordinates(lat, lng);
     }

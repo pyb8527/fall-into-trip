@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { api, ApiError } from '@/api/client';
+import { api, ApiError, UNEXPECTED } from '@/api/client';
 import type { Comment, Itinerary } from '@/api/types';
 import { useAuth } from '@/auth/auth-provider';
 import { Spacing } from '@/constants/theme';
@@ -57,7 +57,7 @@ export function useComments(postId: string, enabled: boolean) {
       setComments(res.comments);
       setFailed(null);
     } catch (e) {
-      setFailed(e instanceof ApiError ? e.message : '불러오지 못했습니다.');
+      setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
     }
   }, [postId, enabled]);
 
@@ -128,7 +128,7 @@ export function CommentList({
       onCountChanged();
       return true;
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : '처리하지 못했습니다.');
+      setError(e instanceof ApiError ? e.message : UNEXPECTED);
       return false;
     } finally {
       setBusy(false);

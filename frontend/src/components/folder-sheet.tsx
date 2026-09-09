@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { api, ApiError } from '@/api/client';
+import { api, ApiError, UNEXPECTED } from '@/api/client';
 import type { Folder } from '@/api/types';
 import { Spacing } from '@/constants/theme';
 import {
@@ -81,7 +81,7 @@ export function FolderSheet({
       onChanged();
       return true;
     } catch (e) {
-      setFailed(e instanceof ApiError ? e.message : '처리하지 못했습니다.');
+      setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
       return false;
     } finally {
       setBusy(false);

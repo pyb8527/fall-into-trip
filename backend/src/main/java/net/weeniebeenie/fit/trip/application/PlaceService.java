@@ -169,7 +169,7 @@ public class PlaceService {
     private static String requireName(String raw) {
         String name = raw == null ? "" : raw.trim();
         if (name.isEmpty()) {
-            throw ApiException.badRequest("장소 이름을 입력해 주세요.");
+            throw ApiException.badRequest("장소 이름을 넣어 주세요.");
         }
         return name;
     }

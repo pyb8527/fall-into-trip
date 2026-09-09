@@ -402,8 +402,8 @@ const toneSoft: Record<Tone, string> = {
 };
 
 /** 화면의 제목. 한 화면에 하나만. */
-export function Title({ children }: { children: React.ReactNode }) {
-  return <Text style={styles.title}>{children}</Text>;
+export function Title({ children, tone }: { children: React.ReactNode; tone?: Tone }) {
+  return <Text style={[styles.title, tone ? { color: toneColor[tone] } : null]}>{children}</Text>;
 }
 
 /** 카드나 묶음의 제목. */
@@ -987,7 +987,17 @@ export function BottomSheet({
  * 손가락 하나로 판을 올리려는 것과 목록을 굴리려는 것이 다투어, 올리려다
  * 스크롤되고 굴리려다 판이 내려갑니다.
  */
-export function DragSheet({
+/** 판 바깥에서 판 안의 목록을 움직여야 할 때 쓰는 손잡이. */
+export type DragSheetHandle = {
+  /**
+   * 그 줄이 보이게 목록을 굴립니다.
+   *
+   * <p>접혀 있으면 함께 펼칩니다 — 굴려 봐야 덮여 있으면 보이지 않습니다.
+   */
+  reveal: (node: unknown) => void;
+};
+
+export const DragSheet = forwardRef<DragSheetHandle, DragSheetProps>(function DragSheet({
   children,
   /** 화면 높이에서 판이 차지할 몫. 낮은 것부터 적습니다. */
   snaps = [0.28, 0.55, 0.92],
@@ -996,19 +1006,7 @@ export function DragSheet({
   /** 판 맨 위에 늘 보이는 줄. 손잡이 옆에 붙습니다. */
   peek,
   onHeightChange,
-}: {
-  children: React.ReactNode;
-  snaps?: number[];
-  initial?: number;
-  peek?: React.ReactNode;
-  /**
-   * 판이 지금 몇 픽셀을 덮고 있는지.
-   *
-   * <p>지도가 이것을 알아야 합니다. 모르면 고른 장소의 핀을 화면 한가운데로
-   * 보내는데, 그 가운데가 판에 덮여 있어 정작 보이지 않습니다.
-   */
-  onHeightChange?: (px: number) => void;
-}) {
+}, ref) {
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
@@ -1048,6 +1046,47 @@ export function DragSheet({
     onHeightChange?.(px);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stops.join(',')]);
+
+  const scroller = useRef<ScrollView>(null);
+  /*
+    목록을 감싸는 자리.
+
+    줄이 목록의 어디쯤에 있는지는 이 자리를 기준으로 잽니다. 스크롤 안쪽의
+    좌표라, 그대로 굴리면 딱 그 줄이 위에 옵니다.
+  */
+  const content = useRef<View>(null);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      reveal(node: unknown) {
+        const target = node as {
+          measureLayout?: (
+            relativeTo: unknown,
+            onSuccess: (x: number, y: number) => void,
+            onFail?: () => void,
+          ) => void;
+        } | null;
+        if (!target?.measureLayout || !content.current) {
+          return;
+        }
+        /* 접혀 있으면 함께 펼칩니다. 굴려 봐야 판에 덮여 있으면 보이지
+           않습니다. 맨 아래 자리에서만 올립니다 — 이미 펼쳐 둔 것을
+           멋대로 더 올리지는 않습니다. */
+        if (atRef.current < 1) {
+          settle(1);
+        }
+        target.measureLayout(
+          content.current,
+          (_x, y) => {
+            scroller.current?.scrollTo({ y: Math.max(0, y - Spacing.md), animated: true });
+          },
+          () => {},
+        );
+      },
+    }),
+    [settle],
+  );
 
   const pan = useRef(
     PanResponder.create({
@@ -1116,9 +1155,10 @@ export function DragSheet({
       </View>
 
       <ScrollView
+        ref={scroller}
         style={styles.dragBody}
         contentContainerStyle={[
-          styles.dragBodyInner,
+          styles.dragBodyOuter,
           { paddingBottom: insets.bottom + Spacing.huge },
         ]}
         /*
@@ -1131,11 +1171,33 @@ export function DragSheet({
         */
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}>
-        {children}
+        {/* collapsable 을 꺼야 이 자리가 실제 화면 요소로 남습니다. 안 그러면
+            안드로이드가 아무것도 안 그리는 껍데기라며 없애 버려, 줄이 어디
+            있는지를 잴 기준이 사라집니다. */}
+        <View ref={content} collapsable={false} style={styles.dragBodyInner}>
+          {children}
+        </View>
       </ScrollView>
     </Animated.View>
   );
-}
+});
+
+type DragSheetProps = {
+  children: React.ReactNode;
+  /** 화면 높이에서 판이 차지할 몫. 낮은 것부터 적습니다. */
+  snaps?: number[];
+  /** 처음 붙는 자리. snaps 의 몇 번째인지. */
+  initial?: number;
+  /** 판 맨 위에 늘 보이는 줄. 손잡이 옆에 붙습니다. */
+  peek?: React.ReactNode;
+  /**
+   * 판이 지금 몇 픽셀을 덮고 있는지.
+   *
+   * <p>지도가 이것을 알아야 합니다. 모르면 고른 장소의 핀을 화면 한가운데로
+   * 보내는데, 그 가운데가 판에 덮여 있어 정작 보이지 않습니다.
+   */
+  onHeightChange?: (px: number) => void;
+};
 
 /**
  * 숫자를 눌러서 고르는 칸.
@@ -1188,7 +1250,7 @@ export function Stepper({
 
 /* ------------------------------------------------------------------ 상태 */
 
-export function Loading({ label = '불러오는 중' }: { label?: string }) {
+export function Loading({ label = '가져오는 중' }: { label?: string }) {
   return (
     <View style={styles.center}>
       <ActivityIndicator color={Colors.accentInk} />
@@ -1402,12 +1464,14 @@ const styles = StyleSheet.create({
   dragBody: {
     flex: 1,
   },
+  dragBodyOuter: {
+    paddingTop: Spacing.sm,
+  },
   dragBodyInner: {
     width: '100%',
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
     paddingHorizontal: Gutter,
-    paddingTop: Spacing.sm,
     gap: Spacing.lg,
   },
   divider: {

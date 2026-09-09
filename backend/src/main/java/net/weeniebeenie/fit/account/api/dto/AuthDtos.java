@@ -13,48 +13,48 @@ public final class AuthDtos {
     }
 
     public record LoginRequest(
-            @NotBlank(message = "이메일을 입력해 주세요.")
+            @NotBlank(message = "이메일을 넣어 주세요.")
             @Email(message = "이메일 형식이 올바르지 않습니다.")
             String email,
 
-            @NotBlank(message = "비밀번호를 입력해 주세요.")
+            @NotBlank(message = "비밀번호를 넣어 주세요.")
             String password) {
     }
 
     public record RegisterRequest(
-            @NotBlank(message = "이메일을 입력해 주세요.")
+            @NotBlank(message = "이메일을 넣어 주세요.")
             @Email(message = "이메일 형식이 올바르지 않습니다.")
             String email,
 
-            @NotBlank(message = "이름을 입력해 주세요.")
+            @NotBlank(message = "이름을 넣어 주세요.")
             @Size(max = 80, message = "이름이 너무 깁니다.")
             String name,
 
-            @NotBlank(message = "비밀번호를 입력해 주세요.")
+            @NotBlank(message = "비밀번호를 넣어 주세요.")
             String password) {
     }
 
     public record SetupRequest(
-            @NotBlank(message = "이메일을 입력해 주세요.")
+            @NotBlank(message = "이메일을 넣어 주세요.")
             @Email(message = "이메일 형식이 올바르지 않습니다.")
             String email,
 
-            @NotBlank(message = "이름을 입력해 주세요.")
+            @NotBlank(message = "이름을 넣어 주세요.")
             @Size(max = 80, message = "이름이 너무 깁니다.")
             String name,
 
-            @NotBlank(message = "비밀번호를 입력해 주세요.")
+            @NotBlank(message = "비밀번호를 넣어 주세요.")
             String password,
 
-            @NotBlank(message = "설치 토큰을 입력해 주세요.")
+            @NotBlank(message = "설치 토큰을 넣어 주세요.")
             String token) {
     }
 
     public record PasswordChangeRequest(
-            @NotBlank(message = "현재 비밀번호를 입력해 주세요.")
+            @NotBlank(message = "현재 비밀번호를 넣어 주세요.")
             String current,
 
-            @NotBlank(message = "새 비밀번호를 입력해 주세요.")
+            @NotBlank(message = "새 비밀번호를 넣어 주세요.")
             String next) {
     }
 

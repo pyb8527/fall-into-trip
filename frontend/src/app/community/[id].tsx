@@ -2,7 +2,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Image, StyleSheet, View } from 'react-native';
 
-import { api, API_BASE, ApiError, query } from '@/api/client';
+import { api, API_BASE, ApiError, query, UNEXPECTED } from '@/api/client';
 import type { ItineraryDay, ItineraryPlace, PostDetail } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
@@ -26,6 +26,7 @@ import {
   ConfirmDialog,
   Divider,
   ErrorNote,
+  Icon,
   IconButton,
   Loading,
   Press,
@@ -59,6 +60,8 @@ export default function Post() {
   const [reporting, setReporting] = useState(false);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  /** 펼쳐 둔 날. 첫날만 열어 둡니다 — 다 접히면 제목만 늘어선 화면이 됩니다. */
+  const [opened, setOpened] = useState<Set<number>>(() => new Set([0]));
   const [savedNames, setSavedNames] = useState<Set<string>>(new Set());
   /** 댓글 판을 열어 둔 장소. */
   const [at, setAt] = useState<{ dayIndex: number; placeIndex: number } | null>(null);
@@ -124,7 +127,7 @@ export default function Post() {
   }
 
   /**
-   * 이 장소만 보관함에 담습니다.
+   * 이 장소만 보석함에 담습니다.
    *
    * <p>담긴 것을 이름으로 기억해 별을 채워 둡니다. 서버는 같은 구글 번호를
    * 두 번 담지 않지만, 화면이 그것을 모르면 눌러도 아무 일도 안 일어나는
@@ -146,9 +149,9 @@ export default function Post() {
         fromPost: id,
       });
       setSavedNames((prev) => new Set(prev).add(place.name));
-      setNotice(`「${place.name}」 를 보관함에 담았습니다.`);
+      setNotice(`「${place.name}」 를 보석함에 담았습니다.`);
     } catch (e) {
-      setFailed(e instanceof ApiError ? e.message : '담지 못했습니다.');
+      setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
     }
   }
 
@@ -159,7 +162,7 @@ export default function Post() {
       await api.post(`/api/posts/${id}/report`, { reason });
       setNotice('신고했습니다. 운영자가 확인합니다.');
     } catch (e) {
-      setFailed(e instanceof ApiError ? e.message : '신고하지 못했습니다.');
+      setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
     } finally {
       setBusy(false);
     }
@@ -182,6 +185,20 @@ export default function Post() {
 
   return (
     <Screen
+      /*
+        지도는 위에 붙여 둡니다.
+
+        아래 일정을 훑는 내내 "여기가 어디쯤인가" 를 봐야 하는데, 함께
+        흘려보내면 장소 하나를 누를 때마다 위로 되감아야 했습니다. 이제
+        누르면 붙어 있는 지도가 그 자리로 갑니다.
+      */
+      header={
+        pins.length > 0 ? (
+          <TripMap places={pins} activeId={activeId} onSelect={setActiveId} height={220} />
+        ) : (
+          <PostMap postId={id} title={data.title} height={160} />
+        )
+      }
       footer={
         <Row gap={Spacing.sm}>
           <Button
@@ -200,21 +217,6 @@ export default function Post() {
       }>
       <Stack.Screen options={{ title: data.title }} />
 
-      {/*
-        글 하나를 볼 때는 살아 있는 지도를 씁니다.
-
-        목록에서는 글마다 지도를 띄우면 화면이 무거워 그림 한 장으로 뒀지만,
-        여기서는 한 장뿐입니다. 어디를 어떻게 도는지 눌러 보고 당겨 볼 수
-        있어야 "가져올지" 를 정할 수 있습니다.
-
-        좌표가 하나도 없는 옛 글에서는 그림으로 물러섭니다.
-      */}
-      {pins.length > 0 ? (
-        <TripMap places={pins} activeId={activeId} onSelect={setActiveId} height={260} />
-      ) : (
-        <PostMap postId={id} title={data.title} height={190} />
-      )}
-
       <View style={styles.head}>
         <Title>{data.title}</Title>
         {data.summary ? <Body tone="secondary">{data.summary}</Body> : null}
@@ -229,11 +231,28 @@ export default function Post() {
       {notice ? <Body tone="success">{notice}</Body> : null}
       {failed ? <ErrorNote message={failed} /> : null}
 
+      {/*
+        여러 날짜를 한꺼번에 펼쳐 두면 닷새짜리 일정은 스무 번을 내려야
+        끝까지 갑니다. 접어 두고 궁금한 날만 엽니다.
+
+        첫날은 열어 둡니다. 다 접혀 있으면 무엇이 들었는지 모르는 채로
+        제목만 늘어선 화면이 됩니다.
+      */}
       {data.itinerary.days.map((day, i) => (
         <DayBlock
           key={i}
           day={day}
           index={i}
+          open={opened.has(i)}
+          onToggle={() =>
+            setOpened((was) => {
+              const next = new Set(was);
+              if (!next.delete(i)) {
+                next.add(i);
+              }
+              return next;
+            })
+          }
           onSave={(place) => (user ? save(place) : needLogin())}
           savedNames={savedNames}
           feedback={data.feedback}
@@ -313,7 +332,7 @@ export default function Post() {
       <ConfirmDialog
         visible={removing}
         title="내릴까요?"
-        message="게시판에서 사라집니다. 내 여행은 그대로 남습니다."
+        message="둘러보기에서 사라집니다. 내 여행은 그대로 남습니다."
         confirmLabel="내리기"
         danger
         busy={busy}
@@ -325,7 +344,7 @@ export default function Post() {
             await api.delete(`/api/posts/${id}`);
             router.replace('/community');
           } catch (e) {
-            setFailed(e instanceof ApiError ? e.message : '내리지 못했습니다.');
+            setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
           } finally {
             setBusy(false);
           }
@@ -353,6 +372,8 @@ export default function Post() {
 function DayBlock({
   day,
   index,
+  open,
+  onToggle,
   onSave,
   savedNames,
   feedback,
@@ -363,6 +384,9 @@ function DayBlock({
 }: {
   day: ItineraryDay;
   index: number;
+  /** 펼쳐 두었는지. 접혀 있으면 제목 줄만 보입니다. */
+  open: boolean;
+  onToggle: () => void;
   onSave: (place: ItineraryPlace) => void;
   /** 이미 담은 곳. 별을 채워 두면 두 번 누르지 않습니다. */
   savedNames: Set<string>;
@@ -379,19 +403,32 @@ function DayBlock({
 
   return (
     <Card>
-      <Row gap={Spacing.md} style={styles.dayHead}>
-        <View style={[styles.dot, { backgroundColor: color }]} />
-        <Subtitle>{day.shortName || day.label || `${index + 1}일차`}</Subtitle>
-        <Badge label={`${day.places.length}곳`} tone="muted" />
-      </Row>
+      {/* 제목 줄 전체가 여닫는 자리입니다. 화살표만 눌러야 하면 손끝으로는
+          맞히기 어렵습니다. */}
+      <Press
+        onPress={onToggle}
+        scale={0.995}
+        accessibilityLabel={`${day.shortName || day.label || `${index + 1}일차`} ${open ? '접기' : '펼치기'}`}>
+        <Row gap={Spacing.md} style={styles.dayHead}>
+          <View style={[styles.dot, { backgroundColor: color }]} />
+          <Subtitle>{day.shortName || day.label || `${index + 1}일차`}</Subtitle>
+          <Badge label={`${day.places.length}곳`} tone="muted" />
+          <View style={styles.grow} />
+          <Icon name={open ? 'chevron-up' : 'chevron-down'} size={20} tone="muted" />
+        </Row>
+      </Press>
 
+      {/* 접혀 있어도 그날의 주제는 남겨 둡니다. 어느 날을 열지 고르는 데
+          가장 도움이 되는 한 줄입니다. */}
       {day.theme ? (
         <Body small tone="secondary">
           {day.theme}
         </Body>
       ) : null}
 
-      {day.places.map((place, i) => (
+      {!open
+        ? null
+        : day.places.map((place, i) => (
         <Row
           key={i}
           gap={Spacing.md}
@@ -472,7 +509,7 @@ function DayBlock({
             onPress={() => onSave(place)}
           />
         </Row>
-      ))}
+          ))}
     </Card>
   );
 }
@@ -507,7 +544,7 @@ function CopySheet({
       const res = await api.post<{ tripId: string }>(`/api/posts/${postId}/copy`, { startIso });
       onDone(res.tripId);
     } catch (e) {
-      setFailed(e instanceof ApiError ? e.message : '가져오지 못했습니다.');
+      setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
     } finally {
       setBusy(false);
     }

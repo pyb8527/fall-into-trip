@@ -34,21 +34,22 @@ export default function Home() {
             onPress={() => router.push('/(app)/settings')}
           />
         </Row>
-        {/* 이름을 강조색으로 떼어 놓습니다. 한 덩어리로 두면 인사말이
-            그냥 문장 하나로 흘러갑니다. */}
+        {/* 이름을 강조색으로 떼어 놓습니다. 한 덩어리로 두면 인사말이 그냥
+            문장 하나로 흘러갑니다.
+
+            색만 다르고 크기는 같습니다. 작게 두었더니 정작 사람 이름이
+            인사말보다 작아 곁다리처럼 보였습니다. */}
         <Title>
           {user?.name ? (
             <>
-              <Caption tone="accent" strong>
-                {user.name}
-              </Caption>
-              {' 님, 어디로 가볼까요?'}
+              <Title tone="accent">{user.name}</Title>
+              {' 님, 오늘은 어디에 반해 볼까요?'}
             </>
           ) : (
-            '어디로 가볼까요?'
+            '오늘은 어디에 반해 볼까요?'
           )}
         </Title>
-        <Body tone="secondary">일정을 짜고, 동행자와 함께 고치고, 다녀온 것을 남깁니다.</Body>
+        <Body tone="secondary">함께 그리고, 주워 담고, 두고두고 꺼내 봅니다.</Body>
       </View>
 
       {/* 카드가 한 번에 툭 나타나면 화면이 갈아 끼워진 것처럼 보입니다.
@@ -57,21 +58,21 @@ export default function Home() {
         <Rise order={0} style={styles.half}>
           <MenuCard
             title="내 여행"
-            caption="일정 짜고 동행자 부르기"
+            caption="짜고, 부르고, 같이 고치기"
             onPress={() => router.push('/(app)/trips')}
           />
         </Rise>
         <Rise order={1} style={styles.half}>
           <MenuCard
-            title="보관함"
-            caption="담아 둔 곳 일정에 넣기"
+            title="보석함"
+            caption="주워 둔 곳들"
             onPress={() => router.push('/(app)/saved')}
           />
         </Rise>
         <Rise order={2} style={styles.half}>
           <MenuCard
-            title="여행 이야기"
-            caption="다른 사람 일정 구경하고 가져오기"
+            title="여행 둘러보기"
+            caption="남이 다녀온 길 구경하기"
             onPress={() => router.push('/community')}
           />
         </Rise>
