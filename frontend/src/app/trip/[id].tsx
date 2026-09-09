@@ -462,6 +462,12 @@ export default function TripScreen() {
             <Row gap={Spacing.xs}>
               {/* 길 위에서는 짜는 화면이 방해입니다. 지금 갈 곳만 크게 보는
                   쪽으로 넘어갑니다. */}
+              {/* 아직 정하지 않은 곳은 일정이 아니라 여기에 모읍니다. */}
+              <IconButton
+                name="star"
+                label="가고 싶은 곳"
+                onPress={() => router.push({ pathname: '/vote/[id]', params: { id } })}
+              />
               <IconButton
                 name="compass"
                 label="여행 중 화면"

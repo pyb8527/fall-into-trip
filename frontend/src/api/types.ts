@@ -377,3 +377,29 @@ export type SavedPlace = {
   fromPost: Maybe<string>;
   createdAt: string;
 };
+
+/* ------------------------------------------------------ 가고 싶은 곳 */
+
+/**
+ * 후보 한 곳과 지금까지의 표.
+ *
+ * 정해지는 기준은 <b>동행자 전원</b>이 좋다고 했을 때입니다. 표를 안 던진
+ * 사람이 있으면 아직 정해지지 않은 것으로 봅니다 — 안 본 사람을 반대로 세면
+ * 한 명이 늦었다는 이유로 확정됩니다.
+ */
+export type Candidate = {
+  id: string;
+  name: string;
+  lat: number;
+  lng: number;
+  placeId: Maybe<string>;
+  cat: Maybe<string>;
+  note: Maybe<string>;
+  addedBy: string;
+  yes: number;
+  no: number;
+  memberCount: number;
+  /** 내 표. 비어 있으면 아직 안 던진 것입니다. */
+  myVote: Maybe<boolean>;
+  agreed: boolean;
+};
