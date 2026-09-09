@@ -623,6 +623,12 @@ export default function TripScreen() {
                 label="가고 싶은 곳"
                 onPress={() => router.push({ pathname: '/vote/[id]', params: { id } })}
               />
+              {/* 다녀온 뒤 한 장으로 돌아보는 자리. */}
+              <IconButton
+                name="share-2"
+                label="여행 카드"
+                onPress={() => router.push({ pathname: '/card/[id]', params: { id } })}
+              />
               <IconButton
                 name="compass"
                 label="여행 중 화면"
@@ -631,7 +637,7 @@ export default function TripScreen() {
               {/* 올리는 것은 주인만 할 수 있습니다. 서버도 그렇게 막습니다. */}
               {data.trip.ownerId === user?.id ? (
                 <IconButton
-                  name="share-2"
+                  name="upload"
                   label="게시판에 올리기"
                   onPress={() => setPublishing(true)}
                 />

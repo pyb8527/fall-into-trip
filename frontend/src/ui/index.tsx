@@ -596,7 +596,8 @@ export type IconName =
   | 'star'
   | 'bookmark'
   | 'compass'
-  | 'message-square';
+  | 'message-square'
+  | 'upload';
 
 export function Icon({
   name,

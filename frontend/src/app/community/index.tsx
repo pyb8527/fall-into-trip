@@ -1,12 +1,12 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Image, Pressable, StyleSheet, View } from 'react-native';
 
-import { api, query } from '@/api/client';
+import { api, API_BASE, query } from '@/api/client';
 import type { PostCard, PostDays, PostPage, PostSort } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
-import { Spacing } from '@/constants/theme';
+import { Colors, Radius, Spacing } from '@/constants/theme';
 import {
   Body,
   Button,
@@ -250,7 +250,15 @@ function PostRow({
     <Card>
       {/* 글로 들어가는 자리와 하트를 나눕니다. 카드 전체가 눌리면 하트를
           누르려다 글이 열립니다. */}
+      {/* 글자만 늘어놓으면 어떤 동선인지 열어 봐야 압니다. 지도 한 장이면
+          어디를 어떻게 도는지가 한눈에 보입니다. */}
       <Pressable onPress={onOpen} accessibilityRole="button" style={styles.tap}>
+        <Image
+          source={{ uri: `${API_BASE}/api/posts/${post.id}/map` }}
+          style={styles.thumb}
+          resizeMode="cover"
+          accessibilityLabel={`${post.title} 동선`}
+        />
         <Subtitle>{post.title}</Subtitle>
         {post.summary ? (
           <Body small tone="secondary" numberOfLines={2}>
@@ -287,6 +295,12 @@ const styles = StyleSheet.create({
   },
   tap: {
     gap: Spacing.xs,
+  },
+  thumb: {
+    width: '100%',
+    height: 150,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.fill,
   },
   meta: {
     justifyContent: 'space-between',

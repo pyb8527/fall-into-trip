@@ -1,13 +1,13 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Image, StyleSheet, View } from 'react-native';
 
-import { api, ApiError, query } from '@/api/client';
+import { api, API_BASE, ApiError, query } from '@/api/client';
 import type { ItineraryDay, ItineraryPlace, PostDetail } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
 import { CommentList } from '@/components/comment-list';
-import { dayColor, Spacing } from '@/constants/theme';
+import { Colors, dayColor, Radius, Spacing } from '@/constants/theme';
 import {
   Badge,
   Body,
@@ -145,6 +145,13 @@ export default function Post() {
         </Row>
       }>
       <Stack.Screen options={{ title: data.title }} />
+
+      <Image
+        source={{ uri: `${API_BASE}/api/posts/${id}/map` }}
+        style={styles.thumb}
+        resizeMode="cover"
+        accessibilityLabel={`${data.title} 동선`}
+      />
 
       <View style={styles.head}>
         <Title>{data.title}</Title>
@@ -408,6 +415,12 @@ function today() {
 const styles = StyleSheet.create({
   head: {
     gap: Spacing.xs,
+  },
+  thumb: {
+    width: '100%',
+    height: 190,
+    borderRadius: Radius.lg,
+    backgroundColor: Colors.fill,
   },
   grow: {
     flex: 1,
