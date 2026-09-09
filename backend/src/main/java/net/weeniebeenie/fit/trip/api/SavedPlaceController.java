@@ -58,11 +58,11 @@ public class SavedPlaceController {
     }
 
     record View(String id, String name, double lat, double lng, String placeId,
-                String cat, String note, String fromPost, Instant createdAt) {
+                String cat, String icon, String note, String fromPost, Instant createdAt) {
 
         static View of(SavedPlace p) {
             return new View(p.getId(), p.getName(), p.getLat(), p.getLng(), p.getPlaceId(),
-                    p.getCat(), p.getNote(), p.getFromPost(), p.getCreatedAt());
+                    p.getCat(), p.getIcon(), p.getNote(), p.getFromPost(), p.getCreatedAt());
         }
     }
 }

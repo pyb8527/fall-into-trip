@@ -3,6 +3,7 @@ package net.weeniebeenie.fit.trip.application;
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.extern.slf4j.Slf4j;
 import net.weeniebeenie.fit.shared.error.ApiException;
+import net.weeniebeenie.fit.trip.domain.PlaceKind;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
@@ -98,12 +99,20 @@ public class PlaceSearchService {
             if (!at.hasNonNull("lat") || !at.hasNonNull("lng")) {
                 continue;
             }
+            String name = r.path("name").asText(q);
+            /* 갈래는 검색 결과에 이미 딸려 옵니다. 이것으로 핀 그림을 미리
+               찍어 두면 구글을 한 번도 더 부르지 않고 지도가 알아봅니다. */
+            List<String> types = new ArrayList<>();
+            for (JsonNode t : r.path("types")) {
+                types.add(t.asText(""));
+            }
             out.add(new Found(
-                    r.path("name").asText(q),
+                    name,
                     r.path("formatted_address").asText(""),
                     at.path("lat").asDouble(),
                     at.path("lng").asDouble(),
-                    r.path("place_id").asText(null)));
+                    r.path("place_id").asText(null),
+                    PlaceKind.guess(types, name)));
             if (out.size() >= LIMIT) {
                 break;
             }
@@ -116,6 +125,7 @@ public class PlaceSearchService {
      * @param placeId 구글이 아는 번호. 이것만 저장이 허용됩니다. 나머지 내용은
      *                필요할 때마다 이 번호로 다시 물어봅니다.
      */
-    public record Found(String name, String address, double lat, double lng, String placeId) {
+    public record Found(String name, String address, double lat, double lng, String placeId,
+                        String icon) {
     }
 }

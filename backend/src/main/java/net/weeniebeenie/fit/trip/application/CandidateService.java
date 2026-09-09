@@ -69,7 +69,7 @@ public class CandidateService {
                "싫다" 로 세면 한 사람이 안 봤다는 이유로 확정됩니다. */
             boolean agreed = memberCount > 0 && counts[0] == memberCount;
             out.add(new Card(c.getId(), c.getName(), c.getLat(), c.getLng(), c.getPlaceId(),
-                    c.getCat(), c.getNote(), c.getAddedBy(),
+                    c.getCat(), c.getIcon(), c.getNote(), c.getAddedBy(),
                     counts[0], counts[1], memberCount, mine.get(c.getId()), agreed));
         }
         return out;
@@ -95,7 +95,7 @@ public class CandidateService {
                     .filter(s -> s.getUserId().equals(me.id()))
                     .orElseThrow(() -> ApiException.notFound("담아 둔 장소를 찾을 수 없습니다."));
             from = new Draft(item.getName(), item.getLat(), item.getLng(),
-                    item.getPlaceId(), item.getCat(), item.getNote(), null);
+                    item.getPlaceId(), item.getCat(), item.getNote(), null, item.getIcon());
         }
         if (from == null || from.name() == null || from.name().isBlank()) {
             throw ApiException.badRequest("장소 이름을 넣어 주세요.");
@@ -109,6 +109,7 @@ public class CandidateService {
                 .lng(at.lng())
                 .placeId(blankToNull(from.placeId()))
                 .cat(blankToNull(from.cat()))
+                .icon(blankToNull(from.icon()))
                 .note(blankToNull(from.note()))
                 .addedBy(me.id())
                 .build());
@@ -186,6 +187,7 @@ public class CandidateService {
                     .lat(c.getLat())
                     .lng(c.getLng())
                     .cat(c.getCat())
+                    .icon(c.getIcon())
                     .note(c.getNote())
                     .placeId(c.getPlaceId())
                     .updatedBy(me.id())
@@ -209,7 +211,7 @@ public class CandidateService {
      * @param savedId 보관함에서 가져올 때. 이것이 있으면 나머지는 보지 않습니다.
      */
     public record Draft(String name, Double lat, Double lng, String placeId,
-                        String cat, String note, String savedId) {
+                        String cat, String note, String savedId, String icon) {
     }
 
     /**
@@ -219,7 +221,7 @@ public class CandidateService {
      * @param agreed  동행자 전원이 좋다고 했는지
      */
     public record Card(String id, String name, double lat, double lng, String placeId,
-                       String cat, String note, String addedBy,
+                       String cat, String icon, String note, String addedBy,
                        int yes, int no, int memberCount, Boolean myVote, boolean agreed) {
     }
 }

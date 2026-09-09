@@ -87,6 +87,7 @@ public class SavedPlaceService {
                 .lng(at.lng())
                 .placeId(placeId)
                 .cat(blankToNull(draft.cat()))
+                .icon(blankToNull(draft.icon()))
                 .note(blankToNull(draft.note()))
                 .fromPost(blankToNull(draft.fromPost()))
                 .build());
@@ -139,6 +140,9 @@ public class SavedPlaceService {
                     .lat(item.getLat())
                     .lng(item.getLng())
                     .cat(item.getCat())
+                    /* 담을 때 찍힌 그림이 일정까지 그대로 따라갑니다. 여기서
+                       끊기면 보관함을 거쳐 온 곳만 지도에서 민무늬가 됩니다. */
+                    .icon(item.getIcon())
                     .note(item.getNote())
                     .placeId(item.getPlaceId())
                     .updatedBy(me.id())
@@ -157,6 +161,6 @@ public class SavedPlaceService {
      * @param fromPost 어느 글에서 담았는지. 검색이나 지도에서 담으면 비어 있습니다.
      */
     public record Draft(String name, Double lat, Double lng, String placeId,
-                        String cat, String note, String fromPost) {
+                        String cat, String note, String fromPost, String icon) {
     }
 }

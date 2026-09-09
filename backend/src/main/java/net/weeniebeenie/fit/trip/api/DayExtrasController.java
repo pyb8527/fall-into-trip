@@ -37,6 +37,19 @@ public class DayExtrasController {
     }
 
     /**
+     * 사이사이를 세 수단으로 한꺼번에.
+     *
+     * <p>수단을 고르게 하지 않고 알아서 셋을 다 계산해 내려 줍니다. 대신
+     * 구간마다 요금이 세 배로 나가므로, 화면은 <b>날짜 하나를 펼쳤을 때만</b>
+     * 이것을 부릅니다.
+     */
+    @GetMapping("/route/compare")
+    public Map<String, Object> compare(@CurrentUser AuthPrincipal me,
+                                       @PathVariable String dayId) {
+        return Map.of("gaps", routes.compare(me, dayId));
+    }
+
+    /**
      * 이 날에 넣어 둔 장소들이 언제 문을 여는지.
      *
      * <p>장소를 하나씩 묻게 두면 화면이 장소 수만큼 요청을 던집니다. 하루를

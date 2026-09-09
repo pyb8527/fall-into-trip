@@ -45,6 +45,10 @@ public class SavedPlace {
     @Column(length = 40)
     private String cat;
 
+    /** 지도에 찍힐 그림의 이름. 일정으로 옮길 때 그대로 따라갑니다. */
+    @Column(length = 24)
+    private String icon;
+
     @Column(columnDefinition = "text")
     private String note;
 
@@ -57,7 +61,8 @@ public class SavedPlace {
 
     @Builder
     public SavedPlace(String userId, String name, double lat, double lng,
-                      String placeId, String cat, String note, String fromPost) {
+                      String placeId, String cat, String note, String fromPost,
+                      String icon) {
         this.id = Ids.next();
         this.userId = userId;
         this.name = name;
@@ -65,6 +70,7 @@ public class SavedPlace {
         this.lng = lng;
         this.placeId = placeId;
         this.cat = cat;
+        this.icon = PlaceKind.clean(icon);
         this.note = note;
         this.fromPost = fromPost;
         this.createdAt = Instant.now();

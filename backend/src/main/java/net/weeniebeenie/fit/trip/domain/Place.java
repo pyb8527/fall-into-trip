@@ -53,6 +53,16 @@ public class Place {
     @Column(length = 40)
     private String cat;
 
+    /**
+     * 지도에 찍힐 그림.
+     *
+     * <p>이모지가 아니라 짧은 이름("ramen", "onsen")만 둡니다. 어떤 그림을
+     * 그릴지는 화면이 정합니다 — 이모지는 기기마다 다르게 생기고, 언젠가
+     * 바꾸고 싶어졌을 때 쌓인 값을 전부 고쳐야 합니다.
+     */
+    @Column(length = 24)
+    private String icon;
+
     /** "HH:MM". 비워 두면 순서만으로 배치됩니다. */
     @Column(length = 10)
     private String time;
@@ -97,7 +107,7 @@ public class Place {
     public Place(String dayId, int sort, String name, String ja, String en,
                  double lat, double lng, String cat, String time, String cost,
                  String note, String url, Integer radius, Boolean fit, String move,
-                 String placeId, String updatedBy) {
+                 String placeId, String icon, String updatedBy) {
         this.id = Ids.next();
         this.dayId = dayId;
         this.sort = sort;
@@ -107,6 +117,7 @@ public class Place {
         this.lat = lat;
         this.lng = lng;
         this.cat = cat;
+        this.icon = PlaceKind.clean(icon);
         this.time = time;
         this.cost = cost;
         this.note = note;

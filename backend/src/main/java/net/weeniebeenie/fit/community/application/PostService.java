@@ -140,6 +140,9 @@ public class PostService {
                 n.put("lat", p.getLat());
                 n.put("lng", p.getLng());
                 n.put("cat", p.getCat());
+                /* 핀 그림도 사본에 담습니다. 안 담으면 남의 일정을 가져왔을
+                   때만 지도가 민무늬가 되어, 왜 내 것과 다른지 알 수 없습니다. */
+                n.put("icon", p.getIcon());
                 n.put("time", p.getTime());
                 n.put("cost", p.getCost());
                 n.put("note", p.getNote());
@@ -342,6 +345,7 @@ public class PostService {
                         .radius(p.hasNonNull("radius") ? p.path("radius").asInt() : null)
                         .fit(!p.has("fit") || p.path("fit").asBoolean(true))
                         .placeId(text(p, "placeId"))
+                        .icon(text(p, "icon"))
                         .updatedBy(me.id())
                         .build());
             }
