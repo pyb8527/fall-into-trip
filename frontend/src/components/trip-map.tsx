@@ -361,6 +361,8 @@ function Pin({
             shadowOpacity: active ? 0.32 : 0.2,
           },
         ]}>
+        {/* 앱에서는 아직 선으로 그린 별을 못 씁니다 — SVG 를 쓰려면 앱을
+            다시 빌드해야 합니다(docs/design.md). 그때까지는 글자표로 둡니다. */}
         <Body small strong style={{ color: place.color }}>
           ★
         </Body>

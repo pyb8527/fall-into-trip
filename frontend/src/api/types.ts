@@ -12,6 +12,13 @@ export type User = {
   id: string;
   email: string;
   name: string;
+  /**
+   * 지도에서 나를 가리키는 그림의 이름("rabbit").
+   *
+   * 이모지가 아니라 짧은 이름입니다. 어떤 그림을 그릴지는 화면이 정합니다
+   * (constants/user-marks.ts). 안 골랐으면 비어 있습니다.
+   */
+  mark: Maybe<string>;
   role: Role;
   disabled: boolean;
   createdAt: string;
@@ -170,6 +177,7 @@ export type Companion = {
   id: string;
   name: string;
   email: string;
+  mark: Maybe<string>;
   role: TripRole;
   owner: boolean;
 };
@@ -519,6 +527,8 @@ export type LivePin = {
 export type LiveWhere = {
   userId: string;
   name: string;
+  /** 지도에서 이 사람을 가리키는 그림의 이름. 안 골랐으면 비어 있습니다. */
+  mark: Maybe<string>;
   lat: number;
   lng: number;
   accuracy: Maybe<number>;

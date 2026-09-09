@@ -137,5 +137,25 @@ T("떼면 사라짐", r.data.posts.length === 0, r.data.posts);
 r = await call("GET", "/api/posts/liked");
 T("로그인 없이는 못 봄", r.status === 401, r.data);
 
+
+console.log("\n[12] 지도에서 나를 가리키는 그림");
+r = await call("GET", "/api/auth/me", { token: me });
+T("처음에는 안 골라 둠", r.data.user.mark == null, r.data.user);
+r = await call("PATCH", "/api/auth/mark", { token: me, body: { mark: "rabbit" } });
+T("고름", r.data.user.mark === "rabbit", r.data.user);
+r = await call("GET", "/api/auth/me", { token: me });
+T("다시 물어도 그대로", r.data.user.mark === "rabbit", r.data.user);
+r = await call("PATCH", "/api/auth/mark", { token: me, body: { mark: "없는동물" } });
+T("모르는 이름은 비움", r.data.user.mark == null, r.data.user);
+r = await call("PATCH", "/api/auth/mark", { token: me, body: { mark: "bear" } });
+r = await call("PATCH", "/api/auth/mark", { token: me, body: { mark: "" } });
+T("빈 문자열이면 뺌", r.data.user.mark == null, r.data.user);
+r = await call("PATCH", "/api/auth/mark", { body: { mark: "cat" } });
+T("로그인 없이는 못 바꿈", r.status === 401, r.data);
+
+await call("PATCH", "/api/auth/mark", { token: me, body: { mark: "fox" } });
+r = await call("GET", `/api/trips/${tripId}/members`, { token: me });
+T("동행자 목록에 그림이 옴", r.data.members.some(m => m.mark === "fox"), r.data.members);
+
 console.log(`\n결과: ${pass} 통과 / ${fail} 실패`);
 process.exit(fail ? 1 : 0);

@@ -6,6 +6,7 @@ import type { Companion, InviteRow, NewInvite, TripRole } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
 import { Spacing } from '@/constants/theme';
+import { faceOf } from '@/constants/user-marks';
 import { shareLink } from '@/lib/share';
 import {
   Badge,
@@ -111,6 +112,9 @@ function Inner({
         <Row key={m.id} style={styles.person}>
           <View style={styles.who}>
             <Row gap={Spacing.xs}>
+              {/* 지도에 찍히는 그림을 여기에도 답니다. 지도에서 곰을 보고
+                  누구인지 알려면 어딘가에서 한 번은 짝지어져야 합니다. */}
+              <Body>{faceOf(m.mark, m.name)}</Body>
               <Body strong>{m.name}</Body>
               {m.id === user?.id ? <Badge label="나" tone="accent" /> : null}
             </Row>

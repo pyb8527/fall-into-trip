@@ -2,9 +2,10 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { ApiError } from '@/api/client';
+import { api, ApiError } from '@/api/client';
 import { useAuth } from '@/auth/auth-provider';
-import { Spacing } from '@/constants/theme';
+import { USER_MARKS, markOf } from '@/constants/user-marks';
+import { Colors, Radius, Spacing } from '@/constants/theme';
 import {
   Badge,
   Body,
@@ -15,6 +16,7 @@ import {
   Divider,
   ErrorNote,
   Field,
+  Press,
   Row,
   Screen,
   Subtitle,
@@ -34,7 +36,11 @@ export default function Settings() {
 
       <Card>
         <Row gap={Spacing.lg}>
-          <LogoMark size={22} />
+          {user?.mark ? (
+            <Body style={styles.markEmoji}>{markOf(user.mark)}</Body>
+          ) : (
+            <LogoMark size={22} />
+          )}
           <View style={styles.identity}>
             <Row gap={Spacing.sm}>
               <Subtitle>{user?.name}</Subtitle>
@@ -60,6 +66,8 @@ export default function Settings() {
         <Button label="운영 화면 열기" variant="secondary" onPress={() => router.push('/admin')} />
       ) : null}
 
+      <MarkCard />
+
       <PasswordCard />
 
       <Card>
@@ -77,6 +85,79 @@ export default function Settings() {
         </Row>
       </Card>
     </Screen>
+  );
+}
+
+/**
+ * 지도에서 나를 가리킬 그림.
+ *
+ * <p>동행자 위치를 이름 첫 글자로 그리고 있었습니다. "지영" 이든 "지훈" 이든
+ * 지도에는 똑같이 "지" 하나만 뜹니다. 누가 어디 있는지 보라고 켠 것인데 정작
+ * 누구인지가 안 보였습니다.
+ *
+ * <p>동물로 둔 것은 서로 헷갈리지 않게 하기 위해서입니다. 도형이나 색은 열
+ * 개만 넘어가도 구별이 안 되지만, 토끼와 곰은 아무리 작게 그려도 다릅니다.
+ */
+function MarkCard() {
+  const { user, refreshUser } = useAuth();
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function pick(next: string | null) {
+    if (busy) {
+      return;
+    }
+    setError(null);
+    setBusy(true);
+    try {
+      await api.patch('/api/auth/mark', { mark: next ?? '' });
+      /* 고른 것이 화면 곳곳(지도·동행자 목록)에 쓰이므로 로그인 정보를 다시
+         받아 옵니다. 여기서만 바꿔 두면 지도는 옛 그림을 그립니다. */
+      await refreshUser();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : '바꾸지 못했습니다.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card>
+      <Subtitle>지도에서 나</Subtitle>
+      <Body small tone="secondary">
+        동행자와 위치를 나눌 때 지도에 이 그림으로 찍힙니다. 안 고르면 이름 첫 글자로
+        찍힙니다.
+      </Body>
+
+      <Row gap={Spacing.xs}>
+        <Press
+          onPress={() => pick(null)}
+          scale={0.9}
+          accessibilityLabel="그림 없이 이름 첫 글자"
+          accessibilityState={{ selected: !user?.mark }}
+          style={[styles.mark, !user?.mark ? styles.markOn : null]}>
+          <Body small strong tone={!user?.mark ? 'accent' : 'secondary'}>
+            {user?.name?.slice(0, 1) ?? '나'}
+          </Body>
+        </Press>
+        {USER_MARKS.map((m) => {
+          const on = user?.mark === m.key;
+          return (
+            <Press
+              key={m.key}
+              onPress={() => pick(m.key)}
+              scale={0.9}
+              accessibilityLabel={m.label}
+              accessibilityState={{ selected: on }}
+              style={[styles.mark, on ? styles.markOn : null]}>
+              <Body style={styles.markEmoji}>{m.emoji}</Body>
+            </Press>
+          );
+        })}
+      </Row>
+
+      {error ? <ErrorNote message={error} /> : null}
+    </Card>
   );
 }
 
@@ -153,6 +234,24 @@ function formatDate(iso?: string | null) {
 }
 
 const styles = StyleSheet.create({
+  mark: {
+    width: 44,
+    height: 44,
+    borderRadius: Radius.full,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.border,
+    backgroundColor: Colors.fill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  markOn: {
+    borderColor: Colors.accent,
+    backgroundColor: Colors.accentSoft,
+  },
+  markEmoji: {
+    /* 이모지는 글꼴이 제 높이를 갖고 있어, 줄 높이를 두면 아래로 처집니다. */
+    lineHeight: undefined,
+  },
   identity: {
     flexShrink: 1,
     gap: Spacing.xs,

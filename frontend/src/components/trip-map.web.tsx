@@ -48,6 +48,49 @@ const FOCUS_ZOOM = 16;
  * <p>다녀온 곳은 속을 날짜 색으로 채웁니다. 지도가 채워지는 체크리스트처럼
  * 읽혀, 채울수록 얼마나 돌았는지가 한눈에 보입니다.
  */
+/**
+ * 별 다섯 개 꼭짓점의 좌표.
+ *
+ * <p>글자표(★)를 얹고 있었습니다. 글꼴이 그리는 것이라 두툼하게 꽉 찬 별이
+ * 되고, 테두리만 두른 동그라미 안에서 혼자 무겁습니다.
+ *
+ * <p>직접 그립니다. 선으로만 그린 별은 같은 굵기의 동그라미와 한 벌로 보이고,
+ * 작게 줄여도 모양이 뭉개지지 않습니다.
+ *
+ * <p>안쪽 반지름은 바깥의 0.382 배입니다. 정오각별에서 선이 서로 만나는
+ * 자리이고, 이보다 크면 통통해져 꽃처럼, 작으면 뾰족해져 가시처럼 보입니다.
+ */
+function starPath(cx: number, cy: number, radius: number) {
+  const inner = radius * 0.382;
+  const points: string[] = [];
+  for (let i = 0; i < 10; i++) {
+    /* 위쪽 꼭짓점에서 시작합니다. 그러지 않으면 별이 기울어 보입니다. */
+    const angle = (Math.PI / 5) * i - Math.PI / 2;
+    const r = i % 2 === 0 ? radius : inner;
+    points.push(`${(cx + r * Math.cos(angle)).toFixed(2)},${(cy + r * Math.sin(angle)).toFixed(2)}`);
+  }
+  return `M${points.join('L')}Z`;
+}
+
+/**
+ * 담아 둔 곳을 가리키는 핀.
+ *
+ * <p>테두리를 두른 동그라미 안에 선으로 그린 별. 담아 둔 곳에는 순서도 갈래도
+ * 앞세울 것이 없어, 어디에 얼마나 담겼는지만 보이면 됩니다.
+ */
+function starIcon(color: string, active: boolean) {
+  const r = active ? 17 : 14.5;
+  const stroke = active ? 2.6 : 2.2;
+  const box = Math.ceil((r + stroke) * 2);
+  const c = box / 2;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${box}" height="${box}" viewBox="0 0 ${box} ${box}">
+<circle cx="${c}" cy="${c}" r="${r}" fill="#FFFFFF" stroke="${color}" stroke-width="${stroke}"/>
+<path d="${starPath(c, c, r * 0.62)}" fill="none" stroke="${color}" stroke-width="${stroke * 0.85}"
+ stroke-linejoin="round" stroke-linecap="round"/>
+</svg>`;
+  return { url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg), box, center: c };
+}
+
 function pinIcon(color: string, active: boolean, visited: boolean, emoji: boolean) {
   const face = visited ? color : '#FFFFFF';
 
@@ -100,15 +143,10 @@ function pinLabel(
   active: boolean,
   shape: 'default' | 'star' = 'default',
 ) {
-  /* 별은 이모지가 아니라 글자표입니다(U+2605). 이모지는 기기마다 다르게
-     생기지만 이것은 어디서나 같은 별입니다. */
+  /* 별은 그림 쪽에서 선으로 직접 그립니다. 여기서는 아무것도 얹지 않습니다 —
+     글자를 겹치면 그려 둔 별 위에 또 하나가 얹힙니다. */
   if (shape === 'star') {
-    return {
-      text: '★',
-      color: place.color,
-      fontSize: active ? '18px' : '15px',
-      fontWeight: '700',
-    };
+    return undefined;
   }
   if (place.emoji) {
     return { text: place.emoji, fontSize: active ? '20px' : '17px' };
@@ -131,16 +169,46 @@ function pinLabel(
  * 그 계산을 한 군데에 모읍니다 — 두 군데로 흩어져 있어서 번호가 한 칸 옆으로
  * 밀려 있었습니다.
  */
+/**
+ * 사람을 가리키는 동그란 판.
+ *
+ * <p>장소 핀(물방울)과 생김새를 달리합니다. 같은 모양으로 두면 지도만 보고는
+ * 일정에 넣어 둔 곳과 지금 누가 서 있는 자리를 구별할 수 없습니다.
+ */
+function personIcon(color: string) {
+  const r = 15;
+  const box = (r + 3) * 2;
+  const c = box / 2;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${box}" height="${box}" viewBox="0 0 ${box} ${box}">
+<circle cx="${c}" cy="${c}" r="${r}" fill="#FFFFFF" stroke="${color}" stroke-width="3"/>
+</svg>`;
+  return {
+    url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
+    scaledSize: new (gmaps().Size)(box, box),
+    anchor: new (gmaps().Point)(c, c),
+    labelOrigin: new (gmaps().Point)(c, c),
+  };
+}
+
 function markerIcon(
   g: ReturnType<typeof gmaps>,
   place: MapPlace,
   active: boolean,
   shape: 'default' | 'star',
 ) {
-  const round = shape === 'star' || !!place.emoji;
-  const made = pinIcon(place.color, active, place.detail.visited, round);
+  if (shape === 'star') {
+    const star = starIcon(place.color, active);
+    return {
+      url: star.url,
+      scaledSize: new g.Size(star.box, star.box),
+      anchor: new g.Point(star.center, star.center),
+      labelOrigin: new g.Point(star.center, star.center),
+    };
+  }
 
-  if (round) {
+  const made = pinIcon(place.color, active, place.detail.visited, !!place.emoji);
+
+  if (place.emoji) {
     return {
       url: made.url,
       scaledSize: new g.Size(made.box, made.box),
@@ -179,6 +247,7 @@ export function TripMap({
   fitAt,
   shape = 'default',
   panTo,
+  myFace,
 }: TripMapProps) {
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -356,16 +425,10 @@ export function TripMap({
       map: map.current,
       zIndex: 999,
       title: '지금 내 위치',
-      icon: {
-        path: g.SymbolPath.CIRCLE,
-        scale: 7,
-        /* 내 자리는 점 하나뿐이라 파스텔로 찍으면 밝은 지도에 묻힙니다.
-           같은 계열에서 짙은 쪽으로 찍습니다. */
-        fillColor: Colors.accentInk,
-        fillOpacity: 1,
-        strokeColor: '#FFFFFF',
-        strokeWeight: 2.5,
-      },
+      /* 나도 동행자와 같은 방식으로 그립니다. 나만 점으로 두면 지도에서
+         내가 어디 있는지를 다른 규칙으로 찾아야 합니다. */
+      icon: personIcon(Colors.accentInk),
+      label: myFace ? { text: myFace, fontSize: '16px', fontWeight: '700' } : undefined,
     });
   }, [ready, here]);
 
@@ -527,15 +590,10 @@ export function TripMap({
           map: map.current,
           title: `${mate.name} 님이 지금 있는 곳`,
           zIndex: 800,
-          label: { text: mate.name.slice(0, 1), color: '#FFFFFF', fontSize: '11px', fontWeight: '700' },
-          icon: {
-            path: g.SymbolPath.CIRCLE,
-            scale: 11,
-            fillColor: Colors.success,
-            fillOpacity: 1,
-            strokeColor: '#FFFFFF',
-            strokeWeight: 2.5,
-          },
+          /* 고른 동물, 안 골랐으면 이름 첫 글자. 첫 글자만으로는 "지영" 과
+             "지훈" 이 지도에서 같아 보입니다. */
+          label: { text: mate.face, fontSize: '16px', fontWeight: '700' },
+          icon: personIcon(Colors.success),
         }),
       );
     }

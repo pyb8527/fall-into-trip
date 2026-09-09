@@ -144,7 +144,10 @@ public class LiveService {
             if (row.getUserId().equals(me.id())) {
                 continue;
             }
-            out.add(new Where(row.getUserId(), nameOf(row.getUserId()),
+            User who = users.findById(row.getUserId()).orElse(null);
+            out.add(new Where(row.getUserId(),
+                    who == null ? "알 수 없음" : who.getName(),
+                    who == null ? null : who.getMark(),
                     row.getLat(), row.getLng(), row.getAccuracy(), row.getUpdatedAt()));
         }
         return out;
@@ -166,7 +169,13 @@ public class LiveService {
                       String authorName, boolean mine, Instant createdAt, Instant expiresAt) {
     }
 
-    public record Where(String userId, String name, double lat, double lng,
+    /**
+     * 지금 켜 둔 동행자의 자리.
+     *
+     * @param mark 지도에서 이 사람을 가리키는 그림의 이름. 안 골랐으면 비어
+     *             있고, 그때는 화면이 이름 첫 글자로 그립니다.
+     */
+    public record Where(String userId, String name, String mark, double lat, double lng,
                         Double accuracy, Instant updatedAt) {
     }
 }

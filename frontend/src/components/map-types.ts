@@ -44,6 +44,14 @@ export type MapPlace = {
 export type MapMate = {
   id: string;
   name: string;
+  /**
+   * 지도에 찍을 것. 고른 동물의 이모지, 안 골랐으면 이름 첫 글자.
+   *
+   * <p>이름 첫 글자만 찍고 있었습니다. "지영" 과 "지훈" 이 지도에서 똑같이
+   * "지" 하나로 보여, 누가 어디 있는지 보라고 켠 것인데 정작 누구인지가 안
+   * 보였습니다.
+   */
+  face: string;
   lat: number;
   lng: number;
 };
@@ -62,6 +70,8 @@ export type TripMapProps = {
   notes?: MapNote[];
   /** 지금 내가 있는 자리. 켰을 때만 옵니다. */
   here?: { lat: number; lng: number; accuracy: number } | null;
+  /** 내 자리에 찍을 것. 동행자와 같은 방식으로 나도 그립니다. */
+  myFace?: string;
   /** 있으면 점선 대신 이것을 그립니다. */
   routes?: RouteLine[];
   places: MapPlace[];

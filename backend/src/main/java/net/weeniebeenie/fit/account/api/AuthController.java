@@ -5,6 +5,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import net.weeniebeenie.fit.shared.error.ApiException;
 import net.weeniebeenie.fit.account.domain.User;
+import net.weeniebeenie.fit.account.domain.UserMark;
 import net.weeniebeenie.fit.account.domain.UserRepository;
 import net.weeniebeenie.fit.account.infrastructure.security.AuthPrincipal;
 import net.weeniebeenie.fit.account.infrastructure.security.CurrentUser;
@@ -12,6 +13,7 @@ import net.weeniebeenie.fit.account.infrastructure.security.JwtProperties;
 import net.weeniebeenie.fit.account.infrastructure.security.JwtProvider;
 import net.weeniebeenie.fit.account.application.AuthService;
 import net.weeniebeenie.fit.account.application.RefreshTokenService;
+import net.weeniebeenie.fit.account.api.dto.AuthDtos;
 import net.weeniebeenie.fit.account.api.dto.AuthDtos.*;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
@@ -129,6 +131,21 @@ public class AuthController {
         User user = users.findById(me.id()).orElseThrow();
         /* 방금 전부 끊었으므로 이 기기용으로 새 세션을 하나 내줍니다. */
         return withNewSession(user, http);
+    }
+
+    /**
+     * 지도에서 나를 가리킬 그림을 고릅니다.
+     *
+     * <p>비밀번호와 달리 세션을 건드리지 않습니다. 그림 하나 바꿨다고 다른
+     * 기기에서 로그아웃될 이유가 없습니다.
+     */
+    @PatchMapping("/mark")
+    public Map<String, Object> mark(@CurrentUser AuthPrincipal me,
+                                    @RequestBody AuthDtos.MarkRequest req) {
+        User user = users.findById(me.id()).orElseThrow();
+        user.setMark(UserMark.clean(req == null ? null : req.mark()));
+        users.save(user);
+        return Map.of("user", AuthDtos.UserView.of(user));
     }
 
     /* ------------------------------------------------------------ 도우미 */

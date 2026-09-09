@@ -49,7 +49,8 @@ public class MemberService {
 
         return members.findAllByIdTripId(tripId).stream()
                 .map(m -> users.findById(m.getUserId())
-                        .map(u -> new Companion(u.getId(), u.getName(), u.getEmail(), m.getRole(),
+                        .map(u -> new Companion(u.getId(), u.getName(), u.getEmail(),
+                                u.getMark(), m.getRole(),
                                 u.getId().equals(trip.getOwnerId())))
                         .orElse(null))
                 .filter(java.util.Objects::nonNull)
@@ -185,7 +186,8 @@ public class MemberService {
         }
     }
 
-    public record Companion(String id, String name, String email, TripRole role, boolean owner) {
+    public record Companion(String id, String name, String email, String mark,
+                            TripRole role, boolean owner) {
     }
 
     public record NewInvite(String id, String token, TripRole role, Instant expiresAt, int maxUses) {

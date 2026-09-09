@@ -63,12 +63,17 @@ public final class AuthDtos {
     }
 
     public record UserView(String id, String email, String name, String role,
-                           boolean disabled, Instant createdAt, Instant lastLoginAt) {
+                           String mark, boolean disabled, Instant createdAt,
+                           Instant lastLoginAt) {
 
         public static UserView of(User u) {
             return new UserView(u.getId(), u.getEmail(), u.getName(), u.getRole().name(),
-                    u.isDisabled(), u.getCreatedAt(), u.getLastLoginAt());
+                    u.getMark(), u.isDisabled(), u.getCreatedAt(), u.getLastLoginAt());
         }
+    }
+
+    /** 지도에서 나를 가리킬 그림. 빈 문자열은 "안 쓰겠다" 입니다. */
+    public record MarkRequest(String mark) {
     }
 
     /** 로그인 전에 화면이 무엇을 띄울지 정할 때 씁니다. */

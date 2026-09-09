@@ -24,6 +24,7 @@ import { PublishForm } from '@/components/publish-form';
 import { TipSheet } from '@/components/tip-sheet';
 import { TripMap, type MapPlace } from '@/components/trip-map';
 import { iconOf } from '@/constants/place-icons';
+import { faceOf } from '@/constants/user-marks';
 import { openDirections } from '@/lib/directions';
 import { useHere } from '@/lib/here';
 import { decodePolyline } from '@/lib/polyline';
@@ -534,7 +535,14 @@ export default function TripScreen() {
         onSelect={setActivePlaceId}
         routes={routeLines}
         here={me.here}
-        mates={mates.map((m) => ({ id: m.userId, name: m.name, lat: m.lat, lng: m.lng }))}
+        mates={mates.map((m) => ({
+          id: m.userId,
+          name: m.name,
+          face: faceOf(m.mark, m.name),
+          lat: m.lat,
+          lng: m.lng,
+        }))}
+        myFace={faceOf(user?.mark, user?.name ?? '나')}
         notes={pins.map((p) => ({ id: p.id, label: p.label ?? null, lat: p.lat, lng: p.lng }))}
         bleed
         chrome={false}
@@ -686,9 +694,12 @@ export default function TripScreen() {
           </View>
         ) : null}
 
+        {/* 지도에 찍힌 그림과 이름을 짝지어 둡니다. 그림만 보고는 누구인지
+            알 수 없고, 이름만 적으면 지도에서 찾을 수가 없습니다. */}
         {mates.length > 0 ? (
           <Caption tone="secondary">
-            지금 {mates.map((m) => m.name).join(' · ')} 님이 지도에 보입니다.
+            지금 {mates.map((m) => `${faceOf(m.mark, m.name)} ${m.name}`).join(' · ')} 님이 지도에
+            보입니다.
           </Caption>
         ) : null}
 
@@ -704,24 +715,24 @@ export default function TripScreen() {
           {/* 길 위에서는 짜는 화면이 방해입니다. 지금 갈 곳만 크게 보는 쪽으로
               넘어갑니다. */}
           <Shortcut
-            icon="compass"
-            label="길에서 보기"
+            icon="check"
+            label="스탬프 찍기"
             onPress={() => router.push({ pathname: '/travel/[id]', params: { id } })}
           />
           {/* 아직 정하지 않은 곳은 일정이 아니라 여기에 모입니다. */}
           <Shortcut
             icon="star"
-            label="가고 싶은 곳"
+            label="투표장"
             onPress={() => router.push({ pathname: '/vote/[id]', params: { id } })}
           />
           <Shortcut
             icon="bookmark"
-            label="돌아보기"
+            label="추억"
             onPress={() => router.push({ pathname: '/card/[id]', params: { id } })}
           />
           {/* 올리는 것은 주인만 할 수 있습니다. 서버도 그렇게 막습니다. */}
           {mine ? (
-            <Shortcut icon="upload" label="올리기" onPress={() => setPublishing(true)} />
+            <Shortcut icon="upload" label="포스팅" onPress={() => setPublishing(true)} />
           ) : null}
         </Row>
 
@@ -862,7 +873,7 @@ function Shortcut({
   return (
     <Press onPress={onPress} scale={0.95} accessibilityLabel={label} style={styles.shortcut}>
       <Icon name={icon} size={20} tone="accent" />
-      <Caption tone="secondary" numberOfLines={1}>
+      <Caption tone="secondary" numberOfLines={2}>
         {label}
       </Caption>
     </Press>
