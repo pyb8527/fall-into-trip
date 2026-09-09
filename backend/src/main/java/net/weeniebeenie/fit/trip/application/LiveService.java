@@ -47,6 +47,15 @@ public class LiveService {
     /** 한 사람이 한 번에 꽂아 둘 수 있는 핀. 지도를 덮지 않을 만큼입니다. */
     private static final int MAX_PINS = 5;
 
+    /**
+     * 같은 자리로 보는 거리(미터).
+     *
+     * <p>휴대폰이 알려 주는 자리는 건물 안이나 골목에서 이십 미터쯤 흔들립니다.
+     * 그래서 가만히 서서 두 번 눌러도 좌표는 조금씩 다릅니다. 그 흔들림보다
+     * 조금 넉넉하게 잡아야 "같은 자리에 또 꽂은 것" 을 제대로 걸러 냅니다.
+     */
+    private static final double SAME_SPOT = 30;
+
     private final TripPinRepository pins;
     private final TripLocationRepository locations;
     private final TripMemberRepository members;
@@ -77,6 +86,24 @@ public class LiveService {
         Coordinates at = Coordinates.of(lat, lng);
 
         pins.sweep(tripId, Instant.now());
+
+        /*
+          바로 여기에 내가 이미 꽂아 두었으면 또 꽂지 않습니다.
+
+          다섯 개까지만 꽂을 수 있는데, 눌린 줄 모르고 두 번 누르면 같은 자리
+          깃발 둘이 겹쳐 서고 자리만 한 칸 줄어듭니다. 지도에서는 두 개가
+          포개져 하나로 보이니 왜 줄었는지도 알 수 없습니다.
+
+          남이 꽂아 둔 것은 막지 않습니다. 같은 카페에 둘이 있다는 것은 오히려
+          알려야 할 일입니다.
+         */
+        for (TripPin mineHere : pins.findAllByTripIdAndExpiresAtAfterOrderByCreatedAtDesc(tripId, Instant.now())) {
+            if (mineHere.getUserId().equals(me.id())
+                    && new Coordinates(mineHere.getLat(), mineHere.getLng()).metersTo(at) < SAME_SPOT) {
+                throw ApiException.badRequest("바로 여기에 이미 깃발을 꽂아 두었습니다.");
+            }
+        }
+
         if (pins.countByTripIdAndUserIdAndExpiresAtAfter(tripId, me.id(), Instant.now()) >= MAX_PINS) {
             throw ApiException.badRequest("한 번에 " + MAX_PINS + "개까지 꽂을 수 있습니다.");
         }

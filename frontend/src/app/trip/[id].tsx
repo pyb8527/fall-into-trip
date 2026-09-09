@@ -33,6 +33,7 @@ import { TipSheet } from '@/components/tip-sheet';
 import { TripMap, type MapPlace } from '@/components/trip-map';
 import { iconOf } from '@/constants/place-icons';
 import { faceOf } from '@/constants/user-marks';
+import { metersBetween, SAME_SPOT } from '@/lib/geo';
 import { openDirections } from '@/lib/directions';
 import { useHere } from '@/lib/here';
 import { decodePolyline } from '@/lib/polyline';
@@ -117,6 +118,8 @@ export default function TripScreen() {
   /* 방금 꽂았다는 표시. 잠깐 뒤 스스로 사라집니다 — 오래 남아 있으면 다음에
      열었을 때 방금 꽂은 줄 압니다. */
   const [planted, setPlanted] = useState(0);
+  /** 꽂은 자리에 이미 깃발을 꽂아 두고 있던 동행자. 없으면 null. */
+  const [plantedWith, setPlantedWith] = useState<string | null>(null);
 
   useEffect(() => {
     if (!planted) {
@@ -348,6 +351,44 @@ export default function TripScreen() {
   const infoOf = useMemo(() => new Map((placeInfo ?? []).map((i) => [i.id, i])), [placeInfo]);
 
   /*
+    같은 곳이 두 날에 들어가 있는지.
+
+    "다음에 또 가자" 하고 넣어 둔 것이면 그대로 두면 되고, 실수로 두 번 넣은
+    것이면 하나는 빼야 합니다. 어느 쪽인지는 넣은 사람만 아니까, 지우지 않고
+    알려만 줍니다.
+
+    구글 번호로 봅니다. 이름은 "이치란" 과 "이치란 도톤보리점" 처럼 사람이
+    다르게 적어 둘 수 있고, 좌표는 같은 건물 안에서도 조금씩 다릅니다. 번호가
+    없는 곳(좌표를 직접 넣은 것)은 견주지 않습니다 — 견줄 것이 없습니다.
+  */
+  const twiceIn = useMemo(() => {
+    const dayOf = new Map<string, Set<number>>();
+    days.forEach((day, di) => {
+      day.places.forEach((p) => {
+        if (!p.placeId) {
+          return;
+        }
+        const seen = dayOf.get(p.placeId) ?? new Set<number>();
+        seen.add(di);
+        dayOf.set(p.placeId, seen);
+      });
+    });
+
+    /* 같은 날에 두 번 넣은 것은 세지 않습니다 — 아침에 들렀다 저녁에 다시
+       가는 일은 흔합니다. 날이 갈릴 때만 말해 줍니다. */
+    const out = new Map<string, string[]>();
+    for (const [placeId, seen] of dayOf) {
+      if (seen.size > 1) {
+        out.set(
+          placeId,
+          [...seen].sort((a, b) => a - b).map((i) => days[i]?.date || days[i]?.label || `${i + 1}일차`),
+        );
+      }
+    }
+    return out;
+  }, [days]);
+
+  /*
     이 날 장소들에 달린 한 줄 팁이 몇 개인지. 장소마다 물으면 그 수만큼 요청이
     나갑니다. 번호가 있는 것만 모아 한 번에 셉니다.
   */
@@ -507,7 +548,16 @@ export default function TripScreen() {
       return;
     }
     setActionError(null);
+    setPlantedWith(null);
     const at = me.here;
+
+    /* 같은 자리에 남이 이미 꽂아 두었는지. 막지는 않습니다 — 같은 카페에
+       둘이 있다는 것은 오히려 알려야 할 일입니다. 내가 두 번 꽂는 것은
+       서버가 막습니다. */
+    const already = pins.find(
+      (pin) => !pin.mine && metersBetween(pin, at) < SAME_SPOT,
+    );
+
     try {
       await api.post(`/api/trips/${id}/pins`, { lat: at.lat, lng: at.lng });
       /* 짧게 한 번. 길게 울리면 알림처럼 느껴집니다. 안 되는 기기에서는
@@ -515,6 +565,7 @@ export default function TripScreen() {
       Vibration.vibrate(20);
       /* 꽂은 자리를 보여 줍니다. 판에 가려 안 보이면 꽂은 보람이 없습니다. */
       setLookAt({ lat: at.lat, lng: at.lng, at: Date.now() });
+      setPlantedWith(already ? already.authorName : null);
       setPlanted(Date.now());
       pullLive();
     } catch (e) {
@@ -745,7 +796,9 @@ export default function TripScreen() {
             </Row>
             {planted ? (
               <Caption tone="hot" strong>
-                여기에 깃발을 꽂았습니다. 여섯 시간 뒤 저절로 사라집니다.
+                {plantedWith
+                  ? `여기에 깃발을 꽂았습니다. ${plantedWith} 님도 바로 여기에 있습니다.`
+                  : '여기에 깃발을 꽂았습니다. 여섯 시간 뒤 저절로 사라집니다.'}
               </Caption>
             ) : null}
             {sharing ? (
@@ -819,6 +872,7 @@ export default function TripScreen() {
               chosenOf={chosenOf}
               onPick={(fromId, mode) => setPicked((p) => ({ ...p, [fromId]: mode }))}
               infoOf={infoOf}
+              twiceIn={twiceIn}
               tipCounts={tipCounts}
               onTips={setTipFor}
             />
@@ -1015,6 +1069,7 @@ function DayCard({
   chosenOf,
   onPick,
   infoOf,
+  twiceIn,
   tipCounts,
   onTips,
 }: {
@@ -1034,6 +1089,8 @@ function DayCard({
   onPick: (fromId: string, mode: TravelMode) => void;
   /** 장소별 영업시간 등. 좌표만 직접 넣은 곳에는 없습니다. */
   infoOf: Map<string, PlaceInfo>;
+  /** 두 날에 걸쳐 들어간 곳. 구글 번호 → 그 날들의 이름. */
+  twiceIn: Map<string, string[]>;
   /** 구글 번호별 최근 팁 수. */
   tipCounts: Record<string, number>;
   onTips: (place: Place) => void;
@@ -1182,6 +1239,13 @@ function DayCard({
                     onEdit={() => setEditing(place)}
                     onRemove={() => onRemove(place.id)}
                     info={infoOf.get(place.id)}
+                    alsoOn={
+                      place.placeId
+                        ? (twiceIn.get(place.placeId) ?? []).filter(
+                            (d) => d !== (day.date || day.label),
+                          )
+                        : []
+                    }
                     tipCount={place.placeId ? (tipCounts[place.placeId] ?? 0) : 0}
                     onTips={() => onTips(place)}
                     dragging={from === i}
@@ -1262,6 +1326,7 @@ function PlaceRow({
   active,
   canEdit,
   info,
+  alsoOn,
   tipCount,
   onTips,
   dragging,
@@ -1285,6 +1350,8 @@ function PlaceRow({
   active: boolean;
   canEdit: boolean;
   info?: PlaceInfo;
+  /** 이 곳이 들어가 있는 다른 날들. 비어 있으면 이 날에만 있습니다. */
+  alsoOn: string[];
   tipCount: number;
   onTips: () => void;
   /** 지금 이 줄을 끌고 있는지. 끌고 있는 동안에는 조금 들어 올립니다. */
@@ -1361,6 +1428,11 @@ function PlaceRow({
               {place.ja || place.en ? <Caption>{place.ja ?? place.en}</Caption> : null}
               {place.note ? <Caption tone="secondary">{place.note}</Caption> : null}
               {info ? <PlaceHours info={info} at={place.time} /> : null}
+              {/* 실수로 두 번 넣었을 수도, 일부러 또 가려는 것일 수도 있습니다.
+                  어느 쪽인지는 넣은 사람만 아니까 지우지 않고 알려만 줍니다. */}
+              {alsoOn.length > 0 ? (
+                <Caption tone="warning">{alsoOn.join(' · ')}에도 넣어 두었습니다</Caption>
+              ) : null}
               {place.cat || place.cost ? (
                 <Row gap={Spacing.sm}>
                   {place.cat ? <Caption>{place.cat}</Caption> : null}

@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { api, ApiError } from '@/api/client';
 import type { Found, PlaceSearchProps } from '@/components/map-types';
 import { Colors, Radius, Spacing, Tap } from '@/constants/theme';
-import { Body, Button, Caption, Divider, Field, IconButton, Loading, Row } from '@/ui';
+import { Body, Caption, Divider, Field, IconButton, Loading, Row } from '@/ui';
 
 /**
  * 이름으로 장소 찾기.
@@ -65,9 +65,8 @@ export function PlaceSearch({ onPick }: PlaceSearchProps) {
 
   return (
     <View style={styles.wrap}>
-      {/* 찾기 단추가 없고 "확인을 누르면" 이라고만 적혀 있었습니다. 화면에
-          없는 단추를 누르라는 말이라, 자판이 없는 데스크톱에서는 무엇을
-          해야 하는지 알 수 없었습니다. */}
+      {/* 찾기 단추를 칸 아래에 따로 두었더니 둘이 한 벌로 안 읽히고 세로로만
+          길어졌습니다. 칸 안 오른쪽 끝에 돋보기로 붙입니다. */}
       <Field
         label="장소 찾기"
         value={query}
@@ -77,13 +76,12 @@ export function PlaceSearch({ onPick }: PlaceSearchProps) {
         returnKeyType="search"
         onSubmitEditing={search}
         hint="이름을 넣고 찾아 주세요. 고르면 지도에 찍을 자리가 잡힙니다."
-      />
-      <Button
-        label="찾기"
-        variant="secondary"
-        busy={busy}
-        disabled={!query.trim()}
-        onPress={search}
+        action={{
+          icon: 'search',
+          label: '장소 찾기',
+          disabled: !query.trim() || busy,
+          onPress: search,
+        }}
       />
 
       {busy ? <Loading label="찾는 중" /> : null}

@@ -474,8 +474,20 @@ export function Field({
   multiline,
   onFocus,
   onBlur,
+  action,
   ...rest
-}: TextInputProps & { label: string; hint?: string; error?: string }) {
+}: TextInputProps & {
+  label: string;
+  hint?: string;
+  error?: string;
+  /**
+   * 입력칸 오른쪽 끝에 붙는 단추.
+   *
+   * <p>찾기처럼 <b>친 것을 가지고 바로 하는 일</b>에 씁니다. 아래에 따로 두면
+   * 칸과 단추 사이가 벌어져 둘이 한 벌로 안 읽히고, 그만큼 세로로 길어집니다.
+   */
+  action?: { icon: IconName; label: string; onPress: () => void; disabled?: boolean };
+}) {
   /* 지금 쓰고 있는 칸이 어디인지 보이게 합니다. 회색 칸이 여럿 붙어 있으면
      커서만으로는 눈에 잘 띄지 않습니다. */
   const [focused, setFocused] = useState(false);
@@ -483,26 +495,42 @@ export function Field({
   return (
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
-      <TextInput
-        placeholderTextColor={Colors.textDisabled}
-        multiline={multiline}
-        onFocus={(e) => {
-          setFocused(true);
-          onFocus?.(e);
-        }}
-        onBlur={(e) => {
-          setFocused(false);
-          onBlur?.(e);
-        }}
-        style={[
-          styles.input,
-          multiline && styles.inputMultiline,
-          focused && styles.inputFocused,
-          error ? styles.inputError : null,
-          style,
-        ]}
-        {...rest}
-      />
+      <View>
+        <TextInput
+          placeholderTextColor={Colors.textDisabled}
+          multiline={multiline}
+          onFocus={(e) => {
+            setFocused(true);
+            onFocus?.(e);
+          }}
+          onBlur={(e) => {
+            setFocused(false);
+            onBlur?.(e);
+          }}
+          style={[
+            styles.input,
+            multiline && styles.inputMultiline,
+            focused && styles.inputFocused,
+            error ? styles.inputError : null,
+            /* 단추가 붙으면 글자가 그 밑으로 들어가지 않게 오른쪽을 비웁니다. */
+            action ? styles.inputWithAction : null,
+            style,
+          ]}
+          {...rest}
+        />
+        {action ? (
+          <View style={styles.fieldAction}>
+            <IconButton
+              name={action.icon}
+              label={action.label}
+              tone="accent"
+              bare
+              disabled={action.disabled}
+              onPress={action.onPress}
+            />
+          </View>
+        ) : null}
+      </View>
       {error ? (
         <Text style={styles.errorText}>{error}</Text>
       ) : hint ? (
@@ -1431,6 +1459,16 @@ const styles = StyleSheet.create({
     /* 자리를 미리 잡아 둡니다. 눌렸을 때 테두리가 생기며 글자가 밀리지 않게. */
     borderWidth: 1.5,
     borderColor: Colors.fill,
+  },
+  inputWithAction: {
+    paddingRight: Tap.min,
+  },
+  fieldAction: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
   },
   inputMultiline: {
     height: 104,

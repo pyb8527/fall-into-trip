@@ -5,6 +5,7 @@ import net.weeniebeenie.fit.shared.error.ApiException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -111,6 +112,24 @@ public class StaticMapService {
                             .build())
                     .retrieve()
                     .body(byte[].class);
+        } catch (RestClientResponseException e) {
+            /*
+              구글이 왜 거절했는지는 본문에 적혀 있습니다.
+
+              이것을 버리면 "받지 못했습니다" 만 남아, 키가 잘못된 것인지
+              콘솔에서 이 API 를 안 켠 것인지 알 길이 없습니다. 실제로 장소
+              검색이 되는데 그림만 안 나오는 일이 생기는데, 그때 답은 늘
+              본문에 있습니다("This API project is not authorized to use this
+              API" 같은 한 줄).
+
+              본문에는 키가 들어 있지 않습니다 — 우리가 보낸 주소가 아니라
+              구글이 돌려준 설명입니다. 그래도 길게 남기지는 않습니다.
+             */
+            String why = e.getResponseBodyAsString();
+            log.warn("지도 그림을 받지 못했습니다 ({}): {}", e.getStatusCode(),
+                    why.length() > 200 ? why.substring(0, 200) : why);
+            throw new ApiException(org.springframework.http.HttpStatus.BAD_GATEWAY,
+                    "지도 그림을 받지 못했습니다.");
         } catch (Exception e) {
             log.warn("지도 그림을 받지 못했습니다: {}", e.getMessage());
             throw new ApiException(org.springframework.http.HttpStatus.BAD_GATEWAY,

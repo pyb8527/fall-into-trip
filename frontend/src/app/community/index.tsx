@@ -151,9 +151,8 @@ export default function Community() {
           없고, 서버도 내 글에는 조건을 받지 않습니다. */}
       {PRIVATE.includes(view) ? null : (
         <View style={styles.filters}>
-          {/* 엔터만으로 찾게 두면 자판이 없는 데스크톱에서는 무엇을 눌러야
-              하는지 알 수 없습니다. 단추를 답니다. 찾고 있는 중이면 지울
-              수도 있어야 합니다. */}
+          {/* 돋보기는 칸 안 오른쪽 끝에 붙입니다. 아래에 따로 두면 둘이 한
+              벌로 안 읽히고 세로로만 길어집니다. */}
           <Field
             label="찾기"
             value={typed}
@@ -161,15 +160,14 @@ export default function Community() {
             placeholder="도쿄, 온천, 아이와 함께"
             returnKeyType="search"
             onSubmitEditing={() => refilter(() => setQ(typed.trim()))}
+            action={{
+              icon: 'search',
+              label: '찾기',
+              onPress: () => refilter(() => setQ(typed.trim())),
+            }}
           />
-          <Row gap={Spacing.sm}>
-            <Button
-              label="찾기"
-              variant="secondary"
-              compact
-              onPress={() => refilter(() => setQ(typed.trim()))}
-            />
-            {q ? (
+          {q ? (
+            <Row gap={Spacing.sm}>
               <Button
                 label={`"${q}" 지우기`}
                 variant="ghost"
@@ -181,8 +179,8 @@ export default function Community() {
                   })
                 }
               />
-            ) : null}
-          </Row>
+            </Row>
+          ) : null}
 
           <Row gap={Spacing.xs}>
             <Chip

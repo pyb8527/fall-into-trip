@@ -43,6 +43,27 @@ T("남은 못 봄", r.status === 403 || r.status === 404, r.data);
 r = await call("POST", `/api/trips/${tripId}/pins`, { token: mate, body: { lat: 999, lng: 999 } });
 T("좌표가 이상하면 거절", r.status === 400, r.data);
 
+/* 같은 자리에 또 꽂는 것. 눌린 줄 모르고 두 번 누르면 겹쳐 서고 다섯 개
+   한도만 줄어든다. GPS 흔들림만큼(수 미터) 어긋난 좌표도 같은 자리로 본다 */
+r = await call("POST", `/api/trips/${tripId}/pins`, { token: mate,
+  body: { lat: 35.15872, lng: 129.16043 } });
+T("같은 자리에 또 꽂으면 거절", r.status === 400, r.data);
+r = await call("GET", `/api/trips/${tripId}/pins`, { token: host });
+T("거절됐으니 늘지 않음", r.data.pins.length === 1, r.data.pins);
+
+/* 남이 꽂아 둔 자리는 막지 않는다. 같은 카페에 둘이 있다는 것은 알려야 한다 */
+r = await call("POST", `/api/trips/${tripId}/pins`, { token: host,
+  body: { lat: 35.1587, lng: 129.1604 } });
+T("남이 꽂은 자리에는 꽂힘", r.status === 200, r.data);
+const stacked = r.data.id;
+
+/* 한 골목 건너(약 300m)는 다른 자리다 */
+r = await call("POST", `/api/trips/${tripId}/pins`, { token: mate,
+  body: { lat: 35.1614, lng: 129.1604 } });
+T("떨어진 자리에는 꽂힘", r.status === 200, r.data);
+await call("DELETE", `/api/pins/${r.data.id}`, { token: mate });
+await call("DELETE", `/api/pins/${stacked}`, { token: host });
+
 r = await call("DELETE", `/api/pins/${pinId}`, { token: host });
 T("남이 꽂은 것은 못 뺌", r.status === 403, r.data);
 r = await call("DELETE", `/api/pins/${pinId}`, { token: mate });

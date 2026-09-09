@@ -23,6 +23,23 @@ public record Coordinates(double lat, double lng) {
         }
     }
 
+    /**
+     * 두 좌표 사이의 거리(미터).
+     *
+     * <p>지구를 공으로 놓고 잽니다. 실제 지구는 조금 눌린 타원이라 아주 먼
+     * 거리에서는 몇 미터씩 어긋나지만, 우리가 이것을 쓰는 곳은 "같은 자리에
+     * 또 꽂았나" 를 보는 수십 미터짜리 판단이라 그 차이가 문제되지 않습니다.
+     */
+    public double metersTo(Coordinates other) {
+        double r = 6_371_000;
+        double dLat = Math.toRadians(other.lat - lat);
+        double dLng = Math.toRadians(other.lng - lng);
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                + Math.cos(Math.toRadians(lat)) * Math.cos(Math.toRadians(other.lat))
+                * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+        return r * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
     public static Coordinates of(Double lat, Double lng) {
         if (lat == null || lng == null) {
             throw ApiException.badRequest("좌표를 입력해 주세요.");

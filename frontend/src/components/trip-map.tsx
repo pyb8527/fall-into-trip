@@ -32,6 +32,51 @@ const PAD = 1.35;
  */
 const DRAW_MS = 400;
 
+/**
+ * 별을 묶는 간격(화면 픽셀).
+ *
+ * 별 하나가 21픽셀이라 이보다 좁으면 서로 겹칩니다. 조금 넉넉하게 잡아야
+ * 스쳐 지나가듯 붙은 것까지 묶입니다.
+ */
+const CLUMP_PX = 46;
+
+/** 한자리에 몰려 하나로 묶인 별. */
+type Clump = {
+  key: string;
+  lat: number;
+  lng: number;
+  color: string;
+  members: MapPlace[];
+};
+
+/**
+ * 묶인 별.
+ *
+ * <p>수가 많을수록 조금씩 키웁니다 — 세 개와 서른 개가 같은 크기면 묶였다는
+ * 것만 알 뿐 얼마나 몰렸는지는 모릅니다. 다만 끝없이 커지지는 않게 막습니다.
+ */
+function ClumpPin({ color, count }: { color: string; count: number }) {
+  const r = Math.min(38, 25 + Math.log10(count) * 12);
+  return (
+    <View
+      style={[
+        styles.chip,
+        {
+          width: r,
+          height: r,
+          borderRadius: r / 2,
+          borderWidth: 2.2,
+          borderColor: color,
+          backgroundColor: '#FFFFFF',
+        },
+      ]}>
+      <Body small strong style={{ color }}>
+        {count}
+      </Body>
+    </View>
+  );
+}
+
 export type { MapPlace } from '@/components/map-types';
 
 /* here·mates·notes 는 앱에서 아직 채워지지 않습니다. 위치가 있어야 뜻이 있는
@@ -56,6 +101,13 @@ export function TripMap({
   /* 전체화면에서 핀을 눌렀을 때 아래에 뜨는 카드. 목록의 선택과 따로 둡니다. */
   const [sheetId, setSheetId] = useState<string | null>(null);
   const insets = useSafeAreaInsets();
+
+  /* 지금 보고 있는 자리와 지도의 크기. 둘 다 있어야 "화면에서 몇 픽셀
+     떨어졌나" 를 잴 수 있습니다. 별을 묶는 데만 씁니다. */
+  const [view, setView] = useState<{ lat: number; lng: number; dLat: number; dLng: number } | null>(
+    null,
+  );
+  const [size, setSize] = useState({ w: 0, h: 0 });
 
   /**
    * 처음 보여 줄 범위.
@@ -157,6 +209,76 @@ export function TripMap({
     );
   }, [activeId, places]);
 
+  /*
+    가까이 몰린 별을 하나로 묶습니다.
+
+    보관함은 한 동네에 여남은 곳이 몰리는 일이 흔합니다. 그대로 찍으면 별이
+    서로 덮여 몇 개가 있는지도 모릅니다. 화면에서 몇 픽셀 떨어져 있는지로
+    묶으므로, 당기면 저절로 흩어지고 밀면 다시 뭉칩니다.
+
+    묶는 것은 별 모양일 때뿐입니다. 일정의 물방울 핀은 번호가 순서를 말해
+    주는 것이라 묶으면 그 순서가 사라집니다.
+  */
+  const { loners, clumps } = useMemo(() => {
+    const none = { loners: places, clumps: [] as Clump[] };
+    if (shape !== 'star' || !view || size.w === 0 || size.h === 0) {
+      return none;
+    }
+
+    /* 한 칸의 크기를 각도로 환산합니다. 배율이 낮을수록(멀리 볼수록) 같은
+       46픽셀이 더 넓은 땅을 덮으므로, 자연히 더 많이 묶입니다. */
+    const cellLng = (view.dLng / size.w) * CLUMP_PX;
+    const cellLat = (view.dLat / size.h) * CLUMP_PX;
+    if (!(cellLng > 0) || !(cellLat > 0)) {
+      return none;
+    }
+
+    const bins = new Map<string, MapPlace[]>();
+    places.forEach((p) => {
+      /* 고른 것은 묶지 않습니다. 눌러서 고른 별이 숫자 뒤로 사라지면 어디를
+         골랐는지 알 수 없습니다. */
+      if (p.id === activeId) {
+        return;
+      }
+      const key = `${Math.floor(p.lng / cellLng)}:${Math.floor(p.lat / cellLat)}`;
+      const bin = bins.get(key) ?? [];
+      bin.push(p);
+      bins.set(key, bin);
+    });
+
+    const loners: MapPlace[] = places.filter((p) => p.id === activeId);
+    const clumps: Clump[] = [];
+    bins.forEach((bin, key) => {
+      if (bin.length < 2) {
+        loners.push(...bin);
+        return;
+      }
+      clumps.push({
+        key,
+        lat: bin.reduce((n, p) => n + p.lat, 0) / bin.length,
+        lng: bin.reduce((n, p) => n + p.lng, 0) / bin.length,
+        color: bin[0].color,
+        members: bin,
+      });
+    });
+    return { loners, clumps };
+  }, [places, activeId, shape, view, size]);
+
+  /** 묶음을 누르면 그 안이 다 보일 만큼 당깁니다. */
+  const spread = useCallback((group: Clump) => {
+    const lats = group.members.map((p) => p.lat);
+    const lngs = group.members.map((p) => p.lng);
+    map.current?.animateToRegion(
+      {
+        latitude: (Math.min(...lats) + Math.max(...lats)) / 2,
+        longitude: (Math.min(...lngs) + Math.max(...lngs)) / 2,
+        latitudeDelta: Math.max((Math.max(...lats) - Math.min(...lats)) * PAD, FOCUS_SPAN),
+        longitudeDelta: Math.max((Math.max(...lngs) - Math.min(...lngs)) * PAD, FOCUS_SPAN),
+      },
+      350,
+    );
+  }, []);
+
   const pick = useCallback(
     (id: string) => {
       onSelect(id);
@@ -182,7 +304,20 @@ export function TripMap({
       initialRegion={region}
       showsPointsOfInterests={false}
       toolbarEnabled={false}
-      moveOnMarkerPress={false}>
+      moveOnMarkerPress={false}
+      onLayout={(e) =>
+        setSize({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })
+      }
+      /* 손을 뗀 뒤에만 다시 셉니다. 끄는 동안 매 프레임 다시 묶으면 별이
+         깜빡입니다. */
+      onRegionChangeComplete={(r) =>
+        setView({
+          lat: r.latitude,
+          lng: r.longitude,
+          dLat: r.latitudeDelta,
+          dLng: r.longitudeDelta,
+        })
+      }>
       {/*
         실제 경로를 받았으면 그것을 그립니다. 없을 때만 장소끼리 잇습니다.
         그 선은 "이 순서로 간다" 는 뜻일 뿐 지나는 길이 아니므로, 실제 길과
@@ -220,7 +355,18 @@ export function TripMap({
         ) : null,
       )}
 
-      {places.map((p) => (
+      {clumps.map((group) => (
+        <Marker
+          key={group.key}
+          coordinate={{ latitude: group.lat, longitude: group.lng }}
+          anchor={{ x: 0.5, y: 0.5 }}
+          tracksViewChanges={false}
+          onPress={() => spread(group)}>
+          <ClumpPin color={group.color} count={group.members.length} />
+        </Marker>
+      ))}
+
+      {loners.map((p) => (
         <PlacePin
           key={p.id}
           place={p}
@@ -345,7 +491,9 @@ function Pin({
     생기지만 이것은 어디서나 같은 별입니다.
   */
   if (shape === 'star') {
-    const r = active ? 32 : 27;
+    /* 담아 둔 곳은 한 동네에 여남은 개가 몰립니다. 장소 핀만큼 키우면 서로
+       덮어 몇 개가 있는지도 안 보입니다. 고른 것만 눈에 띄게 둡니다. */
+    const r = active ? 27 : 21;
     return (
       <View
         style={[

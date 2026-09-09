@@ -79,8 +79,11 @@ function starPath(cx: number, cy: number, radius: number) {
  * 앞세울 것이 없어, 어디에 얼마나 담겼는지만 보이면 됩니다.
  */
 function starIcon(color: string, active: boolean) {
-  const r = active ? 17 : 14.5;
-  const stroke = active ? 2.6 : 2.2;
+  /* 담아 둔 곳은 한 동네에 여남은 개가 몰립니다. 장소 핀만큼 키우면 서로
+     덮어 몇 개가 있는지도 안 보입니다. 고른 것만 눈에 띄게 두고 나머지는
+     작게 둡니다. */
+  const r = active ? 13.5 : 10.5;
+  const stroke = active ? 2.4 : 1.9;
   const box = Math.ceil((r + stroke) * 2);
   const c = box / 2;
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${box}" height="${box}" viewBox="0 0 ${box} ${box}">
@@ -89,6 +92,27 @@ function starIcon(color: string, active: boolean) {
  stroke-linejoin="round" stroke-linecap="round"/>
 </svg>`;
   return { url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg), box, center: c };
+}
+
+/**
+ * 가까이 몰린 것들을 하나로 묶은 별.
+ *
+ * <p>같은 골목에 열 곳을 담아 두면 별이 서로 덮여 몇 개가 있는지조차 보이지
+ * 않습니다. 하나로 묶고 그 안에 수를 적습니다. 그러면 "여기 많다" 가 한눈에
+ * 보이고, 눌러서 당기면 흩어집니다.
+ *
+ * <p>수가 많을수록 조금씩 키웁니다 — 세 개와 서른 개가 같은 크기면 묶었다는
+ * 것만 알 뿐 얼마나 몰렸는지는 모릅니다. 다만 끝없이 커지지는 않게 막습니다.
+ */
+function clusterIcon(color: string, count: number) {
+  const r = Math.min(19, 12.5 + Math.log10(count) * 6);
+  const stroke = 2.2;
+  const box = Math.ceil((r + stroke) * 2);
+  const c = box / 2;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${box}" height="${box}" viewBox="0 0 ${box} ${box}">
+<circle cx="${c}" cy="${c}" r="${r}" fill="#FFFFFF" stroke="${color}" stroke-width="${stroke}"/>
+</svg>`;
+  return { url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg), box, center: c, r };
 }
 
 function pinIcon(color: string, active: boolean, visited: boolean, emoji: boolean) {
@@ -288,6 +312,8 @@ export function TripMap({
   const markers = useRef<Map<string, any>>(new Map());
   const circles = useRef<any[]>([]);
   const lines = useRef<any[]>([]);
+  /** 가까운 것들을 대신 가리키는 별. 당기면 흩어지므로 배율마다 다시 만듭니다. */
+  const clusters = useRef<any[]>([]);
 
   /**
    * 마지막으로 화면을 맞춘 장소 묶음.
@@ -672,6 +698,108 @@ export function TripMap({
       map.current.panBy(0, bottomInset / 2);
     }
   }, [here, bottomInset]);
+
+  /*
+    가까이 몰린 별을 하나로 묶습니다.
+
+    보관함은 한 동네에 여남은 곳이 몰리는 일이 흔합니다. 그대로 찍으면 별이
+    서로 덮여 몇 개가 있는지도 모릅니다. 화면에서 몇 픽셀 떨어져 있는지로
+    묶으므로, 당기면 저절로 흩어지고 밀면 다시 뭉칩니다.
+
+    묶는 것은 별 모양일 때뿐입니다. 일정의 물방울 핀은 번호가 순서를 말해
+    주는 것이라 묶으면 그 순서가 사라집니다.
+  */
+  const clump = useCallback(() => {
+    const m = map.current;
+    if (!m || shape !== 'star') {
+      return;
+    }
+    const g = gmaps();
+    const projection = m.getProjection();
+    const zoom = m.getZoom();
+    if (!projection || zoom == null) {
+      return;
+    }
+
+    clusters.current.forEach((c) => c.setMap(null));
+    clusters.current = [];
+
+    /* 구글의 좌표계는 배율 0 에서 256픽셀입니다. 지금 배율만큼 곱하면 화면
+       위의 거리가 됩니다. */
+    const scale = 2 ** zoom;
+    const cell = 46;
+
+    const bins = new Map<string, MapPlace[]>();
+    places.forEach((p) => {
+      /* 고른 것은 묶지 않습니다. 눌러서 고른 별이 숫자 뒤로 사라지면
+         어디를 골랐는지 알 수 없습니다. */
+      if (p.id === activeId) {
+        return;
+      }
+      const pt = projection.fromLatLngToPoint(new g.LatLng(p.lat, p.lng));
+      const key = `${Math.floor((pt.x * scale) / cell)}:${Math.floor((pt.y * scale) / cell)}`;
+      const bin = bins.get(key) ?? [];
+      bin.push(p);
+      bins.set(key, bin);
+    });
+
+    bins.forEach((bin) => {
+      const alone = bin.length < 2;
+      bin.forEach((p) => markers.current.get(p.id)?.setVisible(alone));
+      if (alone) {
+        return;
+      }
+
+      const lat = bin.reduce((n, p) => n + p.lat, 0) / bin.length;
+      const lng = bin.reduce((n, p) => n + p.lng, 0) / bin.length;
+      const made = clusterIcon(bin[0].color, bin.length);
+      const marker = new g.Marker({
+        position: { lat, lng },
+        title: `${bin.length}곳`,
+        map: m,
+        zIndex: 200,
+        icon: {
+          url: made.url,
+          scaledSize: new g.Size(made.box, made.box),
+          anchor: new g.Point(made.center, made.center),
+          labelOrigin: new g.Point(made.center, made.center),
+        },
+        label: {
+          text: String(bin.length),
+          color: bin[0].color,
+          fontSize: '12px',
+          fontWeight: '700',
+        },
+      });
+      /* 누르면 그 안이 다 보일 만큼 당깁니다. 한 단계씩만 당기면 촘촘히
+         몰린 곳은 몇 번을 눌러야 흩어집니다. */
+      marker.addListener('click', () => {
+        const box = new g.LatLngBounds();
+        bin.forEach((p) => box.extend({ lat: p.lat, lng: p.lng }));
+        m.fitBounds(box, 64);
+      });
+      clusters.current.push(marker);
+    });
+  }, [places, activeId, shape]);
+
+  useEffect(() => {
+    if (!ready || !map.current || shape !== 'star') {
+      return;
+    }
+    const m = map.current;
+    clump();
+    /* 배율이나 보는 자리가 바뀌면 다시 묶습니다. idle 은 움직임이 멎은 뒤
+       한 번만 부르므로 끄는 동안 계속 다시 그리지 않습니다. */
+    const off = m.addListener('idle', clump);
+    return () => {
+      off.remove();
+      clusters.current.forEach((c) => c.setMap(null));
+      clusters.current = [];
+      /* 묶기를 그만두면 숨겨 둔 것을 도로 보여 줍니다. 안 그러면 별이
+         통째로 사라진 것처럼 보입니다. */
+      markers.current.forEach((mk) => mk.setVisible(true));
+    };
+  }, [ready, shape, clump]);
 
   /* 고른 장소를 크게 하고, 그 자리로 옮기면서 들여다볼 만큼 당깁니다. */
   useEffect(() => {

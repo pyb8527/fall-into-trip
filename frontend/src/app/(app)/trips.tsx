@@ -17,6 +17,7 @@ import {
   Caption,
   Empty,
   ErrorNote,
+  Field,
   Icon,
   IconButton,
   ListRow,
@@ -68,7 +69,22 @@ export default function Trips() {
   /** 폴더별로 볼 때 열어 둔 폴더. 없으면 폴더들만 늘어놓습니다. */
   const [opened, setOpened] = useState<Folder | null>(null);
 
-  const trips = useMemo(() => data?.trips ?? [], [data]);
+  /*
+    이름으로 거르기.
+
+    게시판에는 찾기를 넣어 두고 정작 내 여행에는 없었습니다. 폴더로 묶는
+    것만으로는 스무 개가 넘어가면 훑어 내려가야 합니다.
+
+    친 대로 바로 거릅니다 — 서버를 부르는 것이 아니라 이미 받아 둔 목록에서
+    골라내는 것이라, 확인을 누르게 할 이유가 없습니다.
+  */
+  const [q, setQ] = useState('');
+
+  const all = useMemo(() => data?.trips ?? [], [data]);
+  const trips = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return needle ? all.filter((t) => t.title.toLowerCase().includes(needle)) : all;
+  }, [all, q]);
   const folders = useMemo(() => folderData?.folders ?? [], [folderData]);
 
   const sections = useMemo(() => (group === 'when' ? byWhen(trips) : []), [group, trips]);
@@ -86,16 +102,31 @@ export default function Trips() {
         <Body tone="secondary">{user?.name ? `${user.name} 님의 일정` : '함께 짜는 일정'}</Body>
       </View>
 
+      {/* 몇 개 안 될 때는 찾을 것이 없습니다. 칸만 자리를 차지합니다. */}
+      {all.length > 4 ? (
+        <Field
+          label="여행 찾기"
+          value={q}
+          onChangeText={setQ}
+          placeholder="오사카, 제주"
+          returnKeyType="search"
+          action={{ icon: 'search', label: '여행 찾기', onPress: () => {} }}
+        />
+      ) : null}
+
       {loading && !data ? <Loading /> : null}
       {error ? <ErrorNote message={error} onRetry={reload} /> : null}
 
-      {data && data.trips.length === 0 ? (
+      {data && all.length === 0 ? (
         <Empty message="아직 여행이 없습니다. 아래에서 하나 만들어 보세요." />
+      ) : null}
+      {data && all.length > 0 && trips.length === 0 ? (
+        <Empty message={`"${q.trim()}" 로 찾은 여행이 없습니다.`} />
       ) : null}
 
       {/* 폴더를 하나라도 만들었으면 여행이 하나뿐이어도 띠를 둡니다. 안 그러면
           폴더에 넣어 놓고도 폴더별로 볼 방법이 없습니다. */}
-      {data && (data.trips.length > 1 || folders.length > 0) ? (
+      {data && (all.length > 1 || folders.length > 0) ? (
         <SegmentedTabs items={GROUPS} value={group} onChange={setGroup} />
       ) : null}
 
