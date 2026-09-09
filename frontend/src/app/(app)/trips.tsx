@@ -96,10 +96,6 @@ export default function Trips() {
       safeTop
       /* 주 동작은 아래에 붙입니다. 한 손으로 쥐었을 때 엄지가 닿는 자리입니다. */
       footer={<Button label="새 여행 만들기" onPress={() => setCreating(true)} />}>
-      {/* 위 막대가 이미 "내 여행" 이라고 적고 있습니다. 본문에 한 번 더 쓰면
-          같은 말이 두 줄을 차지하고, 정작 볼 것은 그만큼 아래로 밀립니다. */}
-      <Body tone="secondary">{user?.name ? `${user.name} 님이 그리는 중` : '함께 그리는 길'}</Body>
-
       {/* 몇 개 안 될 때는 찾을 것이 없습니다. 칸만 자리를 차지합니다. */}
       {all.length > 4 ? (
         <Field
