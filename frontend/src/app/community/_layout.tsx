@@ -1,5 +1,7 @@
 import { Stack } from 'expo-router';
 
+import { stackHeader } from '@/ui/nav';
+
 /**
  * 게시판.
  *
@@ -19,8 +21,8 @@ export const unstable_settings = { anchor: 'index' };
 export default function CommunityLayout() {
   return (
     <Stack>
-      <Stack.Screen name="index" options={{ title: '여행 둘러보기' }} />
-      <Stack.Screen name="[id]" options={{ title: '' }} />
+      <Stack.Screen name="index" options={stackHeader('여행 둘러보기')} />
+      <Stack.Screen name="[id]" options={stackHeader('')} />
     </Stack>
   );
 }

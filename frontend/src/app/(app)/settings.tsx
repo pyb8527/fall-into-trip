@@ -1,8 +1,9 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { api, ApiError, UNEXPECTED } from '@/api/client';
+import { canNotify, notifyState, turnOff, turnOn } from '@/lib/notify';
 import { useAuth } from '@/auth/auth-provider';
 import { USER_MARKS, markOf } from '@/constants/user-marks';
 import { Colors, Radius, Spacing } from '@/constants/theme';
@@ -64,6 +65,8 @@ export default function Settings() {
         <Button label="운영 화면 열기" variant="secondary" onPress={() => router.push('/admin')} />
       ) : null}
 
+      <NotifyCard />
+
       <MarkCard />
 
       <PasswordCard />
@@ -83,6 +86,88 @@ export default function Settings() {
         </Row>
       </Card>
     </Screen>
+  );
+}
+
+/**
+ * 동행자가 고쳤을 때 알려 주기.
+ *
+ * <p>함께 짜는 일정인데 남이 고친 것은 그 화면을 다시 열어야만 알 수
+ * 있었습니다. 출발 전날 동행자가 저녁 자리를 바꿔 놨는데 나는 옛 가게로
+ * 가는 일이 생깁니다.
+ *
+ * <p>못 켜는 자리에서는 이 판을 아예 내지 않습니다. 앱은 아직 안 되고,
+ * 아이폰 사파리는 홈 화면에 얹어야만 됩니다. 눌러서 안 되는 스위치를
+ * 보여 주느니 없는 편이 낫습니다.
+ */
+function NotifyCard() {
+  const [state, setState] = useState<'off' | 'on' | 'blocked'>('off');
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    notifyState().then((got) => {
+      if (alive) {
+        setState(got);
+      }
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  if (!canNotify) {
+    return null;
+  }
+
+  async function toggle() {
+    setFailed(null);
+    setBusy(true);
+    try {
+      if (state === 'on') {
+        await turnOff(api);
+        setState('off');
+        return;
+      }
+      const got = await turnOn(api);
+      setState(got === 'failed' ? 'off' : got);
+      if (got === 'failed') {
+        setFailed('알림을 켜지 못했습니다. 잠시 뒤 다시 눌러 주세요.');
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card>
+      <Subtitle>알림</Subtitle>
+      <Body small tone="secondary">
+        동행자가 일정을 고치면 이 기기로 알려 드립니다. 한 번 고칠 때마다 울리지는 않고, 한동안
+        고친 것을 묶어 한 번만 옵니다.
+      </Body>
+
+      {state === 'blocked' ? (
+        /* 우리가 할 수 있는 것이 없습니다. 어디서 푸는지만 알려 줍니다. */
+        <Caption tone="danger">
+          이 브라우저에서 알림을 막아 두었습니다. 주소창 왼쪽의 자물쇠를 눌러 알림을 허용으로
+          바꾸면 켤 수 있습니다.
+        </Caption>
+      ) : (
+        <Button
+          label={state === 'on' ? '이 기기에서 알림 끄기' : '이 기기에서 알림 받기'}
+          variant={state === 'on' ? 'secondary' : 'primary'}
+          busy={busy}
+          onPress={toggle}
+        />
+      )}
+
+      {state === 'on' ? (
+        <Caption tone="success">켜 두었습니다. 기기마다 따로 켜야 합니다.</Caption>
+      ) : null}
+      {failed ? <ErrorNote message={failed} /> : null}
+    </Card>
   );
 }
 

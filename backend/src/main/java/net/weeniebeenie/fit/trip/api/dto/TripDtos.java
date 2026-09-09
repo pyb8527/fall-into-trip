@@ -27,6 +27,21 @@ public final class TripDtos {
 
     /* ------------------------------------------------------------ 요청 */
 
+    /**
+     * 여행을 밑그림 삼아 새로 하나.
+     *
+     * <p>이름은 비워도 됩니다 — 그러면 원래 이름 뒤에 "(사본)" 을 붙입니다.
+     * 날짜는 반드시 받습니다. 지난 날짜를 물려받으면 만들자마자 다녀온
+     * 여행이 되기 때문입니다.
+     */
+    public record DuplicateTripRequest(
+            @Size(max = 120, message = "여행 이름이 너무 깁니다.")
+            String title,
+
+            @NotBlank(message = "언제 떠날지 정해 주세요.")
+            String startIso) {
+    }
+
     public record CreateTripRequest(
             @NotBlank(message = "여행 이름을 지어 주세요.")
             @Size(max = 120, message = "여행 이름이 너무 깁니다.")

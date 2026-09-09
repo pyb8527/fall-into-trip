@@ -2,6 +2,7 @@ import { Redirect, Stack } from 'expo-router';
 
 import { useAuth } from '@/auth/auth-provider';
 import { Loading, Screen } from '@/ui';
+import { stackHeader } from '@/ui/nav';
 
 /**
  * 주소로 곧장 들어왔을 때 밑에 깔아 둘 화면.
@@ -40,10 +41,10 @@ export default function AdminLayout() {
 
   return (
     <Stack>
-      <Stack.Screen name="index" options={{ title: '운영' }} />
-      <Stack.Screen name="users" options={{ title: '계정 관리' }} />
-      <Stack.Screen name="audit" options={{ title: '감사 로그' }} />
-      <Stack.Screen name="posts" options={{ title: '신고된 것' }} />
+      <Stack.Screen name="index" options={stackHeader('운영')} />
+      <Stack.Screen name="users" options={stackHeader('계정 관리')} />
+      <Stack.Screen name="audit" options={stackHeader('감사 로그')} />
+      <Stack.Screen name="posts" options={stackHeader('신고된 것')} />
     </Stack>
   );
 }

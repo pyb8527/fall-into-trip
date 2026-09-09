@@ -44,6 +44,20 @@ public class TripController {
         return Map.of("trip", TripView.of(trip));
     }
 
+    /**
+     * 이 여행을 밑그림 삼아 새로 하나.
+     *
+     * <p>동행자는 부르지 않고, 다녀온 표시는 지웁니다. 자세한 것은
+     * {@link net.weeniebeenie.fit.trip.application.TripService#duplicate}.
+     */
+    @PostMapping("/trips/{id}/copy")
+    public Map<String, Object> copy(@CurrentUser AuthPrincipal me,
+                                    @PathVariable String id,
+                                    @Valid @RequestBody DuplicateTripRequest req) {
+        Trip made = trips.duplicate(me, id, req.title(), req.startIso());
+        return Map.of("trip", TripView.of(made));
+    }
+
     @PatchMapping("/trips/{id}")
     public Map<String, Object> update(@CurrentUser AuthPrincipal me,
                                       @PathVariable String id,

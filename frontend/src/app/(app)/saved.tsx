@@ -18,6 +18,7 @@ import {
   Caption,
   Chip,
   Empty,
+  Field,
   ErrorNote,
   IconButton,
   ListRow,
@@ -73,10 +74,30 @@ export default function Saved() {
     return PLACE_ICONS.filter((k) => have.has(k.key));
   }, [all]);
 
-  const shown = useMemo(
-    () => (kind === null ? all : all.filter((p) => p.icon === kind)),
-    [all, kind],
-  );
+  /*
+    이름으로 찾기.
+
+    갈래로 거르는 것만으로는 모자랍니다. "식당" 을 눌러도 스무 곳이 남고,
+    그중 이번 일정에 넣을 그 집 하나를 눈으로 찾아야 했습니다. 특히 일정에
+    넣으려고 들어왔을 때는 무엇을 찾는지 이미 알고 있는데도 그렇습니다.
+
+    적어 둔 메모와 갈래까지 함께 봅니다 — "부산 갔을 때 그 국밥집" 처럼
+    이름은 기억나지 않고 메모만 기억나는 일이 있습니다.
+  */
+  const [q, setQ] = useState('');
+
+  const shown = useMemo(() => {
+    const byKind = kind === null ? all : all.filter((p) => p.icon === kind);
+    const needle = q.trim().toLowerCase();
+    if (!needle) {
+      return byKind;
+    }
+    return byKind.filter((p) =>
+      [p.name, p.cat, p.note]
+        .filter(Boolean)
+        .some((field) => String(field).toLowerCase().includes(needle)),
+    );
+  }, [all, kind, q]);
 
   /** 지도에 얹을 것. 거른 것만 올립니다 — 지도와 목록이 어긋나면 안 됩니다. */
   const pins = useMemo<MapPlace[]>(
@@ -179,6 +200,18 @@ export default function Saved() {
         />
       ) : null}
 
+      {/* 몇 개 안 될 때는 찾을 것이 없습니다. 칸만 자리를 차지합니다. */}
+      {all.length > 4 ? (
+        <Field
+          label="보석함에서 찾기"
+          value={q}
+          onChangeText={setQ}
+          placeholder="국밥, 온천, 도톤보리"
+          returnKeyType="search"
+          action={{ icon: 'search', label: '보석함에서 찾기', onPress: () => {} }}
+        />
+      ) : null}
+
       {/* 갈래가 둘 이상일 때만 거르기를 둡니다. 하나뿐이면 누를 것이 없습니다. */}
       {kinds.length > 1 ? (
         <Row gap={Spacing.xs}>
@@ -195,7 +228,11 @@ export default function Saved() {
       ) : null}
 
       {data && all.length > 0 && shown.length === 0 ? (
-        <Empty message="이 갈래에는 아직 없습니다." />
+        <Empty
+          message={
+            q.trim() ? `"${q.trim()}" 로는 찾은 것이 없습니다.` : '이 갈래에는 아직 없습니다.'
+          }
+        />
       ) : null}
 
       {/*
@@ -319,6 +356,8 @@ function PourSheet({
   onCancel: () => void;
 }) {
   const [trip, setTrip] = useState<TripSummary | null>(null);
+  /** 여행 고르는 칸에서 이름으로 거르기. */
+  const [pick, setPick] = useState('');
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
 
@@ -361,15 +400,29 @@ function PourSheet({
 
       {failed ? <ErrorNote message={failed} /> : null}
 
+      {/* 여행이 여럿이면 여기서도 훑어 내려가야 합니다. 다섯을 넘을 때만 냅니다. */}
+      {trip === null && (trips?.trips.length ?? 0) > 5 ? (
+        <Field
+          label="여행 찾기"
+          value={pick}
+          onChangeText={setPick}
+          placeholder="오사카, 제주"
+          returnKeyType="search"
+          action={{ icon: 'search', label: '여행 찾기', onPress: () => {} }}
+        />
+      ) : null}
+
       {trip === null
-        ? trips?.trips.map((t) => (
+        ? (trips?.trips ?? [])
+            .filter((t) => t.title.toLowerCase().includes(pick.trim().toLowerCase()))
+            .map((t) => (
             <ListRow
               key={t.id}
               title={t.title}
               subtitle={`${t.dayCount}일 · 장소 ${t.placeCount}곳`}
               onPress={() => setTrip(t)}
             />
-          ))
+            ))
         : null}
 
       {trip !== null ? (

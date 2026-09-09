@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { useFocusEffect } from 'expo-router';
+
 import { ApiError, UNEXPECTED } from '@/api/client';
 
 /**
@@ -58,6 +60,27 @@ export function useAsync<T>(load: (signal: AbortSignal) => Promise<T>, deps: unk
   }, deps);
 
   useEffect(() => run(), [run]);
+
+  /*
+    화면으로 돌아오면 다시 가져옵니다.
+
+    뒤로 가기로 목록에 돌아왔을 때가 문제였습니다. 화면이 살아 있는 채로
+    가려져 있다가 도로 보이는 것뿐이라 다시 가져올 일이 없고, 방금 만든
+    여행도 방금 지운 장소도 목록에는 옛것 그대로였습니다. 새로고침을 눌러야
+    맞아졌는데, 그건 사용자가 알아서 할 일이 아닙니다.
+
+    처음 뜰 때는 건너뜁니다 — 바로 위 useEffect 가 이미 가져왔습니다.
+  */
+  const firstFocus = useRef(true);
+  useFocusEffect(
+    useCallback(() => {
+      if (firstFocus.current) {
+        firstFocus.current = false;
+        return;
+      }
+      run();
+    }, [run]),
+  );
 
   return { data, error, loading, reload: run, setData };
 }

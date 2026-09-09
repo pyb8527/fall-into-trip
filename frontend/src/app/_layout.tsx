@@ -1,4 +1,4 @@
-import { Stack, ThemeProvider, useRouter, type Theme as NavTheme } from 'expo-router';
+import { Stack, ThemeProvider, type Theme as NavTheme } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
@@ -6,7 +6,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AuthProvider, useAuth } from '@/auth/auth-provider';
 import { Colors, Fonts, Type, Weight } from '@/constants/theme';
-import { IconButton } from '@/ui';
+import { stackHeader } from '@/ui/nav';
 
 /**
  * 앱 전체를 감싸는 껍데기.
@@ -50,46 +50,6 @@ const navigationTheme: NavTheme = {
   },
 };
 
-/**
- * 여행에 딸린 화면들 — 여행 중 · 가고 싶은 곳 · 여행 카드.
- *
- * <p>이 셋은 늘 어떤 여행 하나에 붙어 있습니다. 그런데 주소를 새로고침하거나
- * 링크로 곧장 들어오면 밑에 쌓인 것이 없어 돌아갈 화살표가 아예 생기지
- * 않습니다. 그때는 그 여행의 일정 화면으로 돌려보냅니다.
- *
- * <p>쌓인 것이 있으면 손대지 않고 네비게이션이 만든 것을 그대로 씁니다.
- */
-function backToTrip(title: string) {
-  return ({
-    navigation,
-    route,
-  }: {
-    navigation: { canGoBack: () => boolean };
-    route: { params?: object };
-  }) => ({
-    title,
-    headerLeft: navigation.canGoBack() ? undefined : () => <ToTrip route={route} />,
-  });
-}
-
-function ToTrip({ route }: { route: { params?: object } }) {
-  const router = useRouter();
-  const params = route.params as { id?: unknown } | undefined;
-  const id = typeof params?.id === 'string' ? params.id : null;
-  return (
-    <IconButton
-      name="chevron-left"
-      label="일정으로"
-      bare
-      onPress={() =>
-        id
-          ? router.replace({ pathname: '/trip/[id]', params: { id } })
-          : router.replace('/(app)/trips')
-      }
-    />
-  );
-}
-
 export default function RootLayout() {
   return (
     /* 노치·홈 인디케이터 크기를 화면들이 물어볼 수 있게 가장 바깥에 둡니다. */
@@ -114,10 +74,10 @@ export default function RootLayout() {
             <Stack.Screen name="index" options={{ headerShown: false }} />
             <Stack.Screen name="(auth)" options={{ headerShown: false }} />
             <Stack.Screen name="(app)" options={{ headerShown: false }} />
-            <Stack.Screen name="trip/[id]" options={{ title: '일정' }} />
-            <Stack.Screen name="travel/[id]" options={backToTrip('여행 중')} />
-            <Stack.Screen name="vote/[id]" options={backToTrip('가고 싶은 곳')} />
-            <Stack.Screen name="card/[id]" options={backToTrip('여행 카드')} />
+            <Stack.Screen name="trip/[id]" options={stackHeader('일정')} />
+            <Stack.Screen name="travel/[id]" options={stackHeader('여행 중', { toTrip: true })} />
+            <Stack.Screen name="vote/[id]" options={stackHeader('가고 싶은 곳', { toTrip: true })} />
+            <Stack.Screen name="card/[id]" options={stackHeader('여행 카드', { toTrip: true })} />
             <Stack.Screen name="community" options={{ headerShown: false }} />
             <Stack.Screen name="admin" options={{ headerShown: false }} />
           </Stack>

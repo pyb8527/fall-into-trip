@@ -13,6 +13,7 @@ import net.weeniebeenie.fit.trip.application.PlaceService;
 import net.weeniebeenie.fit.trip.application.PlaceService.PlaceDraft;
 import net.weeniebeenie.fit.trip.application.RouteService;
 import net.weeniebeenie.fit.trip.domain.Place;
+import net.weeniebeenie.fit.trip.domain.RouteTidy;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -89,6 +90,23 @@ public class PlaceController {
     public Map<String, Object> delete(@CurrentUser AuthPrincipal me, @PathVariable String id) {
         places.delete(me, id);
         return Map.of("ok", true);
+    }
+
+    /**
+     * 이 날을 이렇게 돌면 덜 걷는다는 제안.
+     *
+     * <p>보기만 합니다. 받아들이면 화면이 아래 reorder 로 저장합니다.
+     */
+    @GetMapping("/tidy")
+    public Map<String, Object> tidy(@CurrentUser AuthPrincipal me, @RequestParam String dayId) {
+        RouteTidy.Tidied made = places.tidy(me, dayId);
+        return Map.of(
+                "placeIds", made.order().stream().map(Place::getId).toList(),
+                /* 미터로 내보냅니다. "3.2km" 같은 꾸밈은 화면이 합니다 —
+                   나라마다 부르는 단위가 다릅니다. */
+                "beforeMeters", Math.round(made.beforeMeters()),
+                "afterMeters", Math.round(made.afterMeters()),
+                "worthIt", made.worthIt());
     }
 
     @PostMapping("/reorder")

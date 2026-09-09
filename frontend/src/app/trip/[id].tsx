@@ -35,8 +35,10 @@ import { iconOf } from '@/constants/place-icons';
 import { faceOf } from '@/constants/user-marks';
 import { metersBetween, SAME_SPOT } from '@/lib/geo';
 import { openDirections } from '@/lib/directions';
+import { canPrint, printItinerary } from '@/lib/print';
 import { useHere } from '@/lib/here';
 import { decodePolyline } from '@/lib/polyline';
+import { DateField } from '@/ui/date-field';
 import { Colors, dayColor, Gutter, Radius, Spacing, Tap } from '@/constants/theme';
 import {
   Badge,
@@ -52,6 +54,7 @@ import {
   type DragSheetHandle,
   Empty,
   ErrorNote,
+  Field,
   Icon,
   IconButton,
   type IconName,
@@ -142,6 +145,7 @@ export default function TripScreen() {
     sheet.current?.reveal(rowNodes.current.get(placeId));
   }, []);
 
+  const [cloning, setCloning] = useState(false);
   const [planted, setPlanted] = useState(0);
   /** 꽂은 자리에 이미 깃발을 꽂아 두고 있던 동행자. 없으면 null. */
   const [plantedWith, setPlantedWith] = useState<string | null>(null);
@@ -906,6 +910,37 @@ export default function TripScreen() {
           ) : null,
         )}
 
+        {/*
+          같은 데를 또 가는 일은 흔합니다. 매년 가는 곳, 이번엔 다른 사람과
+          가는 곳. 그때마다 스무 곳을 다시 찾아 넣게 하면 그 자체가 일입니다.
+
+          동행자로 들어온 여행도 뜹니다 — 함께 짠 것을 내 것으로 하나 떠 두는
+          것은 자연스러운 일입니다.
+        */}
+        <Divider />
+        <Button
+          label="이 일정으로 새 여행 만들기"
+          variant="secondary"
+          onPress={() => setCloning(true)}
+        />
+
+        {/*
+          종이로 한 장.
+
+          길에서 배터리가 나가도, 데이터가 안 터지는 지하철에서도 보입니다.
+          숙소에 붙여 두면 동행자가 저마다 폰을 꺼내지 않아도 됩니다.
+
+          앱에서는 아직 못 하는 일이라 단추 자체를 내지 않습니다 — 눌러서
+          안 되는 것을 보여 주느니 없는 편이 낫습니다.
+        */}
+        {canPrint ? (
+          <Button
+            label="일정 한 장 인쇄"
+            variant="secondary"
+            onPress={() => printItinerary(data)}
+          />
+        ) : null}
+
         {/* 되돌릴 수 없는 일이라 맨 아래, 손이 잘 닿지 않는 자리에 둡니다. */}
         {mine ? (
           <>
@@ -914,6 +949,19 @@ export default function TripScreen() {
           </>
         ) : null}
       </DragSheet>
+
+      <CloneSheet
+        visible={cloning}
+        tripId={id}
+        title={data.trip.title}
+        onCancel={() => setCloning(false)}
+        onDone={(made) => {
+          setCloning(false);
+          /* 만들었으면 바로 그리로 갑니다. 목록에서 다시 찾게 하면 방금
+             만든 것이 어디 있는지 헤맵니다. */
+          router.replace({ pathname: '/trip/[id]', params: { id: made } });
+        }}
+      />
 
       <BottomSheet visible={flags} title="꽂아 둔 깃발" onClose={() => setFlags(false)}>
         <Caption tone="secondary">
@@ -1192,6 +1240,75 @@ function DayCard({
     }
   }
 
+  /*
+    이렇게 돌면 덜 걷는다는 제안.
+
+    손으로 넣다 보면 지도에서 갈지자가 됩니다. 생각난 순서대로 넣게 되니
+    어쩔 수 없는 일이라, 다 넣은 뒤 한 번 정리해 주는 편이 맞습니다.
+
+    바로 바꾸지 않습니다. 얼마나 짧아지는지 보여 주고 사람이 정합니다 —
+    시간을 안 적어 둔 곳들의 순서에는 "여기 들렀다 저녁 먹으러" 같은 뜻이
+    담겨 있을 수 있고, 그것은 서버가 알 길이 없습니다.
+  */
+  const [tidy, setTidy] = useState<Tidy | null>(null);
+  const [tidying, setTidying] = useState(false);
+  /*
+    바꾸기 전의 순서.
+
+    바꾸고 나서야 "아 이게 아닌데" 를 아는 일이 많습니다. 지도에서 보면
+    짧아 보여도 실제로는 문 여는 시간이 있고, 저 골목은 저녁에 가야 하고.
+    한 번 되돌릴 수 있어야 마음 놓고 눌러 봅니다.
+  */
+  const [undo, setUndo] = useState<Place[] | null>(null);
+
+  async function askTidy() {
+    setTidying(true);
+    try {
+      const got = await api.get<Tidy>(`/api/places/tidy?dayId=${encodeURIComponent(day.id)}`);
+      setTidy(got);
+    } catch {
+      /* 제안일 뿐이라 못 받아도 화면을 어지럽히지 않습니다. */
+    } finally {
+      setTidying(false);
+    }
+  }
+
+  async function applyTidy() {
+    if (!tidy) {
+      return;
+    }
+    const byId = new Map(day.places.map((p) => [p.id, p]));
+    const next = tidy.placeIds.map((pid) => byId.get(pid)).filter(Boolean) as Place[];
+    const was = order;
+    setTidy(null);
+    setOrder(next);
+    try {
+      await api.post('/api/places/reorder', { dayId: day.id, placeIds: next.map((p) => p.id) });
+      setUndo(was);
+      onChanged();
+    } catch {
+      setOrder(was);
+    }
+  }
+
+  /** 바꾸기 전으로. */
+  async function undoTidy() {
+    if (!undo) {
+      return;
+    }
+    const was = undo;
+    setUndo(null);
+    setOrder(was);
+    try {
+      await api.post('/api/places/reorder', { dayId: day.id, placeIds: was.map((p) => p.id) });
+      onChanged();
+    } catch {
+      /* 못 되돌렸으면 화면도 그대로 둡니다. 화면만 옛 순서로 두면 다음에
+         열 때 슬쩍 되돌아가 있습니다. */
+      setUndo(was);
+    }
+  }
+
   const done = day.places.filter((p) => visited.has(p.id)).length;
   const color = day.color || dayColor(index);
 
@@ -1216,6 +1333,18 @@ function DayCard({
               {done}/{day.places.length}
             </Caption>
           ) : null}
+          {/* 셋은 있어야 순서를 바꿀 여지가 생깁니다. 둘이면 갈 데가 하나뿐입니다. */}
+          {canEdit && day.places.length > 2 ? (
+            <IconButton
+              name="shuffle"
+              label={`${day.date || day.label} 동선 정리`}
+              disabled={tidying}
+              onPress={() => {
+                setFolded(false);
+                askTidy();
+              }}
+            />
+          ) : null}
           {canEdit ? (
             <IconButton
               name="plus"
@@ -1235,6 +1364,65 @@ function DayCard({
             <Body small tone="secondary">
               {day.theme}
             </Body>
+          ) : null}
+
+          {/*
+            제안을 받았을 때만 뜹니다. 얼마나 짧아지는지 적어 두지 않으면
+            무엇을 받아들이는 것인지 모르는 채로 누르게 됩니다.
+          */}
+          {tidy ? (
+            <Card style={styles.tidyCard}>
+              {tidy.worthIt ? (
+                <>
+                  <Body small strong>
+                    이렇게 돌면 {km(tidy.beforeMeters - tidy.afterMeters)} 덜 걷습니다.
+                  </Body>
+                  <Caption tone="secondary">
+                    {km(tidy.beforeMeters)} → {km(tidy.afterMeters)} · 시간을 적어 둔 곳은
+                    그대로 둡니다.
+                  </Caption>
+                  <Row gap={Spacing.sm}>
+                    <Button label="이대로 바꾸기" compact onPress={applyTidy} />
+                    <Button
+                      label="그냥 두기"
+                      variant="ghost"
+                      compact
+                      onPress={() => setTidy(null)}
+                    />
+                  </Row>
+                </>
+              ) : (
+                <>
+                  <Body small strong>
+                    지금 순서로도 충분히 짧습니다.
+                  </Body>
+                  <Row gap={Spacing.sm}>
+                    <Button
+                      label="알겠습니다"
+                      variant="ghost"
+                      compact
+                      onPress={() => setTidy(null)}
+                    />
+                  </Row>
+                </>
+              )}
+            </Card>
+          ) : null}
+
+          {/*
+            바꾼 뒤에도 한 번은 물러설 수 있어야 합니다. 지도에서 짧아 보여도
+            문 여는 시간이 있고, 저 골목은 저녁에 가야 하는 일이 있습니다.
+          */}
+          {undo ? (
+            <Card style={styles.tidyCard}>
+              <Body small strong>
+                동선을 다시 세웠습니다.
+              </Body>
+              <Row gap={Spacing.sm}>
+                <Button label="이대로 갑니다" compact onPress={() => setUndo(null)} />
+                <Button label="되돌리기" variant="ghost" compact onPress={undoTidy} />
+              </Row>
+            </Card>
           ) : null}
 
           {day.places.length === 0 ? (
@@ -1823,7 +2011,95 @@ function outsideHours(at: string, spans: { start: string; end?: string | null }[
   });
 }
 
+/** 동선 정리 제안. 서버가 재 보고 "이렇게 돌면 얼마나 덜 걷는다" 를 돌려줍니다. */
+type Tidy = {
+  placeIds: string[];
+  beforeMeters: number;
+  afterMeters: number;
+  /** 눈에 띄게 짧아지는지. 몇 미터 차이로 바꾸자고 물으면 성가십니다. */
+  worthIt: boolean;
+};
+
+/**
+ * 거리를 사람이 읽는 말로.
+ *
+ * <p>1km 아래는 미터로, 그 위는 소수 한 자리까지. "3247m" 는 읽으라고 쓴
+ * 글자가 아닙니다.
+ */
+function km(meters: number) {
+  return meters < 1000 ? `${Math.round(meters)}m` : `${(meters / 1000).toFixed(1)}km`;
+}
+
+/**
+ * 이 일정으로 새 여행 하나.
+ *
+ * <p>날짜는 반드시 새로 받습니다. 지난 날짜를 그대로 물려받으면 만들자마자
+ * 이미 다녀온 여행이 됩니다. 첫날만 정하면 나머지가 그 간격 그대로 따라옵니다.
+ */
+function CloneSheet({
+  visible,
+  tripId,
+  title,
+  onDone,
+  onCancel,
+}: {
+  visible: boolean;
+  tripId: string;
+  title: string;
+  onDone: (tripId: string) => void;
+  onCancel: () => void;
+}) {
+  const [name, setName] = useState('');
+  const [startIso, setStartIso] = useState(todayIso);
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
+
+  async function submit() {
+    setFailed(null);
+    setBusy(true);
+    try {
+      const res = await api.post<{ trip: { id: string } }>(`/api/trips/${tripId}/copy`, {
+        title: name.trim() || null,
+        startIso,
+      });
+      onDone(res.trip.id);
+    } catch (e) {
+      setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <BottomSheet
+      visible={visible}
+      title="이 일정으로 새 여행"
+      onClose={onCancel}
+      footer={<Button label="만들기" onPress={submit} busy={busy} />}>
+      <Caption tone="secondary">
+        「{title}」 의 날짜와 장소가 그대로 옮겨집니다. 동행자는 부르지 않고, 다녀온 표시는
+        지웁니다 — 아직 가지 않은 여행이니까요.
+      </Caption>
+      <Field
+        label="새 이름"
+        value={name}
+        onChangeText={setName}
+        placeholder={`${title} (사본)`}
+        maxLength={120}
+      />
+      <DateField label="떠나는 날" value={startIso} onChange={setStartIso} />
+      {failed ? <ErrorNote message={failed} /> : null}
+    </BottomSheet>
+  );
+}
+
 const styles = StyleSheet.create({
+  /* 제안은 목록 위에 얹힙니다. 줄들과 같은 결이면 그중 하나로 읽혀
+     지나칩니다. */
+  tidyCard: {
+    gap: Spacing.sm,
+    backgroundColor: Colors.accentSoft,
+  },
   screen: {
     flex: 1,
     backgroundColor: Colors.abyss,

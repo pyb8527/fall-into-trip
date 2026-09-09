@@ -6,6 +6,7 @@ import net.weeniebeenie.fit.shared.domain.Coordinates;
 import net.weeniebeenie.fit.shared.domain.Versioned;
 import net.weeniebeenie.fit.shared.error.ApiException;
 import net.weeniebeenie.fit.support.audit.AuditService;
+import net.weeniebeenie.fit.support.push.PushService;
 import net.weeniebeenie.fit.trip.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,8 +26,27 @@ public class PlaceService {
 
     private final PlaceRepository places;
     private final DayRepository days;
+    private final TripMemberRepository members;
     private final TripAccessPolicy access;
     private final AuditService audit;
+    private final PushService push;
+
+    /**
+     * 함께 짜는 사람들에게 "누가 무엇을 고쳤다" 고 알립니다.
+     *
+     * <p>고친 사람에게는 가지 않고, 한동안은 여행마다 한 번만 갑니다 —
+     * 자세한 것은 {@link PushService#tell}.
+     *
+     * <p>알림이 실패해도 고친 것은 이미 저장되어 있습니다. 알리는 일 때문에
+     * 고치는 일이 막히면 앞뒤가 바뀝니다.
+     */
+    private void announce(AuthPrincipal me, String tripId, String what) {
+        List<String> people = members.findAllByIdTripId(tripId).stream()
+                .map(m -> m.getId().getUserId())
+                .toList();
+        push.tell(people, me.id(), tripId, me.name() + " 님이 일정을 고쳤습니다", what,
+                "/trip/" + tripId);
+    }
 
     @Transactional
     public Place create(AuthPrincipal me, String dayId, PlaceDraft draft) {
@@ -61,6 +81,7 @@ public class PlaceService {
 
         resort(day.getId());
         audit.log(me.id(), "place.create", place.getId(), Map.of("name", name, "day", day.getLabel()));
+        announce(me, day.getTripId(), day.getLabel() + "에 「" + name + "」 를 넣었습니다.");
         return place;
     }
 
@@ -114,6 +135,8 @@ public class PlaceService {
         place.touch(me.id());
         resort(place.getDayId());
         audit.log(me.id(), "place.update", place.getId(), Map.of("name", place.getName()));
+        days.findById(place.getDayId()).ifPresent(d ->
+                announce(me, d.getTripId(), "「" + place.getName() + "」 를 고쳤습니다."));
         return place;
     }
 
@@ -128,6 +151,23 @@ public class PlaceService {
         places.delete(place);
         resort(day.getId());
         audit.log(me.id(), "place.delete", place.getId(), Map.of("name", place.getName()));
+        announce(me, day.getTripId(), "「" + place.getName() + "」 를 뺐습니다.");
+    }
+
+    /**
+     * 이렇게 돌면 덜 걷습니다 — 하는 제안.
+     *
+     * <p>저장하지 않습니다. 사람이 보고 받아들일지 정합니다. 받아들이면
+     * 화면이 {@link #reorder} 를 부릅니다 — 손으로 끌어 옮긴 것과 똑같은
+     * 길로 들어가므로, 저장하는 자리는 여전히 하나뿐입니다.
+     */
+    @Transactional(readOnly = true)
+    public RouteTidy.Tidied tidy(AuthPrincipal me, String dayId) {
+        Day day = days.findById(dayId)
+                .orElseThrow(() -> ApiException.notFound("날짜를 찾을 수 없습니다."));
+        access.requireCanRead(day.getTripId(), me.id());
+
+        return RouteTidy.tidy(places.findAllByDayIdOrderBySortAsc(dayId));
     }
 
     /** 손으로 끌어 옮긴 순서를 그대로 저장합니다. */
@@ -145,6 +185,7 @@ public class PlaceService {
             p.setSort(i);
         }
         audit.log(me.id(), "place.reorder", dayId);
+        announce(me, day.getTripId(), day.getLabel() + " 순서를 바꿨습니다.");
     }
 
     /**

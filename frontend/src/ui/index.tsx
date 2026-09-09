@@ -733,6 +733,9 @@ export function MenuCard({
 /** 쓰는 아이콘 이름만 열어 둡니다. 아무거나 부르면 화면마다 결이 흐트러집니다. */
 export type IconName =
   | 'check'
+  | 'home'
+  /* 동선 정리. 순서를 다시 세운다는 뜻으로 이만한 그림이 없습니다. */
+  | 'shuffle'
   | 'edit-2'
   | 'trash-2'
   | 'settings'
@@ -931,6 +934,72 @@ export function BottomSheet({
 }) {
   const insets = useSafeAreaInsets();
   const keyboardUp = useKeyboardUp();
+  const { height: screenHeight } = useWindowDimensions();
+
+  /*
+    끌어서 닫고, 끌어서 넓히기.
+
+    판을 닫으려면 X 를 누르거나 바깥을 눌러야 했습니다. X 는 화면 위쪽
+    구석이라 한 손으로 쥐었을 때 엄지가 안 닿고, 바깥은 판이 화면을 거의
+    다 덮으면 누를 자리가 얼마 없습니다. 폰에서 판을 닫는 몸짓은 아래로
+    쓸어내리는 것입니다.
+
+    위로 끌면 넓어집니다. 목록이 긴 판(장소 고르기 같은)은 처음 높이가
+    내용에 맞춰 정해지는데, 그것으로 모자랄 때 한 번 끌어올리면 끝까지
+    펴집니다.
+  */
+  const slide = useRef(new Animated.Value(0)).current;
+  const [tall, setTall] = useState(false);
+  const tallRef = useRef(false);
+  tallRef.current = tall;
+
+  /* 다시 열 때는 처음 자리에서. 끌어 내리다 만 채로 닫혔으면 그 자리가
+     남아 있어 다음에 열 때 반쯤 내려간 판이 뜹니다. */
+  useEffect(() => {
+    if (visible) {
+      slide.setValue(0);
+      setTall(false);
+    }
+  }, [visible, slide]);
+
+  const drag = useRef(
+    PanResponder.create({
+      /* 세로로 어느 정도 움직였을 때만 잡습니다. 그러지 않으면 머리의
+         닫기 단추를 누르려는 것까지 끌기로 오해합니다. */
+      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 6,
+      onPanResponderMove: (_, g) => {
+        if (g.dy >= 0) {
+          slide.setValue(g.dy);
+          return;
+        }
+        /* 위로는 넓어지는 것으로 갚습니다. 판이 천장을 뚫고 올라가면
+           고장 난 것처럼 보입니다. */
+        if (!tallRef.current) {
+          setTall(true);
+        }
+        slide.setValue(g.dy * 0.12);
+      },
+      onPanResponderRelease: (_, g) => {
+        /* 세게 튕겼으면 얼마나 내려왔는지보다 방향을 봅니다. 살짝
+           쓸어내려도 닫히는 편이 몸에 익은 동작입니다. */
+        if (g.dy > 120 || g.vy > 0.7) {
+          Animated.timing(slide, {
+            toValue: screenHeight,
+            duration: Motion.tap,
+            useNativeDriver: true,
+          }).start(onClose);
+          return;
+        }
+        Animated.spring(slide, {
+          toValue: 0,
+          damping: Motion.spring.damping,
+          stiffness: Motion.spring.stiffness,
+          mass: Motion.spring.mass,
+          useNativeDriver: true,
+        }).start();
+      },
+    }),
+  ).current;
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -943,16 +1012,24 @@ export function BottomSheet({
         {/* 바깥을 누르면 닫힙니다. */}
         <Pressable style={styles.sheetBackdrop} onPress={onClose} accessibilityLabel="닫기" />
 
-        <View
+        <Animated.View
           style={[
             styles.sheet,
-            { paddingBottom: (keyboardUp ? 0 : insets.bottom) + Spacing.md },
+            tall ? styles.sheetTall : null,
+            {
+              paddingBottom: (keyboardUp ? 0 : insets.bottom) + Spacing.md,
+              transform: [{ translateY: slide }],
+            },
           ]}>
-          <View style={styles.sheetGrip} />
+          {/* 손잡이와 제목 줄까지가 끄는 자리입니다. 손잡이만 잡게 하면
+              손가락으로는 잘 안 맞습니다. */}
+          <View {...drag.panHandlers}>
+            <View style={styles.sheetGrip} />
 
-          <View style={styles.sheetHead}>
-            <Subtitle>{title}</Subtitle>
-            <IconButton name="x" label="닫기" onPress={onClose} />
+            <View style={styles.sheetHead}>
+              <Subtitle>{title}</Subtitle>
+              <IconButton name="x" label="닫기" onPress={onClose} />
+            </View>
           </View>
 
           <ScrollView
@@ -964,7 +1041,7 @@ export function BottomSheet({
           </ScrollView>
 
           {footer ? <View style={styles.sheetFoot}>{footer}</View> : null}
-        </View>
+        </Animated.View>
       </KeyboardAvoidingView>
     </Modal>
   );
@@ -1750,6 +1827,11 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.md,
     /* 화면을 다 덮지 않습니다. 뒤가 조금 보여야 어디로 돌아가는지 압니다. */
     maxHeight: '88%',
+  },
+  /* 위로 한 번 끌어올렸을 때. 내용이 짧아도 끝까지 폅니다 — 끌어올렸는데
+     아무것도 안 움직이면 안 되는 줄 압니다. */
+  sheetTall: {
+    height: '88%',
   },
   sheetGrip: {
     alignSelf: 'center',

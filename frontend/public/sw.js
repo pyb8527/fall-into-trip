@@ -116,3 +116,66 @@ self.addEventListener('fetch', (event) => {
     );
   }
 });
+
+/* ==========================================================================
+   알림
+   --------------------------------------------------------------------------
+   동행자가 일정을 고치면 서버가 여기로 한 줄 보냅니다. 화면이 닫혀 있어도
+   워커는 깨어나므로, 앱을 열어 두지 않아도 받습니다.
+   ========================================================================== */
+
+self.addEventListener('push', (event) => {
+  /*
+    본문이 비어 오는 일이 있습니다. 브라우저가 워커를 깨우려고 빈 것을 보낼
+    때도 있고, 우리가 보낸 것이 어딘가에서 잘릴 때도 있습니다. 그때 아무것도
+    안 띄우면 사용자에게는 그냥 안 온 것이 되는데, 안드로이드는 push 를 받고
+    알림을 안 띄우면 "이 사이트가 몰래 뭔가 했다" 는 딱지를 대신 띄웁니다.
+    그러느니 우리가 한 줄 띄웁니다.
+  */
+  let note = { title: 'FIT', body: '일정에 새 소식이 있습니다.', url: '/' };
+  try {
+    if (event.data) {
+      note = { ...note, ...event.data.json() };
+    }
+  } catch {
+    /* 우리가 보낸 모양이 아닙니다. 위의 기본값으로 띄웁니다. */
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(note.title, {
+      body: note.body,
+      icon: '/icons/icon-192.png',
+      badge: '/icons/icon-192.png',
+      /* 같은 여행의 알림은 겹쳐 씁니다. 다섯 번 고치면 다섯 줄이 쌓이는
+         것이 아니라 마지막 것 하나만 남습니다. */
+      tag: note.url,
+      renotify: false,
+      data: { url: note.url },
+    }),
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const go = (event.notification.data && event.notification.data.url) || '/';
+
+  event.waitUntil(
+    (async () => {
+      /*
+        이미 열려 있는 창이 있으면 그리로 데려갑니다. 누를 때마다 새 창이
+        뜨면 금세 같은 앱이 다섯 개 열립니다.
+      */
+      const open = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      for (const client of open) {
+        if ('focus' in client) {
+          await client.focus();
+          if ('navigate' in client) {
+            await client.navigate(go);
+          }
+          return;
+        }
+      }
+      await self.clients.openWindow(go);
+    })(),
+  );
+});

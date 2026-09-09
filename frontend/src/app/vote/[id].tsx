@@ -17,6 +17,7 @@ import {
   Card,
   ConfirmDialog,
   Divider,
+  Field,
   Empty,
   ErrorNote,
   IconButton,
@@ -218,6 +219,8 @@ function AddSheet({
   onCancel: () => void;
 }) {
   const [failed, setFailed] = useState<string | null>(null);
+  /** 보석함에서 고를 때 이름으로 거르기. */
+  const [pick, setPick] = useState('');
   const { data: saved } = useAsync<{ places: SavedPlace[] }>(
     (signal) => (visible ? api.get('/api/saved', signal) : Promise.resolve({ places: [] })),
     [visible],
@@ -247,14 +250,31 @@ function AddSheet({
         <>
           <Divider />
           <Caption tone="secondary">보석함에서</Caption>
-          {saved.places.map((place) => (
+          {/* 담아 둔 것이 여럿이면 여기서도 훑어 내려가야 합니다. */}
+          {saved.places.length > 5 ? (
+            <Field
+              label="보석함에서 찾기"
+              value={pick}
+              onChangeText={setPick}
+              placeholder="국밥, 온천"
+              returnKeyType="search"
+              action={{ icon: 'search', label: '보석함에서 찾기', onPress: () => {} }}
+            />
+          ) : null}
+          {saved.places
+            .filter((place) =>
+              [place.name, place.cat, place.note]
+                .filter(Boolean)
+                .some((f) => String(f).toLowerCase().includes(pick.trim().toLowerCase())),
+            )
+            .map((place) => (
             <ListRow
               key={place.id}
               title={`${iconOf(place.icon)} ${place.name}`.trim()}
               subtitle={place.note ?? place.cat ?? '메모 없음'}
               onPress={() => add({ savedId: place.id })}
             />
-          ))}
+            ))}
         </>
       ) : null}
     </BottomSheet>
