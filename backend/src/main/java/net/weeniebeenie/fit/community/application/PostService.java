@@ -434,6 +434,11 @@ public class PostService {
         return posts.findAllByAuthorIdOrderByCreatedAtDesc(me.id(), pageable);
     }
 
+    /** 내가 추천을 눌러 둔 글. 구경하다 담아 둔 것을 되찾는 길입니다. */
+    public Page<TripPost> liked(AuthPrincipal me, Pageable pageable) {
+        return posts.likedBy(me.id(), pageable);
+    }
+
     private static String text(JsonNode node, String field) {
         return node.hasNonNull(field) ? node.path(field).asText() : null;
     }

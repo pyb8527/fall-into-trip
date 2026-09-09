@@ -111,5 +111,31 @@ T("지움", r.status === 200, r.data);
 r = await call("GET", `/api/trip?trip=${tripId}`, { token: me });
 T("나머지 그림 유지", r.data.days[0].places.some(p => p.icon === "onsen"), r.data.days?.[0]?.places);
 
+
+console.log("\n[10] 담아 둔 곳의 그림 바꾸기");
+r = await call("POST", "/api/saved", { token: me, body: { name: "이름표 시험", lat: 34.1, lng: 135.1 } });
+const tagId = r.data.place.id;
+T("그림 없이 담김", r.data.place.icon == null, r.data.place);
+r = await call("PATCH", `/api/saved/${tagId}`, { token: me, body: { icon: "cafe" } });
+T("바꿈", r.data.place.icon === "cafe", r.data.place);
+r = await call("PATCH", `/api/saved/${tagId}`, { token: me, body: { icon: "없는것" } });
+T("모르는 이름은 비움", r.data.place.icon == null, r.data.place);
+r = await call("PATCH", `/api/saved/${tagId}`, { token: stranger, body: { icon: "cafe" } });
+T("남의 것은 못 바꿈", r.status === 404, r.data);
+
+console.log("\n[11] 내가 누른 글");
+r = await call("GET", "/api/posts/liked", { token: stranger });
+T("처음에는 비어 있음", r.status === 200 && r.data.posts.length === 0, r.data);
+r = await call("POST", `/api/posts/${postId}/like?on=true`, { token: stranger });
+T("누름", r.status === 200, r.data);
+r = await call("GET", "/api/posts/liked", { token: stranger });
+T("눌러 둔 것이 나옴", r.data.posts.length === 1 && r.data.posts[0].id === postId, r.data.posts);
+T("누른 것으로 표시됨", r.data.posts[0].liked === true, r.data.posts?.[0]);
+r = await call("POST", `/api/posts/${postId}/like?on=false`, { token: stranger });
+r = await call("GET", "/api/posts/liked", { token: stranger });
+T("떼면 사라짐", r.data.posts.length === 0, r.data.posts);
+r = await call("GET", "/api/posts/liked");
+T("로그인 없이는 못 봄", r.status === 401, r.data);
+
 console.log(`\n결과: ${pass} 통과 / ${fail} 실패`);
 process.exit(fail ? 1 : 0);

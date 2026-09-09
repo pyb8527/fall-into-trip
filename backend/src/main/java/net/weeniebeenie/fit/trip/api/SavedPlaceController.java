@@ -34,6 +34,25 @@ public class SavedPlaceController {
         return Map.of("place", View.of(saved.save(me, draft)));
     }
 
+    /**
+     * 담아 둔 곳의 그림을 바꿉니다.
+     *
+     * <p>담을 때는 구글 갈래로 짐작해 찍어 둡니다. 대개 맞지만 틀릴 때가
+     * 있고, 무엇보다 "이건 나한테 온천이 아니라 사진 찍을 곳" 처럼 쓰는 사람이
+     * 달리 보고 싶을 수 있습니다. 지우고 다시 담게 하지 않습니다.
+     */
+    @PatchMapping("/api/saved/{savedId}")
+    public Map<String, Object> retag(@CurrentUser AuthPrincipal me,
+                                     @PathVariable String savedId,
+                                     @RequestBody IconRequest req) {
+        return Map.of("place",
+                View.of(saved.retag(me, savedId, req == null ? null : req.icon())));
+    }
+
+    /** 빈 문자열은 "그림 빼기" 입니다. */
+    public record IconRequest(String icon) {
+    }
+
     @DeleteMapping("/api/saved/{savedId}")
     public Map<String, Object> remove(@CurrentUser AuthPrincipal me, @PathVariable String savedId) {
         saved.remove(me, savedId);

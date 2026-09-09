@@ -12,6 +12,23 @@ public interface TripPostRepository extends JpaRepository<TripPost, String> {
     Page<TripPost> findAllByAuthorIdOrderByCreatedAtDesc(String authorId, Pageable pageable);
 
     /**
+     * 내가 추천을 눌러 둔 글.
+     *
+     * <p>구경하다 마음에 든 것을 눌러 두고는 나중에 다시 찾지 못했습니다.
+     * 추천은 세는 데만 쓰이고 되찾는 길이 없었습니다.
+     *
+     * <p>감춰진 글은 뺍니다. 눌러 둔 뒤 신고로 내려간 글이 목록에 남아 있으면
+     * 눌렀을 때 없는 글이 됩니다.
+     */
+    @Query("""
+           SELECT p FROM TripPost p
+           WHERE p.hidden = false
+             AND p.id IN (SELECT l.postId FROM PostLike l WHERE l.userId = :userId)
+           ORDER BY p.createdAt DESC
+           """)
+    Page<TripPost> likedBy(@Param("userId") String userId, Pageable pageable);
+
+    /**
      * 걸러 보기.
      *
      * <p>지역·기간·글자를 한 질의로 받습니다. 조건마다 메서드를 따로 두면

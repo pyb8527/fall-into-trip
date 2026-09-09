@@ -7,6 +7,7 @@ import net.weeniebeenie.fit.shared.error.ApiException;
 import net.weeniebeenie.fit.trip.domain.Day;
 import net.weeniebeenie.fit.trip.domain.DayRepository;
 import net.weeniebeenie.fit.trip.domain.Place;
+import net.weeniebeenie.fit.trip.domain.PlaceKind;
 import net.weeniebeenie.fit.trip.domain.PlaceRepository;
 import net.weeniebeenie.fit.trip.domain.SavedPlace;
 import net.weeniebeenie.fit.trip.domain.SavedPlaceRepository;
@@ -91,6 +92,23 @@ public class SavedPlaceService {
                 .note(blankToNull(draft.note()))
                 .fromPost(blankToNull(draft.fromPost()))
                 .build());
+    }
+
+    /**
+     * 담아 둔 곳의 그림만 바꿉니다.
+     *
+     * <p>모르는 이름이면 비웁니다. 화면에서 넘어온 값을 그대로 믿지 않습니다.
+     */
+    @Transactional
+    public SavedPlace retag(AuthPrincipal me, String savedId, String icon) {
+        SavedPlace item = saved.findById(savedId)
+                .orElseThrow(() -> ApiException.notFound("담아 둔 장소를 찾을 수 없습니다."));
+        if (!item.getUserId().equals(me.id())) {
+            /* 남의 보관함이 있다는 것 자체를 알릴 이유가 없습니다. */
+            throw ApiException.notFound("담아 둔 장소를 찾을 수 없습니다.");
+        }
+        item.setIcon(PlaceKind.clean(icon));
+        return item;
     }
 
     @Transactional

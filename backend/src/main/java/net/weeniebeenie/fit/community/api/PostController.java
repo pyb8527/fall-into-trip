@@ -83,6 +83,19 @@ public class PostController {
         return out;
     }
 
+    /** 내가 추천을 눌러 둔 글. */
+    @GetMapping("/liked")
+    public Map<String, Object> liked(@CurrentUser AuthPrincipal me,
+                                     @RequestParam(name = "page", defaultValue = "0") int page) {
+        Page<TripPost> found = posts.liked(me, PageRequest.of(Math.max(0, page), SIZE));
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("posts", posts.cardsOf(found.getContent(), me.id()));
+        out.put("page", found.getNumber());
+        out.put("totalPages", found.getTotalPages());
+        out.put("total", found.getTotalElements());
+        return out;
+    }
+
     @GetMapping("/{postId}")
     public Map<String, Object> read(@CurrentUser AuthPrincipal me, @PathVariable String postId) {
         TripPost post = posts.read(postId);

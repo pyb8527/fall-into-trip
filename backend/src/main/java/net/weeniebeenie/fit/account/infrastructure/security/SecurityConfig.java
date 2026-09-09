@@ -84,7 +84,11 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/places/*/tips").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/posts/*/comments").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/posts/*/map").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/posts/mine").authenticated()
+                        /* 나만 볼 수 있는 것들. 아래 넓은 규칙(/api/posts/*)보다
+                           먼저 적어야 합니다 — 순서가 뒤바뀌면 누구나 남의
+                           목록을 부를 수 있게 됩니다. */
+                        .requestMatchers(HttpMethod.GET, "/api/posts/mine", "/api/posts/liked")
+                        .authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/posts", "/api/posts/*").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/**").authenticated()
