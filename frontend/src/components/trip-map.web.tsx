@@ -178,6 +178,7 @@ export function TripMap({
   goHereAt,
   fitAt,
   shape = 'default',
+  panTo,
 }: TripMapProps) {
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -647,6 +648,21 @@ export function TripMap({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [goHereAt]);
+
+  /** 일정에 없는 자리로 옮깁니다. 꽂아 둔 깃발처럼 고를 id 가 없는 것들. */
+  useEffect(() => {
+    if (!panTo || !ready || !map.current) {
+      return;
+    }
+    map.current.panTo({ lat: panTo.lat, lng: panTo.lng });
+    if ((map.current.getZoom() ?? 0) < FOCUS_ZOOM) {
+      map.current.setZoom(FOCUS_ZOOM);
+    }
+    if (bottomInset > 0) {
+      map.current.panBy(0, bottomInset / 2);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [panTo?.at]);
 
   /** 넣어 둔 곳을 모두 한 화면에. 바깥에서 부릅니다. */
   useEffect(() => {

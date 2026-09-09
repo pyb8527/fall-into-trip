@@ -49,6 +49,7 @@ export function TripMap({
   link = true,
   fitAt,
   shape = 'default',
+  panTo,
 }: TripMapProps) {
   const map = useRef<MapView | null>(null);
   const [full, setFull] = useState(false);
@@ -81,6 +82,23 @@ export function TripMap({
       longitudeDelta: Math.max((maxLng - minLng) * PAD, FOCUS_SPAN),
     };
   }, [places]);
+
+  /** 일정에 없는 자리로 옮깁니다. 꽂아 둔 깃발처럼 고를 id 가 없는 것들. */
+  useEffect(() => {
+    if (!panTo || !map.current) {
+      return;
+    }
+    map.current.animateToRegion(
+      {
+        latitude: panTo.lat,
+        longitude: panTo.lng,
+        latitudeDelta: FOCUS_SPAN,
+        longitudeDelta: FOCUS_SPAN,
+      },
+      300,
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [panTo?.at]);
 
   /** 넣어 둔 곳을 모두 한 화면에. 바깥에서 값을 바꿔 부릅니다. */
   useEffect(() => {

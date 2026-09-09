@@ -117,6 +117,14 @@ export type TripMapProps = {
    * 전부 같은 동그라미에 별 하나라, 어디에 얼마나 담겼는지만 보입니다.
    */
   shape?: 'default' | 'star';
+  /**
+   * 이 자리로 옮겨 달라는 신호.
+   *
+   * <p><code>at</code> 이 바뀔 때마다 지도가 그 좌표로 갑니다. 일정에 없는
+   * 것(꽂아 둔 깃발 같은)을 가리킬 때 씁니다 — 그런 것에는 고를 id 가
+   * 없습니다.
+   */
+  panTo?: { lat: number; lng: number; at: number } | null;
 };
 
 /** 검색으로 찾은 장소. */

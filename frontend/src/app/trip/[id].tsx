@@ -31,6 +31,7 @@ import { Colors, dayColor, Gutter, Radius, Spacing, Tap } from '@/constants/them
 import {
   Badge,
   Body,
+  BottomSheet,
   Button,
   Caption,
   Card,
@@ -42,6 +43,8 @@ import {
   ErrorNote,
   Icon,
   IconButton,
+  type IconName,
+  ListRow,
   Loading,
   Press,
   Row,
@@ -98,6 +101,10 @@ export default function TripScreen() {
   /* "내 위치로" 를 누른 횟수. 값이 바뀌면 지도가 그리로 갑니다. 자리가 아니라
      "눌렀다" 는 것만 넘겨야 같은 자리를 두 번 눌러도 두 번 다 움직입니다. */
   const [goHereAt, setGoHereAt] = useState(0);
+  /** 꽂아 둔 깃발 목록을 열어 두었는지. */
+  const [flags, setFlags] = useState(false);
+  /** 지도를 옮겨 달라고 가리키는 자리. 일정에 없는 것(깃발)을 볼 때 씁니다. */
+  const [lookAt, setLookAt] = useState<{ lat: number; lng: number; at: number } | null>(null);
 
   /* 방문 표시는 나만 보는 것이라, 서버 응답을 기다리지 않고 먼저 칠합니다.
      걸으면서 누르는 것이라 매번 기다리게 하면 손이 멎습니다. */
@@ -533,6 +540,7 @@ export default function TripScreen() {
         chrome={false}
         bottomInset={covered}
         goHereAt={goHereAt}
+        panTo={lookAt}
       />
 
       {/* 막대 바로 아래, 지도 위에 뜨는 날짜 칩. */}
@@ -608,6 +616,26 @@ export default function TripScreen() {
         </View>
       ) : null}
 
+      {/*
+        꽂아 둔 깃발.
+
+        전에는 판 안에 "여기 · 누가 찍음" 을 줄줄이 늘어놓았습니다. 대개 한둘
+        뿐이고 여섯 시간이면 사라지는 것이라, 일정을 보는 내내 자리를 차지할
+        만한 것이 아닙니다. 단추 하나로 접어 두고 눌렀을 때만 펼칩니다.
+      */}
+      {pins.length > 0 ? (
+        <View style={[styles.floatLeft, { bottom: covered + Spacing.md }]}>
+          <IconButton
+            name="flag"
+            label={`꽂아 둔 깃발 ${pins.length}개 보기`}
+            tone="accent"
+            active
+            onMap
+            onPress={() => setFlags(true)}
+          />
+        </View>
+      ) : null}
+
       <DragSheet
         onHeightChange={setCovered}
         peek={
@@ -664,34 +692,7 @@ export default function TripScreen() {
           </Caption>
         ) : null}
 
-        {/*
-          찍어 둔 곳.
 
-          지도에는 네모로 찍히지만 지도만으로는 뺄 수가 없었습니다. 한 사람이
-          다섯까지 찍을 수 있어서, 뺄 길이 없으면 여섯 번째부터는 여섯 시간을
-          기다려야 합니다. 여기에 늘어놓고 내가 찍은 것만 뺄 수 있게 합니다.
-        */}
-        {pins.length > 0 ? (
-          <View style={styles.live}>
-            <Caption tone="secondary">
-              여기 있다고 찍어 둔 곳 {pins.length}곳 · 여섯 시간 뒤 저절로 사라집니다
-            </Caption>
-            {pins.map((pin) => (
-              <Row key={pin.id} style={styles.pinRow}>
-                <Caption tone={pin.mine ? 'default' : 'secondary'} numberOfLines={1}>
-                  {pin.label || '여기'} · {pin.mine ? '내가' : `${pin.authorName} 님이`} 찍음
-                </Caption>
-                {pin.mine ? (
-                  <IconButton
-                    name="x"
-                    label="찍어 둔 것 빼기"
-                    onPress={() => pullPin(pin.id)}
-                  />
-                ) : null}
-              </Row>
-            ))}
-          </View>
-        ) : null}
 
         {/*
           가끔 쓰는 것들.
@@ -699,35 +700,28 @@ export default function TripScreen() {
           맨 아래에 두었더니 날짜가 여럿인 여행에서는 한참 굴려야 닿아서, 있는
           줄도 모르고 지나갔습니다. 판을 열면 바로 보이는 자리로 올립니다.
         */}
-        <Row gap={Spacing.xs}>
+        <Row gap={Spacing.xs} style={styles.shortcuts}>
           {/* 길 위에서는 짜는 화면이 방해입니다. 지금 갈 곳만 크게 보는 쪽으로
               넘어갑니다. */}
-          <Button
-            label="여행 중 화면"
-            variant="secondary"
-            compact
+          <Shortcut
+            icon="compass"
+            label="길에서 보기"
             onPress={() => router.push({ pathname: '/travel/[id]', params: { id } })}
           />
-          <Button
+          {/* 아직 정하지 않은 곳은 일정이 아니라 여기에 모입니다. */}
+          <Shortcut
+            icon="star"
             label="가고 싶은 곳"
-            variant="secondary"
-            compact
             onPress={() => router.push({ pathname: '/vote/[id]', params: { id } })}
           />
-          <Button
-            label="여행 카드"
-            variant="secondary"
-            compact
+          <Shortcut
+            icon="bookmark"
+            label="돌아보기"
             onPress={() => router.push({ pathname: '/card/[id]', params: { id } })}
           />
           {/* 올리는 것은 주인만 할 수 있습니다. 서버도 그렇게 막습니다. */}
           {mine ? (
-            <Button
-              label="게시판에 올리기"
-              variant="secondary"
-              compact
-              onPress={() => setPublishing(true)}
-            />
+            <Shortcut icon="upload" label="올리기" onPress={() => setPublishing(true)} />
           ) : null}
         </Row>
 
@@ -765,6 +759,36 @@ export default function TripScreen() {
           </>
         ) : null}
       </DragSheet>
+
+      <BottomSheet visible={flags} title="꽂아 둔 깃발" onClose={() => setFlags(false)}>
+        <Caption tone="secondary">
+          여섯 시간 뒤 저절로 사라집니다. 누르면 지도가 그 자리로 갑니다.
+        </Caption>
+        {pins.map((pin) => (
+          <Row key={pin.id} style={styles.pinRow}>
+            <View style={styles.grow}>
+              <ListRow
+                title={pin.label || (pin.mine ? '내가 꽂은 곳' : `${pin.authorName} 님이 꽂은 곳`)}
+                subtitle={pin.mine ? '내가 꽂음' : `${pin.authorName} 님`}
+                onPress={() => {
+                  setFlags(false);
+                  setLookAt({ lat: pin.lat, lng: pin.lng, at: Date.now() });
+                }}
+              />
+            </View>
+            {/* 내가 꽂은 것만 뺍니다. 남이 꽂아 둔 것을 치우면 그 사람은 왜
+                사라졌는지 알 수가 없습니다. */}
+            {pin.mine ? (
+              <IconButton
+                name="trash-2"
+                label="이 깃발 빼기"
+                tone="danger"
+                onPress={() => pullPin(pin.id)}
+              />
+            ) : null}
+          </Row>
+        ))}
+      </BottomSheet>
 
       <CompanionsSheet
         visible={companions}
@@ -813,6 +837,35 @@ export default function TripScreen() {
         }}
       />
     </View>
+  );
+}
+
+/**
+ * 이 여행으로 갈 수 있는 다른 화면들.
+ *
+ * <p>작은 글자 단추를 한 줄에 늘어놓았더니 무엇을 하는 것인지도, 어디까지가
+ * 한 덩어리인지도 읽히지 않았습니다. 그림 아래 짧은 말을 두면 훑는 것만으로
+ * 무엇이 있는지 압니다.
+ *
+ * <p>말은 짧게 자릅니다. "여행 중 화면" 처럼 화면 이름을 그대로 쓰면, 그것이
+ * 무엇을 보여 주는 곳인지가 아니라 우리가 붙인 이름을 읽게 됩니다.
+ */
+function Shortcut({
+  icon,
+  label,
+  onPress,
+}: {
+  icon: IconName;
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <Press onPress={onPress} scale={0.95} accessibilityLabel={label} style={styles.shortcut}>
+      <Icon name={icon} size={20} tone="accent" />
+      <Caption tone="secondary" numberOfLines={1}>
+        {label}
+      </Caption>
+    </Press>
   );
 }
 
@@ -1624,9 +1677,31 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     alignItems: 'center',
   },
+  floatLeft: {
+    position: 'absolute',
+    left: Gutter,
+    gap: Spacing.sm,
+    alignItems: 'center',
+  },
+  grow: {
+    flex: 1,
+  },
 
   head: {
     gap: Spacing.sm,
+  },
+  shortcuts: {
+    alignItems: 'stretch',
+  },
+  shortcut: {
+    flexGrow: 1,
+    flexBasis: 72,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.xs,
+    paddingVertical: Spacing.md,
+    borderRadius: Radius.lg,
+    backgroundColor: Colors.fill,
   },
   live: {
     gap: Spacing.sm,
