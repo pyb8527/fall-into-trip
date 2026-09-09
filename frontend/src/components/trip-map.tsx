@@ -47,6 +47,7 @@ export function TripMap({
   chrome = true,
   bleed = false,
   link = true,
+  fitAt,
 }: TripMapProps) {
   const map = useRef<MapView | null>(null);
   const [full, setFull] = useState(false);
@@ -79,6 +80,18 @@ export function TripMap({
       longitudeDelta: Math.max((maxLng - minLng) * PAD, FOCUS_SPAN),
     };
   }, [places]);
+
+  /** 넣어 둔 곳을 모두 한 화면에. 바깥에서 값을 바꿔 부릅니다. */
+  useEffect(() => {
+    if (!fitAt || !map.current || places.length === 0) {
+      return;
+    }
+    map.current.fitToCoordinates(
+      places.map((p) => ({ latitude: p.lat, longitude: p.lng })),
+      { edgePadding: { top: 60, right: 50, bottom: 60, left: 50 }, animated: true },
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fitAt]);
 
   /** 받은 경로 중 그릴 수 있는 것만. */
   const drawn = useMemo(() => (routes ?? []).filter((r) => r.points.length > 1), [routes]);
@@ -266,8 +279,9 @@ function PlacePin({
       title={place.name}
       onPress={() => onPress(place.id)}
       tracksViewChanges={drawing}
-      /* 물방울 아래 뾰족한 끝이 실제 좌표를 가리킵니다. */
-      anchor={{ x: 0.5, y: 1 }}>
+      /* 물방울은 아래 뾰족한 끝이 좌표를 가리키고, 동그란 그림 판은 한가운데가
+         좌표에 얹힙니다. */
+      anchor={place.emoji ? { x: 0.5, y: 0.5 } : { x: 0.5, y: 1 }}>
       <Pin place={place} active={active} />
     </Marker>
   );
@@ -284,11 +298,40 @@ function PlacePin({
  * 층에 따로 얹습니다.
  */
 function Pin({ place, active }: { place: MapPlace; active: boolean }) {
+  const visited = place.detail.visited;
+
+  /*
+    그림이 있으면 그림만 찍습니다.
+
+    물방울을 씌우고 그 안 흰 원에 그림을 넣었더니 열 몇 픽셀로 쪼그라들어
+    무엇인지 알아볼 수 없었습니다. 라멘인지 온천인지가 보이라고 넣은 것이
+    안 보이면 넣은 뜻이 없습니다. 대신 동그란 판을 깔아 지도의 건물·글자에서
+    떼어 놓습니다.
+  */
+  if (place.emoji) {
+    const r = active ? 34 : 29;
+    return (
+      <View
+        style={[
+          styles.chip,
+          {
+            width: r,
+            height: r,
+            borderRadius: r / 2,
+            borderWidth: active ? 3 : 2.4,
+            borderColor: place.color,
+            backgroundColor: visited ? place.color : '#FFFFFF',
+            elevation: active ? 6 : 3,
+            shadowOpacity: active ? 0.32 : 0.2,
+          },
+        ]}>
+        <Body style={[styles.pinEmoji, { fontSize: active ? 20 : 17 }]}>{place.emoji}</Body>
+      </View>
+    );
+  }
+
   const size = active ? 36 : 30;
   const border = active ? 3 : 2.5;
-  /* 다녀온 곳은 속을 색으로 채우고 표시를 얹습니다. 아직인 곳은 흰 속에 번호.
-     지도가 체크리스트처럼 읽혀, 채워질수록 얼마나 돌았는지 보입니다. */
-  const visited = place.detail.visited;
   /* 45도 돌리면 대각선이 가로가 됩니다. 잘리지 않게 그만큼 자리를 잡아 둡니다. */
   const box = Math.ceil(size * 1.42);
   /* 방울 한가운데에서 아래 끝까지. 이 끝이 좌표에 닿습니다. */
@@ -327,17 +370,9 @@ function Pin({ place, active }: { place: MapPlace; active: boolean }) {
               backgroundColor: visited ? place.color : '#FFFFFF',
             },
           ]}>
-          {place.emoji ? (
-            /* 그림이 있으면 번호 대신 그림입니다. 둘 다 넣으면 열몇
-               픽셀 안에서 어느 쪽도 안 읽힙니다. 순서는 목록이 말해 줍니다. */
-            <Body small style={styles.pinEmoji}>
-              {place.emoji}
-            </Body>
-          ) : (
-            <Body small strong style={{ color: visited ? Colors.onDay : Colors.text }}>
-              {place.order}
-            </Body>
-          )}
+          <Body small strong style={{ color: visited ? Colors.onDay : Colors.text }}>
+            {place.order}
+          </Body>
         </View>
       </View>
     </View>
@@ -440,6 +475,14 @@ const styles = StyleSheet.create({
     left: 0,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  /* 그림 핀. 물방울이 아니라 동그란 판이라 좌표 한가운데에 얹힙니다. */
+  chip: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 3,
   },
   pinEmoji: {
     /* 이모지는 글꼴이 제 높이를 갖고 있어, 줄 높이를 두면 아래로 처집니다. */

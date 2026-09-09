@@ -415,6 +415,22 @@ export default function TripScreen() {
     pullLive();
   }
 
+  /**
+   * 찍어 둔 것을 뺍니다.
+   *
+   * <p>서버는 자기가 찍은 것만 빼게 합니다. 남이 찍어 둔 것을 치워 버리면
+   * 그 사람은 왜 사라졌는지 알 수가 없습니다.
+   */
+  async function pullPin(pinId: string) {
+    setActionError(null);
+    try {
+      await api.delete(`/api/pins/${pinId}`);
+      pullLive();
+    } catch (e) {
+      setActionError(e instanceof ApiError ? e.message : '빼지 못했습니다.');
+    }
+  }
+
   /** 지금 자리에 "여기 있다" 를 찍어 둡니다. */
   async function dropPin() {
     if (!me.here) {
@@ -635,6 +651,35 @@ export default function TripScreen() {
           <Caption tone="secondary">
             지금 {mates.map((m) => m.name).join(' · ')} 님이 지도에 보입니다.
           </Caption>
+        ) : null}
+
+        {/*
+          찍어 둔 곳.
+
+          지도에는 네모로 찍히지만 지도만으로는 뺄 수가 없었습니다. 한 사람이
+          다섯까지 찍을 수 있어서, 뺄 길이 없으면 여섯 번째부터는 여섯 시간을
+          기다려야 합니다. 여기에 늘어놓고 내가 찍은 것만 뺄 수 있게 합니다.
+        */}
+        {pins.length > 0 ? (
+          <View style={styles.live}>
+            <Caption tone="secondary">
+              여기 있다고 찍어 둔 곳 {pins.length}곳 · 여섯 시간 뒤 저절로 사라집니다
+            </Caption>
+            {pins.map((pin) => (
+              <Row key={pin.id} style={styles.pinRow}>
+                <Caption tone={pin.mine ? 'default' : 'secondary'} numberOfLines={1}>
+                  {pin.label || '여기'} · {pin.mine ? '내가' : `${pin.authorName} 님이`} 찍음
+                </Caption>
+                {pin.mine ? (
+                  <IconButton
+                    name="x"
+                    label="찍어 둔 것 빼기"
+                    onPress={() => pullPin(pin.id)}
+                  />
+                ) : null}
+              </Row>
+            ))}
+          </View>
         ) : null}
 
         {/*
@@ -1134,6 +1179,14 @@ function PlaceRow({
           },
           active && { borderColor: Colors.accent },
         ]}>
+        {/*
+          손잡이를 누르는 자리 <b>밖</b>에 둡니다.
+
+          안에 넣어 두었더니 끌리지 않았습니다. 손이 닿는 순간 바깥의 누름
+          자리가 먼저 손짓을 가져가 버려서, 손잡이는 움직임을 받아 볼 기회조차
+          없었습니다. 형제로 나란히 두면 손잡이에 닿은 손짓은 손잡이 것입니다.
+        */}
+        <Row gap={0} style={styles.placeTop}>
         <Pressable onPress={onFocus} style={styles.placeTap}>
           <View style={styles.placeMain}>
             {/* 지도 핀과 같은 것이 찍힙니다. 목록과 지도를 눈으로 잇는 고리라
@@ -1179,20 +1232,21 @@ function PlaceRow({
             </View>
 
             {visited ? <Icon name="check" size={18} tone="success" /> : null}
-
-            {/* 끌어서 옮기는 손잡이. 손짓이 여기에만 걸려 있어 목록을 굴리는
-                것, 판을 올리는 것과 다투지 않습니다. */}
-            {canEdit ? (
-              <DragHandle
-                index={index}
-                dragging={dragging}
-                onStart={onDragStart}
-                onMove={onDragMove}
-                onEnd={onDragEnd}
-              />
-            ) : null}
           </View>
         </Pressable>
+
+        {/* 끌어서 옮기는 손잡이. 손짓이 여기에만 걸려 있어 목록을 굴리는 것,
+            판을 올리는 것과 다투지 않습니다. */}
+        {canEdit ? (
+          <DragHandle
+            index={index}
+            dragging={dragging}
+            onStart={onDragStart}
+            onMove={onDragMove}
+            onEnd={onDragEnd}
+          />
+        ) : null}
+        </Row>
 
         {/*
           손대는 단추는 고른 줄에서만 펼칩니다.
@@ -1296,7 +1350,21 @@ function DragHandle({
 
   const pan = useRef(
     PanResponder.create({
-      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 4,
+      /*
+        닿는 순간 붙잡습니다.
+
+        "조금 움직이면 그때 붙잡기" 로 두었더니 목록을 감싼 스크롤이 먼저
+        가져가 버려서 끌리지 않았습니다. 손잡이는 끄는 것 말고 하는 일이
+        없으므로, 닿자마자 붙잡아도 뺏기는 것이 없습니다.
+
+        놓아 달라는 요청도 거절합니다 — 끄는 중에 스크롤이 뺏어 가면 장소가
+        허공에서 멈춥니다.
+      */
+      onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponderCapture: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponderCapture: () => true,
+      onPanResponderTerminationRequest: () => false,
       onPanResponderGrant: () => call.current.onStart(at.current),
       onPanResponderMove: (_, g) => call.current.onMove(at.current, g.dy),
       onPanResponderRelease: () => call.current.onEnd(at.current),
@@ -1309,7 +1377,7 @@ function DragHandle({
       {...pan.panHandlers}
       accessibilityRole="adjustable"
       accessibilityLabel="끌어서 순서 옮기기"
-      style={styles.grip}>
+      style={[styles.grip, dragging ? styles.gripOn : null]}>
       <Icon name="menu" size={18} tone={dragging ? 'accent' : 'muted'} />
     </View>
   );
@@ -1552,6 +1620,11 @@ const styles = StyleSheet.create({
   live: {
     gap: Spacing.sm,
   },
+  pinRow: {
+    flexWrap: 'nowrap',
+    justifyContent: 'space-between',
+    gap: Spacing.sm,
+  },
   headTop: {
     justifyContent: 'space-between',
     alignItems: 'baseline',
@@ -1596,6 +1669,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   placeTap: {
+    flex: 1,
     padding: Spacing.lg,
     paddingBottom: Spacing.sm,
     minHeight: Tap.min,
@@ -1616,11 +1690,23 @@ const styles = StyleSheet.create({
     borderRadius: Radius.full,
     marginBottom: Spacing.xs,
   },
+  placeTop: {
+    flexWrap: 'nowrap',
+    alignItems: 'flex-start',
+  },
   grip: {
     width: Tap.min,
     height: Tap.min,
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: Spacing.sm,
+    borderRadius: Radius.md,
+    /* 브라우저가 이 자리에서 화면을 굴리지 않게 합니다. 안 막으면 손잡이를
+       끌어도 목록만 위아래로 움직입니다. */
+    touchAction: 'none',
+  },
+  gripOn: {
+    backgroundColor: Colors.accentSoft,
   },
   order: {
     width: 28,

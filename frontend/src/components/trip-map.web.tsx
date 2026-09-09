@@ -34,53 +34,110 @@ const FOCUS_ZOOM = 16;
 /**
  * 핀 그림.
  *
- * <p>물방울 안에 흰 원, 그 안에 그림(없으면 번호). 그림은 SVG 안에 글자로
- * 넣지 않고 구글 지도의 <b>라벨</b>로 얹습니다. SVG 를 그림 파일처럼 그릴
- * 때는 이모지 글꼴이 딸려 오지 않는 브라우저가 있어, 라멘 대신 네모가
- * 뜨는 일이 생깁니다.
+ * <p><b>그림이 있으면 그림만 찍습니다.</b> 물방울을 씌우고 그 안에 그림을
+ * 넣었더니, 물방울 속 흰 원 안으로 들어가면서 그림이 열 몇 픽셀로 쪼그라들어
+ * 무엇인지 알아볼 수 없었습니다. 라멘인지 온천인지가 보이라고 넣은 것이
+ * 안 보이면 넣은 뜻이 없습니다.
  *
- * <p>다녀온 곳은 물방울 속을 날짜 색으로 채우고, 아직인 곳은 어둡게 비워
- * 둡니다. 지도가 체크리스트처럼 읽혀, 채워질수록 얼마나 돌았는지가 한눈에
- * 보입니다.
+ * <p>대신 동그란 흰 판을 깔아 줍니다. 아무것도 없이 그림만 얹으면 지도의
+ * 건물·글자와 섞여 그림이 반쯤 잘려 보입니다.
  *
- * <p>안 간 곳을 잿빛으로 만들지는 않았습니다. 여행 전에는 아무 데도 안 갔으니
- * 지도가 통째로 잿빛이 됩니다. 채워지는 쪽으로 달라지게 하는 편이 두 시기에
- * 모두 맞습니다.
+ * <p>그림이 없는 곳은 번호를 적은 물방울입니다. 그쪽은 몇 번째인지가 곧
+ * 내용이라 뾰족한 끝이 어느 자리를 가리키는지도 중요합니다.
+ *
+ * <p>다녀온 곳은 속을 날짜 색으로 채웁니다. 지도가 채워지는 체크리스트처럼
+ * 읽혀, 채울수록 얼마나 돌았는지가 한눈에 보입니다.
  */
-function pinIcon(color: string, active: boolean, visited: boolean) {
-  const stroke = active ? 3.4 : 2.6;
-  /* 흰 테두리가 지도의 길·건물에서 핀을 떼어 놓습니다. */
-  const rim = '#FFFFFF';
+function pinIcon(color: string, active: boolean, visited: boolean, emoji: boolean) {
   const face = visited ? color : '#FFFFFF';
 
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="44" height="54" viewBox="0 0 44 54">
-<path d="M20 4C11.7 4 5 10.7 5 19c0 10.7 13.3 27 13.9 27.7a1.4 1.4 0 0 0 2.2 0C21.7 46 35 29.7 35 19 35 10.7 28.3 4 20 4z"
- fill="${color}" stroke="${rim}" stroke-width="${stroke}"/>
-<circle cx="20" cy="19" r="9" fill="${face}"/>
+  if (emoji) {
+    const r = active ? 17 : 14.5;
+    const ring = active ? 3 : 2.4;
+    const box = Math.ceil((r + ring) * 2);
+    const c = box / 2;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${box}" height="${box}" viewBox="0 0 ${box} ${box}">
+<circle cx="${c}" cy="${c}" r="${r}" fill="${face}" stroke="${color}" stroke-width="${ring}"/>
 </svg>`;
-  return 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
+    return {
+      url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
+      box,
+      /* 동그란 판은 좌표 위에 가운데를 얹습니다. 물방울처럼 아래 끝이
+         가리키는 것이 아닙니다. */
+      anchor: c,
+      center: c,
+    };
+  }
+
+  const stroke = active ? 3.2 : 2.4;
+  /*
+    상자 너비를 그림 너비에 맞춥니다. 전에는 44 짜리 상자에 40 만큼 그려 놓고
+    다른 비율로 줄여서, 번호가 물방울 한가운데에서 한 칸 옆으로 밀려 있었습니다.
+  */
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="52" viewBox="0 0 40 52">
+<path d="M20 3C11.7 3 5 9.7 5 18c0 10.7 13.3 27 13.9 27.7a1.4 1.4 0 0 0 2.2 0C21.7 45 35 28.7 35 18 35 9.7 28.3 3 20 3z"
+ fill="${color}" stroke="#FFFFFF" stroke-width="${stroke}"/>
+<circle cx="20" cy="18" r="8.6" fill="${face}"/>
+</svg>`;
+  return {
+    url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
+    box: 0,
+    anchor: 0,
+    center: 0,
+  };
 }
 
 /**
  * 핀 위에 얹는 글자.
  *
- * <p>그림이 있으면 그림을, 없으면 번호를 얹습니다. 그림이 있을 때 번호가
- * 사라지는 것은 감수합니다 — 둘 다 넣으면 열두 픽셀 안에 두 가지를 우겨넣는
- * 셈이라 어느 쪽도 안 읽힙니다. 순서는 아래 목록이 말해 줍니다.
+ * <p>그림이 있으면 그림을, 없으면 번호를 얹습니다. 둘 다 넣으면 열 몇 픽셀
+ * 안에 두 가지를 우겨넣는 셈이라 어느 쪽도 안 읽힙니다. 순서는 아래 목록이
+ * 말해 줍니다.
  */
-function pinLabel(place: MapPlace, visited: boolean) {
+function pinLabel(place: MapPlace, visited: boolean, active: boolean) {
   if (place.emoji) {
-    return { text: place.emoji, fontSize: '13px' };
+    return { text: place.emoji, fontSize: active ? '20px' : '17px' };
   }
-  /* 날짜 색이 파스텔이라 그것으로 번호를 쓰면 흰 방울 안에서 읽히지
-     않습니다. 색은 방울이 맡고 번호는 늘 짙게 씁니다. */
   return {
     text: String(place.order),
     /* 다녀온 곳은 방울 속이 날짜 색으로 차 있어 흰 글자, 아직인 곳은 속이
-       희어서 짙은 글자. 한쪽으로 못박으면 다른 한쪽에서 번호가 사라집니다. */
+       희어서 짙은 글자. */
     color: visited ? '#FFFFFF' : Colors.text,
     fontSize: '11px',
     fontWeight: '700',
+  };
+}
+
+/**
+ * 구글 지도에 넘길 아이콘 한 벌.
+ *
+ * <p>그림 핀과 물방울 핀은 크기도, 좌표에 닿는 자리도 다릅니다. 물방울은 아래
+ * 뾰족한 끝이 그 자리를 가리키고, 동그란 그림 판은 한가운데가 얹힙니다.
+ * 그 계산을 한 군데에 모읍니다 — 두 군데로 흩어져 있어서 번호가 한 칸 옆으로
+ * 밀려 있었습니다.
+ */
+function markerIcon(g: ReturnType<typeof gmaps>, place: MapPlace, active: boolean) {
+  const made = pinIcon(place.color, active, place.detail.visited, !!place.emoji);
+
+  if (place.emoji) {
+    return {
+      url: made.url,
+      scaledSize: new g.Size(made.box, made.box),
+      anchor: new g.Point(made.anchor, made.anchor),
+      labelOrigin: new g.Point(made.center, made.center),
+    };
+  }
+
+  /* 물방울은 그린 크기 그대로 씁니다. 늘리거나 줄이면 상자와 그림의 비율이
+     어긋나 번호가 가운데를 벗어납니다. 고른 것만 조금 키웁니다. */
+  const scale = active ? 1.22 : 1;
+  const w = 40 * scale;
+  const h = 52 * scale;
+  return {
+    url: made.url,
+    scaledSize: new g.Size(w, h),
+    anchor: new g.Point(w / 2, h),
+    labelOrigin: new g.Point(w / 2, 18 * scale),
   };
 }
 
@@ -98,6 +155,7 @@ export function TripMap({
   link = true,
   bottomInset = 0,
   goHereAt,
+  fitAt,
 }: TripMapProps) {
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -307,15 +365,8 @@ export function TripMap({
         title: p.name,
         map: map.current,
         zIndex: 100 + p.order,
-        icon: {
-          url: pinIcon(p.color, false, p.detail.visited),
-          scaledSize: new g.Size(40, 49),
-          anchor: new g.Point(20, 49),
-          /* 글자를 물방울 한가운데 원에 맞춥니다. 안 맞추면 핀 아래
-             꼬리 쪽에 찍힙니다. */
-          labelOrigin: new g.Point(20, 17),
-        },
-        label: pinLabel(p, p.detail.visited),
+        icon: markerIcon(g, p, false),
+        label: pinLabel(p, p.detail.visited, false),
       });
       marker.addListener('click', () => {
         selectRef.current(p.id);
@@ -515,13 +566,8 @@ export function TripMap({
         return;
       }
       const active = p.id === activeId;
-      marker.setIcon({
-        url: pinIcon(p.color, active, p.detail.visited),
-        scaledSize: new g.Size(active ? 50 : 40, active ? 61 : 49),
-        anchor: new g.Point(active ? 25 : 20, active ? 61 : 49),
-        labelOrigin: new g.Point(active ? 25 : 20, active ? 21 : 17),
-      });
-      marker.setLabel(pinLabel(p, p.detail.visited));
+      marker.setIcon(markerIcon(g, p, active));
+      marker.setLabel(pinLabel(p, p.detail.visited, active));
       marker.setZIndex(active ? 999 : 100 + p.order);
     });
     const chosen = places.find((p) => p.id === activeId);
@@ -579,6 +625,25 @@ export function TripMap({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [goHereAt]);
+
+  /** 넣어 둔 곳을 모두 한 화면에. 바깥에서 부릅니다. */
+  useEffect(() => {
+    if (!fitAt || !ready || !map.current || places.length === 0) {
+      return;
+    }
+    const g = gmaps();
+    const bounds = new g.LatLngBounds();
+    places.forEach((p) => bounds.extend({ lat: p.lat, lng: p.lng }));
+    map.current.fitBounds(bounds, {
+      top: 48,
+      right: 40,
+      bottom: 40 + bottomInset,
+      left: 40,
+    });
+    /* 다음에 또 부르면 다시 맞춰야 하므로, 이 자리를 기억해 두지 않습니다. */
+    fitted.current = '';
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fitAt]);
 
   const chosen = full && sheetId ? (places.find((p) => p.id === sheetId) ?? null) : null;
 
