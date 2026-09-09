@@ -670,9 +670,11 @@ export default function TripScreen() {
         {me.supported && me.watching ? (
           <View style={styles.live}>
             <Row gap={Spacing.xs}>
+              {/* 켜져 있을 때만 색이 찹니다. 반대로 두었더니 켜지도 않았는데
+                  이미 공유 중인 것처럼 보였습니다. */}
               <Button
                 label={sharing ? '내 위치 공유 중 · 끄기' : '내 위치 공유'}
-                variant={sharing ? 'secondary' : 'primary'}
+                variant={sharing ? 'primary' : 'secondary'}
                 compact
                 onPress={toggleSharing}
               />

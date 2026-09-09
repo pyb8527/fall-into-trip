@@ -39,12 +39,51 @@ export default function Document({ children }: PropsWithChildren) {
         <base href="/" />
 
         {/*
+          홈 화면에 설치해서 쓸 수 있게.
+
+          안드로이드는 이 셋이 모두 있어야 "앱으로 설치" 를 내줍니다 — 설명서
+          (manifest), 192·512 아이콘, 그리고 요청을 실제로 받아 보는 서비스
+          워커. 셋 중 하나만 빠져도 조용히 안 뜹니다.
+
+          iOS 는 설명서를 잘 안 읽어서 apple- 로 시작하는 것들을 따로 답니다.
+          그쪽은 "공유 → 홈 화면에 추가" 로만 됩니다.
+        */}
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="theme-color" content="#FAFAFA" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="FIT" />
+        <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+
+        {/*
           웹은 화면 전체가 아니라 안쪽 영역만 스크롤합니다. 이것을 넣지 않으면
           body 까지 함께 늘어나 고정해 둔 아래 단추가 밀려 올라갑니다.
         */}
         <ScrollViewStyleReset />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+
+        {/*
+          서비스 워커를 등록합니다.
+
+          화면이 다 뜬 뒤에 합니다. 첫 그림보다 먼저 하면 그만큼 늦게 뜨는데,
+          이것은 두 번째 방문부터 쓰이는 것이라 서두를 이유가 없습니다.
+
+          안 되는 브라우저에서는 조용히 넘어갑니다. 없으면 설치가 안 될 뿐,
+          화면은 그대로 돕니다.
+        */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('/sw.js').catch(function () {});
+  });
+}`,
+          }}
+        />
+      </body>
     </html>
   );
 }

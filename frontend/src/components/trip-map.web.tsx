@@ -170,6 +170,32 @@ function pinLabel(
  * 밀려 있었습니다.
  */
 /**
+ * 꽂아 둔 깃발.
+ *
+ * <p>장소 핀(물방울)과도, 사람(동그란 판)과도 달라야 합니다. 셋이 같은 모양이면
+ * 지도만 보고는 일정에 넣어 둔 곳인지, 지금 누가 서 있는 자리인지, 잠깐
+ * 표시해 둔 곳인지 구별할 수 없습니다.
+ *
+ * <p>깃대 아래 끝이 실제 좌표를 가리킵니다. 깃발을 꽂는다는 말 그대로입니다.
+ */
+function flagIcon(g: ReturnType<typeof gmaps>, color: string) {
+  const w = 26;
+  const h = 32;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+<path d="M8 30 L8 4" stroke="${color}" stroke-width="2.6" stroke-linecap="round"/>
+<path d="M8 5 L21 10.5 L8 16 Z" fill="${color}" stroke="#FFFFFF" stroke-width="1.6"
+ stroke-linejoin="round"/>
+<circle cx="8" cy="30" r="2" fill="${color}"/>
+</svg>`;
+  return {
+    url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
+    scaledSize: new g.Size(w, h),
+    /* 깃대 아래 끝. */
+    anchor: new g.Point(8, 30),
+  };
+}
+
+/**
  * 사람을 가리키는 동그란 판.
  *
  * <p>장소 핀(물방울)과 생김새를 달리합니다. 같은 모양으로 두면 지도만 보고는
@@ -605,14 +631,9 @@ export function TripMap({
           map: map.current,
           title: note.label ?? '잠깐 꽂아 둔 곳',
           zIndex: 700,
-          /* 네모로 둡니다. 동그란 것은 사람, 물방울은 일정입니다. */
-          icon: {
-            path: 'M -7 -7 L 7 -7 L 7 7 L -7 7 Z',
-            fillColor: Colors.warning,
-            fillOpacity: 1,
-            strokeColor: '#FFFFFF',
-            strokeWeight: 2,
-          },
+          /* 꽂는 단추가 깃발인데 지도에는 네모가 찍히고 있었습니다. 누른
+             것과 찍힌 것이 다르면 그것이 그것인 줄 알 수가 없습니다. */
+          icon: flagIcon(g, Colors.warning),
         }),
       );
     }

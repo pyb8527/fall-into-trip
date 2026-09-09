@@ -1,0 +1,47 @@
+{
+  "name": "FIT — fall into trip",
+  "short_name": "FIT",
+  "description": "일정을 짜고, 동행자와 함께 고치고, 다녀온 것을 남깁니다.",
+  "lang": "ko",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FAFAFA",
+  "theme_color": "#FAFAFA",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "내 여행",
+      "url": "/trips"
+    },
+    {
+      "name": "보관함",
+      "url": "/saved"
+    },
+    {
+      "name": "여행 이야기",
+      "url": "/community"
+    }
+  ]
+}
