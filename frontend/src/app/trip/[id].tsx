@@ -249,6 +249,24 @@ export default function TripScreen() {
   const dayId = dayIndex >= 0 ? (days[dayIndex]?.id ?? null) : null;
 
   /*
+    이 날의 장소가 어떤 순서로 늘어서 있는지.
+
+    사이사이 이동 시간은 <b>어느 곳에서 어느 곳으로</b> 가느냐로 정해집니다.
+    날짜만 보고 다시 물으면, 순서를 바꿔도 · 하나 넣어도 · 빼도 시간이 그대로
+    남아 있습니다. 이치란 다음이 카페였다가 시장으로 바뀌었는데 화면에는 여전히
+    카페까지 걸리는 시간이 붙어 있는 것입니다.
+
+    늘어선 차례를 그대로 열쇠로 삼습니다. 바뀌면 다시 묻습니다.
+
+    영업시간도 같습니다. 순서와는 상관없지만 장소가 늘거나 줄면 다시 물어야
+    새로 넣은 곳의 여는 시간이 붙습니다.
+  */
+  const daySeq = useMemo(
+    () => (dayIndex >= 0 ? (days[dayIndex]?.places ?? []).map((p) => p.id).join(',') : ''),
+    [days, dayIndex],
+  );
+
+  /*
     사이사이 이동 — 세 수단을 한꺼번에.
 
     "전체" 를 보고 있을 때는 부르지 않습니다. 날짜 수만큼, 구간마다, 수단마다
@@ -263,7 +281,7 @@ export default function TripScreen() {
       dayId
         ? api.get<{ gaps: Gap[] }>(`/api/days/${dayId}/route/compare`, signal).then((r) => r.gaps)
         : Promise.resolve([]),
-    [dayId],
+    [dayId, daySeq],
   );
 
   /**
@@ -274,9 +292,15 @@ export default function TripScreen() {
    */
   const [picked, setPicked] = useState<Record<string, TravelMode>>({});
   useEffect(() => {
-    /* 날짜를 옮기면 고른 것을 비웁니다. 다른 날의 구간에는 뜻이 없습니다. */
+    /*
+      날짜를 옮기거나 순서가 바뀌면 고른 것을 비웁니다.
+
+      고른 수단은 "이치란에서 카페까지" 처럼 <b>두 곳 사이</b>에 대한 것입니다.
+      순서가 바뀌면 같은 자리에서 다른 곳으로 가게 되므로, 그때 고른 것을 그대로
+      들고 있으면 엉뚱한 구간에 붙습니다.
+    */
     setPicked({});
-  }, [dayId]);
+  }, [dayId, daySeq]);
 
   const chosenOf = useCallback(
     (gap: Gap): GapOption | null => {
@@ -319,7 +343,7 @@ export default function TripScreen() {
             .get<{ info: PlaceInfo[] }>(`/api/days/${dayId}/places-info`, signal)
             .then((res) => res.info)
         : Promise.resolve([]),
-    [dayId],
+    [dayId, daySeq],
   );
   const infoOf = useMemo(() => new Map((placeInfo ?? []).map((i) => [i.id, i])), [placeInfo]);
 
