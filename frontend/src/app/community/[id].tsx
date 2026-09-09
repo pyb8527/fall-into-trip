@@ -28,6 +28,7 @@ import {
   ErrorNote,
   IconButton,
   Loading,
+  Press,
   Row,
   Screen,
   Subtitle,
@@ -238,6 +239,8 @@ export default function Post() {
           feedback={data.feedback}
           countAt={(placeIndex) => perPlace.get(`${i}:${placeIndex}`) ?? 0}
           onComment={(placeIndex) => setAt({ dayIndex: i, placeIndex })}
+          activeId={activeId}
+          onFocus={(placeIndex) => setActiveId(`${i}:${placeIndex}`)}
         />
       ))}
 
@@ -355,6 +358,8 @@ function DayBlock({
   feedback,
   countAt,
   onComment,
+  activeId,
+  onFocus,
 }: {
   day: ItineraryDay;
   index: number;
@@ -366,6 +371,9 @@ function DayBlock({
   /** 이 장소에 달린 댓글 수. */
   countAt: (placeIndex: number) => number;
   onComment: (placeIndex: number) => void;
+  /** 지도에서 켜 둔 곳. 목록의 그 줄도 함께 켜집니다. */
+  activeId: string | null;
+  onFocus: (placeIndex: number) => void;
 }) {
   const color = day.color || dayColor(index);
 
@@ -384,7 +392,22 @@ function DayBlock({
       ) : null}
 
       {day.places.map((place, i) => (
-        <Row key={i} gap={Spacing.md} style={styles.place}>
+        <Row
+          key={i}
+          gap={Spacing.md}
+          style={[styles.place, activeId === `${index}:${i}` ? styles.placeOn : null]}>
+          {/*
+            누르면 지도가 그리로 갑니다. 어디쯤인지 모르는 채로 이름만 읽어서는
+            가져올지를 정할 수 없습니다.
+
+            누르는 자리는 이름 쪽까지입니다. 옆의 담기·댓글은 따로 눌립니다 —
+            겹쳐 두면 담으려다 지도만 움직입니다.
+          */}
+          <Press
+            onPress={() => onFocus(i)}
+            scale={0.99}
+            accessibilityLabel={`${place.name} 지도에서 보기`}
+            style={styles.placeTap}>
           <View style={[styles.order, { backgroundColor: color }]}>
             <Body small strong style={styles.orderText}>
               {iconOf(place.icon) || i + 1}
@@ -413,6 +436,7 @@ function DayBlock({
               </Row>
             ) : null}
           </View>
+          </Press>
 
           {/*
             말풍선 그림만 두었을 때는 눌러도 아래 목록이 걸러질 뿐이라, 무슨
@@ -558,6 +582,23 @@ const styles = StyleSheet.create({
   },
   place: {
     alignItems: 'flex-start',
+    flexWrap: 'nowrap',
+    borderRadius: Radius.md,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+  },
+  /* 지도에서 켜 둔 줄. 목록과 지도가 같은 곳을 가리킨다는 것이 보여야 합니다. */
+  placeOn: {
+    borderColor: Colors.accent,
+    backgroundColor: Colors.accentSoft,
+  },
+  placeTap: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.md,
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
   },
   placeText: {
     flex: 1,

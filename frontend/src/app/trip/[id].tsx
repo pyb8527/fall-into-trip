@@ -1,7 +1,6 @@
 import { Stack, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, PanResponder, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { api, ApiError } from '@/api/client';
 import type {
@@ -78,7 +77,6 @@ export default function TripScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const navigation = useNavigation();
-  const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { data, error, loading, reload } = useAsync<TripDetail>(
     (signal) => api.get(`/api/trip?trip=${encodeURIComponent(id)}`, signal),
@@ -366,6 +364,21 @@ export default function TripScreen() {
   /* 자리는 소수 넷째 자리(십여 미터)까지만 봅니다. 그보다 잘게 보면 가만히
      서 있어도 값이 떨려 계속 보냅니다. */
   const herePoint = me.here ? `${me.here.lat.toFixed(4)},${me.here.lng.toFixed(4)}` : null;
+
+  /* 켜서 처음 자리가 잡히면 그리로 옮겨 줍니다. 켰는데 지도가 딴 데를 보고
+     있으면 켠 보람이 없습니다. 그 뒤로는 따라다니지 않습니다 — 걸을 때마다
+     지도가 끌려가면 다른 곳을 볼 수가 없습니다. */
+  const arrived = useRef(false);
+  useEffect(() => {
+    if (!me.watching) {
+      arrived.current = false;
+      return;
+    }
+    if (herePoint && !arrived.current) {
+      arrived.current = true;
+      setGoHereAt((n) => n + 1);
+    }
+  }, [me.watching, herePoint]);
   useEffect(() => {
     if (!sharing || !herePoint || !me.here) {
       return;
@@ -529,7 +542,10 @@ export default function TripScreen() {
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          style={[styles.floatTop, { top: insets.top + Tap.control }]}
+          /* 막대를 되돌리면서 지도가 그 아래부터 시작하는데, 띠는 아직
+             안전영역과 막대 높이만큼 더 내려가 있었습니다. 이제 지도 맨
+             위에서 조금만 띄웁니다. */
+          style={[styles.floatTop, { top: Spacing.md }]}
           contentContainerStyle={styles.chipRail}>
           <Row gap={Spacing.xs} style={styles.chipRow}>
             <Chip
@@ -585,15 +601,9 @@ export default function TripScreen() {
             active={me.watching}
             tone="accent"
             onMap
-            onPress={() => {
-              /* 이미 켜 두었으면 그리로 옮겨 줍니다. 켜 놓고도 지도가 딴 데를
-                 보고 있으면 켠 보람이 없습니다. */
-              if (me.watching) {
-                setGoHereAt((n) => n + 1);
-              } else {
-                me.start();
-              }
-            }}
+            /* 한 번 누르면 켜지면서 그리로 가고, 한 번 더 누르면 꺼집니다.
+               끄는 단추를 따로 두면 지도 위에 단추가 또 하나 늘어납니다. */
+            onPress={() => (me.watching ? stopLive() : me.start())}
           />
         </View>
       ) : null}
@@ -625,18 +635,19 @@ export default function TripScreen() {
           <View style={styles.live}>
             <Row gap={Spacing.xs}>
               <Button
-                label={sharing ? '위치 알리는 중 · 끄기' : '동행자에게 내 위치 알리기'}
+                label={sharing ? '내 위치 공유 중 · 끄기' : '내 위치 공유'}
                 variant={sharing ? 'secondary' : 'primary'}
                 compact
                 onPress={toggleSharing}
               />
-              <Button
-                label="여기 있다고 찍어 두기"
-                variant="secondary"
-                compact
+              {/* 지금 서 있는 자리에 꽂아 두는 깃발. 동행자에게 "나 여기"
+                  라고 알리는 표시입니다. */}
+              <IconButton
+                name="flag"
+                label="여기 있다고 깃발 꽂기"
+                tone="accent"
                 onPress={dropPin}
               />
-              <Button label="내 위치 끄기" variant="ghost" compact onPress={stopLive} />
             </Row>
             {sharing ? (
               <Caption tone="success" strong>

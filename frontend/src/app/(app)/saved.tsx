@@ -89,9 +89,9 @@ export default function Saved() {
         lng: place.lng,
         dayIndex: 0,
         order: i + 1,
-        /* 그림을 안 골랐으면 별. 담아 둔 곳이라는 뜻이 그대로 그림이 됩니다.
-           번호로 두면 있지도 않은 순서를 말하게 됩니다. */
-        emoji: iconOf(place.icon) || STAR,
+        /* 지도에서는 그림도 번호도 얹지 않습니다. 아래 shape="star" 가
+           전부 같은 동그라미에 별 하나로 그립니다. */
+        emoji: '',
         color: Colors.accent,
         fit: true,
         radius: null,
@@ -174,6 +174,9 @@ export default function Saved() {
           activeId={activeId}
           onSelect={setActiveId}
           link={false}
+          /* 전부 같은 동그라미에 별 하나. 담아 둔 곳에는 순서가 없고, 갈래는
+             아래 목록과 거르기가 이미 말해 줍니다. */
+          shape="star"
           height={240}
         />
       ) : null}

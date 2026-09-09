@@ -48,6 +48,7 @@ export function TripMap({
   bleed = false,
   link = true,
   fitAt,
+  shape = 'default',
 }: TripMapProps) {
   const map = useRef<MapView | null>(null);
   const [full, setFull] = useState(false);
@@ -202,7 +203,13 @@ export function TripMap({
       )}
 
       {places.map((p) => (
-        <PlacePin key={p.id} place={p} active={p.id === activeId} onPress={pick} />
+        <PlacePin
+          key={p.id}
+          place={p}
+          active={p.id === activeId}
+          shape={shape}
+          onPress={pick}
+        />
       ))}
     </MapView>
   );
@@ -259,10 +266,12 @@ export function TripMap({
 function PlacePin({
   place,
   active,
+  shape,
   onPress,
 }: {
   place: MapPlace;
   active: boolean;
+  shape: 'default' | 'star';
   onPress: (id: string) => void;
 }) {
   const [drawing, setDrawing] = useState(true);
@@ -281,8 +290,8 @@ function PlacePin({
       tracksViewChanges={drawing}
       /* 물방울은 아래 뾰족한 끝이 좌표를 가리키고, 동그란 그림 판은 한가운데가
          좌표에 얹힙니다. */
-      anchor={place.emoji ? { x: 0.5, y: 0.5 } : { x: 0.5, y: 1 }}>
-      <Pin place={place} active={active} />
+      anchor={place.emoji || shape === 'star' ? { x: 0.5, y: 0.5 } : { x: 0.5, y: 1 }}>
+      <Pin place={place} active={active} shape={shape} />
     </Marker>
   );
 }
@@ -297,8 +306,49 @@ function PlacePin({
  * <p>돌린 각도는 안에 든 숫자에도 그대로 옮겨붙으므로, 숫자는 돌아가지 않는
  * 층에 따로 얹습니다.
  */
-function Pin({ place, active }: { place: MapPlace; active: boolean }) {
+function Pin({
+  place,
+  active,
+  shape,
+}: {
+  place: MapPlace;
+  active: boolean;
+  shape: 'default' | 'star';
+}) {
   const visited = place.detail.visited;
+
+  /*
+    보관함처럼 순서도 갈래도 앞세울 것이 없는 자리.
+
+    전부 같은 동그라미에 별 하나입니다. 어디에 얼마나 담겼는지만 보이면
+    되므로, 그림도 번호도 얹지 않습니다.
+
+    별은 이모지가 아니라 글자표(U+2605)입니다. 이모지는 기기마다 다르게
+    생기지만 이것은 어디서나 같은 별입니다.
+  */
+  if (shape === 'star') {
+    const r = active ? 32 : 27;
+    return (
+      <View
+        style={[
+          styles.chip,
+          {
+            width: r,
+            height: r,
+            borderRadius: r / 2,
+            borderWidth: active ? 3 : 2.4,
+            borderColor: place.color,
+            backgroundColor: '#FFFFFF',
+            elevation: active ? 6 : 3,
+            shadowOpacity: active ? 0.32 : 0.2,
+          },
+        ]}>
+        <Body small strong style={{ color: place.color }}>
+          ★
+        </Body>
+      </View>
+    );
+  }
 
   /*
     그림이 있으면 그림만 찍습니다.

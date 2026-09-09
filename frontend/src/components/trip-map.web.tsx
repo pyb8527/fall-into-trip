@@ -94,7 +94,22 @@ function pinIcon(color: string, active: boolean, visited: boolean, emoji: boolea
  * 안에 두 가지를 우겨넣는 셈이라 어느 쪽도 안 읽힙니다. 순서는 아래 목록이
  * 말해 줍니다.
  */
-function pinLabel(place: MapPlace, visited: boolean, active: boolean) {
+function pinLabel(
+  place: MapPlace,
+  visited: boolean,
+  active: boolean,
+  shape: 'default' | 'star' = 'default',
+) {
+  /* 별은 이모지가 아니라 글자표입니다(U+2605). 이모지는 기기마다 다르게
+     생기지만 이것은 어디서나 같은 별입니다. */
+  if (shape === 'star') {
+    return {
+      text: '★',
+      color: place.color,
+      fontSize: active ? '18px' : '15px',
+      fontWeight: '700',
+    };
+  }
   if (place.emoji) {
     return { text: place.emoji, fontSize: active ? '20px' : '17px' };
   }
@@ -116,10 +131,16 @@ function pinLabel(place: MapPlace, visited: boolean, active: boolean) {
  * 그 계산을 한 군데에 모읍니다 — 두 군데로 흩어져 있어서 번호가 한 칸 옆으로
  * 밀려 있었습니다.
  */
-function markerIcon(g: ReturnType<typeof gmaps>, place: MapPlace, active: boolean) {
-  const made = pinIcon(place.color, active, place.detail.visited, !!place.emoji);
+function markerIcon(
+  g: ReturnType<typeof gmaps>,
+  place: MapPlace,
+  active: boolean,
+  shape: 'default' | 'star',
+) {
+  const round = shape === 'star' || !!place.emoji;
+  const made = pinIcon(place.color, active, place.detail.visited, round);
 
-  if (place.emoji) {
+  if (round) {
     return {
       url: made.url,
       scaledSize: new g.Size(made.box, made.box),
@@ -156,6 +177,7 @@ export function TripMap({
   bottomInset = 0,
   goHereAt,
   fitAt,
+  shape = 'default',
 }: TripMapProps) {
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -365,8 +387,8 @@ export function TripMap({
         title: p.name,
         map: map.current,
         zIndex: 100 + p.order,
-        icon: markerIcon(g, p, false),
-        label: pinLabel(p, p.detail.visited, false),
+        icon: markerIcon(g, p, false, shape),
+        label: pinLabel(p, p.detail.visited, false, shape),
       });
       marker.addListener('click', () => {
         selectRef.current(p.id);
@@ -566,8 +588,8 @@ export function TripMap({
         return;
       }
       const active = p.id === activeId;
-      marker.setIcon(markerIcon(g, p, active));
-      marker.setLabel(pinLabel(p, p.detail.visited, active));
+      marker.setIcon(markerIcon(g, p, active, shape));
+      marker.setLabel(pinLabel(p, p.detail.visited, active, shape));
       marker.setZIndex(active ? 999 : 100 + p.order);
     });
     const chosen = places.find((p) => p.id === activeId);

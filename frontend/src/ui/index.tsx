@@ -737,7 +737,9 @@ export type IconName =
   | 'message-square'
   | 'upload'
   /** 끌어서 옮기는 손잡이 */
-  | 'menu';
+  | 'menu'
+  /** 여기 있다고 꽂아 두는 깃발 */
+  | 'flag';
 
 export function Icon({
   name,
