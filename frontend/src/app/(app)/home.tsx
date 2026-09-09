@@ -45,6 +45,11 @@ export default function Home() {
           onPress={() => router.push('/(app)/trips')}
         />
         <MenuCard
+          title="보관함"
+          caption="담아 둔 곳 일정에 넣기"
+          onPress={() => router.push('/(app)/saved')}
+        />
+        <MenuCard
           title="여행 이야기"
           caption="남의 일정 구경하고 가져오기"
           onPress={() => router.push('/community')}

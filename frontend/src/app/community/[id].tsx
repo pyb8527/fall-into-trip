@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { api, ApiError, query } from '@/api/client';
-import type { ItineraryDay, PostDetail } from '@/api/types';
+import type { ItineraryDay, ItineraryPlace, PostDetail } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
 import { dayColor, Spacing } from '@/constants/theme';
@@ -17,6 +17,7 @@ import {
   ConfirmDialog,
   Divider,
   ErrorNote,
+  IconButton,
   Loading,
   Row,
   Screen,
@@ -48,6 +49,7 @@ export default function Post() {
   const [reporting, setReporting] = useState(false);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [savedNames, setSavedNames] = useState<Set<string>>(new Set());
   const [failed, setFailed] = useState<string | null>(null);
 
   /** 로그인이 필요한 동작 앞에서 한 번 걸러 줍니다. */
@@ -65,6 +67,32 @@ export default function Post() {
       prev ? { ...prev, liked: next, likeCount: prev.likeCount + (next ? 1 : -1) } : prev,
     );
     api.post(`/api/posts/${id}/like${query({ on: next })}`).catch(() => reload());
+  }
+
+  /**
+   * 이 장소만 보관함에 담습니다.
+   *
+   * <p>담긴 것을 이름으로 기억해 별을 채워 둡니다. 서버는 같은 구글 번호를
+   * 두 번 담지 않지만, 화면이 그것을 모르면 눌러도 아무 일도 안 일어나는
+   * 것처럼 보입니다.
+   */
+  async function save(place: ItineraryPlace) {
+    setFailed(null);
+    try {
+      await api.post('/api/saved', {
+        name: place.name,
+        lat: place.lat,
+        lng: place.lng,
+        placeId: place.placeId,
+        cat: place.cat,
+        note: place.note,
+        fromPost: id,
+      });
+      setSavedNames((prev) => new Set(prev).add(place.name));
+      setNotice(`「${place.name}」 를 보관함에 담았습니다.`);
+    } catch (e) {
+      setFailed(e instanceof ApiError ? e.message : '담지 못했습니다.');
+    }
   }
 
   async function report(reason: string) {
@@ -128,7 +156,13 @@ export default function Post() {
       {failed ? <ErrorNote message={failed} /> : null}
 
       {data.itinerary.days.map((day, i) => (
-        <DayBlock key={i} day={day} index={i} />
+        <DayBlock
+          key={i}
+          day={day}
+          index={i}
+          onSave={(place) => (user ? save(place) : needLogin())}
+          savedNames={savedNames}
+        />
       ))}
 
       <Divider />
@@ -199,7 +233,18 @@ export default function Post() {
 }
 
 /** 하루치. 지도는 두지 않습니다 — 구경하는 화면이라 목록이면 충분합니다. */
-function DayBlock({ day, index }: { day: ItineraryDay; index: number }) {
+function DayBlock({
+  day,
+  index,
+  onSave,
+  savedNames,
+}: {
+  day: ItineraryDay;
+  index: number;
+  onSave: (place: ItineraryPlace) => void;
+  /** 이미 담은 곳. 별을 채워 두면 두 번 누르지 않습니다. */
+  savedNames: Set<string>;
+}) {
   const color = day.color || dayColor(index);
 
   return (
@@ -246,6 +291,15 @@ function DayBlock({ day, index }: { day: ItineraryDay; index: number }) {
               </Row>
             ) : null}
           </View>
+
+          {/* 일정을 통째로 가져오지 않고 이 집만 담을 수 있어야 합니다. */}
+          <IconButton
+            name="star"
+            label={`${place.name} 담기`}
+            tone={savedNames.has(place.name) ? 'accent' : 'default'}
+            active={savedNames.has(place.name)}
+            onPress={() => onSave(place)}
+          />
         </Row>
       ))}
     </Card>

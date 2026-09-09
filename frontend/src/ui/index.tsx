@@ -575,7 +575,9 @@ export type IconName =
   | 'chevron-up'
   | 'arrow-up'
   | 'arrow-down'
-  | 'folder';
+  | 'folder'
+  | 'star'
+  | 'bookmark';
 
 export function Icon({
   name,

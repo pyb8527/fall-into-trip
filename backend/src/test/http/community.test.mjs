@@ -1,5 +1,5 @@
 /* 일정을 올리고, 남이 복제하고, 추천·조회·신고가 어떻게 세어지는지 */
-const BASE = "http://127.0.0.1:8080";
+const BASE = process.env.BASE || "http://127.0.0.1:8080";
 let pass = 0, fail = 0;
 const T = (n, ok, x) => ok ? (pass++, console.log("  ok   " + n))
                            : (fail++, console.log("  FAIL " + n, x !== undefined ? JSON.stringify(x).slice(0,200) : ""));

@@ -1,5 +1,5 @@
 /* 여행을 폴더로 묶는다. 폴더는 여행이 아니라 보는 사람의 것이다. */
-const BASE = "http://127.0.0.1:8080";
+const BASE = process.env.BASE || "http://127.0.0.1:8080";
 let pass = 0, fail = 0;
 const T = (n, ok, x) => ok ? (pass++, console.log("  ok   " + n))
                            : (fail++, console.log("  FAIL " + n, x !== undefined ? JSON.stringify(x).slice(0,200) : ""));

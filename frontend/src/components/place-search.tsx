@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { api, ApiError } from '@/api/client';
 import type { Found, PlaceSearchProps } from '@/components/map-types';
 import { Colors, Radius, Spacing, Tap } from '@/constants/theme';
-import { Body, Caption, Divider, Field, Loading } from '@/ui';
+import { Body, Caption, Divider, Field, IconButton, Loading, Row } from '@/ui';
 
 /**
  * 이름으로 장소 찾기.
@@ -19,6 +19,24 @@ import { Body, Caption, Divider, Field, Loading } from '@/ui';
 export function PlaceSearch({ onPick }: PlaceSearchProps) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Found[] | null>(null);
+  /* 담은 것을 기억해 별을 채웁니다. 서버는 같은 곳을 두 번 담지 않지만,
+     화면이 그것을 모르면 눌러도 아무 일도 안 일어난 것처럼 보입니다. */
+  const [kept, setKept] = useState<Set<string>>(new Set());
+
+  async function keep(found: Found) {
+    try {
+      await api.post('/api/saved', {
+        name: found.name,
+        lat: found.lat,
+        lng: found.lng,
+        placeId: found.placeId,
+      });
+      setKept((prev) => new Set(prev).add(found.name));
+    } catch {
+      /* 담기는 곁다리라 실패해도 검색을 막지 않습니다. 별이 안 켜지는 것으로
+         알 수 있습니다. */
+    }
+  }
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -65,18 +83,29 @@ export function PlaceSearch({ onPick }: PlaceSearchProps) {
           {results.map((r, i) => (
             <View key={`${r.lat},${r.lng},${i}`}>
               {i > 0 ? <Divider /> : null}
-              <Pressable
-                onPress={() => {
-                  onPick(r);
-                  setResults(null);
-                  setQuery('');
-                }}
-                style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
-                <Body strong numberOfLines={1}>
-                  {r.name}
-                </Body>
-                {r.address ? <Caption numberOfLines={1}>{r.address}</Caption> : null}
-              </Pressable>
+              <Row style={styles.resultRow}>
+                <Pressable
+                  onPress={() => {
+                    onPick(r);
+                    setResults(null);
+                    setQuery('');
+                  }}
+                  style={({ pressed }) => [styles.row, styles.grow, pressed && styles.rowPressed]}>
+                  <Body strong numberOfLines={1}>
+                    {r.name}
+                  </Body>
+                  {r.address ? <Caption numberOfLines={1}>{r.address}</Caption> : null}
+                </Pressable>
+
+                {/* 지금 넣지 않고 나중에 쓰려고 담아만 둘 수도 있습니다. */}
+                <IconButton
+                  name="star"
+                  label={`${r.name} 담기`}
+                  tone={kept.has(r.name) ? 'accent' : 'default'}
+                  active={kept.has(r.name)}
+                  onPress={() => keep(r)}
+                />
+              </Row>
             </View>
           ))}
         </View>
@@ -86,6 +115,13 @@ export function PlaceSearch({ onPick }: PlaceSearchProps) {
 }
 
 const styles = StyleSheet.create({
+  resultRow: {
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  grow: {
+    flex: 1,
+  },
   wrap: {
     gap: Spacing.md,
   },

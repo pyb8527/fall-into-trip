@@ -342,3 +342,25 @@ export type Folder = {
   name: string;
   tripCount: number;
 };
+
+/* ------------------------------------------------------------- 보관함 */
+
+/**
+ * 나중에 쓰려고 담아 둔 장소.
+ *
+ * 담는 순간의 값을 그대로 둡니다. 원래 글이 지워지거나 그쪽에서 이름을 고쳐도
+ * 내가 담아 둔 것은 그대로입니다.
+ */
+export type SavedPlace = {
+  id: string;
+  name: string;
+  lat: number;
+  lng: number;
+  /** 구글이 아는 번호. 있으면 영업시간도 볼 수 있습니다. */
+  placeId: Maybe<string>;
+  cat: Maybe<string>;
+  note: Maybe<string>;
+  /** 어느 글에서 담았는지. 검색이나 지도에서 담았으면 비어 있습니다. */
+  fromPost: Maybe<string>;
+  createdAt: string;
+};

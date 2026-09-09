@@ -1,5 +1,5 @@
 /* 회원가입 → 여행 만들기 → 초대 링크로 동행자 부르기 */
-const BASE = "http://127.0.0.1:8080";
+const BASE = process.env.BASE || "http://127.0.0.1:8080";
 let pass = 0, fail = 0;
 const T = (n, ok, x) => ok ? (pass++, console.log("  ok   " + n))
                            : (fail++, console.log("  FAIL " + n, x !== undefined ? JSON.stringify(x).slice(0,200) : ""));
