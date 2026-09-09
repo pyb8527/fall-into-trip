@@ -18,6 +18,7 @@ import { CompanionsSheet } from '@/components/companions-sheet';
 import type { RouteLine } from '@/components/map-types';
 import { PlaceForm } from '@/components/place-form';
 import { PublishForm } from '@/components/publish-form';
+import { TipSheet } from '@/components/tip-sheet';
 import { TripMap, type MapPlace } from '@/components/trip-map';
 import { openDirections } from '@/lib/directions';
 import { useHere } from '@/lib/here';
@@ -326,6 +327,41 @@ export default function TripScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activePlaceId, mode, herePoint]);
 
+  /*
+    이 날 장소들에 달린 한 줄 팁이 몇 개인지.
+
+    장소마다 물으면 그 수만큼 요청이 나갑니다. 번호가 있는 것만 모아 한 번에
+    셉니다.
+  */
+  const [tipCounts, setTipCounts] = useState<Record<string, number>>({});
+  const tipKeys = (placeInfo ?? []).length;
+  const dayPlaceIds = useMemo(
+    () =>
+      (days[activeDay === ALL ? 0 : activeDay]?.places ?? [])
+        .map((p) => p.placeId)
+        .filter((id): id is string => !!id),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [routeDayId, tipKeys],
+  );
+
+  const countTips = useCallback(() => {
+    if (dayPlaceIds.length === 0) {
+      setTipCounts({});
+      return;
+    }
+    api
+      .post<{ counts: Record<string, number> }>('/api/tips/counts', { placeIds: dayPlaceIds })
+      .then((res) => setTipCounts(res.counts))
+      .catch(() => {
+        /* 팁은 곁다리라 못 세어도 일정은 보여야 합니다. */
+      });
+  }, [dayPlaceIds]);
+
+  useEffect(countTips, [countTips]);
+
+  /** 한 줄을 열어 둔 장소. */
+  const [tipFor, setTipFor] = useState<Place | null>(null);
+
   /** 장소 뒤에 붙는 구간을 목록에서 바로 찾기 위해. */
   const legAfter = useMemo(
     () => new Map((route?.legs ?? []).map((leg) => [leg.fromId, leg])),
@@ -514,6 +550,16 @@ export default function TripScreen() {
         }}
       />
 
+      {tipFor?.placeId ? (
+        <TipSheet
+          visible
+          placeId={tipFor.placeId}
+          placeName={tipFor.name}
+          onClose={() => setTipFor(null)}
+          onChanged={countTips}
+        />
+      ) : null}
+
       <PublishForm
         visible={publishing}
         tripId={data.trip.id}
@@ -546,6 +592,8 @@ export default function TripScreen() {
             legAfter={legAfter}
             mode={mode}
             infoOf={infoOf}
+            tipCounts={tipCounts}
+            onTips={setTipFor}
           />
         ) : null,
       )}
@@ -602,6 +650,8 @@ function DayCard({
   legAfter,
   mode,
   infoOf,
+  tipCounts,
+  onTips,
 }: {
   day: Day;
   index: number;
@@ -619,6 +669,9 @@ function DayCard({
   mode: TravelMode | null;
   /** 장소별 영업시간 등. 좌표만 직접 넣은 곳에는 없습니다. */
   infoOf: Map<string, PlaceInfo>;
+  /** 구글 번호별 최근 팁 수. */
+  tipCounts: Record<string, number>;
+  onTips: (place: Place) => void;
 }) {
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<Place | null>(null);
@@ -725,6 +778,8 @@ function DayCard({
                 onRemove={() => onRemove(place.id)}
                 mode={mode}
                 info={infoOf.get(place.id)}
+                tipCount={place.placeId ? (tipCounts[place.placeId] ?? 0) : 0}
+                onTips={() => onTips(place)}
                 onUp={i > 0 ? () => move(i, -1) : undefined}
                 onDown={i < day.places.length - 1 ? () => move(i, 1) : undefined}
                 moving={moving}
@@ -786,6 +841,8 @@ function PlaceRow({
   canEdit,
   mode,
   info,
+  tipCount,
+  onTips,
   onUp,
   onDown,
   moving,
@@ -803,6 +860,8 @@ function PlaceRow({
   canEdit: boolean;
   mode: TravelMode | null;
   info?: PlaceInfo;
+  tipCount: number;
+  onTips: () => void;
   /** 맨 위·맨 아래 장소에는 갈 데가 없어 넘어오지 않습니다. */
   onUp?: () => void;
   onDown?: () => void;
@@ -873,6 +932,15 @@ function PlaceRow({
               onPress={() => onDown?.()}
             />
           </>
+        ) : null}
+        {/* 구글이 모르고 방금 다녀온 사람만 아는 것들이 여기 모입니다. */}
+        {place.placeId ? (
+          <IconButton
+            name="message-square"
+            label={tipCount > 0 ? `한 줄 ${tipCount}개 보기` : '한 줄 남기기'}
+            active={tipCount > 0}
+            onPress={onTips}
+          />
         ) : null}
         <IconButton
           name="navigation"

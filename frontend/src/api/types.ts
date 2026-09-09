@@ -403,3 +403,20 @@ export type Candidate = {
   myVote: Maybe<boolean>;
   agreed: boolean;
 };
+
+/* --------------------------------------------------------- 한 줄 팁 */
+
+/**
+ * 다녀온 사람이 남긴 한 줄.
+ *
+ * 여행이 아니라 그 가게에 달립니다. 같은 곳을 넣어 둔 사람이면 누구든 같은
+ * 팁을 봅니다. 일주일 지난 것은 오지 않습니다.
+ */
+export type Tip = {
+  id: string;
+  text: string;
+  authorName: string;
+  /** 내가 남긴 것인지. 지울 수 있는지를 이걸로 정합니다. */
+  mine: boolean;
+  createdAt: string;
+};

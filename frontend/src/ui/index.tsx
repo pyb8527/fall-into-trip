@@ -595,7 +595,8 @@ export type IconName =
   | 'folder'
   | 'star'
   | 'bookmark'
-  | 'compass';
+  | 'compass'
+  | 'message-square';
 
 export function Icon({
   name,

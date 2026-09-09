@@ -43,7 +43,7 @@ export default function AdminLayout() {
       <Stack.Screen name="index" options={{ title: '운영' }} />
       <Stack.Screen name="users" options={{ title: '계정 관리' }} />
       <Stack.Screen name="audit" options={{ title: '감사 로그' }} />
-      <Stack.Screen name="posts" options={{ title: '신고된 글' }} />
+      <Stack.Screen name="posts" options={{ title: '신고된 것' }} />
     </Stack>
   );
 }

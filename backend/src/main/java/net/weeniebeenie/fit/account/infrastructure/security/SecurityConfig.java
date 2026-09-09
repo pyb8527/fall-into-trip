@@ -79,6 +79,9 @@ public class SecurityConfig {
                            규칙에 걸려 로그인이 필요합니다. */
                         /* 내 글 목록만은 누구 것인지 알아야 하므로 로그인이
                            필요합니다. 아래 공개 규칙보다 먼저 걸어야 합니다. */
+                        /* 팁 읽기는 로그인 없이도 됩니다. 남기거나 신고할 때만
+                           로그인을 부릅니다(POST 라 아래 규칙에 걸립니다). */
+                        .requestMatchers(HttpMethod.GET, "/api/places/*/tips").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/posts/mine").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/posts", "/api/posts/*").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")

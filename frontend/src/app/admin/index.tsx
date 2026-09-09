@@ -90,8 +90,8 @@ export default function AdminHome() {
       />
 
       <ListRow
-        title="신고된 글"
-        subtitle="감춰진 글을 되돌리거나 감춥니다"
+        title="신고된 것"
+        subtitle="일정 글과 한 줄을 되돌리거나 감춥니다"
         onPress={() => router.push('/admin/posts')}
       />
 

@@ -16,18 +16,28 @@ import {
   Loading,
   Row,
   Screen,
+  SegmentedTabs,
   Subtitle,
   Title,
 } from '@/ui';
 
-/**
- * 신고된 글.
- *
- * <p>신고가 몇 건 쌓이면 글이 자동으로 감춰집니다. 사람이 볼 때까지 문제되는
- * 글을 첫 화면에 두지 않기 위해서인데, 그러면 되돌릴 통로도 있어야 합니다.
- * 몇 사람이 짜고 신고하면 멀쩡한 글도 내려가고, 되살릴 수 없으면 신고가 곧
- * 삭제가 됩니다.
- */
+/** 신고는 일정 글과 한 줄 두 곳에서 들어옵니다. 한 화면에서 봅니다. */
+type Kind = 'posts' | 'tips';
+
+const KINDS: { value: Kind; label: string }[] = [
+  { value: 'posts', label: '일정 글' },
+  { value: 'tips', label: '한 줄' },
+];
+
+type ReportedTip = {
+  id: string;
+  text: string;
+  authorName: string;
+  hidden: boolean;
+  reportCount: number;
+  createdAt: string;
+};
+
 type ReportedPost = {
   id: string;
   title: string;
@@ -39,26 +49,44 @@ type ReportedPost = {
   createdAt: string;
 };
 
+/**
+ * 신고된 것.
+ *
+ * <p>신고가 몇 건 쌓이면 자동으로 감춰집니다. 사람이 볼 때까지 문제되는 것을
+ * 첫 화면에 두지 않기 위해서인데, 그러면 되돌릴 통로도 있어야 합니다. 몇
+ * 사람이 짜고 신고하면 멀쩡한 것도 내려가고, 되살릴 수 없으면 신고가 곧
+ * 삭제가 됩니다.
+ */
 export default function AdminPosts() {
+  const [kind, setKind] = useState<Kind>('posts');
   const [page, setPage] = useState(0);
-  const { data, error, loading, reload } = useAsync<PageView<ReportedPost>>(
-    (signal) => api.get(`/api/admin/posts${query({ page, size: 20 })}`, signal),
-    [page],
+  const { data, error, loading, reload } = useAsync<PageView<ReportedPost | ReportedTip>>(
+    (signal) => api.get(`/api/admin/${kind}${query({ page, size: 20 })}`, signal),
+    [kind, page],
   );
 
   return (
     <Screen>
-      <Title>신고된 글</Title>
+      <Title>신고된 것</Title>
       <Body tone="secondary">
-        신고가 쌓여 자동으로 감춰진 글과, 신고가 들어왔지만 아직 보이는 글입니다.
+        신고가 쌓여 자동으로 감춰진 것과, 신고가 들어왔지만 아직 보이는 것입니다.
       </Body>
+
+      <SegmentedTabs
+        items={KINDS}
+        value={kind}
+        onChange={(next) => {
+          setKind(next);
+          setPage(0);
+        }}
+      />
 
       {loading && !data ? <Loading /> : null}
       {error ? <ErrorNote message={error} onRetry={reload} /> : null}
-      {data && data.items.length === 0 ? <Empty message="살펴볼 글이 없습니다." /> : null}
+      {data && data.items.length === 0 ? <Empty message="살펴볼 것이 없습니다." /> : null}
 
-      {data?.items.map((post) => (
-        <PostRow key={post.id} post={post} onChanged={reload} />
+      {data?.items.map((item) => (
+        <ReportedRow key={item.id} kind={kind} item={item} onChanged={reload} />
       ))}
 
       {data && data.totalPages > 1 ? (
@@ -86,7 +114,18 @@ export default function AdminPosts() {
   );
 }
 
-function PostRow({ post, onChanged }: { post: ReportedPost; onChanged: () => void }) {
+function ReportedRow({
+  kind,
+  item,
+  onChanged,
+}: {
+  kind: Kind;
+  item: ReportedPost | ReportedTip;
+  onChanged: () => void;
+}) {
+  /* 글에는 제목이, 한 줄에는 본문이 있습니다. 있는 쪽을 씁니다. */
+  const title = 'title' in item ? item.title : item.text;
+  const post = item as ReportedPost;
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
 
@@ -94,7 +133,7 @@ function PostRow({ post, onChanged }: { post: ReportedPost; onChanged: () => voi
     setFailed(null);
     setBusy(true);
     try {
-      await api.patch(`/api/admin/posts/${post.id}/hidden`, { hidden });
+      await api.patch(`/api/admin/${kind}/${item.id}/hidden`, { hidden });
       onChanged();
     } catch (e) {
       setFailed(e instanceof ApiError ? e.message : '처리하지 못했습니다.');
@@ -107,26 +146,28 @@ function PostRow({ post, onChanged }: { post: ReportedPost; onChanged: () => voi
     <Card>
       <Row style={styles.head}>
         <View style={styles.title}>
-          <Subtitle>{post.title}</Subtitle>
+          <Subtitle>{title}</Subtitle>
           <Caption tone="secondary">
-            {post.authorName} · {post.createdAt.slice(0, 10)}
+            {item.authorName} · {item.createdAt.slice(0, 10)}
           </Caption>
         </View>
         <Row gap={Spacing.xs}>
-          <Badge label={`신고 ${post.reportCount}`} tone="danger" />
-          {post.hidden ? <Badge label="감춰짐" tone="muted" /> : null}
+          <Badge label={`신고 ${item.reportCount}`} tone="danger" />
+          {item.hidden ? <Badge label="감춰짐" tone="muted" /> : null}
         </Row>
       </Row>
 
-      <Row gap={Spacing.md}>
-        <Caption>추천 {post.likeCount}</Caption>
-        <Caption>조회 {post.viewCount}</Caption>
-      </Row>
+      {'likeCount' in item ? (
+        <Row gap={Spacing.md}>
+          <Caption>추천 {post.likeCount}</Caption>
+          <Caption>조회 {post.viewCount}</Caption>
+        </Row>
+      ) : null}
 
       {failed ? <ErrorNote message={failed} /> : null}
 
       <Row gap={Spacing.sm}>
-        {post.hidden ? (
+        {item.hidden ? (
           <Button
             label="다시 올리기"
             variant="secondary"
