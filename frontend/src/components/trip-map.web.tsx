@@ -78,6 +78,8 @@ export function TripMap({
   onSelect,
   routes,
   here,
+  mates,
+  notes,
   height = 300,
 }: TripMapProps) {
   const [ready, setReady] = useState(false);
@@ -426,6 +428,62 @@ export function TripMap({
   if (!hasMaps() || failed) {
     return null;
   }
+
+  /*
+    동행자와 임시 핀.
+
+    장소 핀과 따로 그립니다. 일정에 넣어 둔 곳과 "지금 저기 있다" 는 성격이
+    다른데, 같은 모양으로 두면 지도만 보고는 구별이 안 됩니다.
+  */
+  const mateMarks = useRef<any[]>([]);
+
+  useEffect(() => {
+    if (!ready || !map.current) {
+      return;
+    }
+    const g = gmaps();
+    mateMarks.current.forEach((m) => m.setMap(null));
+    mateMarks.current = [];
+
+    for (const mate of mates ?? []) {
+      mateMarks.current.push(
+        new g.Marker({
+          position: { lat: mate.lat, lng: mate.lng },
+          map: map.current,
+          title: `${mate.name} 님이 지금 있는 곳`,
+          zIndex: 800,
+          label: { text: mate.name.slice(0, 1), color: '#FFFFFF', fontSize: '11px', fontWeight: '700' },
+          icon: {
+            path: g.SymbolPath.CIRCLE,
+            scale: 11,
+            fillColor: Colors.success,
+            fillOpacity: 1,
+            strokeColor: '#FFFFFF',
+            strokeWeight: 2.5,
+          },
+        }),
+      );
+    }
+
+    for (const note of notes ?? []) {
+      mateMarks.current.push(
+        new g.Marker({
+          position: { lat: note.lat, lng: note.lng },
+          map: map.current,
+          title: note.label ?? '잠깐 꽂아 둔 곳',
+          zIndex: 700,
+          /* 네모로 둡니다. 동그란 것은 사람, 물방울은 일정입니다. */
+          icon: {
+            path: 'M -7 -7 L 7 -7 L 7 7 L -7 7 Z',
+            fillColor: Colors.warning,
+            fillOpacity: 1,
+            strokeColor: '#FFFFFF',
+            strokeWeight: 2,
+          },
+        }),
+      );
+    }
+  }, [ready, mates, notes]);
 
   /** 내가 있는 자리로 지도를 옮깁니다. 어디까지 갔는지 놓쳤을 때 쓰는 단추입니다. */
   const goHere = useCallback(() => {

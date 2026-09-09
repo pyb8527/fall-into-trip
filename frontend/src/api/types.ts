@@ -440,3 +440,33 @@ export type Tip = {
   mine: boolean;
   createdAt: string;
 };
+
+/* ----------------------------------------------------- 자유시간에 서로 찾기 */
+
+/** "나 지금 여기 카페임" — 잠깐 꽂아 두는 핀. 몇 시간 뒤 사라집니다. */
+export type LivePin = {
+  id: string;
+  lat: number;
+  lng: number;
+  label: Maybe<string>;
+  authorName: string;
+  /** 내가 꽂은 것인지. 뺄 수 있는지를 이걸로 정합니다. */
+  mine: boolean;
+  createdAt: string;
+  expiresAt: string;
+};
+
+/**
+ * 지금 켜 둔 동행자의 자리.
+ *
+ * 내 자리는 오지 않습니다 — 내 기기가 이미 알고, 서버를 거쳐 돌아오면 한 박자
+ * 늦은 자리가 보입니다.
+ */
+export type LiveWhere = {
+  userId: string;
+  name: string;
+  lat: number;
+  lng: number;
+  accuracy: Maybe<number>;
+  updatedAt: string;
+};

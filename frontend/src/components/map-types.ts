@@ -30,7 +30,26 @@ export type MapPlace = {
   };
 };
 
+/** 지도에 얹는 사람과 임시 핀. 장소 핀과 생김새를 달리해 헷갈리지 않게 합니다. */
+export type MapMate = {
+  id: string;
+  name: string;
+  lat: number;
+  lng: number;
+};
+
+export type MapNote = {
+  id: string;
+  label: string | null;
+  lat: number;
+  lng: number;
+};
+
 export type TripMapProps = {
+  /** 지금 켜 둔 동행자들. */
+  mates?: MapMate[];
+  /** 잠깐 꽂아 둔 핀들. */
+  notes?: MapNote[];
   /** 지금 내가 있는 자리. 켰을 때만 옵니다. */
   here?: { lat: number; lng: number; accuracy: number } | null;
   /** 있으면 점선 대신 이것을 그립니다. */

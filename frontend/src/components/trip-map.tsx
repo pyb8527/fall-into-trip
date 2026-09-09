@@ -33,7 +33,8 @@ const DRAW_MS = 400;
 
 export type { MapPlace } from '@/components/map-types';
 
-/* here 는 앱에서 아직 채워지지 않습니다. 위치 권한이 매니페스트에 박히는
+/* here·mates·notes 는 앱에서 아직 채워지지 않습니다. 위치가 있어야 뜻이 있는
+   값들인데 앱 GPS 가 다음 빌드에 열립니다. 위치 권한이 매니페스트에 박히는
    것이라 다음 빌드 때 열립니다(docs/design.md). 그때 showsUserLocation 을
    켜면 됩니다. */
 export function TripMap({ places, activeId, onSelect, routes, height = 300 }: TripMapProps) {

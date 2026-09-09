@@ -5,6 +5,8 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { api, ApiError } from '@/api/client';
 import type {
   Day,
+  LivePin,
+  LiveWhere,
   DayRoute,
   Place,
   PlaceInfo,
@@ -359,6 +361,99 @@ export default function TripScreen() {
 
   useEffect(countTips, [countTips]);
 
+  /*
+    자유시간에 서로 찾기 — 켜 둔 동행자와 잠깐 꽂아 둔 핀.
+
+    내 자리는 서버를 거치지 않고 기기 것을 그대로 씁니다. 서버를 돌아오면 한
+    박자 늦은 자리가 보입니다.
+  */
+  const [mates, setMates] = useState<LiveWhere[]>([]);
+  const [sharing, setSharing] = useState(false);
+  const [pins, setPins] = useState<LivePin[]>([]);
+
+  const pullLive = useCallback(() => {
+    api
+      .get<{ people: LiveWhere[]; sharing: boolean }>(`/api/trips/${id}/locations`)
+      .then((res) => {
+        setMates(res.people);
+        setSharing(res.sharing);
+      })
+      .catch(() => {
+        /* 곁다리라 못 받아도 일정은 보여야 합니다. */
+      });
+    api
+      .get<{ pins: LivePin[] }>(`/api/trips/${id}/pins`)
+      .then((res) => setPins(res.pins))
+      .catch(() => {});
+  }, [id]);
+
+  /*
+    켜 둔 동안에만 주기적으로 오갑니다. 안 켰으면 남의 자리도 자주 볼 이유가
+    없어 한 번만 봅니다.
+  */
+  useEffect(() => {
+    pullLive();
+    if (!sharing) {
+      return;
+    }
+    const timer = setInterval(pullLive, 20_000);
+    return () => clearInterval(timer);
+  }, [pullLive, sharing]);
+
+  /* 켜 둔 동안 내 자리를 보냅니다. 십여 미터 단위로만 봐서, 가만히 서 있을 때
+     떨리는 값으로 계속 보내지 않습니다. */
+  useEffect(() => {
+    if (!sharing || !herePoint || !me.here) {
+      return;
+    }
+    api
+      .put(`/api/trips/${id}/location`, {
+        lat: me.here.lat,
+        lng: me.here.lng,
+        accuracy: me.here.accuracy,
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sharing, herePoint, id]);
+
+  async function toggleSharing() {
+    setActionError(null);
+    try {
+      if (sharing) {
+        await api.delete(`/api/trips/${id}/location`);
+        setSharing(false);
+        setMates([]);
+      } else if (me.here) {
+        await api.put(`/api/trips/${id}/location`, {
+          lat: me.here.lat,
+          lng: me.here.lng,
+          accuracy: me.here.accuracy,
+        });
+        setSharing(true);
+      } else {
+        setActionError('지금 위치를 알 수 없습니다. 위치 사용을 허용해 주세요.');
+      }
+      pullLive();
+    } catch (e) {
+      setActionError(e instanceof ApiError ? e.message : '바꾸지 못했습니다.');
+    }
+  }
+
+  /** 지금 자리에 "여기 있다" 를 꽂습니다. */
+  async function dropPin() {
+    if (!me.here) {
+      setActionError('지금 위치를 알 수 없습니다. 위치 사용을 허용해 주세요.');
+      return;
+    }
+    setActionError(null);
+    try {
+      await api.post(`/api/trips/${id}/pins`, { lat: me.here.lat, lng: me.here.lng });
+      pullLive();
+    } catch (e) {
+      setActionError(e instanceof ApiError ? e.message : '꽂지 못했습니다.');
+    }
+  }
+
   /** 한 줄을 열어 둔 장소. */
   const [tipFor, setTipFor] = useState<Place | null>(null);
 
@@ -406,6 +501,8 @@ export default function TripScreen() {
             onSelect={setActivePlaceId}
             routes={routeLines}
             here={me.here}
+            mates={mates.map((m) => ({ id: m.userId, name: m.name, lat: m.lat, lng: m.lng }))}
+            notes={pins.map((p) => ({ id: p.id, label: p.label ?? null, lat: p.lat, lng: p.lng }))}
             height={260}
           />
 
@@ -440,6 +537,18 @@ export default function TripScreen() {
 
           <Row gap={Spacing.xs}>
             <Chip label="안 보기" selected={mode === null} onPress={() => setMode(null)} />
+            {me.supported ? (
+              <>
+                {/* 켜 두면 네 시간 뒤 스스로 꺼집니다. 지나온 자리는 남지
+                    않고 마지막 자리만 동행자에게 보입니다. */}
+                <Chip
+                  label={sharing ? '위치 공유 끄기' : '위치 공유'}
+                  selected={sharing}
+                  onPress={toggleSharing}
+                />
+                <Chip label="여기 있다고 꽂기" selected={false} onPress={dropPin} />
+              </>
+            ) : null}
             {MODES.map((m) => (
               <Chip
                 key={m.value}
@@ -452,6 +561,16 @@ export default function TripScreen() {
           </Row>
 
           {me.error ? <Caption tone="danger">{me.error}</Caption> : null}
+          {sharing ? (
+            <Caption tone="success" strong>
+              위치를 동행자에게 알리는 중입니다. 네 시간 뒤 저절로 꺼집니다.
+            </Caption>
+          ) : null}
+          {mates.length > 0 ? (
+            <Caption tone="secondary">
+              지금 {mates.map((m) => m.name).join(' · ')} 님이 지도에 보입니다.
+            </Caption>
+          ) : null}
           {fromHere ? (
             <Caption tone="accent" strong>
               여기서{' '}
