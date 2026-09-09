@@ -8,17 +8,20 @@ import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
 import { FolderSheet } from '@/components/folder-sheet';
 import { TripForm } from '@/components/trip-form';
-import { Spacing } from '@/constants/theme';
+import { Colors, Radius, Spacing } from '@/constants/theme';
 import {
   Badge,
   Body,
+  BottomSheet,
   Button,
   Caption,
   Empty,
   ErrorNote,
+  Icon,
   IconButton,
   ListRow,
   Loading,
+  Press,
   Row,
   Screen,
   SegmentedTabs,
@@ -62,10 +65,16 @@ export default function Trips() {
     [],
   );
 
-  const sections = useMemo(
-    () => (group === 'when' ? byWhen(data?.trips ?? []) : byFolder(data?.trips ?? [], folderData?.folders ?? [])),
-    [group, data, folderData],
-  );
+  /** 폴더별로 볼 때 열어 둔 폴더. 없으면 폴더들만 늘어놓습니다. */
+  const [opened, setOpened] = useState<Folder | null>(null);
+
+  const trips = useMemo(() => data?.trips ?? [], [data]);
+  const folders = useMemo(() => folderData?.folders ?? [], [folderData]);
+
+  const sections = useMemo(() => (group === 'when' ? byWhen(trips) : []), [group, trips]);
+
+  /** 어느 폴더에도 안 넣은 것. 폴더별로 볼 때 아래에 따로 모읍니다. */
+  const loose = useMemo(() => trips.filter((t) => !t.folderId), [trips]);
 
   return (
     <Screen
@@ -84,8 +93,61 @@ export default function Trips() {
         <Empty message="아직 여행이 없습니다. 아래에서 하나 만들어 보세요." />
       ) : null}
 
-      {data && data.trips.length > 1 ? (
+      {/* 폴더를 하나라도 만들었으면 여행이 하나뿐이어도 띠를 둡니다. 안 그러면
+          폴더에 넣어 놓고도 폴더별로 볼 방법이 없습니다. */}
+      {data && (data.trips.length > 1 || folders.length > 0) ? (
         <SegmentedTabs items={GROUPS} value={group} onChange={setGroup} />
+      ) : null}
+
+      {/*
+        폴더별로 볼 때는 폴더를 먼저 보여 줍니다.
+
+        전에는 폴더 이름을 제목으로 달고 그 아래에 여행을 죽 늘어놓았습니다.
+        폴더가 서넛만 되어도 화면이 길어져, 정리한 보람이 없고 무엇보다
+        "폴더에 넣었는데 어디 있지" 가 됩니다. 탐색기처럼 폴더는 폴더로 두고,
+        누르면 그 안이 열립니다.
+      */}
+      {group === 'folder' ? (
+        <>
+          {folders.length === 0 ? (
+            <Empty message="아직 폴더가 없습니다. 여행 오른쪽의 폴더 단추로 만들 수 있습니다." />
+          ) : null}
+
+          <Row gap={Spacing.sm} style={styles.shelf}>
+            {folders.map((folder) => (
+              <Press
+                key={folder.id}
+                onPress={() => setOpened(folder)}
+                scale={0.96}
+                accessibilityLabel={`${folder.name} 폴더 열기`}
+                style={styles.folder}>
+                <Icon name="folder" size={28} tone="accent" />
+                <Body small strong numberOfLines={1}>
+                  {folder.name}
+                </Body>
+                <Caption tone="muted">{folder.tripCount}개</Caption>
+              </Press>
+            ))}
+          </Row>
+
+          {loose.length > 0 ? (
+            <View style={styles.section}>
+              <Row style={styles.sectionHead}>
+                <Subtitle>폴더 없음</Subtitle>
+                <Caption tone="secondary">{loose.length}</Caption>
+              </Row>
+              {loose.map((trip) => (
+                <TripRow
+                  key={trip.id}
+                  trip={trip}
+                  mine={trip.ownerId === user?.id}
+                  onOpen={() => router.push({ pathname: '/trip/[id]', params: { id: trip.id } })}
+                  onFolder={() => setPlacing(trip)}
+                />
+              ))}
+            </View>
+          ) : null}
+        </>
       ) : null}
 
       {sections.map((section) => (
@@ -96,27 +158,13 @@ export default function Trips() {
           </Row>
 
           {section.trips.map((trip) => (
-            <Row key={trip.id} style={styles.row}>
-              <View style={styles.grow}>
-                <ListRow
-                  title={trip.title}
-                  subtitle={`${formatRange(trip.startIso, trip.endIso)} · ${trip.dayCount}일 · 장소 ${trip.placeCount}곳`}
-                  right={
-                    trip.ownerId === user?.id ? (
-                      <Badge label="내 여행" tone="accent" />
-                    ) : (
-                      <Badge label="동행" tone="muted" />
-                    )
-                  }
-                  onPress={() => router.push({ pathname: '/trip/[id]', params: { id: trip.id } })}
-                />
-              </View>
-              <IconButton
-                name="folder"
-                label={`${trip.title} 폴더에 넣기`}
-                onPress={() => setPlacing(trip)}
-              />
-            </Row>
+            <TripRow
+              key={trip.id}
+              trip={trip}
+              mine={trip.ownerId === user?.id}
+              onOpen={() => router.push({ pathname: '/trip/[id]', params: { id: trip.id } })}
+              onFolder={() => setPlacing(trip)}
+            />
           ))}
         </View>
       ))}
@@ -129,6 +177,33 @@ export default function Trips() {
           router.push({ pathname: '/trip/[id]', params: { id: trip.id } });
         }}
       />
+
+      {/* 폴더 안. 화면을 갈아 끼우지 않고 판으로 엽니다 — 닫으면 보던
+          자리로 그대로 돌아옵니다. */}
+      {opened ? (
+        <BottomSheet visible title={opened.name} onClose={() => setOpened(null)}>
+          {trips.filter((t) => t.folderId === opened.id).length === 0 ? (
+            <Empty message="이 폴더는 비어 있습니다." />
+          ) : null}
+          {trips
+            .filter((t) => t.folderId === opened.id)
+            .map((trip) => (
+              <TripRow
+                key={trip.id}
+                trip={trip}
+                mine={trip.ownerId === user?.id}
+                onOpen={() => {
+                  setOpened(null);
+                  router.push({ pathname: '/trip/[id]', params: { id: trip.id } });
+                }}
+                onFolder={() => {
+                  setOpened(null);
+                  setPlacing(trip);
+                }}
+              />
+            ))}
+        </BottomSheet>
+      ) : null}
 
       {placing ? (
         <FolderSheet
@@ -144,6 +219,38 @@ export default function Trips() {
         />
       ) : null}
     </Screen>
+  );
+}
+
+/**
+ * 여행 한 줄.
+ *
+ * <p>"내 여행" 표는 달지 않습니다. 대개가 내 여행이라 거의 모든 줄에 같은 표가
+ * 붙어 아무것도 구별해 주지 못했습니다. 남의 여행에 끼어 있는 것만 표시합니다.
+ */
+function TripRow({
+  trip,
+  mine,
+  onOpen,
+  onFolder,
+}: {
+  trip: TripSummary;
+  mine: boolean;
+  onOpen: () => void;
+  onFolder: () => void;
+}) {
+  return (
+    <Row style={styles.row}>
+      <View style={styles.grow}>
+        <ListRow
+          title={trip.title}
+          subtitle={`${formatRange(trip.startIso, trip.endIso)} · ${trip.dayCount}일 · 장소 ${trip.placeCount}곳`}
+          right={mine ? undefined : <Badge label="동행" tone="muted" />}
+          onPress={onOpen}
+        />
+      </View>
+      <IconButton name="folder" label={`${trip.title} 폴더에 넣기`} onPress={onFolder} />
+    </Row>
   );
 }
 
@@ -188,19 +295,6 @@ function byWhen(trips: TripSummary[]): Section[] {
   ].filter((s) => s.trips.length > 0);
 }
 
-/** 폴더로 나눕니다. 안 넣은 것은 맨 아래에 모읍니다. */
-function byFolder(trips: TripSummary[], folders: Folder[]): Section[] {
-  const sections: Section[] = folders.map((folder) => ({
-    title: folder.name,
-    trips: trips.filter((t) => t.folderId === folder.id),
-  }));
-  const loose = trips.filter((t) => !t.folderId);
-  if (loose.length > 0) {
-    sections.push({ title: '폴더 없음', trips: loose });
-  }
-  return sections.filter((s) => s.trips.length > 0);
-}
-
 function todayIso() {
   const now = new Date();
   const pad = (n: number) => String(n).padStart(2, '0');
@@ -218,6 +312,20 @@ function formatRange(start: string | null, end: string | null) {
 }
 
 const styles = StyleSheet.create({
+  /* 폴더를 늘어놓는 선반. 좁은 폰에서는 두 칸, 넓으면 더 들어갑니다. */
+  shelf: {
+    alignItems: 'stretch',
+  },
+  folder: {
+    flexGrow: 1,
+    flexBasis: 104,
+    maxWidth: 160,
+    alignItems: 'flex-start',
+    gap: Spacing.xs,
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.lg,
+    padding: Spacing.lg,
+  },
   headText: {
     gap: Spacing.xs,
   },

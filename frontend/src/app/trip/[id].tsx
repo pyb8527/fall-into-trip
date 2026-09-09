@@ -1,6 +1,6 @@
 import { Stack, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Animated, PanResponder, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { api, ApiError } from '@/api/client';
@@ -94,6 +94,12 @@ export default function TripScreen() {
      다른 날을 골라 놓아도 다시 오늘로 끌려갑니다. */
   const jumped = useRef(false);
   const [activePlaceId, setActivePlaceId] = useState<string | null>(null);
+  /* 판이 지금 몇 픽셀을 덮고 있는지. 지도가 이것을 알아야 고른 핀을 판에
+     가리지 않는 자리에 놓습니다. */
+  const [covered, setCovered] = useState(0);
+  /* "내 위치로" 를 누른 횟수. 값이 바뀌면 지도가 그리로 갑니다. 자리가 아니라
+     "눌렀다" 는 것만 넘겨야 같은 자리를 두 번 눌러도 두 번 다 움직입니다. */
+  const [goHereAt, setGoHereAt] = useState(0);
 
   /* 방문 표시는 나만 보는 것이라, 서버 응답을 기다리지 않고 먼저 칠합니다.
      걸으면서 누르는 것이라 매번 기다리게 하면 손이 멎습니다. */
@@ -506,6 +512,8 @@ export default function TripScreen() {
         notes={pins.map((p) => ({ id: p.id, label: p.label ?? null, lat: p.lat, lng: p.lng }))}
         bleed
         chrome={false}
+        bottomInset={covered}
+        goHereAt={goHereAt}
       />
 
       {/* 막대 바로 아래, 지도 위에 뜨는 날짜 칩. */}
@@ -552,16 +560,39 @@ export default function TripScreen() {
         단추이고 무엇이 화면에 대한 단추인지 구별되지 않습니다. 날짜 띠
         바로 아래에서 시작해, 띠와 왼쪽 여백을 맞춥니다.
       */}
+      {/*
+        지도 단추는 판 바로 위, 오른쪽에 세웁니다.
+
+        위쪽 구석에 두면 막대·날짜 띠와 겹쳐 셋이 한 덩어리로 뭉칩니다. 무엇보다
+        지도를 볼 때 손은 아래에 있습니다 — 위 구석은 한 손으로 쥐면 닿지도
+        않습니다.
+      */}
       {me.supported ? (
-        <View style={[styles.floatRight, { top: insets.top + Tap.control + Tap.min }]}>
+        <View style={[styles.floatRight, { bottom: covered + Spacing.md }]}>
           <IconButton
             name="crosshair"
-            label={me.watching ? '내 위치 끄기' : '내 위치 보기'}
+            label={me.watching ? '내 위치로' : '내 위치 보기'}
             active={me.watching}
             tone="accent"
             onMap
-            onPress={() => (me.watching ? stopLive() : me.start())}
+            onPress={() => {
+              /* 이미 켜 두었으면 그리로 옮겨 줍니다. 켜 놓고도 지도가 딴 데를
+                 보고 있으면 켠 보람이 없습니다. */
+              if (me.watching) {
+                setGoHereAt((n) => n + 1);
+              } else {
+                me.start();
+              }
+            }}
           />
+          {me.watching ? (
+            <IconButton
+              name="x"
+              label="내 위치 끄기"
+              onMap
+              onPress={() => stopLive()}
+            />
+          ) : null}
           {me.watching ? (
             <>
               {/* 켜 두면 네 시간 뒤 스스로 꺼집니다. 지나온 자리는 남지 않고
@@ -586,6 +617,7 @@ export default function TripScreen() {
       ) : null}
 
       <DragSheet
+        onHeightChange={setCovered}
         peek={
           <SheetHead
             title={dayIndex >= 0 ? days[dayIndex]?.date || days[dayIndex]?.label || '' : '전체 일정'}
@@ -609,6 +641,36 @@ export default function TripScreen() {
             지금 {mates.map((m) => m.name).join(' · ')} 님이 지도에 보입니다.
           </Caption>
         ) : null}
+
+        {/*
+          가끔 쓰는 것들.
+
+          맨 아래에 두었더니 날짜가 여럿인 여행에서는 한참 굴려야 닿아서, 있는
+          줄도 모르고 지나갔습니다. 판을 열면 바로 보이는 자리로 올립니다.
+        */}
+        <Row gap={Spacing.xs}>
+          <Button
+            label="가고 싶은 곳"
+            variant="secondary"
+            compact
+            onPress={() => router.push({ pathname: '/vote/[id]', params: { id } })}
+          />
+          <Button
+            label="여행 카드"
+            variant="secondary"
+            compact
+            onPress={() => router.push({ pathname: '/card/[id]', params: { id } })}
+          />
+          {/* 올리는 것은 주인만 할 수 있습니다. 서버도 그렇게 막습니다. */}
+          {mine ? (
+            <Button
+              label="게시판에 올리기"
+              variant="secondary"
+              compact
+              onPress={() => setPublishing(true)}
+            />
+          ) : null}
+        </Row>
 
         {days.length === 0 ? <Empty message="아직 날짜가 없습니다." /> : null}
 
@@ -635,31 +697,6 @@ export default function TripScreen() {
             />
           ) : null,
         )}
-
-        {/* 가끔 쓰는 것들. 그림만으로는 뜻이 안 통해 글자로 답니다. */}
-        <Row gap={Spacing.xs}>
-          <Button
-            label="가고 싶은 곳"
-            variant="secondary"
-            compact
-            onPress={() => router.push({ pathname: '/vote/[id]', params: { id } })}
-          />
-          <Button
-            label="여행 카드"
-            variant="secondary"
-            compact
-            onPress={() => router.push({ pathname: '/card/[id]', params: { id } })}
-          />
-          {/* 올리는 것은 주인만 할 수 있습니다. 서버도 그렇게 막습니다. */}
-          {mine ? (
-            <Button
-              label="게시판에 올리기"
-              variant="secondary"
-              compact
-              onPress={() => setPublishing(true)}
-            />
-          ) : null}
-        </Row>
 
         {/* 되돌릴 수 없는 일이라 맨 아래, 손이 잘 닿지 않는 자리에 둡니다. */}
         {mine ? (
@@ -818,28 +855,67 @@ function DayCard({
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<Place | null>(null);
   const [folded, setFolded] = useState(false);
-  const [moving, setMoving] = useState(false);
 
-  /**
-   * 장소 순서를 한 칸 옮깁니다.
-   *
-   * <p>끌어서 옮기는 편이 보기에는 좋지만, 목록 안에서 끌면 화면 굴리기·판
-   * 올리기와 셋이 다투게 됩니다. 화살표는 못생겼어도 헷갈리지 않습니다.
-   */
-  async function move(at: number, by: number) {
-    const next = at + by;
-    if (moving || next < 0 || next >= day.places.length) {
-      return;
+  /*
+    끌어서 옮기기.
+
+    화살표 둘을 장소마다 두고 있었습니다. 헷갈리지는 않지만 한 칸씩만
+    움직이고, 무엇보다 장소마다 단추가 둘씩 늘 서 있어 목록이 단추밭이
+    됩니다. 손잡이 하나를 잡고 끌면 한 번에 원하는 자리로 갑니다.
+
+    손잡이에만 손짓을 겁니다. 줄 전체를 잡게 하면 목록을 굴리려는 것과
+    다투어, 굴리려다 장소가 옮겨집니다.
+
+    화면에 보이는 순서는 여기서 먼저 바꾸고 서버는 뒤따라옵니다. 왕복을
+    기다렸다가 제자리로 돌아왔다 다시 가면 손이 미끄러진 것처럼 보입니다.
+  */
+  const [order, setOrder] = useState<Place[]>(day.places);
+  useEffect(() => setOrder(day.places), [day.places]);
+
+  /** 줄마다의 높이. 어디로 끌었는지는 이것으로만 알 수 있습니다. */
+  const heights = useRef<number[]>([]);
+  const [from, setFrom] = useState<number | null>(null);
+  const [to, setTo] = useState<number | null>(null);
+  const shift = useRef(new Animated.Value(0)).current;
+  const toRef = useRef<number | null>(null);
+
+  /** 끌고 있는 줄의 한가운데가 지금 어느 줄의 한가운데에 가장 가까운지. */
+  function landingOf(start: number, dy: number) {
+    const h = heights.current;
+    const tops: number[] = [];
+    let acc = 0;
+    for (let i = 0; i < order.length; i++) {
+      tops.push(acc);
+      acc += h[i] ?? 0;
     }
-    const ids = day.places.map((p) => p.id);
-    [ids[at], ids[next]] = [ids[next], ids[at]];
+    const center = tops[start] + (h[start] ?? 0) / 2 + dy;
+    let best = start;
+    let near = Infinity;
+    for (let i = 0; i < order.length; i++) {
+      const gap = Math.abs(tops[i] + (h[i] ?? 0) / 2 - center);
+      if (gap < near) {
+        near = gap;
+        best = i;
+      }
+    }
+    return best;
+  }
 
-    setMoving(true);
+  async function land(start: number, end: number) {
+    const next = [...order];
+    const [moved] = next.splice(start, 1);
+    next.splice(end, 0, moved);
+    setOrder(next);
     try {
-      await api.post('/api/places/reorder', { dayId: day.id, placeIds: ids });
+      await api.post('/api/places/reorder', {
+        dayId: day.id,
+        placeIds: next.map((p) => p.id),
+      });
       onChanged();
-    } finally {
-      setMoving(false);
+    } catch {
+      /* 서버가 못 받았으면 되돌립니다. 화면만 바뀐 채로 두면 다음에 열 때
+         순서가 슬쩍 되돌아가 있습니다. */
+      setOrder(day.places);
     }
   }
 
@@ -892,30 +968,66 @@ function DayCard({
             <Caption>이 날에는 아직 장소가 없습니다.</Caption>
           ) : (
             <View style={styles.places}>
-              {day.places.map((place, i) => (
-                <PlaceRow
+              {order.map((place, i) => (
+                <Animated.View
                   key={place.id}
-                  place={place}
-                  order={i + 1}
-                  color={color}
-                  visited={visited.has(place.id)}
-                  busy={pending.has(place.id)}
-                  active={activePlaceId === place.id}
-                  canEdit={canEdit}
-                  onToggle={() => onToggle(place.id)}
-                  onFocus={() => onFocus(place.id)}
-                  onEdit={() => setEditing(place)}
-                  onRemove={() => onRemove(place.id)}
-                  info={infoOf.get(place.id)}
-                  tipCount={place.placeId ? (tipCounts[place.placeId] ?? 0) : 0}
-                  onTips={() => onTips(place)}
-                  onUp={i > 0 ? () => move(i, -1) : undefined}
-                  onDown={i < day.places.length - 1 ? () => move(i, 1) : undefined}
-                  moving={moving}
-                  gap={gapAfter.get(place.id)}
-                  chosenOf={chosenOf}
-                  onPick={onPick}
-                />
+                  onLayout={(e) => {
+                    heights.current[i] = e.nativeEvent.layout.height;
+                  }}
+                  style={
+                    from === i
+                      ? [styles.lifted, { transform: [{ translateY: shift }] }]
+                      : undefined
+                  }>
+                  {/* 여기로 들어간다는 표시. 끌고 있는 동안만 뜹니다. */}
+                  {from !== null && to === i && to !== from ? (
+                    <View style={[styles.landing, { backgroundColor: Colors.accent }]} />
+                  ) : null}
+                  <PlaceRow
+                    place={place}
+                    order={i + 1}
+                    color={color}
+                    visited={visited.has(place.id)}
+                    busy={pending.has(place.id)}
+                    active={activePlaceId === place.id}
+                    canEdit={canEdit}
+                    onToggle={() => onToggle(place.id)}
+                    onFocus={() => onFocus(place.id)}
+                    onEdit={() => setEditing(place)}
+                    onRemove={() => onRemove(place.id)}
+                    info={infoOf.get(place.id)}
+                    tipCount={place.placeId ? (tipCounts[place.placeId] ?? 0) : 0}
+                    onTips={() => onTips(place)}
+                    dragging={from === i}
+                    index={i}
+                    onDragStart={(at) => {
+                      setFrom(at);
+                      setTo(at);
+                      toRef.current = at;
+                      shift.setValue(0);
+                    }}
+                    onDragMove={(at, dy) => {
+                      shift.setValue(dy);
+                      const next = landingOf(at, dy);
+                      if (next !== toRef.current) {
+                        toRef.current = next;
+                        setTo(next);
+                      }
+                    }}
+                    onDragEnd={(at) => {
+                      const end = toRef.current ?? at;
+                      setFrom(null);
+                      setTo(null);
+                      shift.setValue(0);
+                      if (end !== at) {
+                        land(at, end);
+                      }
+                    }}
+                    gap={gapAfter.get(place.id)}
+                    chosenOf={chosenOf}
+                    onPick={onPick}
+                  />
+                </Animated.View>
               ))}
             </View>
           )}
@@ -966,9 +1078,11 @@ function PlaceRow({
   info,
   tipCount,
   onTips,
-  onUp,
-  onDown,
-  moving,
+  dragging,
+  index,
+  onDragStart,
+  onDragMove,
+  onDragEnd,
   onToggle,
   onFocus,
   onEdit,
@@ -987,10 +1101,12 @@ function PlaceRow({
   info?: PlaceInfo;
   tipCount: number;
   onTips: () => void;
-  /** 맨 위·맨 아래 장소에는 갈 데가 없어 넘어오지 않습니다. */
-  onUp?: () => void;
-  onDown?: () => void;
-  moving: boolean;
+  /** 지금 이 줄을 끌고 있는지. 끌고 있는 동안에는 조금 들어 올립니다. */
+  dragging: boolean;
+  index: number;
+  onDragStart: (index: number) => void;
+  onDragMove: (index: number, dy: number) => void;
+  onDragEnd: (index: number) => void;
   onToggle: () => void;
   onFocus: () => void;
   onEdit: () => void;
@@ -1019,43 +1135,22 @@ function PlaceRow({
           <View style={styles.placeMain}>
             {/* 지도 핀과 같은 것이 찍힙니다. 목록과 지도를 눈으로 잇는 고리라
                 양쪽이 반드시 같아야 합니다. */}
-            {/* 순서를 바꾸는 화살표는 순서를 적어 둔 자리 옆에 둡니다. 오른쪽
-                단추 줄에 같이 세우면 폰에서는 일곱 개가 한 줄에 안 들어가
-                두 줄로 접힙니다. */}
-            <View style={styles.orderColumn}>
-              <View
-                style={[
-                  styles.order,
-                  { backgroundColor: visited ? color : 'transparent', borderColor: color },
-                ]}>
-                {emoji ? (
-                  <Body small style={styles.orderEmoji}>
-                    {emoji}
-                  </Body>
-                ) : (
-                  /* 날짜 색이 파스텔이라 그것으로 번호를 쓰면 흰 바탕에서
-                     읽히지 않습니다. 색은 테두리가 맡고 번호는 짙게 씁니다. */
-                  <Body small strong style={styles.orderText}>
-                    {order}
-                  </Body>
-                )}
-              </View>
-              {canEdit && (onUp || onDown) ? (
-                <Row gap={0} style={styles.nudge}>
-                  <IconButton
-                    name="arrow-up"
-                    label="위로 옮기기"
-                    disabled={!onUp || moving}
-                    onPress={() => onUp?.()}
-                  />
-                  <IconButton
-                    name="arrow-down"
-                    label="아래로 옮기기"
-                    disabled={!onDown || moving}
-                    onPress={() => onDown?.()}
-                  />
-                </Row>
-              ) : null}
+            <View
+              style={[
+                styles.order,
+                { backgroundColor: visited ? color : 'transparent', borderColor: color },
+              ]}>
+              {emoji ? (
+                <Body small style={styles.orderEmoji}>
+                  {emoji}
+                </Body>
+              ) : (
+                /* 다녀온 곳은 속이 날짜 색으로 차 있어 흰 글자, 아직인 곳은
+                   속이 비어 있어 짙은 글자. */
+                <Body small strong style={{ color: visited ? Colors.onDay : Colors.text }}>
+                  {order}
+                </Body>
+              )}
             </View>
 
             <View style={styles.placeText}>
@@ -1080,10 +1175,30 @@ function PlaceRow({
               ) : null}
             </View>
 
-            {visited ? <Badge label="다녀옴" tone="success" /> : null}
+            {visited ? <Icon name="check" size={18} tone="success" /> : null}
+
+            {/* 끌어서 옮기는 손잡이. 손짓이 여기에만 걸려 있어 목록을 굴리는
+                것, 판을 올리는 것과 다투지 않습니다. */}
+            {canEdit ? (
+              <DragHandle
+                index={index}
+                dragging={dragging}
+                onStart={onDragStart}
+                onMove={onDragMove}
+                onEnd={onDragEnd}
+              />
+            ) : null}
           </View>
         </Pressable>
 
+        {/*
+          손대는 단추는 고른 줄에서만 펼칩니다.
+
+          전에는 장소마다 다섯이 늘 서 있어 목록이 단추밭이었습니다. 지도와
+          목록은 이미 이어져 있어(누르면 핀이 커집니다) 고르는 몸짓이
+          자연스럽고, 한 번에 한 곳만 손대는 것이 실제로 하는 일과도 맞습니다.
+        */}
+        {active ? (
         <Row gap={Spacing.xs} style={styles.placeActions}>
           {/* 구글이 모르고 방금 다녀온 사람만 아는 것들이 여기 모입니다. */}
           {place.placeId ? (
@@ -1126,6 +1241,7 @@ function PlaceRow({
             </>
           ) : null}
         </Row>
+        ) : null}
 
         <ConfirmDialog
           visible={confirming}
@@ -1142,6 +1258,56 @@ function PlaceRow({
       </View>
 
       {gap ? <GapBlock gap={gap} chosen={chosen} onPick={onPick} /> : null}
+    </View>
+  );
+}
+
+/**
+ * 끌어서 옮기는 손잡이.
+ *
+ * <p>줄 전체가 아니라 이 작은 자리에만 손짓을 겁니다. 줄을 잡게 하면 목록을
+ * 굴리려는 것, 판을 올리려는 것과 셋이 다투어 굴리려다 장소가 옮겨집니다.
+ *
+ * <p>세로로 조금 움직였을 때만 잡습니다. 그러지 않으면 손잡이를 스치기만 해도
+ * 옮기기가 시작됩니다.
+ */
+function DragHandle({
+  index,
+  dragging,
+  onStart,
+  onMove,
+  onEnd,
+}: {
+  index: number;
+  dragging: boolean;
+  onStart: (index: number) => void;
+  onMove: (index: number, dy: number) => void;
+  onEnd: (index: number) => void;
+}) {
+  /* 손짓은 한 번만 만들어 둡니다. 매번 새로 만들면 끄는 도중에 갈아 끼워져
+     손가락이 떨어진 것처럼 됩니다. 대신 바뀌는 값은 상자에 담아 봅니다. */
+  const at = useRef(index);
+  at.current = index;
+  const call = useRef({ onStart, onMove, onEnd });
+  call.current = { onStart, onMove, onEnd };
+
+  const pan = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 4,
+      onPanResponderGrant: () => call.current.onStart(at.current),
+      onPanResponderMove: (_, g) => call.current.onMove(at.current, g.dy),
+      onPanResponderRelease: () => call.current.onEnd(at.current),
+      onPanResponderTerminate: () => call.current.onEnd(at.current),
+    }),
+  ).current;
+
+  return (
+    <View
+      {...pan.panHandlers}
+      accessibilityRole="adjustable"
+      accessibilityLabel="끌어서 순서 옮기기"
+      style={styles.grip}>
+      <Icon name="menu" size={18} tone={dragging ? 'accent' : 'muted'} />
     </View>
   );
 }
@@ -1433,15 +1599,22 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: Spacing.md,
   },
-  orderColumn: {
-    alignItems: 'center',
+  /* 끌어 올린 줄. 다른 줄 위로 떠 있어야 어느 것을 쥐고 있는지 보입니다. */
+  lifted: {
+    zIndex: 10,
+    elevation: 10,
   },
-  /* 화살표 둘을 번호 아래에 붙입니다. 사이를 벌리면 번호에서 떨어져 나가
-     무엇의 순서를 바꾸는지 알기 어려워집니다. */
-  nudge: {
-    flexWrap: 'nowrap',
-    marginTop: -Spacing.xs,
-    marginHorizontal: -Spacing.sm,
+  /* 여기로 들어간다는 표시. */
+  landing: {
+    height: 2,
+    borderRadius: Radius.full,
+    marginBottom: Spacing.xs,
+  },
+  grip: {
+    width: Tap.min,
+    height: Tap.min,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   order: {
     width: 28,
@@ -1455,9 +1628,6 @@ const styles = StyleSheet.create({
   orderEmoji: {
     /* 이모지는 글꼴이 제 높이를 갖고 있어, 줄 높이를 두면 아래로 처집니다. */
     lineHeight: undefined,
-  },
-  orderText: {
-    color: Colors.onDay,
   },
   placeText: {
     flex: 1,

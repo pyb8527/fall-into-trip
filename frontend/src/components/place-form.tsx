@@ -4,7 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import { api, ApiError } from '@/api/client';
 import type { Place } from '@/api/types';
 import { PlaceSearch } from '@/components/place-search';
-import { PLACE_ICONS, iconOf } from '@/constants/place-icons';
+import { IconPicker } from '@/components/icon-picker';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import {
   Body,
@@ -199,6 +199,9 @@ export function PlaceForm({
         라멘집인지 온천인지가 핀만 보고 읽히면, 다 짜 놓은 지도를 한 장으로
         찍었을 때 그것이 곧 여행의 요약이 됩니다.
       */}
+      <Body small strong>
+        지도에 찍을 그림
+      </Body>
       <IconPicker value={icon} onChange={setIcon} />
 
       <Row gap={Spacing.sm} style={styles.pair}>
@@ -227,85 +230,7 @@ export function PlaceForm({
   );
 }
 
-/**
- * 핀에 찍을 그림 고르기.
- *
- * <p>먼저 하나 찍혀 있습니다. 장소를 찾아 고르면 서버가 구글이 알려 준 갈래로
- * 짐작해 둡니다. 대개 맞고, 틀렸을 때만 손대면 됩니다 — 넣을 때마다 열여섯 개
- * 중에서 고르라고 하면 그것이 곧 일이 됩니다.
- *
- * <p>그림만 늘어놓지 않고 이름을 함께 답니다. 이모지는 기기마다 다르게 생겨,
- * 어떤 폰에서는 라멘과 우동이 거의 같아 보입니다.
- */
-function IconPicker({
-  value,
-  onChange,
-}: {
-  value: string | null;
-  onChange: (next: string | null) => void;
-}) {
-  return (
-    <View style={styles.picker}>
-      <Body small strong>
-        지도에 찍을 그림
-      </Body>
-      <Row gap={Spacing.xs}>
-        <Press
-          onPress={() => onChange(null)}
-          scale={0.9}
-          accessibilityLabel="그림 없이 번호만"
-          accessibilityState={{ selected: value === null }}
-          style={[styles.kind, value === null ? styles.kindOn : null]}>
-          <Body small strong tone={value === null ? 'accent' : 'secondary'}>
-            번호
-          </Body>
-        </Press>
-        {PLACE_ICONS.map((kind) => {
-          const on = value === kind.key;
-          return (
-            <Press
-              key={kind.key}
-              onPress={() => onChange(kind.key)}
-              scale={0.9}
-              accessibilityLabel={kind.label}
-              accessibilityState={{ selected: on }}
-              style={[styles.kind, on ? styles.kindOn : null]}>
-              <Body small style={styles.kindEmoji}>
-                {kind.emoji}
-              </Body>
-              <Caption tone={on ? 'accent' : 'muted'}>{kind.label}</Caption>
-            </Press>
-          );
-        })}
-      </Row>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  picker: {
-    gap: Spacing.sm,
-  },
-  kind: {
-    minWidth: 56,
-    borderRadius: Radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: Colors.border,
-    backgroundColor: Colors.fill,
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 2,
-  },
-  kindOn: {
-    borderColor: Colors.accent,
-    backgroundColor: Colors.accentSoft,
-  },
-  kindEmoji: {
-    /* 이모지는 글꼴이 제 높이를 갖고 있어, 줄 높이를 두면 아래로 처집니다. */
-    lineHeight: undefined,
-  },
   /* 나란한 두 칸은 위쪽으로 맞춥니다. 한쪽에만 힌트가 붙어 키가 달라져도
      입력 상자끼리는 한 줄에 서야 합니다. */
   pair: {

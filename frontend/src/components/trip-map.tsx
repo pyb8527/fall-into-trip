@@ -46,6 +46,7 @@ export function TripMap({
   height = 300,
   chrome = true,
   bleed = false,
+  link = true,
 }: TripMapProps) {
   const map = useRef<MapView | null>(null);
   const [full, setFull] = useState(false);
@@ -155,7 +156,7 @@ export function TripMap({
         그 선은 "이 순서로 간다" 는 뜻일 뿐 지나는 길이 아니므로, 실제 길과
         헷갈리지 않게 점선으로 둡니다.
       */}
-      {drawn.length > 0
+      {drawn.length === 0 && !link ? null : drawn.length > 0
         ? drawn.map((line) => (
             <Polyline
               key={line.id}
@@ -333,7 +334,7 @@ function Pin({ place, active }: { place: MapPlace; active: boolean }) {
               {place.emoji}
             </Body>
           ) : (
-            <Body small strong style={styles.pinNumber}>
+            <Body small strong style={{ color: visited ? Colors.onDay : Colors.text }}>
               {place.order}
             </Body>
           )}
@@ -439,11 +440,6 @@ const styles = StyleSheet.create({
     left: 0,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  pinNumber: {
-    /* 날짜 색이 파스텔이라 그것으로 번호를 쓰면 읽히지 않습니다. 색은 방울이
-       맡고 번호는 늘 짙게 씁니다. */
-    color: Colors.onDay,
   },
   pinEmoji: {
     /* 이모지는 글꼴이 제 높이를 갖고 있어, 줄 높이를 두면 아래로 처집니다. */

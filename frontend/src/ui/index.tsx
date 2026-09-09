@@ -735,7 +735,9 @@ export type IconName =
   | 'bookmark'
   | 'compass'
   | 'message-square'
-  | 'upload';
+  | 'upload'
+  /** 끌어서 옮기는 손잡이 */
+  | 'menu';
 
 export function Icon({
   name,
@@ -952,13 +954,19 @@ export function DragSheet({
   initial = 1,
   /** 판 맨 위에 늘 보이는 줄. 손잡이 옆에 붙습니다. */
   peek,
-  onSnapChange,
+  onHeightChange,
 }: {
   children: React.ReactNode;
   snaps?: number[];
   initial?: number;
   peek?: React.ReactNode;
-  onSnapChange?: (index: number) => void;
+  /**
+   * 판이 지금 몇 픽셀을 덮고 있는지.
+   *
+   * <p>지도가 이것을 알아야 합니다. 모르면 고른 장소의 핀을 화면 한가운데로
+   * 보내는데, 그 가운데가 판에 덮여 있어 정작 보이지 않습니다.
+   */
+  onHeightChange?: (px: number) => void;
 }) {
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -977,7 +985,7 @@ export function DragSheet({
     (index: number) => {
       const next = Math.max(0, Math.min(stops.length - 1, index));
       setAt(next);
-      onSnapChange?.(next);
+      onHeightChange?.(stops[next]);
       Animated.spring(tall, {
         toValue: stops[next],
         damping: Motion.spring.damping,
@@ -989,12 +997,14 @@ export function DragSheet({
       }).start();
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [tall, onSnapChange, stops.join(',')],
+    [tall, onHeightChange, stops.join(',')],
   );
 
   /* 창 크기가 바뀌면 붙어 있던 자리를 새 높이로 다시 잡습니다. */
   useEffect(() => {
-    tall.setValue(stops[Math.min(atRef.current, stops.length - 1)]);
+    const px = stops[Math.min(atRef.current, stops.length - 1)];
+    tall.setValue(px);
+    onHeightChange?.(px);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stops.join(',')]);
 
@@ -1070,9 +1080,14 @@ export function DragSheet({
           styles.dragBodyInner,
           { paddingBottom: insets.bottom + Spacing.huge },
         ]}
-        /* 맨 위까지 올라오기 전에는 굴리지 않습니다. 판을 끄는 손짓과
-           다투지 않게 하려는 것입니다. */
-        scrollEnabled={top}
+        /*
+          언제나 굴러갑니다.
+
+          전에는 맨 위까지 올라오기 전에는 막아 두었습니다. 판을 끄는 손짓과
+          다툴까 봐서였는데, 실제로는 끄는 자리가 위쪽 머리(손잡이와 그 옆
+          줄)뿐이라 다툴 일이 없었습니다. 반쯤 올린 채로 목록을 훑을 수 없는
+          쪽이 훨씬 답답합니다.
+        */
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}>
         {children}

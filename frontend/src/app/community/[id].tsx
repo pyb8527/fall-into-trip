@@ -12,6 +12,8 @@ import {
   countByPlace,
   useComments,
 } from '@/components/comment-list';
+import type { MapPlace } from '@/components/map-types';
+import { TripMap } from '@/components/trip-map';
 import { iconOf } from '@/constants/place-icons';
 import { Colors, dayColor, Radius, Spacing } from '@/constants/theme';
 import {
@@ -68,6 +70,40 @@ export default function Post() {
   */
   const talk = useComments(id, !!data?.feedback);
   const perPlace = useMemo(() => countByPlace(talk.comments), [talk.comments]);
+
+  /** 지도에서 켜 둔 곳. */
+  const [activeId, setActiveId] = useState<string | null>(null);
+
+  /** 사본의 장소를 지도에 얹을 모양으로. 자리(몇째 날 몇 번째)가 곧 이름표입니다. */
+  const pins = useMemo<MapPlace[]>(
+    () =>
+      (data?.itinerary.days ?? []).flatMap((day, di) =>
+        day.places
+          .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng))
+          .map((p, i) => ({
+            id: `${di}:${i}`,
+            name: p.name,
+            lat: p.lat,
+            lng: p.lng,
+            dayIndex: di,
+            order: i + 1,
+            emoji: iconOf(p.icon),
+            color: day.color || dayColor(di),
+            fit: true,
+            radius: null,
+            detail: {
+              time: p.time,
+              cat: p.cat,
+              cost: p.cost,
+              note: p.note,
+              sub: null,
+              dayLabel: day.shortName || day.label || `${di + 1}일차`,
+              visited: false,
+            },
+          })),
+      ),
+    [data],
+  );
 
   /** 로그인이 필요한 동작 앞에서 한 번 걸러 줍니다. */
   function needLogin() {
@@ -163,7 +199,20 @@ export default function Post() {
       }>
       <Stack.Screen options={{ title: data.title }} />
 
-      <PostMap postId={id} title={data.title} height={190} />
+      {/*
+        글 하나를 볼 때는 살아 있는 지도를 씁니다.
+
+        목록에서는 글마다 지도를 띄우면 화면이 무거워 그림 한 장으로 뒀지만,
+        여기서는 한 장뿐입니다. 어디를 어떻게 도는지 눌러 보고 당겨 볼 수
+        있어야 "가져올지" 를 정할 수 있습니다.
+
+        좌표가 하나도 없는 옛 글에서는 그림으로 물러섭니다.
+      */}
+      {pins.length > 0 ? (
+        <TripMap places={pins} activeId={activeId} onSelect={setActiveId} height={260} />
+      ) : (
+        <PostMap postId={id} title={data.title} height={190} />
+      )}
 
       <View style={styles.head}>
         <Title>{data.title}</Title>
@@ -371,12 +420,24 @@ function DayBlock({
             누르면 그 장소의 댓글만 담긴 판이 올라옵니다.
           */}
           {feedback ? (
-            <Button
-              label={countAt(i) > 0 ? `댓글 ${countAt(i)}` : '댓글'}
-              variant={countAt(i) > 0 ? 'secondary' : 'ghost'}
-              compact
-              onPress={() => onComment(i)}
-            />
+            <Row gap={2}>
+              <IconButton
+                name="message-square"
+                label={
+                  countAt(i) > 0
+                    ? `${place.name} 댓글 ${countAt(i)}개 보기`
+                    : `${place.name}에 댓글 남기기`
+                }
+                tone="accent"
+                active={countAt(i) > 0}
+                onPress={() => onComment(i)}
+              />
+              {countAt(i) > 0 ? (
+                <Caption tone="accent" strong>
+                  {countAt(i)}
+                </Caption>
+              ) : null}
+            </Row>
           ) : null}
           {/* 일정을 통째로 가져오지 않고 이 집만 담을 수 있어야 합니다. */}
           <IconButton

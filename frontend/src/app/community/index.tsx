@@ -36,7 +36,7 @@ import {
  * 정렬과 "내 글" 은 성격이 다르지만 한 줄에 둡니다. 내 글을 보러 화면을 따로
  * 만들면 올리고 나서 그것을 어디서 찾는지가 또 하나의 질문이 됩니다.
  */
-type Tab = PostSort | 'mine';
+type Tab = PostSort | 'mine' | 'liked';
 
 /**
  * 거를 수 있는 기간.
@@ -54,8 +54,14 @@ const TABS: { value: Tab; label: string }[] = [
   { value: 'hot', label: '인기' },
   { value: 'new', label: '최신' },
   { value: 'top', label: '추천순' },
+  /* 구경하다 마음에 든 것을 눌러 두고는 나중에 찾지 못했습니다. 추천이
+     세는 데만 쓰이고 되찾는 길이 없었습니다. */
+  { value: 'liked', label: '내가 누른' },
   { value: 'mine', label: '내 글' },
 ];
+
+/** 나만 볼 수 있는 것들. 로그인하지 않았으면 띠에서 뺍니다. */
+const PRIVATE: Tab[] = ['mine', 'liked'];
 
 export default function Community() {
   const router = useRouter();
@@ -81,8 +87,8 @@ export default function Community() {
 
   const { data, error, loading, reload, setData } = useAsync<PostPage>(
     (signal) =>
-      view === 'mine'
-        ? api.get(`/api/posts/mine${query({ page })}`, signal)
+      view === 'mine' || view === 'liked'
+        ? api.get(`/api/posts/${view}${query({ page })}`, signal)
         : api.get(`/api/posts${query({ sort: view, region, days, q, page })}`, signal),
     [view, page, region, days, q],
   );
@@ -133,7 +139,7 @@ export default function Community() {
       </View>
 
       <SegmentedTabs
-        items={user ? TABS : TABS.filter((t) => t.value !== 'mine')}
+        items={user ? TABS : TABS.filter((t) => !PRIVATE.includes(t.value))}
         value={view}
         onChange={(next) => {
           setView(next);
@@ -143,7 +149,7 @@ export default function Community() {
 
       {/* 내 글에는 거르기를 두지 않습니다. 몇 개 안 되는 것을 또 거를 이유가
           없고, 서버도 내 글에는 조건을 받지 않습니다. */}
-      {view === 'mine' ? null : (
+      {PRIVATE.includes(view) ? null : (
         <View style={styles.filters}>
           {/* 엔터만으로 찾게 두면 자판이 없는 데스크톱에서는 무엇을 눌러야
               하는지 알 수 없습니다. 단추를 답니다. 찾고 있는 중이면 지울
@@ -222,7 +228,9 @@ export default function Community() {
           message={
             view === 'mine'
               ? '아직 올린 일정이 없습니다. 여행 화면에서 올릴 수 있습니다.'
-              : filtered
+              : view === 'liked'
+                ? '아직 눌러 둔 글이 없습니다. 마음에 드는 일정에 하트를 눌러 두세요.'
+                : filtered
                 ? '조건에 맞는 일정이 없습니다. 조건을 줄여 보세요.'
                 : '아직 올라온 일정이 없습니다. 첫 번째가 되어 보세요.'
           }

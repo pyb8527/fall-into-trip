@@ -5,29 +5,32 @@ import { StyleSheet, View } from 'react-native';
 import { api, ApiError } from '@/api/client';
 import type { SavedPlace, TripDetail, TripSummary } from '@/api/types';
 import { useAsync } from '@/api/use-async';
+import { IconPicker } from '@/components/icon-picker';
 import type { MapPlace } from '@/components/map-types';
 import { TripMap } from '@/components/trip-map';
 import { PLACE_ICONS, iconOf, labelOf } from '@/constants/place-icons';
-import { Colors, dayColor, Spacing } from '@/constants/theme';
+import { Colors, Radius, Spacing } from '@/constants/theme';
 import { openDirections } from '@/lib/directions';
 import {
-  Badge,
   Body,
   BottomSheet,
   Button,
   Caption,
-  Card,
   Chip,
   Empty,
   ErrorNote,
   IconButton,
   ListRow,
   Loading,
+  Press,
   Row,
   Screen,
   Subtitle,
   Title,
 } from '@/ui';
+
+/** 그림을 아직 안 고른 곳. 지도에서는 별로 찍힙니다. */
+const STAR = '⭐';
 
 /**
  * 보관함.
@@ -36,12 +39,11 @@ import {
  * 꺼내 넣습니다.
  *
  * <p><b>지도를 함께 둡니다.</b> 담아 둔 곳은 목록으로만 보면 이름의 나열입니다.
- * "오사카에서 담은 게 뭐였지" 를 알려면 하나씩 눌러 봐야 했습니다. 지도에
- * 얹으면 어디에 무엇이 모여 있는지가 한눈에 보이고, 그 자체가 다음 일정의
- * 밑그림이 됩니다.
+ * "오사카에서 담은 게 뭐였지" 를 알려면 하나씩 눌러 봐야 했습니다.
  *
- * <p>갈래로도 거릅니다. 스무 곳이 넘어가면 "밥집만" 이나 "온천만" 을 보고
- * 싶어지는데, 목록을 끝까지 훑어 골라내는 것은 일입니다.
+ * <p>지도에서 <b>점끼리 잇지 않습니다.</b> 담아 둔 곳에는 순서가 없습니다.
+ * 이어 놓으면 담은 차례가 무슨 동선인 것처럼 보여, 있지도 않은 길을 그려
+ * 놓게 됩니다.
  */
 export default function Saved() {
   const router = useRouter();
@@ -52,8 +54,10 @@ export default function Saved() {
   const [kind, setKind] = useState<string | null>(null);
   /** 지도에서 켜 둔 곳. 목록의 그 줄도 함께 켜집니다. */
   const [activeId, setActiveId] = useState<string | null>(null);
+  /** 그림을 바꾸려고 열어 둔 곳. */
+  const [tagging, setTagging] = useState<SavedPlace | null>(null);
 
-  const { data, error, loading, reload } = useAsync<{ places: SavedPlace[] }>(
+  const { data, error, loading, reload, setData } = useAsync<{ places: SavedPlace[] }>(
     (signal) => api.get('/api/saved', signal),
     [],
   );
@@ -63,8 +67,7 @@ export default function Saved() {
   /**
    * 담아 둔 것에 실제로 있는 갈래만 늘어놓습니다.
    *
-   * <p>열여섯 개를 다 보여 주면 대부분 눌러도 아무것도 안 걸립니다. 있는
-   * 것만, 그리고 담아 둔 순서가 아니라 정해 둔 순서(밥·카페가 먼저)로.
+   * <p>열여섯 개를 다 보여 주면 대부분 눌러도 아무것도 안 걸립니다.
    */
   const kinds = useMemo(() => {
     const have = new Set(all.map((p) => p.icon).filter((k): k is string => !!k));
@@ -86,10 +89,10 @@ export default function Saved() {
         lng: place.lng,
         dayIndex: 0,
         order: i + 1,
-        emoji: iconOf(place.icon),
-        /* 보관함에는 날짜가 없습니다. 갈래마다 색을 돌려 써서, 지도만 봐도
-           밥집이 모인 곳과 명소가 모인 곳이 갈라 보이게 합니다. */
-        color: colorOfKind(place.icon),
+        /* 그림을 안 골랐으면 별. 담아 둔 곳이라는 뜻이 그대로 그림이 됩니다.
+           번호로 두면 있지도 않은 순서를 말하게 됩니다. */
+        emoji: iconOf(place.icon) || STAR,
+        color: Colors.accent,
         fit: true,
         radius: null,
         detail: {
@@ -128,6 +131,22 @@ export default function Saved() {
     }
   }
 
+  /** 그림을 바꿉니다. 서버를 기다리지 않고 먼저 칠합니다 — 고르는 맛이 있어야 합니다. */
+  async function retag(place: SavedPlace, icon: string | null) {
+    setData((prev) =>
+      prev
+        ? { ...prev, places: prev.places.map((p) => (p.id === place.id ? { ...p, icon } : p)) }
+        : prev,
+    );
+    setTagging(null);
+    try {
+      await api.patch(`/api/saved/${place.id}`, { icon: icon ?? '' });
+    } catch (e) {
+      setFailed(e instanceof ApiError ? e.message : '바꾸지 못했습니다.');
+      reload();
+    }
+  }
+
   return (
     <Screen
       footer={
@@ -154,6 +173,7 @@ export default function Saved() {
           places={pins}
           activeId={activeId}
           onSelect={setActiveId}
+          link={false}
           height={240}
         />
       ) : null}
@@ -161,7 +181,7 @@ export default function Saved() {
       {/* 갈래가 둘 이상일 때만 거르기를 둡니다. 하나뿐이면 누를 것이 없습니다. */}
       {kinds.length > 1 ? (
         <Row gap={Spacing.xs}>
-          <Chip label={`전체 ${all.length}`} selected={kind === null} onPress={() => setKind(null)} />
+          <Chip label="전체" selected={kind === null} onPress={() => setKind(null)} />
           {kinds.map((k) => (
             <Chip
               key={k.key}
@@ -177,22 +197,55 @@ export default function Saved() {
         <Empty message="이 갈래로 담아 둔 곳이 없습니다." />
       ) : null}
 
-      {shown.map((place) => {
-        const on = picked.has(place.id);
-        return (
-          <Card key={place.id} style={activeId === place.id ? styles.lit : undefined}>
-            <Row style={styles.row}>
-              <View style={styles.grow}>
-                <ListRow
-                  title={`${iconOf(place.icon)} ${place.name}`.trim()}
-                  subtitle={place.note ?? place.cat ?? labelOf(place.icon) ?? '메모 없음'}
-                  right={on ? <Badge label="고름" tone="accent" /> : undefined}
-                  onPress={() => {
-                    setActiveId(place.id);
-                    toggle(place.id);
-                  }}
-                />
-              </View>
+      {/*
+        한 줄에 한 곳.
+
+        전에는 카드 안에 줄이 들어 있고 그 안에 "고름" 이라는 표가 또 붙었습니다.
+        층이 셋이면 한 곳을 읽는 데 눈이 세 번 멈춥니다. 고른 것은 글자로 적지
+        않고 바탕색으로 말합니다 — 고른 것과 안 고른 것을 나란히 놓으면 표가
+        없어도 어느 쪽인지 압니다.
+      */}
+      <View style={styles.list}>
+        {shown.map((place) => {
+          const on = picked.has(place.id);
+          return (
+            /* 누르는 자리를 겹쳐 두지 않습니다. 큰 것 안에 작은 것을 넣으면
+               웹에서는 둘 다 눌려, 그림을 바꾸려다 고르기까지 됩니다. */
+            <View
+              key={place.id}
+              style={[
+                styles.row,
+                on ? styles.rowOn : null,
+                activeId === place.id && !on ? styles.rowLit : null,
+              ]}>
+              {/* 그림을 누르면 바꿀 수 있습니다. 지우고 다시 담게 하지 않습니다. */}
+              <Press
+                onPress={() => setTagging(place)}
+                scale={0.9}
+                accessibilityLabel={`${place.name} 그림 바꾸기`}
+                style={styles.mark}>
+                <Body style={styles.emoji}>{iconOf(place.icon) || STAR}</Body>
+              </Press>
+
+              <Press
+                onPress={() => {
+                  setActiveId(place.id);
+                  toggle(place.id);
+                }}
+                scale={0.99}
+                accessibilityLabel={`${place.name} ${on ? '고르기 취소' : '고르기'}`}
+                accessibilityState={{ selected: on }}
+                style={styles.grow}>
+                <Body strong numberOfLines={1}>
+                  {place.name}
+                </Body>
+                {place.note || place.cat ? (
+                  <Caption tone="secondary" numberOfLines={1}>
+                    {place.note ?? place.cat}
+                  </Caption>
+                ) : null}
+              </Press>
+
               <IconButton
                 name="navigation"
                 label={`${place.name} 길찾기`}
@@ -209,10 +262,26 @@ export default function Saved() {
                 tone="danger"
                 onPress={() => drop(place.id)}
               />
-            </Row>
-          </Card>
-        );
-      })}
+            </View>
+          );
+        })}
+      </View>
+
+      {tagging ? (
+        <BottomSheet
+          visible
+          title={`${tagging.name} 그림`}
+          onClose={() => setTagging(null)}>
+          <Caption tone="secondary">
+            지도에 이 그림으로 찍힙니다. 일정에 넣을 때도 그대로 따라갑니다.
+          </Caption>
+          <IconPicker
+            value={tagging.icon ?? null}
+            onChange={(next) => retag(tagging, next)}
+            noneLabel="별"
+          />
+        </BottomSheet>
+      ) : null}
 
       <PourSheet
         visible={pouring}
@@ -227,21 +296,6 @@ export default function Saved() {
       />
     </Screen>
   );
-}
-
-/**
- * 갈래마다 다른 색.
- *
- * <p>보관함에는 날짜가 없어 날짜 색을 쓸 수 없습니다. 대신 갈래 순서로 같은
- * 색표를 돌려 씁니다. 밥집은 늘 같은 색, 온천은 늘 같은 색이라 지도만 봐도
- * 무엇이 어디에 모여 있는지 갈라 보입니다.
- *
- * <p>갈래가 없는 곳은 첫 색으로 둡니다. 회색으로 두면 "덜 중요한 것" 처럼
- * 보이는데, 그냥 아직 그림을 안 고른 것뿐입니다.
- */
-function colorOfKind(icon: string | null | undefined) {
-  const at = PLACE_ICONS.findIndex((k) => k.key === icon);
-  return dayColor(at < 0 ? 0 : at);
 }
 
 /**
@@ -341,16 +395,48 @@ const styles = StyleSheet.create({
   head: {
     gap: Spacing.xs,
   },
-  row: {
-    alignItems: 'center',
+  list: {
     gap: Spacing.xs,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.lg,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+    paddingVertical: Spacing.sm,
+    paddingLeft: Spacing.md,
+    paddingRight: Spacing.sm,
+  },
+  /* 고른 것. 글자로 적지 않고 색으로 말합니다. */
+  rowOn: {
+    backgroundColor: Colors.accentSoft,
+    borderColor: Colors.accent,
+  },
+  /* 지도에서 핀만 누른 것. 고른 것과는 다르게, 실선만 옅게. */
+  rowLit: {
+    borderColor: Colors.border,
+  },
+  mark: {
+    width: 36,
+    height: 36,
+    borderRadius: Radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.fill,
+  },
+  emoji: {
+    /* 이모지는 글꼴이 제 높이를 갖고 있어, 줄 높이를 두면 아래로 처집니다. */
+    lineHeight: undefined,
   },
   grow: {
     flex: 1,
-  },
-  /* 지도에서 핀을 누른 곳. 목록에서 어느 줄인지 바로 보여야 둘이 이어집니다. */
-  lit: {
-    borderColor: Colors.accent,
+    gap: 2,
+    /* 누르는 자리가 좁으면 손가락으로 맞추기 어렵습니다. 세로로 채웁니다. */
+    justifyContent: 'center',
+    minHeight: 36,
   },
   back: {
     justifyContent: 'space-between',

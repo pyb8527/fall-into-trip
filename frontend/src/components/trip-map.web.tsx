@@ -76,7 +76,9 @@ function pinLabel(place: MapPlace, visited: boolean) {
      않습니다. 색은 방울이 맡고 번호는 늘 짙게 씁니다. */
   return {
     text: String(place.order),
-    color: Colors.onDay,
+    /* 다녀온 곳은 방울 속이 날짜 색으로 차 있어 흰 글자, 아직인 곳은 속이
+       희어서 짙은 글자. 한쪽으로 못박으면 다른 한쪽에서 번호가 사라집니다. */
+    color: visited ? '#FFFFFF' : Colors.text,
     fontSize: '11px',
     fontWeight: '700',
   };
@@ -93,6 +95,9 @@ export function TripMap({
   height = 300,
   chrome = true,
   bleed = false,
+  link = true,
+  bottomInset = 0,
+  goHereAt,
 }: TripMapProps) {
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -355,8 +360,7 @@ export function TripMap({
           }),
         );
       });
-    } else {
-
+    } else if (link) {
       /* 실제 경로가 없을 때만 같은 날끼리 잇습니다. 점선으로 둬야 도로와
          헷갈리지 않습니다. */
       const byDay = new Map<number, MapPlace[]>();
@@ -414,9 +418,17 @@ export function TripMap({
     } else if (target.length > 1) {
       const bounds = new g.LatLngBounds();
       target.forEach((p) => bounds.extend({ lat: p.lat, lng: p.lng }));
-      map.current.fitBounds(bounds, { top: 48, right: 40, bottom: 40, left: 40 });
+      /* 아래를 판이 덮고 있으면 그만큼 여백을 더 줍니다. 안 그러면 아래쪽
+         핀들이 판 뒤로 들어갑니다. */
+      map.current.fitBounds(bounds, {
+        top: 48,
+        right: 40,
+        bottom: 40 + bottomInset,
+        left: 40,
+      });
     }
-  }, [ready, places, routes]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, places, routes, link]);
 
   /*
     동행자와 임시 핀.
@@ -484,7 +496,12 @@ export function TripMap({
     if ((map.current.getZoom() ?? 0) < 15) {
       map.current.setZoom(16);
     }
-  }, [here]);
+    /* 아래가 판에 덮여 있으면 그만큼 위로. 내 자리도 판 뒤로 들어가면
+       "눌렀는데 아무 일도 안 일어난다" 가 됩니다. */
+    if (bottomInset > 0) {
+      map.current.panBy(0, bottomInset / 2);
+    }
+  }, [here, bottomInset]);
 
   /* 고른 장소를 크게 하고, 그 자리로 옮기면서 들여다볼 만큼 당깁니다. */
   useEffect(() => {
@@ -513,7 +530,16 @@ export function TripMap({
       if ((map.current.getZoom() ?? 0) < FOCUS_ZOOM) {
         map.current.setZoom(FOCUS_ZOOM);
       }
+      /*
+        화면 한가운데는 판에 덮여 있습니다. 그대로 두면 고른 곳이 판 뒤로
+        들어가, 눌렀는데 아무 데도 안 간 것처럼 보입니다. 덮인 높이의 절반만큼
+        위로 올려 보이는 곳의 한가운데에 놓습니다.
+      */
+      if (bottomInset > 0) {
+        map.current.panBy(0, bottomInset / 2);
+      }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, activeId, places]);
 
   /*
@@ -539,6 +565,20 @@ export function TripMap({
       </View>
     );
   }
+
+  /*
+    바깥에서 "내 위치로" 를 눌렀을 때.
+
+    단추는 지도 밖(일정 화면)에 있고 지도를 옮기는 것은 여기입니다. 값이
+    바뀌기만 하면 움직입니다 — 같은 자리를 두 번 눌러도 두 번 다 가야 하므로
+    자리가 아니라 "눌렀다" 는 것만 넘겨받습니다.
+  */
+  useEffect(() => {
+    if (goHereAt) {
+      goHere();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [goHereAt]);
 
   const chosen = full && sheetId ? (places.find((p) => p.id === sheetId) ?? null) : null;
 
