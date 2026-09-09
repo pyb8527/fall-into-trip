@@ -465,38 +465,27 @@ export default function TripScreen() {
       <Stack.Screen
         options={{
           title: data.trip.title,
-          /* 지도가 막대 뒤까지 이어져야 화면이 지도로 시작합니다. 잘라 두면
-             위쪽에 검은 띠가 하나 더 생긴 것처럼 보입니다. */
-          headerTransparent: true,
-          headerStyle: { backgroundColor: 'transparent' },
-          /* 막대가 비쳐 지도 위에 바로 얹히므로, 여기 단추도 지도 단추와
-             같은 생김새여야 합니다. 네모난 연회색 단추는 지도의 건물·구획과
-             섞여 어디까지가 단추인지 보이지 않습니다. */
+          /*
+            막대를 비쳐 두었더니 여행 이름이 지도 무늬 위에 그냥 얹혀 읽히지
+            않았습니다. 지도 위에 떠 있는 동그란 단추와 맨 글자 제목이 나란히
+            서서 어느 쪽도 아닌 모양이 되기도 했습니다.
+
+            평범한 막대로 되돌립니다. 지도는 그 아래부터 화면 끝까지 채우므로
+            잃는 것은 막대 높이만큼뿐입니다.
+          */
           headerLeft: navigation.canGoBack()
             ? undefined
             : () => (
                 <IconButton
                   name="chevron-left"
                   label="내 여행으로"
-                  onMap
                   onPress={() => router.replace('/(app)/trips')}
                 />
               ),
+          /* 길 위에서 가장 자주 여는 하나만 둡니다. 나머지는 판 안에 글자로
+             있습니다 — 그림만 늘어놓으면 눌러 보기 전에는 뜻을 모릅니다. */
           headerRight: () => (
-            <Row gap={Spacing.xs}>
-              <IconButton
-                name="compass"
-                label="여행 중 화면"
-                onMap
-                onPress={() => router.push({ pathname: '/travel/[id]', params: { id } })}
-              />
-              <IconButton
-                name="users"
-                label="동행자"
-                onMap
-                onPress={() => setCompanions(true)}
-              />
-            </Row>
+            <IconButton name="users" label="동행자" onPress={() => setCompanions(true)} />
           ),
         }}
       />
@@ -561,14 +550,18 @@ export default function TripScreen() {
         바로 아래에서 시작해, 띠와 왼쪽 여백을 맞춥니다.
       */}
       {/*
-        지도 단추는 판 바로 위, 오른쪽에 세웁니다.
+        지도 위에는 내 위치 하나만 둡니다.
 
-        위쪽 구석에 두면 막대·날짜 띠와 겹쳐 셋이 한 덩어리로 뭉칩니다. 무엇보다
-        지도를 볼 때 손은 아래에 있습니다 — 위 구석은 한 손으로 쥐면 닿지도
-        않습니다.
+        전에는 누르면 동그란 단추 넷이 세로로 펼쳐졌습니다. 글자가 없어 X 가
+        무엇인지, 사람 모양이 무엇인지 눌러 보기 전에는 알 수 없었고, 그중
+        하나는 내가 어디 있는지를 남에게 알리는 것이라 아무 표시 없이 둘
+        일이 아니었습니다.
+
+        지도 단추는 지도를 움직이는 것만 맡습니다. 나머지는 말로 설명할
+        자리가 있는 판 안으로 내렸습니다.
       */}
       {me.supported ? (
-        <View style={[styles.floatRight, { bottom: covered + Spacing.md }]}>
+        <View style={[styles.floatRight, { bottom: covered + Spacing.xxl }]}>
           <IconButton
             name="crosshair"
             label={me.watching ? '내 위치로' : '내 위치 보기'}
@@ -585,34 +578,6 @@ export default function TripScreen() {
               }
             }}
           />
-          {me.watching ? (
-            <IconButton
-              name="x"
-              label="내 위치 끄기"
-              onMap
-              onPress={() => stopLive()}
-            />
-          ) : null}
-          {me.watching ? (
-            <>
-              {/* 켜 두면 네 시간 뒤 스스로 꺼집니다. 지나온 자리는 남지 않고
-                  마지막 자리만 동행자에게 보입니다. */}
-              <IconButton
-                name="users"
-                label={sharing ? '동행자에게 알리는 중 · 끄기' : '동행자에게 내 위치 알리기'}
-                active={sharing}
-                tone="success"
-                onMap
-                onPress={toggleSharing}
-              />
-              <IconButton
-                name="map-pin"
-                label="여기 있다고 찍어 두기"
-                onMap
-                onPress={dropPin}
-              />
-            </>
-          ) : null}
         </View>
       ) : null}
 
@@ -631,11 +596,40 @@ export default function TripScreen() {
         {actionError ? <ErrorNote message={actionError} /> : null}
         {gapError && dayId ? <Caption tone="danger">{gapError}</Caption> : null}
         {me.error ? <Caption tone="danger">{me.error}</Caption> : null}
-        {sharing ? (
-          <Caption tone="success" strong>
-            위치를 동행자에게 알리는 중입니다. 네 시간 뒤 저절로 꺼집니다.
-          </Caption>
+
+        {/*
+          내 위치로 하는 일들.
+
+          지도 위에 동그란 단추로 두었더니 무엇인지 알 수 없었습니다. 특히
+          "동행자에게 알리기" 는 내가 어디 있는지가 남에게 가는 일이라, 그림
+          하나로 둘 것이 아닙니다. 켜 두었을 때만 글자로 펼칩니다.
+        */}
+        {me.supported && me.watching ? (
+          <View style={styles.live}>
+            <Row gap={Spacing.xs}>
+              <Button
+                label={sharing ? '위치 알리는 중 · 끄기' : '동행자에게 내 위치 알리기'}
+                variant={sharing ? 'secondary' : 'primary'}
+                compact
+                onPress={toggleSharing}
+              />
+              <Button
+                label="여기 있다고 찍어 두기"
+                variant="secondary"
+                compact
+                onPress={dropPin}
+              />
+              <Button label="내 위치 끄기" variant="ghost" compact onPress={stopLive} />
+            </Row>
+            {sharing ? (
+              <Caption tone="success" strong>
+                지금 어디 있는지가 동행자에게 보입니다. 네 시간 뒤 저절로 꺼지고,
+                지나온 자리는 남지 않습니다.
+              </Caption>
+            ) : null}
+          </View>
         ) : null}
+
         {mates.length > 0 ? (
           <Caption tone="secondary">
             지금 {mates.map((m) => m.name).join(' · ')} 님이 지도에 보입니다.
@@ -649,6 +643,14 @@ export default function TripScreen() {
           줄도 모르고 지나갔습니다. 판을 열면 바로 보이는 자리로 올립니다.
         */}
         <Row gap={Spacing.xs}>
+          {/* 길 위에서는 짜는 화면이 방해입니다. 지금 갈 곳만 크게 보는 쪽으로
+              넘어갑니다. */}
+          <Button
+            label="여행 중 화면"
+            variant="secondary"
+            compact
+            onPress={() => router.push({ pathname: '/travel/[id]', params: { id } })}
+          />
           <Button
             label="가고 싶은 곳"
             variant="secondary"
@@ -1544,6 +1546,9 @@ const styles = StyleSheet.create({
   },
 
   head: {
+    gap: Spacing.sm,
+  },
+  live: {
     gap: Spacing.sm,
   },
   headTop: {
