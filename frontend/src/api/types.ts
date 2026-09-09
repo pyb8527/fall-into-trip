@@ -32,6 +32,8 @@ export type TripSummary = {
   id: string;
   title: string;
   ownerId: string;
+  /** 내가 넣어 둔 폴더. 폴더는 보는 사람 것이라 사람마다 다릅니다. */
+  folderId: Maybe<string>;
   startIso: string | null;
   endIso: string | null;
   dayCount: number;
@@ -326,3 +328,17 @@ export type PostSort = 'hot' | 'new' | 'top';
  * 하는지 3을 넣어야 하는지 헷갈리기 때문입니다.
  */
 export type PostDays = '1' | '2-4' | '5';
+
+/* --------------------------------------------------------------- 폴더 */
+
+/**
+ * 여행을 묶어 두는 폴더.
+ *
+ * 여행이 아니라 <b>보는 사람</b>의 것입니다. 같이 간 사람에게는 안 보이고,
+ * 그쪽은 자기 식대로 정리합니다.
+ */
+export type Folder = {
+  id: string;
+  name: string;
+  tripCount: number;
+};

@@ -62,12 +62,15 @@ public final class TripDtos {
 
     /* ------------------------------------------------------------ 응답 */
 
-    public record TripSummaryView(String id, String title, String ownerId,
+    /**
+     * @param folderId 이 사람이 넣어 둔 폴더. 안 넣었으면 비어 있습니다.
+     */
+    public record TripSummaryView(String id, String title, String ownerId, String folderId,
                                   LocalDate startIso, LocalDate endIso,
                                   int dayCount, int placeCount) {
 
-        public static TripSummaryView of(TripService.TripSummary s) {
-            return new TripSummaryView(s.id(), s.title(), s.ownerId(),
+        public static TripSummaryView of(TripService.TripSummary s, String folderId) {
+            return new TripSummaryView(s.id(), s.title(), s.ownerId(), folderId,
                     s.startIso(), s.endIso(), s.dayCount(), s.placeCount());
         }
     }

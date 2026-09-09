@@ -1,5 +1,5 @@
 import { Stack, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { api, ApiError } from '@/api/client';
@@ -86,6 +86,9 @@ export default function TripScreen() {
   /* 지금 자리에서 고른 장소까지. 위치를 켜고 장소를 골랐을 때만 있습니다. */
   const [fromHere, setFromHere] = useState<RouteLeg | null>(null);
   const [activeDay, setActiveDay] = useState<number>(ALL);
+  /* 여행 중에 열면 오늘로 맞춰 준 적이 있는지. 한 번만 합니다 — 매번 하면
+     사용자가 다른 날을 골라 놓아도 다시 오늘로 끌려갑니다. */
+  const jumped = useRef(false);
   const [activePlaceId, setActivePlaceId] = useState<string | null>(null);
 
   /* 방문 표시는 나만 보는 것이라, 서버 응답을 기다리지 않고 먼저 칠합니다.
@@ -104,6 +107,29 @@ export default function TripScreen() {
   const days = data?.days ?? [];
 
   /* 지도에 넘길 것만 추립니다. 날짜를 고르면 그 날만 남습니다. */
+  /**
+   * 여행 중이면 오늘을 펼쳐 놓고 시작합니다.
+   *
+   * <p>길 위에서 열었을 때 궁금한 것은 오늘 어디를 가는지입니다. 전체가 펼쳐진
+   * 채로 열리면 오늘을 찾으려고 굴려야 하고, 날이 길수록 더 굴려야 합니다.
+   *
+   * <p>한 번만 합니다. 매번 하면 다른 날을 골라 봐도 다시 오늘로 끌려갑니다.
+   *
+   * <p>여행 기간이 아니면 손대지 않습니다. 짜는 중일 때는 전체가 보이는 편이
+   * 낫습니다.
+   */
+  useEffect(() => {
+    if (jumped.current || days.length === 0) {
+      return;
+    }
+    const today = todayIso();
+    const index = days.findIndex((d) => d.iso === today);
+    jumped.current = true;
+    if (index >= 0) {
+      setActiveDay(index);
+    }
+  }, [days]);
+
   const mapPlaces = useMemo<MapPlace[]>(() => {
     const out: MapPlace[] = [];
     days.forEach((day, di) => {
@@ -360,7 +386,12 @@ export default function TripScreen() {
               {days.map((day, i) => (
                 <Chip
                   key={day.id}
-                  label={day.date || day.shortName || day.label}
+                  /* 오늘이 어느 칩인지 한눈에 보여야 길 위에서 헤매지 않습니다. */
+                  label={
+                    day.iso === todayIso()
+                      ? `오늘 · ${day.date || day.shortName || day.label}`
+                      : day.date || day.shortName || day.label
+                  }
                   selected={activeDay === i}
                   onPress={() => {
                     setActiveDay(i);
@@ -882,6 +913,13 @@ function OrderLabel({ n }: { n: number }) {
   return <Body small strong style={styles.orderText}>{n}</Body>;
 }
 
+
+/** 오늘 날짜를 여행의 iso 와 같은 모양으로. */
+function todayIso() {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
 
 /** "1시간 12분" 처럼. 초는 버립니다 — 이동 시간에서 초는 뜻이 없습니다. */
 function asDuration(seconds: number) {

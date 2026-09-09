@@ -18,8 +18,9 @@ T("관리자 생성", r.status === 200, r.data);
 const admin = r.data.accessToken;
 
 r = await call("GET", "/api/trips", { token: admin });
-T("첫 여행이 자동으로 생김", r.data?.trips?.length === 1, r.data);
-T("일수·장소수 포함", r.data.trips[0].dayCount === 0 && r.data.trips[0].placeCount === 0, r.data.trips[0]);
+/* 예전에는 설치하면 빈 여행이 하나 생겼습니다. 지금은 만들지 않습니다 —
+   쓰지도 않을 것이 목록에 남아 지우는 일부터 하게 됩니다. */
+T("처음에는 여행이 없음", r.data?.trips?.length === 0, r.data);
 
 console.log("\n[2] 여행 만들기");
 r = await call("POST", "/api/trips", { token: admin, body: { title: "도쿄 3박 4일", startIso: "2026-10-08", nights: 3 } });
@@ -122,14 +123,13 @@ r = await call("GET", "/api/trip?trip=" + tripId, { token: admin });
 T("모든 날짜가 같이 이동", r.data.days.map(d => d.iso).join() === "2026-11-01,2026-11-02,2026-11-03,2026-11-04", r.data.days.map(d=>d.iso));
 T("표시 문자열도 갱신", r.data.days[0].date === "11.01 (일)", r.data.days[0].date);
 
-console.log("\n[8] 삭제 보호");
+console.log("\n[8] 삭제");
 r = await call("DELETE", "/api/trips/" + tripId, { token: admin });
 T("여행 삭제", r.status === 200, r.data);
 r = await call("GET", "/api/trips", { token: admin });
-const rest = r.data.trips;
-T("하나 남음", rest.length === 1, rest.length);
-r = await call("DELETE", "/api/trips/" + rest[0].id, { token: admin });
-T("마지막 여행은 못 지움", r.status === 400, r.data);
+/* 예전에는 마지막 하나는 못 지우게 막았습니다. 지금은 그 제한이 없습니다 —
+   다 지우고 처음부터 짜고 싶을 수 있고, 빈 목록이 잘못된 상태도 아닙니다. */
+T("남김없이 지울 수 있음", r.data.trips.length === 0, r.data.trips);
 
 console.log(`\n결과: ${pass} 통과 / ${fail} 실패`);
 process.exit(fail ? 1 : 0);

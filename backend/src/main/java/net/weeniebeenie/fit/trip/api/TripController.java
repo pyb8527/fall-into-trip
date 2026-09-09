@@ -8,6 +8,7 @@ import net.weeniebeenie.fit.account.infrastructure.security.CurrentUser;
 import net.weeniebeenie.fit.trip.api.dto.TripDtos;
 import net.weeniebeenie.fit.trip.api.dto.TripDtos.*;
 import net.weeniebeenie.fit.trip.application.TripQueryService;
+import net.weeniebeenie.fit.trip.application.FolderService;
 import net.weeniebeenie.fit.trip.application.TripService;
 import net.weeniebeenie.fit.trip.domain.Trip;
 import org.springframework.web.bind.annotation.*;
@@ -21,13 +22,19 @@ import java.util.Map;
 public class TripController {
 
     private final TripService trips;
+    private final FolderService folders;
     private final TripQueryService query;
     private final ObjectMapper mapper;
 
     /** 내가 볼 수 있는 여행 목록. */
     @GetMapping("/trips")
     public Map<String, Object> list(@CurrentUser AuthPrincipal me) {
-        return Map.of("trips", trips.listFor(me).stream().map(TripSummaryView::of).toList());
+        /* 폴더는 여행마다 따로 묻지 않고 한 번에 받아 짝지웁니다. 여행 수만큼
+           질의가 붙으면 목록 한 번에 그만큼 왕복합니다. */
+        Map<String, String> placed = folders.placementOf(me);
+        return Map.of("trips", trips.listFor(me).stream()
+                .map(s -> TripSummaryView.of(s, placed.get(s.id())))
+                .toList());
     }
 
     @PostMapping("/trips")
