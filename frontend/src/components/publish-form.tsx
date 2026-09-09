@@ -29,6 +29,7 @@ export function PublishForm({
   const [title, setTitle] = useState(tripTitle);
   const [summary, setSummary] = useState('');
   const [region, setRegion] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState(false);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
 
@@ -47,6 +48,7 @@ export function PublishForm({
     setTitle(tripTitle);
     setSummary('');
     setRegion(null);
+    setFeedback(false);
     setFailed(null);
     setBusy(false);
   }, [visible, tripTitle]);
@@ -66,6 +68,7 @@ export function PublishForm({
         title: title.trim(),
         summary: summary.trim(),
         region,
+        feedback,
       });
       onDone(res.postId);
     } catch (e) {
@@ -110,6 +113,20 @@ export function PublishForm({
           />
         ))}
       </Row>
+
+      {/* 구경만 하라고 올린 글에 훈수가 달리면 반갑지 않습니다. 열어 둘
+          때만 댓글칸이 생깁니다. */}
+      <Row gap={Spacing.xs}>
+        <Chip
+          label="의견 안 받기"
+          selected={!feedback}
+          onPress={() => setFeedback(false)}
+        />
+        <Chip label="의견 받기" selected={feedback} onPress={() => setFeedback(true)} />
+      </Row>
+      <Caption tone="secondary">
+        의견을 받으면 다른 사람이 일정에, 또는 장소 하나하나에 댓글을 달 수 있습니다.
+      </Caption>
 
       {failed ? <ErrorNote message={failed} /> : null}
     </BottomSheet>

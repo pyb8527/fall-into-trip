@@ -76,7 +76,7 @@ public class PostService {
 
     @Transactional
     public TripPost publish(AuthPrincipal me, String tripId, String title, String summary,
-                            String region) {
+                            String region, boolean feedback) {
         Trip trip = access.requireOwner(tripId, me.id());
 
         if (posts.findAllByAuthorIdOrderByCreatedAtDesc(me.id(), Pageable.ofSize(1))
@@ -101,6 +101,7 @@ public class PostService {
                 .snapshot(snapshotOf(clean, dayList, placeList))
                 .dayCount(dayList.size())
                 .placeCount(placeList.size())
+                .feedback(feedback)
                 .build());
 
         audit.log(me.id(), "post.publish", post.getId(), Map.of("trip", tripId));

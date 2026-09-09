@@ -28,7 +28,8 @@ public class PublishController {
         TripPost post = posts.publish(me, tripId,
                 req == null ? null : req.title(),
                 req == null ? null : req.summary(),
-                req == null ? null : req.region());
+                req == null ? null : req.region(),
+                req != null && Boolean.TRUE.equals(req.feedback()));
         return Map.of("postId", post.getId());
     }
 
@@ -37,6 +38,7 @@ public class PublishController {
      * @param summary 목록에서 보이는 한 줄 소개
      * @param region  어느 지역 여행인지. 목록에 없는 값은 버립니다.
      */
-    public record PublishRequest(String title, String summary, String region) {
+    public record PublishRequest(String title, String summary, String region,
+                                 Boolean feedback) {
     }
 }

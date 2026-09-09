@@ -82,6 +82,7 @@ public class SecurityConfig {
                         /* 팁 읽기는 로그인 없이도 됩니다. 남기거나 신고할 때만
                            로그인을 부릅니다(POST 라 아래 규칙에 걸립니다). */
                         .requestMatchers(HttpMethod.GET, "/api/places/*/tips").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/posts/*/comments").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/posts/mine").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/posts", "/api/posts/*").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")

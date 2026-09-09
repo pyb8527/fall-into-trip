@@ -3,6 +3,7 @@ package net.weeniebeenie.fit.community.api;
 import lombok.RequiredArgsConstructor;
 import net.weeniebeenie.fit.account.infrastructure.security.AuthPrincipal;
 import net.weeniebeenie.fit.account.infrastructure.security.CurrentUser;
+import net.weeniebeenie.fit.community.application.CommentService;
 import net.weeniebeenie.fit.community.application.PostService;
 import net.weeniebeenie.fit.community.domain.TripPost;
 import net.weeniebeenie.fit.shared.error.ApiException;
@@ -32,6 +33,7 @@ public class PostController {
     private static final int SIZE = 20;
 
     private final PostService posts;
+    private final CommentService comments;
 
     /**
      * @param region 지역. 고를 수 있는 값은 /api/posts/regions 에 있습니다.
@@ -100,6 +102,8 @@ public class PostController {
         out.put("liked", me != null && !posts.likedBy(me.id(), java.util.List.of(postId)).isEmpty());
         out.put("mine", me != null && post.getAuthorId().equals(me.id()));
         out.put("createdAt", post.getCreatedAt());
+        out.put("feedback", post.isFeedback());
+        out.put("commentCount", comments.countOf(postId));
         out.put("itinerary", posts.snapshotOf(post));
         return out;
     }

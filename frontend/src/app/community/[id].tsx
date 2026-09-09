@@ -6,6 +6,7 @@ import { api, ApiError, query } from '@/api/client';
 import type { ItineraryDay, ItineraryPlace, PostDetail } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
+import { CommentList } from '@/components/comment-list';
 import { dayColor, Spacing } from '@/constants/theme';
 import {
   Badge,
@@ -50,6 +51,8 @@ export default function Post() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [savedNames, setSavedNames] = useState<Set<string>>(new Set());
+  /** 장소 하나를 두고 의견을 보는 중이면 그 자리. */
+  const [at, setAt] = useState<{ dayIndex: number; placeIndex: number } | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
 
   /** 로그인이 필요한 동작 앞에서 한 번 걸러 줍니다. */
@@ -149,7 +152,9 @@ export default function Post() {
         <Caption tone="secondary">
           {data.authorName} · {data.dayCount}일 · {data.placeCount}곳 · 조회{' '}
           {data.viewCount.toLocaleString()}
+          {data.feedback ? ` · 의견 ${data.commentCount}` : ''}
         </Caption>
+        {data.feedback ? <Badge label="의견 환영" tone="accent" /> : null}
       </View>
 
       {notice ? <Body tone="success">{notice}</Body> : null}
@@ -162,8 +167,31 @@ export default function Post() {
           index={i}
           onSave={(place) => (user ? save(place) : needLogin())}
           savedNames={savedNames}
+          feedback={data.feedback}
+          onComment={(placeIndex) => setAt({ dayIndex: i, placeIndex })}
         />
       ))}
+
+      {data.feedback ? (
+        <>
+          <Divider />
+          <CommentList
+            postId={id}
+            itinerary={data.itinerary}
+            at={at}
+            onNeedLogin={needLogin}
+            onCountChanged={reload}
+          />
+          {at ? (
+            <Button
+              label="모든 의견 보기"
+              variant="ghost"
+              compact
+              onPress={() => setAt(null)}
+            />
+          ) : null}
+        </>
+      ) : null}
 
       <Divider />
 
@@ -238,12 +266,17 @@ function DayBlock({
   index,
   onSave,
   savedNames,
+  feedback,
+  onComment,
 }: {
   day: ItineraryDay;
   index: number;
   onSave: (place: ItineraryPlace) => void;
   /** 이미 담은 곳. 별을 채워 두면 두 번 누르지 않습니다. */
   savedNames: Set<string>;
+  /** 의견을 받는 글인지. 안 열었으면 말풍선을 두지 않습니다. */
+  feedback: boolean;
+  onComment: (placeIndex: number) => void;
 }) {
   const color = day.color || dayColor(index);
 
@@ -292,6 +325,14 @@ function DayBlock({
             ) : null}
           </View>
 
+          {/* "여기 말고 옆집" 은 어느 집인지가 붙어야 뜻이 통합니다. */}
+          {feedback ? (
+            <IconButton
+              name="message-square"
+              label={`${place.name}에 의견 남기기`}
+              onPress={() => onComment(i)}
+            />
+          ) : null}
           {/* 일정을 통째로 가져오지 않고 이 집만 담을 수 있어야 합니다. */}
           <IconButton
             name="star"

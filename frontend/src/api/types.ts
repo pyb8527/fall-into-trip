@@ -321,7 +321,27 @@ export type PostDetail = Omit<PostCard, 'summary'> & {
   summary: string | null;
   /** 내가 쓴 글인지. 내릴 수 있는지를 이걸로 정합니다. */
   mine: boolean;
+  /** 의견을 받는 글인지. 열어 둔 글에만 댓글칸이 생깁니다. */
+  feedback: boolean;
+  commentCount: number;
   itinerary: Itinerary;
+};
+
+/**
+ * 일정에 달린 댓글.
+ *
+ * dayIndex 와 placeIndex 가 있으면 그 장소에 대한 말입니다. 없으면 일정 전체를
+ * 두고 하는 말입니다.
+ */
+export type Comment = {
+  id: string;
+  text: string;
+  authorName: string;
+  /** 내가 남긴 것인지. 지울 수 있는지를 이걸로 정합니다. */
+  mine: boolean;
+  dayIndex: Maybe<number>;
+  placeIndex: Maybe<number>;
+  createdAt: string;
 };
 
 export type PostPage = {

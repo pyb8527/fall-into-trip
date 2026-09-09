@@ -86,6 +86,15 @@ public class TripPost {
     @Column(nullable = false)
     private boolean hidden;
 
+    /**
+     * 피드백을 받고 싶은 글인지.
+     *
+     * <p>구경만 하라고 올린 글에 훈수가 달리면 반갑지 않습니다. 올리는 사람이
+     * 먼저 열어 둘 때만 댓글칸이 생깁니다.
+     */
+    @Column(nullable = false)
+    private boolean feedback;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -94,7 +103,8 @@ public class TripPost {
 
     @Builder
     public TripPost(String tripId, String authorId, String title, String summary,
-                    String region, String snapshot, int dayCount, int placeCount) {
+                    String region, String snapshot, int dayCount, int placeCount,
+                    boolean feedback) {
         this.id = Ids.next();
         this.tripId = tripId;
         this.authorId = authorId;
@@ -104,6 +114,7 @@ public class TripPost {
         this.snapshot = snapshot;
         this.dayCount = dayCount;
         this.placeCount = placeCount;
+        this.feedback = feedback;
         this.createdAt = Instant.now();
         this.updatedAt = this.createdAt;
     }
