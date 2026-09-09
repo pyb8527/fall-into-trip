@@ -4,9 +4,9 @@ import { StyleSheet, View } from 'react-native';
 import { api, ApiError } from '@/api/client';
 import type { Place } from '@/api/types';
 import { PlaceSearch } from '@/components/place-search';
+import { PLACE_ICONS, iconOf } from '@/constants/place-icons';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import {
-  Badge,
   Body,
   BottomSheet,
   Button,
@@ -14,6 +14,7 @@ import {
   ErrorNote,
   Field,
   Icon,
+  Press,
   Row,
 } from '@/ui';
 
@@ -51,6 +52,8 @@ export function PlaceForm({
   /* 고른 곳이 구글의 어느 장소인지. 저장해 두면 나중에 영업시간을 물어볼 수
      있습니다. 좌표를 직접 넣으면 비어 있습니다. */
   const [placeId, setPlaceId] = useState<string | null>(place?.placeId ?? null);
+  /* 지도에 찍힐 그림. 찾아서 고르면 서버가 구글 갈래로 미리 하나 찍어 줍니다. */
+  const [icon, setIcon] = useState<string | null>(place?.icon ?? null);
   const [time, setTime] = useState(place?.time ?? '');
   const [cat, setCat] = useState(place?.cat ?? '');
   const [cost, setCost] = useState(place?.cost ?? '');
@@ -78,6 +81,7 @@ export function PlaceForm({
     setLng(place ? String(place.lng) : '');
     setPicked(place?.ja ?? place?.en ?? null);
     setPlaceId(place?.placeId ?? null);
+    setIcon(place?.icon ?? null);
     setTime(place?.time ?? '');
     setCat(place?.cat ?? '');
     setCost(place?.cost ?? '');
@@ -121,6 +125,9 @@ export function PlaceForm({
         url: url.trim(),
         fit: place?.fit ?? true,
         placeId,
+        /* 빈 문자열은 "그림 빼기" 입니다. null 은 "손대지 마라" 라서, 골라 둔
+           것을 도로 뺄 수 있으려면 둘을 갈라야 합니다. */
+        icon: icon ?? '',
         version: place?.version,
       };
       if (place) {
@@ -153,6 +160,9 @@ export function PlaceForm({
             setName(found.name);
           }
           setPlaceId(found.placeId);
+          /* 이미 골라 둔 것이 있으면 덮지 않습니다. 다른 곳을 다시 찾았다고
+             일부러 바꿔 둔 그림이 사라지면 화가 납니다. */
+          setIcon((prev) => prev ?? found.icon ?? null);
           setLat(String(found.lat));
           setLng(String(found.lng));
           setPicked(found.address || found.name);
@@ -169,7 +179,6 @@ export function PlaceForm({
             </Body>
             {picked ? <Caption numberOfLines={2}>{picked}</Caption> : null}
           </View>
-          <Badge label="완료" tone="accent" />
         </View>
       ) : null}
 
@@ -182,6 +191,15 @@ export function PlaceForm({
         maxLength={120}
         hint="찾은 이름을 그대로 써도 되고, 부르기 쉽게 바꿔도 됩니다."
       />
+
+      {/*
+        지도에 찍힐 그림.
+
+        같은 모양 핀이 스무 개 꽂혀 있으면 지도는 그냥 점의 무리입니다.
+        라멘집인지 온천인지가 핀만 보고 읽히면, 다 짜 놓은 지도를 한 장으로
+        찍었을 때 그것이 곧 여행의 요약이 됩니다.
+      */}
+      <IconPicker value={icon} onChange={setIcon} />
 
       <Row gap={Spacing.sm} style={styles.pair}>
         <View style={styles.half}>
@@ -209,7 +227,85 @@ export function PlaceForm({
   );
 }
 
+/**
+ * 핀에 찍을 그림 고르기.
+ *
+ * <p>먼저 하나 찍혀 있습니다. 장소를 찾아 고르면 서버가 구글이 알려 준 갈래로
+ * 짐작해 둡니다. 대개 맞고, 틀렸을 때만 손대면 됩니다 — 넣을 때마다 열여섯 개
+ * 중에서 고르라고 하면 그것이 곧 일이 됩니다.
+ *
+ * <p>그림만 늘어놓지 않고 이름을 함께 답니다. 이모지는 기기마다 다르게 생겨,
+ * 어떤 폰에서는 라멘과 우동이 거의 같아 보입니다.
+ */
+function IconPicker({
+  value,
+  onChange,
+}: {
+  value: string | null;
+  onChange: (next: string | null) => void;
+}) {
+  return (
+    <View style={styles.picker}>
+      <Body small strong>
+        지도에 찍을 그림
+      </Body>
+      <Row gap={Spacing.xs}>
+        <Press
+          onPress={() => onChange(null)}
+          scale={0.9}
+          accessibilityLabel="그림 없이 번호만"
+          accessibilityState={{ selected: value === null }}
+          style={[styles.kind, value === null ? styles.kindOn : null]}>
+          <Body small strong tone={value === null ? 'accent' : 'secondary'}>
+            번호
+          </Body>
+        </Press>
+        {PLACE_ICONS.map((kind) => {
+          const on = value === kind.key;
+          return (
+            <Press
+              key={kind.key}
+              onPress={() => onChange(kind.key)}
+              scale={0.9}
+              accessibilityLabel={kind.label}
+              accessibilityState={{ selected: on }}
+              style={[styles.kind, on ? styles.kindOn : null]}>
+              <Body small style={styles.kindEmoji}>
+                {kind.emoji}
+              </Body>
+              <Caption tone={on ? 'accent' : 'muted'}>{kind.label}</Caption>
+            </Press>
+          );
+        })}
+      </Row>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  picker: {
+    gap: Spacing.sm,
+  },
+  kind: {
+    minWidth: 56,
+    borderRadius: Radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.border,
+    backgroundColor: Colors.fill,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+  },
+  kindOn: {
+    borderColor: Colors.accent,
+    backgroundColor: Colors.accentSoft,
+  },
+  kindEmoji: {
+    /* 이모지는 글꼴이 제 높이를 갖고 있어, 줄 높이를 두면 아래로 처집니다. */
+    lineHeight: undefined,
+  },
   /* 나란한 두 칸은 위쪽으로 맞춥니다. 한쪽에만 힌트가 붙어 키가 달라져도
      입력 상자끼리는 한 줄에 서야 합니다. */
   pair: {

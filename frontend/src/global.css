@@ -1,11 +1,39 @@
 /*
- * 웹에서만 쓰이는 글꼴 묶음.
+ * 웹에서만 쓰이는 글꼴.
  *
- * 웹 폰트를 받아 오지 않습니다. 받아 오면 글자가 한 번 바뀌어 보이고,
- * 인터넷이 느린 곳에서는 한동안 아무것도 안 보입니다. 기기에 이미 있는
- * 것 중에서 한글이 가장 또렷한 순서로 씁니다.
+ * <h3>프리텐다드를 직접 싣습니다</h3>
+ *
+ * 전에는 기기에 이미 깔린 것 중에서 골라 썼습니다. 받아 오지 않으니 빠르지만,
+ * 보는 기기마다 글자 모양이 달라 같은 화면이 아니게 됩니다. 특히 안드로이드와
+ * 윈도우에서 한글이 눈에 띄게 다릅니다.
+ *
+ * CDN 을 부르지 않고 우리 서버에서 함께 내보냅니다. 남의 서버를 부르면 그쪽이
+ * 느린 날 우리 화면도 같이 느려지고, 보는 사람의 주소가 그쪽에 남습니다.
+ *
+ * 가변 글꼴 하나로 굵기를 전부 담았습니다(45~920). 굵기마다 파일을 두면 네
+ * 번을 받아야 하는데, 가변은 한 번입니다.
+ *
+ * swap 을 켭니다. 글꼴을 받는 동안 글자가 안 보이는 것보다, 기기 글꼴로 먼저
+ * 보여 주고 도착하면 바꿔 끼우는 편이 낫습니다.
  */
+@font-face {
+  font-family: 'Pretendard';
+  /*
+   * public/ 아래에 두고 뿌리 기준 주소로 부릅니다.
+   *
+   * 처음에는 assets/ 에 두고 상대 주소로 적었는데, 번들러가 CSS 안의 url() 은
+   * 손대지 않고 그대로 흘려보냅니다. 그러면 글꼴 파일이 결과물에 실리지도
+   * 않고, 주소도 CSS 가 놓인 자리(/_expo/static/css/) 기준으로 풀려 엉뚱한
+   * 곳을 가리킵니다. public/ 은 통째로 뿌리에 복사됩니다.
+   */
+  src: url('/fonts/PretendardVariable.woff2') format('woff2-variations');
+  font-weight: 45 920;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
+  /* 프리텐다드가 도착하기 전까지 쓸 것들. 위에서 아래로 한글이 또렷한 순서. */
   --font-sans:
     Pretendard, -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Segoe UI',
     'Malgun Gothic', 'Noto Sans KR', system-ui, sans-serif;
@@ -16,7 +44,7 @@ html,
 body,
 #root {
   height: 100%;
-  background-color: #f9fafb;
+  background-color: #fafafa;
 }
 
 body {

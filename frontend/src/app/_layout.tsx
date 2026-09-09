@@ -1,11 +1,12 @@
-import { Stack, ThemeProvider, type Theme as NavTheme } from 'expo-router';
+import { Stack, ThemeProvider, useRouter, type Theme as NavTheme } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AuthProvider, useAuth } from '@/auth/auth-provider';
-import { Colors, Type, Weight } from '@/constants/theme';
+import { Colors, Fonts, Type, Weight } from '@/constants/theme';
+import { IconButton } from '@/ui';
 
 /**
  * 앱 전체를 감싸는 껍데기.
@@ -32,20 +33,61 @@ SplashScreen.preventAutoHideAsync().catch(() => {
 const navigationTheme: NavTheme = {
   dark: false,
   colors: {
-    primary: Colors.accent,
+    primary: Colors.accentInk,
     background: Colors.background,
     card: Colors.background,
     text: Colors.text,
     border: 'transparent',
     notification: Colors.danger,
   },
+  /* 위쪽 막대의 글자도 화면 안과 같은 글꼴을 씁니다. 여기만 'System' 으로
+     두면 제목 줄만 다른 글꼴로 그려집니다. */
   fonts: {
-    regular: { fontFamily: 'System', fontWeight: '400' },
-    medium: { fontFamily: 'System', fontWeight: '500' },
-    bold: { fontFamily: 'System', fontWeight: '600' },
-    heavy: { fontFamily: 'System', fontWeight: '700' },
+    regular: { fontFamily: Fonts.sans, fontWeight: '400' },
+    medium: { fontFamily: Fonts.sans, fontWeight: '500' },
+    bold: { fontFamily: Fonts.sans, fontWeight: '600' },
+    heavy: { fontFamily: Fonts.sans, fontWeight: '700' },
   },
 };
+
+/**
+ * 여행에 딸린 화면들 — 여행 중 · 가고 싶은 곳 · 여행 카드.
+ *
+ * <p>이 셋은 늘 어떤 여행 하나에 붙어 있습니다. 그런데 주소를 새로고침하거나
+ * 링크로 곧장 들어오면 밑에 쌓인 것이 없어 돌아갈 화살표가 아예 생기지
+ * 않습니다. 그때는 그 여행의 일정 화면으로 돌려보냅니다.
+ *
+ * <p>쌓인 것이 있으면 손대지 않고 네비게이션이 만든 것을 그대로 씁니다.
+ */
+function backToTrip(title: string) {
+  return ({
+    navigation,
+    route,
+  }: {
+    navigation: { canGoBack: () => boolean };
+    route: { params?: object };
+  }) => ({
+    title,
+    headerLeft: navigation.canGoBack() ? undefined : () => <ToTrip route={route} />,
+  });
+}
+
+function ToTrip({ route }: { route: { params?: object } }) {
+  const router = useRouter();
+  const params = route.params as { id?: unknown } | undefined;
+  const id = typeof params?.id === 'string' ? params.id : null;
+  return (
+    <IconButton
+      name="chevron-left"
+      label="일정으로"
+      onPress={() =>
+        id
+          ? router.replace({ pathname: '/trip/[id]', params: { id } })
+          : router.replace('/(app)/trips')
+      }
+    />
+  );
+}
 
 export default function RootLayout() {
   return (
@@ -72,9 +114,9 @@ export default function RootLayout() {
             <Stack.Screen name="(auth)" options={{ headerShown: false }} />
             <Stack.Screen name="(app)" options={{ headerShown: false }} />
             <Stack.Screen name="trip/[id]" options={{ title: '일정' }} />
-            <Stack.Screen name="travel/[id]" options={{ title: '여행 중' }} />
-            <Stack.Screen name="vote/[id]" options={{ title: '가고 싶은 곳' }} />
-            <Stack.Screen name="card/[id]" options={{ title: '여행 카드' }} />
+            <Stack.Screen name="travel/[id]" options={backToTrip('여행 중')} />
+            <Stack.Screen name="vote/[id]" options={backToTrip('가고 싶은 곳')} />
+            <Stack.Screen name="card/[id]" options={backToTrip('여행 카드')} />
             <Stack.Screen name="community" options={{ headerShown: false }} />
             <Stack.Screen name="admin" options={{ headerShown: false }} />
           </Stack>

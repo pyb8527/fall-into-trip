@@ -7,7 +7,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "fit",
     "userInterfaceStyle": "light",
-    "backgroundColor": "#F2F4F6",
+    "backgroundColor": "#FAFAFA",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "net.weeniebeenie.fit"
@@ -15,19 +15,19 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundColor": "#FFFFFF"
+        "backgroundColor": "#FAFAFA"
       },
       "predictiveBackGestureEnabled": false,
       "package": "net.weeniebeenie.fit"
     },
     "androidStatusBar": {
       "barStyle": "dark-content",
-      "backgroundColor": "#F2F4F6"
+      "backgroundColor": "#FAFAFA"
     },
     "web": {
       "output": "static",
       "favicon": "./assets/images/favicon.png",
-      "backgroundColor": "#F2F4F6"
+      "backgroundColor": "#FAFAFA"
     },
     "plugins": [
       "expo-router",
@@ -37,7 +37,7 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 160,
           "resizeMode": "contain",
-          "backgroundColor": "#FFFFFF"
+          "backgroundColor": "#FAFAFA"
         }
       ]
     ],

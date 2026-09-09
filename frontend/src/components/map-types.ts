@@ -14,6 +14,16 @@ export type MapPlace = {
   dayIndex: number;
   /** 그날 안에서 몇 번째인지. 핀에 적습니다. */
   order: number;
+  /**
+   * 핀 안에 그릴 그림.
+   *
+   * <p>같은 모양 핀이 스무 개 꽂혀 있으면 지도는 그냥 점의 무리입니다.
+   * 라멘집인지 온천인지가 핀만 보고 읽히면, 다 짜 놓은 지도를 한 장으로
+   * 찍었을 때 그것이 곧 여행의 요약이 됩니다.
+   *
+   * <p>비어 있으면 번호만 찍힌 핀을 그립니다.
+   */
+  emoji?: string;
   color: string;
   /** 공항처럼 멀리 떨어진 곳. 화면을 맞출 때 뺍니다. */
   fit: boolean;
@@ -58,6 +68,15 @@ export type TripMapProps = {
   activeId: string | null;
   onSelect: (id: string) => void;
   height?: number;
+  /**
+   * 지도 위에 얹는 단추들(내 위치·전체화면)을 보일지.
+   *
+   * <p>지도가 화면 전체를 채우는 일정 화면에서는 "전체화면" 이 뜻이 없고,
+   * 그 자리는 위쪽 막대와 겹칩니다. 그럴 때 끕니다.
+   */
+  chrome?: boolean;
+  /** 지도가 화면을 꽉 채울 때. 모서리를 둥글리지 않습니다. */
+  bleed?: boolean;
 };
 
 /** 검색으로 찾은 장소. */
@@ -68,6 +87,8 @@ export type Found = {
   lng: number;
   /** 구글이 아는 번호. 나중에 영업시간을 물어볼 때 씁니다. */
   placeId: string | null;
+  /** 구글이 알려 준 갈래로 서버가 미리 찍어 둔 핀 그림. 없을 수도 있습니다. */
+  icon?: string | null;
 };
 
 export type PlaceSearchProps = {

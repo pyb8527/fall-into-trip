@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import type { MapPlace, TripMapProps } from '@/components/map-types';
 import { gmaps, hasMaps, loadMaps } from '@/lib/gmaps.web';
+import { QUIET_MAP } from '@/lib/map-style';
 import { Colors, Radius, Spacing, Tap } from '@/constants/theme';
 import { Badge, Body, Caption, IconButton, Row, Subtitle } from '@/ui';
 
@@ -31,45 +32,54 @@ export type { MapPlace } from '@/components/map-types';
 const FOCUS_ZOOM = 16;
 
 /**
- * 핀.
- *
- * 날짜 색 물방울 안에 흰 원, 그 안에 순번. 겹쳐 있어도 몇 번째인지 읽히도록
- * 숫자를 흰 바탕에 날짜 색으로 씁니다.
- */
-/**
  * 핀 그림.
  *
- * <p>다녀온 곳은 속을 색으로 채우고 표시를 얹습니다. 아직 안 간 곳은 테두리만
- * 두른 빈 방울입니다. 지도가 체크리스트처럼 읽혀, 채워질수록 얼마나 돌았는지가
- * 한눈에 보입니다.
+ * <p>물방울 안에 흰 원, 그 안에 그림(없으면 번호). 그림은 SVG 안에 글자로
+ * 넣지 않고 구글 지도의 <b>라벨</b>로 얹습니다. SVG 를 그림 파일처럼 그릴
+ * 때는 이모지 글꼴이 딸려 오지 않는 브라우저가 있어, 라멘 대신 네모가
+ * 뜨는 일이 생깁니다.
  *
- * <p>안 간 곳을 흑백으로 만들지는 않았습니다. 여행 전에는 아무 데도 안 갔으니
+ * <p>다녀온 곳은 물방울 속을 날짜 색으로 채우고, 아직인 곳은 어둡게 비워
+ * 둡니다. 지도가 체크리스트처럼 읽혀, 채워질수록 얼마나 돌았는지가 한눈에
+ * 보입니다.
+ *
+ * <p>안 간 곳을 잿빛으로 만들지는 않았습니다. 여행 전에는 아무 데도 안 갔으니
  * 지도가 통째로 잿빛이 됩니다. 채워지는 쪽으로 달라지게 하는 편이 두 시기에
  * 모두 맞습니다.
  */
-function pinIcon(color: string, n: number, active: boolean, visited: boolean) {
+function pinIcon(color: string, active: boolean, visited: boolean) {
   const stroke = active ? 3.4 : 2.6;
-  const shadow = active ? 0.32 : 0.2;
-  /* 다녀온 곳은 방울 속이 색, 아직인 곳은 흰색입니다. */
+  /* 흰 테두리가 지도의 길·건물에서 핀을 떼어 놓습니다. */
+  const rim = '#FFFFFF';
   const face = visited ? color : '#FFFFFF';
-  const ink = visited ? '#FFFFFF' : color;
-
-  const mark = visited
-    ? `<path d="M15.6 19.2 l3 3 5.8-6.4" fill="none" stroke="${ink}" stroke-width="2.6"
-         stroke-linecap="round" stroke-linejoin="round"/>`
-    : `<text x="20" y="19" dy=".36em" text-anchor="middle" font-family="Helvetica,Arial,sans-serif"
-         font-size="11" font-weight="700" fill="${ink}">${n}</text>`;
 
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="44" height="54" viewBox="0 0 44 54">
-<defs><filter id="s" x="-60%" y="-60%" width="220%" height="220%">
-<feDropShadow dx="0" dy="2" stdDeviation="1.6" flood-color="#191F28" flood-opacity="${shadow}"/>
-</filter></defs>
-<path filter="url(#s)" d="M20 4C11.7 4 5 10.7 5 19c0 10.7 13.3 27 13.9 27.7a1.4 1.4 0 0 0 2.2 0C21.7 46 35 29.7 35 19 35 10.7 28.3 4 20 4z"
- fill="${color}" stroke="#ffffff" stroke-width="${stroke}"/>
-<circle cx="20" cy="19" r="8.6" fill="${face}"/>
-${mark}
+<path d="M20 4C11.7 4 5 10.7 5 19c0 10.7 13.3 27 13.9 27.7a1.4 1.4 0 0 0 2.2 0C21.7 46 35 29.7 35 19 35 10.7 28.3 4 20 4z"
+ fill="${color}" stroke="${rim}" stroke-width="${stroke}"/>
+<circle cx="20" cy="19" r="9" fill="${face}"/>
 </svg>`;
   return 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
+}
+
+/**
+ * 핀 위에 얹는 글자.
+ *
+ * <p>그림이 있으면 그림을, 없으면 번호를 얹습니다. 그림이 있을 때 번호가
+ * 사라지는 것은 감수합니다 — 둘 다 넣으면 열두 픽셀 안에 두 가지를 우겨넣는
+ * 셈이라 어느 쪽도 안 읽힙니다. 순서는 아래 목록이 말해 줍니다.
+ */
+function pinLabel(place: MapPlace, visited: boolean) {
+  if (place.emoji) {
+    return { text: place.emoji, fontSize: '13px' };
+  }
+  /* 날짜 색이 파스텔이라 그것으로 번호를 쓰면 흰 방울 안에서 읽히지
+     않습니다. 색은 방울이 맡고 번호는 늘 짙게 씁니다. */
+  return {
+    text: String(place.order),
+    color: Colors.onDay,
+    fontSize: '11px',
+    fontWeight: '700',
+  };
 }
 
 export function TripMap({
@@ -81,6 +91,8 @@ export function TripMap({
   mates,
   notes,
   height = 300,
+  chrome = true,
+  bleed = false,
 }: TripMapProps) {
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -121,6 +133,10 @@ export function TripMap({
         map.current = new (gmaps().Map)(host.current, {
           center: { lat: 37.5665, lng: 126.978 },
           zoom: 12,
+          /* 조용한 지도. 땅·물·길만 겨우 구별되게 눌러 두어, 그 위에 얹히는
+             우리 핀과 동선이 화면에서 가장 진한 것이 됩니다. */
+          styles: QUIET_MAP as unknown as unknown[],
+          backgroundColor: Colors.abyss,
           disableDefaultUI: true,
           /* 확대·축소 단추는 두지 않습니다. 손가락으로 벌리고 오므리는 것이
              더 빠르고, 그 자리를 내 위치 단추에 씁니다. */
@@ -242,11 +258,11 @@ export function TripMap({
       center: at,
       radius: here.accuracy,
       map: map.current,
-      strokeColor: '#3182F6',
+      strokeColor: Colors.accentInk,
       strokeOpacity: 0.35,
       strokeWeight: 1,
-      fillColor: '#3182F6',
-      fillOpacity: 0.12,
+      fillColor: Colors.accentInk,
+      fillOpacity: 0.08,
       zIndex: 1,
     });
     meDot.current = new g.Marker({
@@ -257,7 +273,9 @@ export function TripMap({
       icon: {
         path: g.SymbolPath.CIRCLE,
         scale: 7,
-        fillColor: '#3182F6',
+        /* 내 자리는 점 하나뿐이라 파스텔로 찍으면 밝은 지도에 묻힙니다.
+           같은 계열에서 짙은 쪽으로 찍습니다. */
+        fillColor: Colors.accentInk,
         fillOpacity: 1,
         strokeColor: '#FFFFFF',
         strokeWeight: 2.5,
@@ -285,10 +303,14 @@ export function TripMap({
         map: map.current,
         zIndex: 100 + p.order,
         icon: {
-          url: pinIcon(p.color, p.order, false, p.detail.visited),
+          url: pinIcon(p.color, false, p.detail.visited),
           scaledSize: new g.Size(40, 49),
-          anchor: new g.Point(18, 49),
+          anchor: new g.Point(20, 49),
+          /* 글자를 물방울 한가운데 원에 맞춥니다. 안 맞추면 핀 아래
+             꼬리 쪽에 찍힙니다. */
+          labelOrigin: new g.Point(20, 17),
         },
+        label: pinLabel(p, p.detail.visited),
       });
       marker.addListener('click', () => {
         selectRef.current(p.id);
@@ -396,39 +418,6 @@ export function TripMap({
     }
   }, [ready, places, routes]);
 
-  /* 고른 장소를 크게 하고, 그 자리로 옮기면서 들여다볼 만큼 당깁니다. */
-  useEffect(() => {
-    if (!ready) {
-      return;
-    }
-    const g = gmaps();
-    places.forEach((p) => {
-      const marker = markers.current.get(p.id);
-      if (!marker) {
-        return;
-      }
-      const active = p.id === activeId;
-      marker.setIcon({
-        url: pinIcon(p.color, p.order, active, p.detail.visited),
-        scaledSize: new g.Size(active ? 48 : 40, active ? 59 : 49),
-        anchor: new g.Point(active ? 22 : 18, active ? 59 : 49),
-      });
-      marker.setZIndex(active ? 999 : 100 + p.order);
-    });
-    const chosen = places.find((p) => p.id === activeId);
-    if (chosen && map.current) {
-      map.current.panTo({ lat: chosen.lat, lng: chosen.lng });
-      if ((map.current.getZoom() ?? 0) < FOCUS_ZOOM) {
-        map.current.setZoom(FOCUS_ZOOM);
-      }
-    }
-  }, [ready, activeId, places]);
-
-  /* 키가 없거나 스크립트를 못 받아 왔으면 지도 자리를 아예 비웁니다. */
-  if (!hasMaps() || failed) {
-    return null;
-  }
-
   /*
     동행자와 임시 핀.
 
@@ -497,6 +486,60 @@ export function TripMap({
     }
   }, [here]);
 
+  /* 고른 장소를 크게 하고, 그 자리로 옮기면서 들여다볼 만큼 당깁니다. */
+  useEffect(() => {
+    if (!ready) {
+      return;
+    }
+    const g = gmaps();
+    places.forEach((p) => {
+      const marker = markers.current.get(p.id);
+      if (!marker) {
+        return;
+      }
+      const active = p.id === activeId;
+      marker.setIcon({
+        url: pinIcon(p.color, active, p.detail.visited),
+        scaledSize: new g.Size(active ? 50 : 40, active ? 61 : 49),
+        anchor: new g.Point(active ? 25 : 20, active ? 61 : 49),
+        labelOrigin: new g.Point(active ? 25 : 20, active ? 21 : 17),
+      });
+      marker.setLabel(pinLabel(p, p.detail.visited));
+      marker.setZIndex(active ? 999 : 100 + p.order);
+    });
+    const chosen = places.find((p) => p.id === activeId);
+    if (chosen && map.current) {
+      map.current.panTo({ lat: chosen.lat, lng: chosen.lng });
+      if ((map.current.getZoom() ?? 0) < FOCUS_ZOOM) {
+        map.current.setZoom(FOCUS_ZOOM);
+      }
+    }
+  }, [ready, activeId, places]);
+
+  /*
+    키가 없거나 스크립트를 못 받아 왔을 때.
+
+    작은 자리에 얹혀 있을 때는 아예 비웁니다 — 빈 회색 판이나 오류를 띄우면
+    쓰는 사람은 자기가 뭘 잘못한 줄 압니다.
+
+    다만 지도가 화면을 통째로 채우는 자리(일정 화면)에서는 그럴 수 없습니다.
+    화면 절반이 비어 있으면 그것이야말로 고장으로 보입니다. 거기서는
+    한 줄만 조용히 남깁니다.
+
+    훅을 모두 부른 뒤에 빠집니다. 위에서 빠지면 부르는 훅의 수가 렌더마다
+    달라져, 스크립트를 못 받은 순간 지도가 아니라 화면 전체가 무너집니다.
+  */
+  if (!hasMaps() || failed) {
+    if (!bleed) {
+      return null;
+    }
+    return (
+      <View style={styles.blank}>
+        <Caption tone="muted">지도를 불러오지 못했습니다. 아래 일정은 그대로 볼 수 있습니다.</Caption>
+      </View>
+    );
+  }
+
   const chosen = full && sheetId ? (places.find((p) => p.id === sheetId) ?? null) : null;
 
   return (
@@ -505,24 +548,24 @@ export function TripMap({
       style={{
         position: 'relative',
         width: '100%',
-        height: full ? '100%' : height,
-        borderRadius: full ? 0 : Radius.lg,
+        height: full || bleed ? '100%' : height,
+        borderRadius: full || bleed ? 0 : Radius.lg,
         overflow: 'hidden',
-        backgroundColor: Colors.fill,
+        backgroundColor: Colors.abyss,
       }}>
       <div ref={host} style={{ width: '100%', height: '100%' }} />
 
       {/* 글자 대신 모양으로 둡니다. 앱 쪽과 같아야 같은 화면으로 읽힙니다. */}
-      <View style={styles.overlay}>
-        {here ? (
-          <IconButton name="crosshair" label="내 위치로" onPress={goHere} />
-        ) : null}
-        <IconButton
-          name={full ? 'minimize' : 'maximize'}
-          label={full ? '전체화면 닫기' : '전체화면으로 보기'}
-          onPress={toggleFull}
-        />
-      </View>
+      {chrome ? (
+        <View style={styles.overlay}>
+          {here ? <IconButton name="crosshair" label="내 위치로" onPress={goHere} /> : null}
+          <IconButton
+            name={full ? 'minimize' : 'maximize'}
+            label={full ? '전체화면 닫기' : '전체화면으로 보기'}
+            onPress={toggleFull}
+          />
+        </View>
+      ) : null}
 
       {chosen ? <PlaceSheet place={chosen} onClose={() => setSheetId(null)} /> : null}
     </div>
@@ -584,6 +627,13 @@ function PlaceSheet({ place, onClose }: { place: MapPlace; onClose: () => void }
 }
 
 const styles = StyleSheet.create({
+  blank: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: Spacing.xl,
+    backgroundColor: Colors.abyss,
+  },
   overlay: {
     flexDirection: 'row',
     gap: Spacing.xs,

@@ -2,12 +2,13 @@ import { Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { api } from '@/api/client';
+import { api, API_BASE } from '@/api/client';
 import type { Companion, DayRoute, TripDetail } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { TripMap } from '@/components/trip-map';
 import type { RouteLine } from '@/components/map-types';
 import { Colors, dayColor, Radius, Spacing } from '@/constants/theme';
+import { iconOf } from '@/constants/place-icons';
 import { decodePolyline } from '@/lib/polyline';
 import { shareLink } from '@/lib/share';
 import {
@@ -97,10 +98,17 @@ export default function Card() {
   );
 }
 
-/** 웹 주소를 만듭니다. 앱에서는 API_BASE 가 곧 웹 주소입니다. */
+/**
+ * 웹 주소를 만듭니다.
+ *
+ * <p>앱에서는 API_BASE 가 곧 웹 주소입니다. 앱에도 window 는 있지만
+ * window.location 은 없어서, 그것부터 읽으면 "링크 보내기" 를 누르는 순간
+ * 화면이 죽습니다. API_BASE 를 먼저 봅니다.
+ */
 function sharableUrl(id: string) {
   const site =
-    typeof window === 'undefined' ? '' : window.location.origin;
+    API_BASE ||
+    (typeof window === 'undefined' || !window.location ? '' : window.location.origin);
   return `${site}/card/${id}`;
 }
 
@@ -240,6 +248,7 @@ function Replay({ trip }: { trip: TripDetail }) {
       lat: p.lat,
       lng: p.lng,
       order: i + 1,
+      emoji: iconOf(p.icon),
       dayIndex,
       color: day.color || dayColor(dayIndex),
       fit: p.fit,

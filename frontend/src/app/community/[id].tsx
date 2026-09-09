@@ -1,12 +1,18 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Image, StyleSheet, View } from 'react-native';
 
 import { api, API_BASE, ApiError, query } from '@/api/client';
 import type { ItineraryDay, ItineraryPlace, PostDetail } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
-import { CommentList } from '@/components/comment-list';
+import {
+  CommentList,
+  PlaceComments,
+  countByPlace,
+  useComments,
+} from '@/components/comment-list';
+import { iconOf } from '@/constants/place-icons';
 import { Colors, dayColor, Radius, Spacing } from '@/constants/theme';
 import {
   Badge,
@@ -51,9 +57,17 @@ export default function Post() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [savedNames, setSavedNames] = useState<Set<string>>(new Set());
-  /** 장소 하나를 두고 의견을 보는 중이면 그 자리. */
+  /** 댓글 판을 열어 둔 장소. */
   const [at, setAt] = useState<{ dayIndex: number; placeIndex: number } | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
+
+  /*
+    댓글은 한 번만 받아 옵니다. 장소마다 몇 개인지 세는 것과 판에 펼쳐 보여
+    주는 것이 같은 것을 봐야 합니다 — 따로 받아 오면 하나 남긴 뒤 한쪽 숫자만
+    늘어납니다.
+  */
+  const talk = useComments(id, !!data?.feedback);
+  const perPlace = useMemo(() => countByPlace(talk.comments), [talk.comments]);
 
   /** 로그인이 필요한 동작 앞에서 한 번 걸러 줍니다. */
   function needLogin() {
@@ -88,6 +102,9 @@ export default function Post() {
         lng: place.lng,
         placeId: place.placeId,
         cat: place.cat,
+        /* 담을 때 그림도 함께 갑니다. 안 넘기면 남의 일정에서 담아 온 곳만
+           내 지도에서 민무늬가 됩니다. */
+        icon: place.icon,
         note: place.note,
         fromPost: id,
       });
@@ -146,12 +163,7 @@ export default function Post() {
       }>
       <Stack.Screen options={{ title: data.title }} />
 
-      <Image
-        source={{ uri: `${API_BASE}/api/posts/${id}/map` }}
-        style={styles.thumb}
-        resizeMode="cover"
-        accessibilityLabel={`${data.title} 동선`}
-      />
+      <PostMap postId={id} title={data.title} height={190} />
 
       <View style={styles.head}>
         <Title>{data.title}</Title>
@@ -159,9 +171,9 @@ export default function Post() {
         <Caption tone="secondary">
           {data.authorName} · {data.dayCount}일 · {data.placeCount}곳 · 조회{' '}
           {data.viewCount.toLocaleString()}
-          {data.feedback ? ` · 의견 ${data.commentCount}` : ''}
+          {data.feedback ? ` · 댓글 ${data.commentCount}` : ''}
         </Caption>
-        {data.feedback ? <Badge label="의견 환영" tone="accent" /> : null}
+        {data.feedback ? <Badge label="댓글 환영" tone="accent" /> : null}
       </View>
 
       {notice ? <Body tone="success">{notice}</Body> : null}
@@ -175,28 +187,30 @@ export default function Post() {
           onSave={(place) => (user ? save(place) : needLogin())}
           savedNames={savedNames}
           feedback={data.feedback}
+          countAt={(placeIndex) => perPlace.get(`${i}:${placeIndex}`) ?? 0}
           onComment={(placeIndex) => setAt({ dayIndex: i, placeIndex })}
         />
       ))}
 
+      {/*
+        아래 목록은 거르지 않고 전부 보여 줍니다. 장소에 달린 것도 어디에
+        달렸는지 표를 붙여 함께 둡니다 — 글 하나를 열었을 때 무슨 이야기가
+        오갔는지는 한자리에서 훑을 수 있어야 합니다.
+
+        특정 장소에 대해 말하려면 그 장소 줄의 "댓글" 을 누릅니다.
+      */}
       {data.feedback ? (
         <>
           <Divider />
           <CommentList
             postId={id}
             itinerary={data.itinerary}
-            at={at}
+            comments={talk.comments}
+            failed={talk.failed}
+            reload={talk.reload}
             onNeedLogin={needLogin}
             onCountChanged={reload}
           />
-          {at ? (
-            <Button
-              label="모든 의견 보기"
-              variant="ghost"
-              compact
-              onPress={() => setAt(null)}
-            />
-          ) : null}
         </>
       ) : null}
 
@@ -227,6 +241,22 @@ export default function Post() {
         postId={id}
         title={data.title}
       />
+
+      {at ? (
+        <PlaceComments
+          visible
+          placeName={data.itinerary.days[at.dayIndex]?.places[at.placeIndex]?.name ?? '이 장소'}
+          onClose={() => setAt(null)}
+          postId={id}
+          itinerary={data.itinerary}
+          comments={talk.comments}
+          failed={talk.failed}
+          reload={talk.reload}
+          onNeedLogin={needLogin}
+          onCountChanged={reload}
+          at={at}
+        />
+      ) : null}
 
       <ConfirmDialog
         visible={removing}
@@ -274,6 +304,7 @@ function DayBlock({
   onSave,
   savedNames,
   feedback,
+  countAt,
   onComment,
 }: {
   day: ItineraryDay;
@@ -281,8 +312,10 @@ function DayBlock({
   onSave: (place: ItineraryPlace) => void;
   /** 이미 담은 곳. 별을 채워 두면 두 번 누르지 않습니다. */
   savedNames: Set<string>;
-  /** 의견을 받는 글인지. 안 열었으면 말풍선을 두지 않습니다. */
+  /** 댓글을 받는 글인지. 안 열었으면 댓글 단추를 두지 않습니다. */
   feedback: boolean;
+  /** 이 장소에 달린 댓글 수. */
+  countAt: (placeIndex: number) => number;
   onComment: (placeIndex: number) => void;
 }) {
   const color = day.color || dayColor(index);
@@ -305,7 +338,7 @@ function DayBlock({
         <Row key={i} gap={Spacing.md} style={styles.place}>
           <View style={[styles.order, { backgroundColor: color }]}>
             <Body small strong style={styles.orderText}>
-              {i + 1}
+              {iconOf(place.icon) || i + 1}
             </Body>
           </View>
           <View style={styles.placeText}>
@@ -332,11 +365,16 @@ function DayBlock({
             ) : null}
           </View>
 
-          {/* "여기 말고 옆집" 은 어느 집인지가 붙어야 뜻이 통합니다. */}
+          {/*
+            말풍선 그림만 두었을 때는 눌러도 아래 목록이 걸러질 뿐이라, 무슨
+            일이 일어났는지 보이지 않았습니다. 몇 개 달렸는지를 글자로 적고,
+            누르면 그 장소의 댓글만 담긴 판이 올라옵니다.
+          */}
           {feedback ? (
-            <IconButton
-              name="message-square"
-              label={`${place.name}에 의견 남기기`}
+            <Button
+              label={countAt(i) > 0 ? `댓글 ${countAt(i)}` : '댓글'}
+              variant={countAt(i) > 0 ? 'secondary' : 'ghost'}
+              compact
               onPress={() => onComment(i)}
             />
           ) : null}
@@ -412,13 +450,37 @@ function today() {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }
 
+
+/**
+ * 동선 그림.
+ *
+ * <p>서버가 구글에서 받아 우리 주소로 내보냅니다. 키를 안 넣어 두었거나
+ * 좌표가 하나도 없는 일정이면 못 받아 오는데, 그때 자리를 그대로 두면 회색
+ * 상자만 덩그러니 남습니다. 아예 비웁니다.
+ */
+function PostMap({ postId, title, height }: { postId: string; title: string; height: number }) {
+  const [broken, setBroken] = useState(false);
+
+  if (broken) {
+    return null;
+  }
+  return (
+    <Image
+      source={{ uri: `${API_BASE}/api/posts/${postId}/map` }}
+      style={[styles.thumb, { height }]}
+      resizeMode="cover"
+      accessibilityLabel={`${title} 동선`}
+      onError={() => setBroken(true)}
+    />
+  );
+}
+
 const styles = StyleSheet.create({
   head: {
     gap: Spacing.xs,
   },
   thumb: {
     width: '100%',
-    height: 190,
     borderRadius: Radius.lg,
     backgroundColor: Colors.fill,
   },
@@ -448,6 +510,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   orderText: {
-    color: '#FFFFFF',
+    /* 날짜 색이 파스텔이라 흰 글자는 읽히지 않습니다. 짙게 씁니다. */
+    color: Colors.onDay,
   },
 });

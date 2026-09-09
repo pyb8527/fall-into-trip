@@ -5,7 +5,7 @@ import { api, ApiError } from '@/api/client';
 import type { Folder } from '@/api/types';
 import { Spacing } from '@/constants/theme';
 import {
-  Body,
+  Badge,
   BottomSheet,
   Button,
   Caption,
@@ -66,6 +66,12 @@ export function FolderSheet({
     }
   }, [visible]);
 
+  /**
+   * 서버에 한 번 다녀옵니다.
+   *
+   * <p>됐는지를 돌려줍니다. 적어 둔 글을 비우는 것은 성공했을 때뿐입니다 —
+   * 실패에도 비우면 길게 쓴 것이 통째로 날아가고 다시 칠 수도 없습니다.
+   */
   async function run(action: () => Promise<unknown>) {
     setFailed(null);
     setBusy(true);
@@ -73,10 +79,23 @@ export function FolderSheet({
       await action();
       await load();
       onChanged();
+      return true;
     } catch (e) {
       setFailed(e instanceof ApiError ? e.message : '처리하지 못했습니다.');
+      return false;
     } finally {
       setBusy(false);
+    }
+  }
+
+  /* 엔터로도 단추로도 같은 일을 합니다. 둘이 갈리면 한쪽만 고쳐 놓고
+     다른 쪽은 그대로 남습니다. */
+  async function makeFolder() {
+    if (busy || !name.trim()) {
+      return;
+    }
+    if (await run(() => api.post('/api/folders', { name: name.trim() }))) {
+      setName('');
     }
   }
 
@@ -90,7 +109,7 @@ export function FolderSheet({
       <ListRow
         title="폴더 없음"
         subtitle="목록에 그대로 둡니다"
-        right={current === null ? <Body strong tone="accent">선택됨</Body> : undefined}
+        right={current === null ? <Badge label="여기" tone="accent" /> : undefined}
         onPress={() =>
           run(() => api.put(`/api/trips/${tripId}/folder`, {}))
         }
@@ -102,13 +121,7 @@ export function FolderSheet({
             <ListRow
               title={folder.name}
               subtitle={`여행 ${folder.tripCount}개`}
-              right={
-                current === folder.id ? (
-                  <Body strong tone="accent">
-                    선택됨
-                  </Body>
-                ) : undefined
-              }
+              right={current === folder.id ? <Badge label="여기" tone="accent" /> : undefined}
               onPress={() =>
                 run(() => api.put(`/api/trips/${tripId}/folder`, { folderId: folder.id }))
               }
@@ -134,19 +147,9 @@ export function FolderSheet({
         onChangeText={setName}
         placeholder="제주 갈 때마다"
         returnKeyType="done"
-        onSubmitEditing={() => {
-          if (name.trim()) {
-            run(() => api.post('/api/folders', { name: name.trim() })).then(() => setName(''));
-          }
-        }}
+        onSubmitEditing={makeFolder}
       />
-      <Button
-        label="폴더 만들기"
-        variant="secondary"
-        busy={busy}
-        disabled={!name.trim()}
-        onPress={() => run(() => api.post('/api/folders', { name: name.trim() })).then(() => setName(''))}
-      />
+      <Button label="폴더 만들기" variant="secondary" busy={busy} disabled={!name.trim()} onPress={makeFolder} />
 
       {failed ? <ErrorNote message={failed} /> : null}
 

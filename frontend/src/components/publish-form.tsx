@@ -116,16 +116,13 @@ export function PublishForm({
 
       {/* 구경만 하라고 올린 글에 훈수가 달리면 반갑지 않습니다. 열어 둘
           때만 댓글칸이 생깁니다. */}
+      <Caption tone="secondary">댓글을 받을까요?</Caption>
       <Row gap={Spacing.xs}>
-        <Chip
-          label="의견 안 받기"
-          selected={!feedback}
-          onPress={() => setFeedback(false)}
-        />
-        <Chip label="의견 받기" selected={feedback} onPress={() => setFeedback(true)} />
+        <Chip label="안 받기" selected={!feedback} onPress={() => setFeedback(false)} />
+        <Chip label="받기" selected={feedback} onPress={() => setFeedback(true)} />
       </Row>
       <Caption tone="secondary">
-        의견을 받으면 다른 사람이 일정에, 또는 장소 하나하나에 댓글을 달 수 있습니다.
+        받으면 다른 사람이 일정 전체에, 또는 장소 하나하나에 댓글을 달 수 있습니다.
       </Caption>
 
       {failed ? <ErrorNote message={failed} /> : null}

@@ -27,10 +27,10 @@ type Kind = 'posts' | 'tips' | 'comments';
 const KINDS: { value: Kind; label: string }[] = [
   { value: 'posts', label: '일정 글' },
   { value: 'tips', label: '한 줄' },
-  { value: 'comments', label: '의견' },
+  { value: 'comments', label: '댓글' },
 ];
 
-/** 한 줄과 의견은 같은 모양입니다. 본문·글쓴이·신고 수뿐입니다. */
+/** 한 줄과 댓글은 같은 모양입니다. 본문·글쓴이·신고 수뿐입니다. */
 type ReportedTip = {
   id: string;
   text: string;

@@ -72,6 +72,12 @@ export function TipSheet({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, placeId]);
 
+  /**
+   * 서버에 한 번 다녀옵니다.
+   *
+   * <p>됐는지를 돌려줍니다. 적어 둔 글을 비우는 것은 성공했을 때뿐입니다 —
+   * 실패에도 비우면 길게 쓴 것이 통째로 날아가고 다시 칠 수도 없습니다.
+   */
   async function run(action: () => Promise<unknown>) {
     setFailed(null);
     setBusy(true);
@@ -79,8 +85,10 @@ export function TipSheet({
       await action();
       await load();
       onChanged();
+      return true;
     } catch (e) {
       setFailed(e instanceof ApiError ? e.message : '처리하지 못했습니다.');
+      return false;
     } finally {
       setBusy(false);
     }
@@ -144,7 +152,11 @@ export function TipSheet({
             onPress={() =>
               run(() =>
                 api.post(`/api/places/${encodeURIComponent(placeId)}/tips`, { text: text.trim() }),
-              ).then(() => setText(''))
+              ).then((done) => {
+                if (done) {
+                  setText('');
+                }
+              })
             }
           />
         </>

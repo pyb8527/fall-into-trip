@@ -112,7 +112,7 @@ function Stat({
 }) {
   const color = {
     default: Colors.text,
-    accent: Colors.accent,
+    accent: Colors.accentInk,
     danger: Colors.danger,
     muted: Colors.text,
   }[tone];

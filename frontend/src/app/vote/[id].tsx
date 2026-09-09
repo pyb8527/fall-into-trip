@@ -6,6 +6,7 @@ import { api, ApiError } from '@/api/client';
 import type { Candidate, SavedPlace, TripDetail } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { PlaceSearch } from '@/components/place-search';
+import { iconOf } from '@/constants/place-icons';
 import { Spacing } from '@/constants/theme';
 import {
   Badge,
@@ -14,6 +15,7 @@ import {
   Button,
   Caption,
   Card,
+  ConfirmDialog,
   Divider,
   Empty,
   ErrorNote,
@@ -53,6 +55,9 @@ export default function Vote() {
   const [adding, setAdding] = useState(false);
   const [pouring, setPouring] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
+  /* 내리는 것은 되돌릴 수 없고, 남이 올린 것도 내릴 수 있습니다. 다른
+     화면과 마찬가지로 한 번 묻습니다 — 여기만 곧장 지워지고 있었습니다. */
+  const [dropping, setDropping] = useState<Candidate | null>(null);
 
   const agreed = useMemo(() => (data?.candidates ?? []).filter((c) => c.agreed), [data]);
 
@@ -106,7 +111,7 @@ export default function Vote() {
         <Card key={candidate.id}>
           <Row style={styles.cardHead}>
             <View style={styles.grow}>
-              <Subtitle>{candidate.name}</Subtitle>
+              <Subtitle>{`${iconOf(candidate.icon)} ${candidate.name}`.trim()}</Subtitle>
               {candidate.note || candidate.cat ? (
                 <Caption tone="secondary">{candidate.note ?? candidate.cat}</Caption>
               ) : null}
@@ -123,13 +128,13 @@ export default function Vote() {
 
           <Row gap={Spacing.sm}>
             <Button
-              label={candidate.myVote === true ? '좋아요 취소' : '좋아요'}
+              label={candidate.myVote === true ? '좋아요 무르기' : '좋아요'}
               variant={candidate.myVote === true ? 'secondary' : 'primary'}
               compact
               onPress={() => vote(candidate, candidate.myVote === true ? null : true)}
             />
             <Button
-              label={candidate.myVote === false ? '아니요 취소' : '아니요'}
+              label={candidate.myVote === false ? '아니요 무르기' : '아니요'}
               variant="secondary"
               compact
               onPress={() => vote(candidate, candidate.myVote === false ? null : false)}
@@ -138,7 +143,7 @@ export default function Vote() {
               name="trash-2"
               label={`${candidate.name} 내리기`}
               tone="danger"
-              onPress={() => drop(candidate)}
+              onPress={() => setDropping(candidate)}
             />
           </Row>
         </Card>
@@ -158,6 +163,26 @@ export default function Vote() {
         onAdded={() => {
           setAdding(false);
           reload();
+        }}
+      />
+
+      <ConfirmDialog
+        visible={dropping !== null}
+        title="목록에서 내릴까요?"
+        message={
+          dropping
+            ? `${dropping.name} 과(와) 지금까지 받은 표가 사라집니다. 되돌릴 수 없습니다.`
+            : undefined
+        }
+        confirmLabel="내리기"
+        danger
+        onCancel={() => setDropping(null)}
+        onConfirm={() => {
+          const target = dropping;
+          setDropping(null);
+          if (target) {
+            drop(target);
+          }
         }}
       />
 
@@ -225,7 +250,7 @@ function AddSheet({
           {saved.places.map((place) => (
             <ListRow
               key={place.id}
-              title={place.name}
+              title={`${iconOf(place.icon)} ${place.name}`.trim()}
               subtitle={place.note ?? place.cat ?? '메모 없음'}
               onPress={() => add({ savedId: place.id })}
             />

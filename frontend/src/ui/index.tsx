@@ -1,28 +1,42 @@
 import Feather from '@expo/vector-icons/Feather';
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from 'react';
 import {
   ActivityIndicator,
+  Animated,
+  Easing,
   Keyboard,
   KeyboardAvoidingView,
   Modal,
+  PanResponder,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
   type StyleProp,
   type TextInputProps,
   type TextStyle,
   type ViewProps,
+  type ViewStyle,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   Colors,
   Gutter,
+  Lift,
   MaxContentWidth,
+  Motion,
   Radius,
   ScreenGap,
   Spacing,
@@ -46,6 +60,128 @@ import {
  *       확대해 버립니다.</li>
  * </ul>
  */
+
+/* ---------------------------------------------------------------- 움직임 */
+
+/**
+ * 누르면 살짝 눌리는 것.
+ *
+ * <p>색만 바뀌는 것으로는 눌렸는지 잘 모릅니다. 특히 어두운 화면에서는 밝기
+ * 차이가 작아 더 그렇습니다. 손끝 아래에서 실제로 조금 작아지면, 화면을
+ * 보지 않아도 닿았다는 것을 압니다.
+ *
+ * <p>reanimated 를 쓰지 않았습니다. 이 저장소에는 babel 설정 파일이 없어
+ * 그 라이브러리가 요구하는 플러그인이 걸려 있지 않습니다. 켜려면 설정을 새로
+ * 만들고 앱을 다시 빌드해야 하는데, 크기를 조금 줄이는 일에 그럴 것까지는
+ * 없습니다. RN 이 기본으로 가진 Animated 로 충분합니다.
+ */
+const Squeezable = Animated.createAnimatedComponent(Pressable);
+
+export function Press({
+  children,
+  onPress,
+  disabled,
+  scale = 0.97,
+  style,
+  accessibilityLabel,
+  accessibilityRole = 'button',
+  accessibilityState,
+  hitSlop,
+}: {
+  children: React.ReactNode;
+  onPress?: () => void;
+  disabled?: boolean;
+  /** 얼마나 작아질지. 큰 판일수록 덜 줄어야 어색하지 않습니다. */
+  scale?: number;
+  style?: StyleProp<ViewStyle>;
+  accessibilityLabel?: string;
+  accessibilityRole?: 'button' | 'tab' | 'link';
+  accessibilityState?: { selected?: boolean; disabled?: boolean; busy?: boolean };
+  hitSlop?: number;
+}) {
+  const value = useRef(new Animated.Value(1)).current;
+
+  const to = (next: number, duration: number) =>
+    Animated.timing(value, {
+      toValue: next,
+      duration,
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: true,
+    }).start();
+
+  /*
+    누르는 것 자체를 움직입니다.
+
+    안쪽에 층을 하나 더 두고 그것만 움직이면, 넓이·높이를 정하는 스타일이
+    껍데기가 아니라 그 안쪽에 걸립니다. 그러면 바깥 껍데기는 내용만큼만
+    커져서, 화면 폭을 꽉 채워야 할 단추가 글자 크기로 쪼그라듭니다.
+    껍데기와 움직이는 것을 하나로 둡니다.
+  */
+  return (
+    <Squeezable
+      onPress={onPress}
+      disabled={disabled}
+      hitSlop={hitSlop}
+      accessibilityRole={accessibilityRole}
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={accessibilityState}
+      /* 누를 때는 바로 붙고, 뗄 때는 조금 느긋하게 돌아옵니다. 둘이 같으면
+         튕기는 것처럼 보입니다. */
+      onPressIn={() => to(scale, Motion.tap)}
+      onPressOut={() => to(1, Motion.base)}
+      style={[style, { transform: [{ scale: value }] }]}>
+      {children}
+    </Squeezable>
+  );
+}
+
+/**
+ * 나타날 때 아래에서 살짝 떠오르는 것.
+ *
+ * <p>목록이 한 번에 툭 나타나면 화면이 갈아 끼워진 것처럼 보입니다. 순서대로
+ * 조금씩 늦게 떠오르면 눈이 위에서 아래로 따라 내려갑니다.
+ *
+ * @param order 몇 번째인지. 앞에서부터 조금씩 늦게 시작합니다.
+ */
+export function Rise({
+  children,
+  order = 0,
+  style,
+}: {
+  children: React.ReactNode;
+  order?: number;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const value = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    /* 늦추는 것도 한도를 둡니다. 스무 번째 줄까지 차례를 기다리게 하면
+       마지막 것이 나타날 때쯤엔 이미 굴려서 지나간 뒤입니다. */
+    const delay = Math.min(order, 6) * 45;
+    Animated.timing(value, {
+      toValue: 1,
+      duration: Motion.base,
+      delay,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [value, order]);
+
+  return (
+    <Animated.View
+      style={[
+        style,
+        {
+          opacity: value,
+          transform: [
+            { translateY: value.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) },
+          ],
+        },
+      ]}>
+      {children}
+    </Animated.View>
+  );
+}
 
 /* ------------------------------------------------------------------ 뼈대 */
 
@@ -192,12 +328,7 @@ export function ListRow({
   onPress: () => void;
 }) {
   return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.listRow,
-        { backgroundColor: pressed ? Colors.fill : Colors.surface },
-      ]}>
+    <Press onPress={onPress} scale={0.985} style={styles.listRow}>
       <View style={styles.listRowText}>
         <Text style={styles.listRowTitle} numberOfLines={1}>
           {title}
@@ -205,7 +336,7 @@ export function ListRow({
         {subtitle ? <Text style={styles.listRowSubtitle}>{subtitle}</Text> : null}
       </View>
       {right}
-    </Pressable>
+    </Press>
   );
 }
 
@@ -237,6 +368,8 @@ type Tone =
   | 'danger'
   | 'success'
   | 'accent'
+  /** 지금·오늘·여기. 강조(라임)와 색상환 반대편이라 나란히 놓아도 안 죽습니다. */
+  | 'hot'
   | 'warning'
   | 'inverse';
 
@@ -246,9 +379,13 @@ const toneColor: Record<Tone, string> = {
   muted: Colors.textMuted,
   danger: Colors.danger,
   success: Colors.success,
-  accent: Colors.accent,
+  /* 칠하는 색(파스텔)이 아니라 글자로 읽히는 짙은 쪽을 씁니다. */
+  accent: Colors.accentInk,
+  hot: Colors.hot,
   warning: Colors.warning,
-  inverse: '#FFFFFF',
+  /* 색으로 채운 자리 위에 얹는 것. 우리 강조색은 모두 밝아서, 그 위에는
+     어두운 글자가 올라가야 읽힙니다. */
+  inverse: Colors.onDay,
 };
 
 const toneSoft: Record<Tone, string> = {
@@ -258,6 +395,7 @@ const toneSoft: Record<Tone, string> = {
   danger: Colors.dangerSoft,
   success: Colors.successSoft,
   accent: Colors.accentSoft,
+  hot: Colors.hotSoft,
   warning: Colors.warningSoft,
   /* 바탕이 이미 진한 자리에 쓰므로 무른 배경은 두지 않습니다. */
   inverse: 'transparent',
@@ -406,17 +544,20 @@ export function Button({
   const offBg = variant === 'ghost' ? 'transparent' : Colors.fill;
 
   return (
-    <Pressable
+    <Press
       onPress={onPress}
       disabled={off}
-      accessibilityRole="button"
       accessibilityState={{ disabled: !!off, busy: !!busy }}
       /* 보이는 높이가 44 보다 작으면 그만큼 누르는 넓이를 넓혀 줍니다. */
       hitSlop={compact ? Tap.compactSlop : undefined}
-      style={({ pressed }) => [
+      scale={compact ? 0.94 : 0.975}
+      style={[
         styles.button,
         compact ? styles.buttonCompact : styles.buttonFull,
-        { backgroundColor: off ? offBg : pressed ? c.pressed : c.bg },
+        { backgroundColor: off ? offBg : c.bg },
+        /* 주 동작에는 제 색을 옅게 흘려 둡니다. 어두운 화면에서 라임 하나가
+           떠 있으면 어디를 눌러야 하는지 찾을 필요가 없습니다. */
+        !off && variant === 'primary' ? styles.buttonGlow : null,
       ]}>
       {busy ? (
         <ActivityIndicator color={off ? Colors.textDisabled : c.fg} size="small" />
@@ -430,7 +571,7 @@ export function Button({
           {label}
         </Text>
       )}
-    </Pressable>
+    </Press>
   );
 }
 
@@ -445,26 +586,23 @@ export function Chip({
   onPress: () => void;
 }) {
   return (
-    <Pressable
+    <Press
       onPress={onPress}
-      accessibilityRole="button"
       accessibilityState={{ selected }}
       hitSlop={Tap.compactSlop}
-      style={({ pressed }) => [
+      scale={0.93}
+      style={[
         styles.chip,
         {
-          backgroundColor: selected
-            ? Colors.accent
-            : pressed
-              ? Colors.fillPressed
-              : Colors.fill,
+          backgroundColor: selected ? Colors.accent : Colors.fill,
+          borderColor: selected ? Colors.accent : Colors.border,
         },
       ]}>
       <Text
         style={[styles.chipLabel, { color: selected ? Colors.accentText : Colors.textSecondary }]}>
         {label}
       </Text>
-    </Pressable>
+    </Press>
   );
 }
 
@@ -540,15 +678,15 @@ export function MenuCard({
   onPress?: () => void;
 }) {
   return (
-    <Pressable
+    <Press
       onPress={onPress}
       disabled={soon || !onPress}
-      accessibilityRole="button"
       accessibilityState={{ disabled: !!soon }}
-      style={({ pressed }) => [
+      scale={0.965}
+      style={[
         styles.menuCard,
         wide ? styles.menuCardWide : styles.menuCardHalf,
-        { backgroundColor: pressed ? Colors.fill : Colors.surface },
+        soon ? styles.menuCardSoon : null,
       ]}>
       <View style={styles.menuText}>
         <Row gap={Spacing.sm}>
@@ -558,7 +696,7 @@ export function MenuCard({
         <Text style={styles.menuCaption}>{caption}</Text>
       </View>
       {wide && !soon ? <Text style={styles.menuChevron}>›</Text> : null}
-    </Pressable>
+    </Press>
   );
 }
 
@@ -624,6 +762,7 @@ export function IconButton({
   tone = 'secondary',
   active,
   disabled,
+  onMap,
 }: {
   name: IconName;
   /** 무엇을 하는 단추인지. 눈에는 안 보이고 읽어 주는 기기만 씁니다. */
@@ -633,26 +772,36 @@ export function IconButton({
   /** 켜진 상태(예: 다녀옴). 눌러 둔 것처럼 보이게 합니다. */
   active?: boolean;
   disabled?: boolean;
+  /**
+   * 지도 위에 얹히는 단추인지.
+   *
+   * <p>지도 위에서는 네모난 연회색 단추가 지도의 건물·구획과 섞여 어디까지가
+   * 단추인지 보이지 않습니다. 동그랗게, 흰 바탕에 그림자를 두어 떠 있는 것으로
+   * 만듭니다. 지도를 쓰는 앱이라면 어디서나 그렇게 생겼습니다.
+   */
+  onMap?: boolean;
 }) {
   return (
-    <Pressable
+    <Press
       onPress={onPress}
       disabled={disabled}
-      accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled: !!disabled, selected: !!active }}
-      style={({ pressed }) => [
+      scale={0.88}
+      style={[
         styles.iconButton,
+        onMap && styles.iconButtonOnMap,
         {
           backgroundColor: active
             ? toneSoft[tone]
-            : pressed
-              ? Colors.fillPressed
+            : onMap
+              ? Colors.surface
               : Colors.fill,
         },
+        active && onMap ? { borderColor: toneColor[tone] } : null,
       ]}>
       <Icon name={name} tone={disabled ? 'muted' : active ? tone : 'secondary'} />
-    </Pressable>
+    </Press>
   );
 }
 
@@ -779,6 +928,160 @@ export function BottomSheet({
 }
 
 /**
+ * 지도 위로 끌어올리는 판.
+ *
+ * <p>지도를 위에 260px 만 얹고 아래를 목록으로 채우면, 지도도 목록도 어느 쪽도
+ * 넉넉하지 않습니다. 동선을 보려면 좁고, 일정을 훑으려면 위가 잘립니다.
+ *
+ * <p>그래서 지도를 화면 전체로 깔고 일정을 그 위에 얹었습니다. 판을 내리면
+ * 지도가 다 보이고, 올리면 일정이 다 보입니다. 어느 쪽을 크게 볼지 그때그때
+ * 손으로 정합니다.
+ *
+ * <p>세 자리에만 붙습니다. 아무 데나 멈추게 두면 매번 어중간한 높이가 되어,
+ * 볼 때마다 다시 맞춰야 합니다.
+ *
+ * <p>안쪽 목록은 <b>판이 맨 위까지 올라왔을 때만</b> 굴러갑니다. 그러지 않으면
+ * 손가락 하나로 판을 올리려는 것과 목록을 굴리려는 것이 다투어, 올리려다
+ * 스크롤되고 굴리려다 판이 내려갑니다.
+ */
+export function DragSheet({
+  children,
+  /** 화면 높이에서 판이 차지할 몫. 낮은 것부터 적습니다. */
+  snaps = [0.28, 0.55, 0.92],
+  /** 처음 붙는 자리. snaps 의 몇 번째인지. */
+  initial = 1,
+  /** 판 맨 위에 늘 보이는 줄. 손잡이 옆에 붙습니다. */
+  peek,
+  onSnapChange,
+}: {
+  children: React.ReactNode;
+  snaps?: number[];
+  initial?: number;
+  peek?: React.ReactNode;
+  onSnapChange?: (index: number) => void;
+}) {
+  const { height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+
+  /* 픽셀로 바꿔 둡니다. 화면을 돌리거나 브라우저 창을 줄이면 다시 계산됩니다. */
+  const stops = snaps.map((r) => Math.round(height * r));
+  const [at, setAt] = useState(Math.min(initial, stops.length - 1));
+  const atRef = useRef(at);
+  atRef.current = at;
+
+  const tall = useRef(new Animated.Value(stops[Math.min(initial, stops.length - 1)])).current;
+  /* 손가락이 닿았을 때의 높이. 여기서부터 얼마나 움직였는지를 셉니다. */
+  const from = useRef(stops[Math.min(initial, stops.length - 1)]);
+
+  const settle = useCallback(
+    (index: number) => {
+      const next = Math.max(0, Math.min(stops.length - 1, index));
+      setAt(next);
+      onSnapChange?.(next);
+      Animated.spring(tall, {
+        toValue: stops[next],
+        damping: Motion.spring.damping,
+        stiffness: Motion.spring.stiffness,
+        mass: Motion.spring.mass,
+        /* 높이는 네이티브 드라이버로 못 움직입니다(레이아웃 값이라서).
+           판 하나뿐이라 이 정도는 자바스크립트 쪽에서 그려도 됩니다. */
+        useNativeDriver: false,
+      }).start();
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [tall, onSnapChange, stops.join(',')],
+  );
+
+  /* 창 크기가 바뀌면 붙어 있던 자리를 새 높이로 다시 잡습니다. */
+  useEffect(() => {
+    tall.setValue(stops[Math.min(atRef.current, stops.length - 1)]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stops.join(',')]);
+
+  const pan = useRef(
+    PanResponder.create({
+      /* 세로로 어느 정도 움직였을 때만 잡습니다. 그러지 않으면 판 안의
+         단추를 누르려는 것까지 끌기로 오해합니다. */
+      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 6,
+      onPanResponderGrant: () => {
+        from.current = stops[atRef.current];
+      },
+      onPanResponderMove: (_, g) => {
+        const next = from.current - g.dy;
+        /* 맨 위와 맨 아래를 넘어가면 조금만 따라옵니다. 딱 멈추면 고장 난 것
+           같고, 그대로 따라가면 판이 화면 밖으로 나갑니다. */
+        const low = stops[0];
+        const high = stops[stops.length - 1];
+        const eased =
+          next < low
+            ? low - (low - next) * 0.35
+            : next > high
+              ? high + (next - high) * 0.35
+              : next;
+        tall.setValue(eased);
+      },
+      onPanResponderRelease: (_, g) => {
+        const ended = from.current - g.dy;
+        /* 세게 튕겼으면 손을 뗀 자리가 아니라 방향을 봅니다. 살짝 올렸다가
+           놓아도 다음 자리로 넘어가야 "던졌다" 는 느낌이 납니다. */
+        if (g.vy < -0.5) {
+          settle(atRef.current + 1);
+          return;
+        }
+        if (g.vy > 0.5) {
+          settle(atRef.current - 1);
+          return;
+        }
+        let best = 0;
+        for (let i = 1; i < stops.length; i++) {
+          if (Math.abs(stops[i] - ended) < Math.abs(stops[best] - ended)) {
+            best = i;
+          }
+        }
+        settle(best);
+      },
+    }),
+  ).current;
+
+  const top = at >= stops.length - 1;
+
+  return (
+    <Animated.View style={[styles.dragSheet, { height: tall }]}>
+      {/* 손잡이와 그 옆 줄까지가 끄는 자리입니다. 손잡이만 잡게 하면
+          손가락으로는 잘 안 맞습니다. */}
+      <View {...pan.panHandlers} style={styles.dragHead}>
+        {/* 끄는 것 말고 눌러서도 오갑니다. 끄는 몸짓은 마우스에서 잘 안
+            잡히고, 무엇보다 끌 수 있다는 것 자체를 모르는 사람이 있습니다.
+            맨 위까지 갔으면 다시 맨 아래로 돌아옵니다. */}
+        <Pressable
+          onPress={() => settle(top ? 0 : atRef.current + 1)}
+          accessibilityRole="button"
+          accessibilityLabel={top ? '일정 접기' : '일정 펼치기'}
+          hitSlop={Spacing.md}
+          style={styles.dragGripTap}>
+          <View style={styles.dragGrip} />
+        </Pressable>
+        {peek ? <View style={styles.dragPeek}>{peek}</View> : null}
+      </View>
+
+      <ScrollView
+        style={styles.dragBody}
+        contentContainerStyle={[
+          styles.dragBodyInner,
+          { paddingBottom: insets.bottom + Spacing.huge },
+        ]}
+        /* 맨 위까지 올라오기 전에는 굴리지 않습니다. 판을 끄는 손짓과
+           다투지 않게 하려는 것입니다. */
+        scrollEnabled={top}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}>
+        {children}
+      </ScrollView>
+    </Animated.View>
+  );
+}
+
+/**
  * 숫자를 눌러서 고르는 칸.
  *
  * 직접 치게 두면 "3박" 을 적는 사람과 "3" 을 적는 사람이 갈리고, 폰에서는
@@ -832,7 +1135,7 @@ export function Stepper({
 export function Loading({ label = '불러오는 중' }: { label?: string }) {
   return (
     <View style={styles.center}>
-      <ActivityIndicator color={Colors.accent} />
+      <ActivityIndicator color={Colors.accentInk} />
       <Caption>{label}</Caption>
     </View>
   );
@@ -956,12 +1259,17 @@ const styles = StyleSheet.create({
 
   card: {
     backgroundColor: Colors.surface,
-    borderRadius: Radius.lg,
+    borderRadius: Radius.xl,
+    /* 거의 흰 바탕 위의 흰 카드입니다. 실선을 두르면 그 선이 카드 안의
+       글자보다 먼저 눈에 띕니다. 옅고 넓은 그림자로만 띄웁니다. */
+    ...Lift,
     padding: Spacing.xl,
     gap: Spacing.md,
   },
 
   listRow: {
+    backgroundColor: Colors.surface,
+    ...Lift,
     borderRadius: Radius.lg,
     paddingVertical: Spacing.lg,
     paddingHorizontal: Spacing.xl,
@@ -989,6 +1297,62 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
+  },
+
+  /* --------------------------------------------------- 지도 위의 판 */
+  dragSheet: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: Radius.xxl,
+    borderTopRightRadius: Radius.xxl,
+    /* 지도 위에 얹히는 판이라 위쪽으로 그림자를 드리웁니다. 실선만 두면
+       지도의 길과 섞여 판의 시작이 보이지 않습니다. */
+    shadowColor: '#000000',
+    shadowOpacity: 0.08,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: -6 },
+    elevation: 12,
+    overflow: 'hidden',
+  },
+  dragHead: {
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.sm,
+    gap: Spacing.sm,
+  },
+  dragGripTap: {
+    alignItems: 'center',
+    paddingVertical: Spacing.xs,
+  },
+  dragGrip: {
+    alignSelf: 'center',
+    width: 44,
+    height: 4,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.borderStrong,
+  },
+  /* 넓은 화면에서 글줄이 지나치게 길어지지 않게 가운데로 모읍니다. 판이
+     화면 폭을 다 쓰면 날짜는 왼쪽 끝, 진행률은 오른쪽 끝에 떨어져 한눈에
+     같이 읽히지 않습니다. */
+  dragPeek: {
+    width: '100%',
+    maxWidth: MaxContentWidth,
+    alignSelf: 'center',
+    paddingHorizontal: Gutter,
+    gap: Spacing.sm,
+  },
+  dragBody: {
+    flex: 1,
+  },
+  dragBodyInner: {
+    width: '100%',
+    maxWidth: MaxContentWidth,
+    alignSelf: 'center',
+    paddingHorizontal: Gutter,
+    paddingTop: Spacing.sm,
+    gap: Spacing.lg,
   },
   divider: {
     height: StyleSheet.hairlineWidth,
@@ -1069,14 +1433,17 @@ const styles = StyleSheet.create({
   },
   buttonFull: {
     height: Tap.control,
-    borderRadius: Radius.md,
+    borderRadius: Radius.lg,
     paddingHorizontal: Spacing.xl,
   },
   buttonCompact: {
     height: Tap.compact,
-    borderRadius: Radius.sm,
-    paddingHorizontal: Spacing.md,
+    borderRadius: Radius.full,
+    paddingHorizontal: Spacing.lg,
   },
+  /* 주 동작도 카드와 같은 그림자로 띄웁니다. 색 그림자를 깔면 단추 아래가
+     물들어 탁해집니다. */
+  buttonGlow: Lift,
   buttonLabel: {
     ...Type.body,
     fontWeight: Weight.semibold,
@@ -1092,6 +1459,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     alignItems: 'center',
     justifyContent: 'center',
+    /* 어두운 바탕에서 칩과 판은 밝기가 비슷합니다. 실선이 없으면 칩이
+       어디서 끝나는지 보이지 않습니다. */
+    borderWidth: StyleSheet.hairlineWidth,
   },
   chipLabel: {
     ...Type.bodySmall,
@@ -1100,21 +1470,23 @@ const styles = StyleSheet.create({
 
   segment: {
     flexDirection: 'row',
-    /* 페이지 바탕(fill)과 같은 색을 쓰면 띠가 보이지 않습니다. 한 단계 진하게. */
-    backgroundColor: Colors.fillPressed,
-    borderRadius: Radius.md,
+    /* 판(surface)보다 한 단 어둡게 눌러 앉힙니다. 고른 칸만 다시 떠오릅니다. */
+    backgroundColor: Colors.abyss,
+    borderRadius: Radius.lg,
     padding: Spacing.xs,
     gap: Spacing.xs,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.border,
   },
   segmentItem: {
     flex: 1,
     height: Tap.min,
-    borderRadius: Radius.sm,
+    borderRadius: Radius.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
   segmentItemOn: {
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.fill,
   },
   segmentLabel: {
     ...Type.bodySmall,
@@ -1122,14 +1494,25 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
   },
   segmentLabelOn: {
-    color: Colors.text,
+    color: Colors.accentInk,
   },
 
   menuCard: {
-    borderRadius: Radius.lg,
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.xl,
+    ...Lift,
     padding: Spacing.xl,
-    minHeight: 96,
+    minHeight: 104,
     justifyContent: 'center',
+  },
+  /* 아직 없는 것은 띄우지 않습니다. 못 누른다는 것이 글자(준비 중) 말고
+     생김새로도 읽혀야 합니다 — 떠 있지 않으면 손이 가지 않습니다. */
+  menuCardSoon: {
+    backgroundColor: 'transparent',
+    shadowOpacity: 0,
+    elevation: 0,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.border,
   },
   menuCardHalf: {
     /* 두 칸씩. 사이 간격(md)을 빼고 반씩 나눠 가집니다. */
@@ -1183,6 +1566,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  /* 지도 위에 떠 있는 단추. 동그랗고, 실선과 그림자로 지도에서 떼어 놓습니다. */
+  iconButtonOnMap: {
+    borderRadius: Radius.full,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.border,
+    shadowColor: '#000000',
+    shadowOpacity: 0.16,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+  },
 
   dialogBackdrop: {
     flex: 1,
@@ -1221,8 +1615,8 @@ const styles = StyleSheet.create({
   },
   sheet: {
     backgroundColor: Colors.surface,
-    borderTopLeftRadius: Radius.xl,
-    borderTopRightRadius: Radius.xl,
+    borderTopLeftRadius: Radius.xxl,
+    borderTopRightRadius: Radius.xxl,
     paddingTop: Spacing.md,
     /* 화면을 다 덮지 않습니다. 뒤가 조금 보여야 어디로 돌아가는지 압니다. */
     maxHeight: '88%',

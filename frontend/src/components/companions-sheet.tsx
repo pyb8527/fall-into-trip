@@ -121,7 +121,7 @@ function Inner({
 
           <Row gap={Spacing.xs}>
             <Badge
-              label={m.owner ? '주인' : m.role === 'EDITOR' ? '같이 고침' : '보기만'}
+              label={m.owner ? '만든 사람' : m.role === 'EDITOR' ? '같이 짜기' : '보기만'}
               tone={m.owner ? 'accent' : 'muted'}
             />
             {amOwner && !m.owner ? (
@@ -271,8 +271,9 @@ function InviteSection({ tripId }: { tripId: string }) {
     <>
       <Subtitle>초대 링크</Subtitle>
 
+      <Caption tone="secondary">부른 사람이 무엇까지 할 수 있게 할까요?</Caption>
       <Row gap={Spacing.xs}>
-        <Chip label="같이 고침" selected={role === 'EDITOR'} onPress={() => setRole('EDITOR')} />
+        <Chip label="같이 짜기" selected={role === 'EDITOR'} onPress={() => setRole('EDITOR')} />
         <Chip label="보기만" selected={role === 'VIEWER'} onPress={() => setRole('VIEWER')} />
       </Row>
 
@@ -292,7 +293,8 @@ function InviteSection({ tripId }: { tripId: string }) {
         />
       ) : (
         <Caption tone="secondary">
-          닫을 때까지 계속 열려 있습니다. 링크가 새어 나갔다 싶으면 취소해 주세요.
+          내가 닫을 때까지 계속 열려 있습니다. 링크가 새어 나갔다 싶으면 아래 목록에서
+          못 쓰게 해 주세요.
         </Caption>
       )}
       <Stepper
@@ -367,7 +369,7 @@ function InviteRowView({ invite, onChanged }: { invite: InviteRow; onChanged: ()
     <View style={styles.invite}>
       <Row style={styles.person}>
         <View style={styles.who}>
-          <Caption strong>{invite.role === 'EDITOR' ? '같이 고침' : '보기만'}</Caption>
+          <Caption strong>{invite.role === 'EDITOR' ? '같이 짜기' : '보기만'}</Caption>
           <Caption tone="secondary">
             {invite.usedCount}/{invite.maxUses}명 ·{' '}
             {invite.expiresAt ? `${invite.expiresAt.slice(0, 10)}까지` : '기한 없음'}
@@ -375,13 +377,13 @@ function InviteRowView({ invite, onChanged }: { invite: InviteRow; onChanged: ()
         </View>
 
         <Row gap={Spacing.xs}>
-          {invite.revoked ? <Badge label="취소함" tone="muted" /> : null}
+          {invite.revoked ? <Badge label="닫음" tone="muted" /> : null}
           {!invite.revoked && expired ? <Badge label="기한 지남" tone="muted" /> : null}
           {!invite.revoked && !expired && spent ? <Badge label="다 씀" tone="muted" /> : null}
           {dead ? null : (
             <IconButton
               name="x"
-              label="이 링크 취소"
+              label="이 링크 못 쓰게 하기"
               tone="danger"
               disabled={busy}
               onPress={() => setAsking(true)}
@@ -394,9 +396,9 @@ function InviteRowView({ invite, onChanged }: { invite: InviteRow; onChanged: ()
 
       <ConfirmDialog
         visible={asking}
-        title="링크를 취소할까요?"
-        message="이미 이 링크로 들어온 사람은 그대로 남습니다. 앞으로 못 쓰게 될 뿐입니다."
-        confirmLabel="취소하기"
+        title="이 링크를 못 쓰게 할까요?"
+        message="이미 이 링크로 들어온 사람은 그대로 남습니다. 앞으로 이 링크로는 못 들어옵니다."
+        confirmLabel="못 쓰게 하기"
         danger
         busy={busy}
         onCancel={() => setAsking(false)}

@@ -64,7 +64,7 @@ export default function InviteScreen() {
         <>
           <ErrorNote message={error} />
           <Caption tone="secondary">
-            링크가 기한이 지났거나 취소됐을 수 있습니다. 부른 사람에게 새로 받아 주세요.
+            기한이 지났거나 닫힌 링크일 수 있습니다. 부른 사람에게 새로 받아 주세요.
           </Caption>
         </>
       ) : null}
@@ -81,7 +81,7 @@ export default function InviteScreen() {
           <Card>
             <Caption tone="secondary">
               {invite.role === 'EDITOR'
-                ? '일정을 같이 고칠 수 있습니다.'
+                ? '일정을 같이 짤 수 있습니다. 장소를 넣고 고칠 수 있어요.'
                 : '일정을 볼 수 있습니다. 고치지는 못합니다.'}
             </Caption>
             <Caption tone="secondary">

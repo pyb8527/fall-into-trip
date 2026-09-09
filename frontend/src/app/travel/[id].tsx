@@ -6,7 +6,8 @@ import { api, ApiError } from '@/api/client';
 import type { Day, DayRoute, Place, PlaceInfo, RouteLeg } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import type { TripDetail } from '@/api/types';
-import { dayColor, Gutter, Spacing } from '@/constants/theme';
+import { iconOf } from '@/constants/place-icons';
+import { Colors, dayColor, Gutter, Spacing } from '@/constants/theme';
 import { openDirections } from '@/lib/directions';
 import {
   Badge,
@@ -177,11 +178,22 @@ export default function Travel() {
       ) : (
         <ScrollView
           horizontal
-          pagingEnabled
+          /* pagingEnabled 는 화면 폭 단위로 넘깁니다. 카드는 그보다 좁아
+             (옆 카드가 살짝 보이도록) 한 장씩 넘길수록 어긋납니다. 카드
+             한 장 + 사이 간격을 눈금으로 삼아야 딱딱 맞습니다. */
+          snapToInterval={cardWidth + Spacing.md}
+          snapToAlignment="start"
+          decelerationRate="fast"
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.deck}>
           {places.map((place, i) => (
-            <View key={place.id} style={[styles.slot, { width: cardWidth }]}>
+            /* 카드 안은 세로로도 흐릅니다. 영업시간·메모가 길면 작은 폰에서
+               아래가 잘려 "다녀왔어요" 에 손이 닿지 않습니다. */
+            <ScrollView
+              key={place.id}
+              style={[styles.slot, { width: cardWidth }]}
+              contentContainerStyle={styles.slotInner}
+              showsVerticalScrollIndicator={false}>
               <PlaceCard
                 place={place}
                 order={i + 1}
@@ -191,7 +203,7 @@ export default function Travel() {
                 next={legAfter.get(place.id)}
                 onToggle={() => toggle(place)}
               />
-            </View>
+            </ScrollView>
           ))}
         </ScrollView>
       )}
@@ -224,7 +236,7 @@ function PlaceCard({
         <Row gap={Spacing.sm}>
           <View style={[styles.order, { backgroundColor: color }]}>
             <Body small strong style={styles.orderText}>
-              {order}
+              {iconOf(place.icon) || order}
             </Body>
           </View>
           {place.time ? (
@@ -312,7 +324,10 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.xl,
   },
   slot: {
-    justifyContent: 'flex-start',
+    flexGrow: 0,
+  },
+  slotInner: {
+    paddingBottom: Spacing.lg,
   },
   cardHead: {
     justifyContent: 'space-between',
@@ -326,6 +341,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   orderText: {
-    color: '#FFFFFF',
+    /* 날짜 색이 파스텔이라 흰 글자는 읽히지 않습니다. 짙게 씁니다. */
+    color: Colors.onDay,
   },
 });

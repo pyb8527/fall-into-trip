@@ -1,16 +1,18 @@
 import { Stack, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { api, ApiError } from '@/api/client';
 import type {
   Day,
+  Gap,
+  GapOption,
   LivePin,
   LiveWhere,
-  DayRoute,
+  Money,
   Place,
   PlaceInfo,
-  RouteLeg,
   TravelMode,
   TripDetail,
 } from '@/api/types';
@@ -22,10 +24,11 @@ import { PlaceForm } from '@/components/place-form';
 import { PublishForm } from '@/components/publish-form';
 import { TipSheet } from '@/components/tip-sheet';
 import { TripMap, type MapPlace } from '@/components/trip-map';
+import { iconOf } from '@/constants/place-icons';
 import { openDirections } from '@/lib/directions';
 import { useHere } from '@/lib/here';
 import { decodePolyline } from '@/lib/polyline';
-import { Colors, dayColor, Radius, Spacing, Tap } from '@/constants/theme';
+import { Colors, dayColor, Gutter, Radius, Spacing, Tap } from '@/constants/theme';
 import {
   Badge,
   Body,
@@ -35,11 +38,13 @@ import {
   Chip,
   ConfirmDialog,
   Divider,
+  DragSheet,
   Empty,
   ErrorNote,
   Icon,
   IconButton,
   Loading,
+  Press,
   Row,
   Screen,
   Subtitle,
@@ -48,27 +53,32 @@ import {
 /** 전체를 보는 상태. 특정 날짜가 아니라는 뜻입니다. */
 const ALL = -1;
 
-/** 고를 수 있는 이동 수단. 서버가 받는 이름을 그대로 씁니다. */
-const MODES: { value: TravelMode; label: string }[] = [
-  { value: 'WALK', label: '도보' },
-  { value: 'TRANSIT', label: '대중교통' },
-  { value: 'DRIVE', label: '자동차' },
-];
+const MODE_LABEL: Record<TravelMode, string> = {
+  WALK: '걸어서',
+  TRANSIT: '대중교통',
+  DRIVE: '택시·차',
+};
 
 /**
  * 일정 화면.
  *
- * <p>서버가 여행·날짜·장소·내가 다녀온 곳을 한 번에 내려 줍니다. 나눠서
- * 부르면 그 사이에 동행자가 고쳤을 때 앞뒤가 안 맞는 화면이 됩니다.
+ * <p><b>지도가 화면입니다.</b> 전에는 지도를 위에 260픽셀만 얹고 아래를 목록으로
+ * 채웠는데, 그러면 동선을 보기엔 좁고 일정을 훑기엔 위가 잘려 어느 쪽도
+ * 넉넉하지 않았습니다. 지도를 화면 전체로 깔고 일정을 그 위에 얹은 판에
+ * 담습니다. 판을 내리면 지도가 다 보이고, 올리면 일정이 다 보입니다.
  *
- * <p>지도와 목록이 같은 것을 가리킵니다. 목록에서 장소를 누르면 지도의
- * 핀이 커지고, 핀을 누르면 목록의 그 줄이 켜집니다. 둘을 따로 두면 어느
- * 쪽을 보고 있었는지 매번 다시 찾아야 합니다.
+ * <p>이동 수단을 고르는 칩도 없앴습니다. 정작 알고 싶은 것은 "이 구간은 뭘
+ * 타야 하나" 이고 그건 셋을 나란히 놓아야만 압니다. 날짜를 펼치면 서버가 세
+ * 수단을 한꺼번에 계산해 장소 사이사이에 끼워 넣습니다.
+ *
+ * <p>지도와 목록이 같은 것을 가리킵니다. 목록에서 장소를 누르면 지도의 핀이
+ * 커지고, 핀을 누르면 목록의 그 줄이 켜집니다.
  */
 export default function TripScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { data, error, loading, reload } = useAsync<TripDetail>(
     (signal) => api.get(`/api/trip?trip=${encodeURIComponent(id)}`, signal),
@@ -78,19 +88,10 @@ export default function TripScreen() {
   const [companions, setCompanions] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [dropping, setDropping] = useState(false);
-  /*
-    이동 수단. 처음에는 아무것도 고르지 않습니다.
-
-    구간마다 구글에 묻고 그만큼 요금이 붙습니다. 화면을 열기만 해도 나가면
-    보지도 않은 것에 돈을 냅니다. 눌렀을 때만 묻습니다.
-  */
-  const [mode, setMode] = useState<TravelMode | null>(null);
   const me = useHere();
-  /* 지금 자리에서 고른 장소까지. 위치를 켜고 장소를 골랐을 때만 있습니다. */
-  const [fromHere, setFromHere] = useState<RouteLeg | null>(null);
   const [activeDay, setActiveDay] = useState<number>(ALL);
   /* 여행 중에 열면 오늘로 맞춰 준 적이 있는지. 한 번만 합니다 — 매번 하면
-     사용자가 다른 날을 골라 놓아도 다시 오늘로 끌려갑니다. */
+     다른 날을 골라 놓아도 다시 오늘로 끌려갑니다. */
   const jumped = useRef(false);
   const [activePlaceId, setActivePlaceId] = useState<string | null>(null);
 
@@ -100,33 +101,23 @@ export default function TripScreen() {
   const [visited, setVisited] = useState<Set<string> | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  /* 매 렌더마다 새 Set 을 만들면, 그것을 쓰는 지도 목록도 매번 새 배열이
-     됩니다. 그러면 핀을 한 번 누른 것만으로 지도가 마커를 다시 그리고 화면을
-     다시 맞춰(축소해) 버립니다. */
-  const marks = useMemo(
-    () => visited ?? new Set(data?.visited ?? []),
-    [visited, data?.visited],
-  );
-  const days = data?.days ?? [];
+  const marks = useMemo(() => visited ?? new Set(data?.visited ?? []), [visited, data?.visited]);
 
-  /* 지도에 넘길 것만 추립니다. 날짜를 고르면 그 날만 남습니다. */
+  /* 매 렌더마다 새 배열이 되면 이것을 보는 useMemo·useEffect 가 전부 매번 다시
+     돕니다. 서버를 부르는 것이 끼어 있으면 요청이 끝없이 나갑니다. */
+  const days = useMemo(() => data?.days ?? [], [data]);
+
   /**
    * 여행 중이면 오늘을 펼쳐 놓고 시작합니다.
    *
-   * <p>길 위에서 열었을 때 궁금한 것은 오늘 어디를 가는지입니다. 전체가 펼쳐진
-   * 채로 열리면 오늘을 찾으려고 굴려야 하고, 날이 길수록 더 굴려야 합니다.
-   *
-   * <p>한 번만 합니다. 매번 하면 다른 날을 골라 봐도 다시 오늘로 끌려갑니다.
-   *
-   * <p>여행 기간이 아니면 손대지 않습니다. 짜는 중일 때는 전체가 보이는 편이
-   * 낫습니다.
+   * <p>길 위에서 열었을 때 궁금한 것은 오늘 어디를 가는지입니다. 여행 기간이
+   * 아니면 손대지 않습니다 — 짜는 중일 때는 전체가 보이는 편이 낫습니다.
    */
   useEffect(() => {
     if (jumped.current || days.length === 0) {
       return;
     }
-    const today = todayIso();
-    const index = days.findIndex((d) => d.iso === today);
+    const index = days.findIndex((d) => d.iso === todayIso());
     jumped.current = true;
     if (index >= 0) {
       setActiveDay(index);
@@ -147,6 +138,7 @@ export default function TripScreen() {
           lng: p.lng,
           dayIndex: di,
           order: i + 1,
+          emoji: iconOf(p.icon),
           color: day.color || dayColor(di),
           fit: p.fit,
           radius: p.radius,
@@ -185,7 +177,6 @@ export default function TripScreen() {
           await api.put(`/api/visits/${placeId}`);
         }
       } catch (e) {
-        /* 되돌립니다. 다녀왔다고 칠해 놓고 서버에 없으면 다음에 열 때 사라집니다. */
         setVisited(marks);
         setActionError(e instanceof ApiError ? e.message : '표시하지 못했습니다.');
       } finally {
@@ -199,7 +190,6 @@ export default function TripScreen() {
     [marks],
   );
 
-  /* 장소가 바뀌면 방문 표시도 서버 것으로 다시 맞춥니다. */
   const refresh = useCallback(() => {
     setVisited(null);
     reload();
@@ -219,131 +209,102 @@ export default function TripScreen() {
   );
 
   /*
-    고른 날짜의 이동 경로.
+    보고 있는 날짜.
 
-    "전체" 를 보고 있을 때는 계산하지 않습니다. 날짜 수만큼 구글에 묻게 되고
-    구간마다 요금이 붙습니다. 한 날을 골라야 보여 줍니다.
-  */
-  /*
     하루짜리 여행에서는 날짜를 고르는 칩 자체가 뜨지 않아 늘 "전체" 로 남습니다.
-    그래서 이동 시간이 한 번도 나오지 않았습니다. 날이 하나뿐이면 전체가 곧 그
-    날이므로 고른 것으로 봅니다.
+    날이 하나뿐이면 전체가 곧 그 날이므로 고른 것으로 봅니다.
   */
-  const routeDayId =
-    activeDay === ALL
-      ? days.length === 1
-        ? (days[0]?.id ?? null)
-        : null
-      : (days[activeDay]?.id ?? null);
+  const dayIndex = activeDay === ALL ? (days.length === 1 ? 0 : -1) : activeDay;
+  const dayId = dayIndex >= 0 ? (days[dayIndex]?.id ?? null) : null;
+
+  /*
+    사이사이 이동 — 세 수단을 한꺼번에.
+
+    "전체" 를 보고 있을 때는 부르지 않습니다. 날짜 수만큼, 구간마다, 수단마다
+    구글에 묻게 되어 요금이 감당이 안 됩니다. 한 날을 펼쳤을 때만입니다.
+  */
   const {
-    data: route,
-    loading: routing,
-    error: routeError,
-  } = useAsync<DayRoute | null>(
+    data: gaps,
+    loading: gapping,
+    error: gapError,
+  } = useAsync<Gap[]>(
     (signal) =>
-      mode && routeDayId
-        ? api
-            .get<{ route: DayRoute }>(`/api/days/${routeDayId}/route?mode=${mode}`, signal)
-            .then((res) => res.route)
-        : /* 고르기 전에는 부르지 않습니다. */ Promise.resolve(null),
-    [routeDayId, mode],
+      dayId
+        ? api.get<{ gaps: Gap[] }>(`/api/days/${dayId}/route/compare`, signal).then((r) => r.gaps)
+        : Promise.resolve([]),
+    [dayId],
   );
 
-  /** 받은 길을 지도가 그릴 수 있는 좌표로 풉니다. */
+  /**
+   * 구간마다 어느 수단으로 볼지.
+   *
+   * <p>비워 두면 가장 빠른 것입니다. 사람이 한 구간을 눌러 바꾸면 그 구간만
+   * 기억합니다 — 하나 바꿨다고 나머지까지 따라 바뀌면 방금 본 것을 잃습니다.
+   */
+  const [picked, setPicked] = useState<Record<string, TravelMode>>({});
+  useEffect(() => {
+    /* 날짜를 옮기면 고른 것을 비웁니다. 다른 날의 구간에는 뜻이 없습니다. */
+    setPicked({});
+  }, [dayId]);
+
+  const chosenOf = useCallback(
+    (gap: Gap): GapOption | null => {
+      const want = picked[gap.fromId] ?? gap.fastest;
+      return gap.options.find((o) => o.mode === want) ?? gap.options[0] ?? null;
+    },
+    [picked],
+  );
+
+  /** 고른 수단의 길만 지도에 그립니다. 셋을 다 그리면 어느 것이 진짜인지 모릅니다. */
   const routeLines = useMemo<RouteLine[]>(() => {
-    if (!route || activeDay === ALL) {
+    if (dayIndex < 0) {
       return [];
     }
-    const color = days[activeDay]?.color || dayColor(activeDay);
-    return route.legs
-      .filter((leg) => leg.polyline)
-      .map((leg) => ({
-        id: `${leg.fromId}-${leg.toId}`,
-        color,
-        points: decodePolyline(leg.polyline),
-      }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [route, activeDay, days]);
+    const color = days[dayIndex]?.color || dayColor(dayIndex);
+    const out: RouteLine[] = [];
+    for (const gap of gaps ?? []) {
+      const option = chosenOf(gap);
+      if (option?.polyline) {
+        out.push({
+          id: `${gap.fromId}-${gap.toId}`,
+          color,
+          points: decodePolyline(option.polyline),
+        });
+      }
+    }
+    return out;
+  }, [gaps, chosenOf, dayIndex, days]);
+
+  const gapAfter = useMemo(() => new Map((gaps ?? []).map((g) => [g.fromId, g])), [gaps]);
 
   /*
-    이 날 장소들이 언제 문을 여는지.
-
-    월요일 휴관을 모르고 갔다가 하루를 날리는 일이 흔합니다. 날짜를 고르면
-    자동으로 받아 옵니다. 경로와 달리 수단을 고를 것이 없어 따로 켜고 끄지
-    않습니다. 다만 "전체" 를 보고 있을 때는 날짜 수만큼 나가므로 쉽니다.
+    이 날 장소들이 언제 문을 여는지. 월요일 휴관을 모르고 갔다가 하루를 날리는
+    일이 흔합니다.
   */
   const { data: placeInfo } = useAsync<PlaceInfo[]>(
     (signal) =>
-      routeDayId
+      dayId
         ? api
-            .get<{ info: PlaceInfo[] }>(`/api/days/${routeDayId}/places-info`, signal)
+            .get<{ info: PlaceInfo[] }>(`/api/days/${dayId}/places-info`, signal)
             .then((res) => res.info)
         : Promise.resolve([]),
-    [routeDayId],
+    [dayId],
   );
-
-  const infoOf = useMemo(
-    () => new Map((placeInfo ?? []).map((i) => [i.id, i])),
-    [placeInfo],
-  );
+  const infoOf = useMemo(() => new Map((placeInfo ?? []).map((i) => [i.id, i])), [placeInfo]);
 
   /*
-    지금 자리에서 고른 장소까지.
-
-    좌표는 본문으로 보냅니다. 쿼리스트링은 접근 기록과 방문 기록에 남는데,
-    사람이 지금 어디 있는지는 거기 남길 값이 아닙니다.
-
-    걸을 때마다 다시 묻지는 않습니다. 다른 장소를 고르거나 수단을 바꿀 때만
-    묻습니다. 몇 걸음 옮겼다고 소요 시간이 달라지지도 않고, 그때마다 물으면
-    요금이 계속 나갑니다.
-  */
-  const herePoint = me.here ? `${me.here.lat.toFixed(4)},${me.here.lng.toFixed(4)}` : null;
-  useEffect(() => {
-    const spot = me.here;
-    if (!spot || !activePlaceId) {
-      setFromHere(null);
-      return;
-    }
-    let alive = true;
-    api
-      .post<{ leg: RouteLeg }>(`/api/places/${activePlaceId}/route`, {
-        lat: spot.lat,
-        lng: spot.lng,
-        mode: mode ?? 'TRANSIT',
-      })
-      .then((res) => {
-        if (alive) {
-          setFromHere(res.leg);
-        }
-      })
-      .catch(() => {
-        if (alive) {
-          setFromHere(null);
-        }
-      });
-    return () => {
-      alive = false;
-    };
-    /* 자리는 소수 넷째 자리(십여 미터)까지만 봅니다. 그보다 잘게 보면
-       가만히 서 있어도 값이 떨려 계속 다시 묻습니다. */
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activePlaceId, mode, herePoint]);
-
-  /*
-    이 날 장소들에 달린 한 줄 팁이 몇 개인지.
-
-    장소마다 물으면 그 수만큼 요청이 나갑니다. 번호가 있는 것만 모아 한 번에
-    셉니다.
+    이 날 장소들에 달린 한 줄 팁이 몇 개인지. 장소마다 물으면 그 수만큼 요청이
+    나갑니다. 번호가 있는 것만 모아 한 번에 셉니다.
   */
   const [tipCounts, setTipCounts] = useState<Record<string, number>>({});
-  const tipKeys = (placeInfo ?? []).length;
   const dayPlaceIds = useMemo(
     () =>
-      (days[activeDay === ALL ? 0 : activeDay]?.places ?? [])
+      days
+        .filter((_, i) => activeDay === ALL || i === activeDay)
+        .flatMap((d) => d.places)
         .map((p) => p.placeId)
-        .filter((id): id is string => !!id),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [routeDayId, tipKeys],
+        .filter((pid): pid is string => !!pid),
+    [days, activeDay],
   );
 
   const countTips = useCallback(() => {
@@ -362,7 +323,7 @@ export default function TripScreen() {
   useEffect(countTips, [countTips]);
 
   /*
-    자유시간에 서로 찾기 — 켜 둔 동행자와 잠깐 꽂아 둔 핀.
+    자유시간에 서로 찾기 — 켜 둔 동행자와 잠깐 찍어 둔 핀.
 
     내 자리는 서버를 거치지 않고 기기 것을 그대로 씁니다. 서버를 돌아오면 한
     박자 늦은 자리가 보입니다.
@@ -387,10 +348,6 @@ export default function TripScreen() {
       .catch(() => {});
   }, [id]);
 
-  /*
-    켜 둔 동안에만 주기적으로 오갑니다. 안 켰으면 남의 자리도 자주 볼 이유가
-    없어 한 번만 봅니다.
-  */
   useEffect(() => {
     pullLive();
     if (!sharing) {
@@ -400,8 +357,9 @@ export default function TripScreen() {
     return () => clearInterval(timer);
   }, [pullLive, sharing]);
 
-  /* 켜 둔 동안 내 자리를 보냅니다. 십여 미터 단위로만 봐서, 가만히 서 있을 때
-     떨리는 값으로 계속 보내지 않습니다. */
+  /* 자리는 소수 넷째 자리(십여 미터)까지만 봅니다. 그보다 잘게 보면 가만히
+     서 있어도 값이 떨려 계속 보냅니다. */
+  const herePoint = me.here ? `${me.here.lat.toFixed(4)},${me.here.lng.toFixed(4)}` : null;
   useEffect(() => {
     if (!sharing || !herePoint || !me.here) {
       return;
@@ -422,7 +380,6 @@ export default function TripScreen() {
       if (sharing) {
         await api.delete(`/api/trips/${id}/location`);
         setSharing(false);
-        setMates([]);
       } else if (me.here) {
         await api.put(`/api/trips/${id}/location`, {
           lat: me.here.lat,
@@ -430,8 +387,6 @@ export default function TripScreen() {
           accuracy: me.here.accuracy,
         });
         setSharing(true);
-      } else {
-        setActionError('지금 위치를 알 수 없습니다. 위치 사용을 허용해 주세요.');
       }
       pullLive();
     } catch (e) {
@@ -439,10 +394,24 @@ export default function TripScreen() {
     }
   }
 
-  /** 지금 자리에 "여기 있다" 를 꽂습니다. */
+  /**
+   * 내 위치를 끕니다.
+   *
+   * <p>동행자에게 알리는 중이었다면 그것도 함께 끕니다. 점만 지우고 두면 동행자
+   * 화면에는 마지막 자리가 그대로 남아, 지금 거기 있는 것처럼 보입니다.
+   */
+  async function stopLive() {
+    if (sharing) {
+      await api.delete(`/api/trips/${id}/location`).catch(() => {});
+      setSharing(false);
+    }
+    me.stop();
+    pullLive();
+  }
+
+  /** 지금 자리에 "여기 있다" 를 찍어 둡니다. */
   async function dropPin() {
     if (!me.here) {
-      setActionError('지금 위치를 알 수 없습니다. 위치 사용을 허용해 주세요.');
       return;
     }
     setActionError(null);
@@ -450,18 +419,12 @@ export default function TripScreen() {
       await api.post(`/api/trips/${id}/pins`, { lat: me.here.lat, lng: me.here.lng });
       pullLive();
     } catch (e) {
-      setActionError(e instanceof ApiError ? e.message : '꽂지 못했습니다.');
+      setActionError(e instanceof ApiError ? e.message : '찍지 못했습니다.');
     }
   }
 
   /** 한 줄을 열어 둔 장소. */
   const [tipFor, setTipFor] = useState<Place | null>(null);
-
-  /** 장소 뒤에 붙는 구간을 목록에서 바로 찾기 위해. */
-  const legAfter = useMemo(
-    () => new Map((route?.legs ?? []).map((leg) => [leg.fromId, leg])),
-    [route],
-  );
 
   if (loading && !data) {
     return (
@@ -489,173 +452,252 @@ export default function TripScreen() {
   const shown = activeDay === ALL ? days : days.filter((_, i) => i === activeDay);
   const total = shown.reduce((n, d) => n + d.places.length, 0);
   const done = shown.reduce((n, d) => n + d.places.filter((p) => marks.has(p.id)).length, 0);
+  const mine = data.trip.ownerId === user?.id;
 
   return (
-    <Screen
-      header={
-        <>
-          {/* 지도·날짜·진행 상황은 아래 목록을 훑는 내내 붙어 있어야 합니다. */}
-          <TripMap
-            places={mapPlaces}
-            activeId={activePlaceId}
-            onSelect={setActivePlaceId}
-            routes={routeLines}
-            here={me.here}
-            mates={mates.map((m) => ({ id: m.userId, name: m.name, lat: m.lat, lng: m.lng }))}
-            notes={pins.map((p) => ({ id: p.id, label: p.label ?? null, lat: p.lat, lng: p.lng }))}
-            height={260}
-          />
-
-          {days.length > 1 ? (
-            <Row gap={Spacing.sm}>
-              <Chip
-                label="전체"
-                selected={activeDay === ALL}
-                onPress={() => {
-                  setActiveDay(ALL);
-                  setActivePlaceId(null);
-                }}
-              />
-              {days.map((day, i) => (
-                <Chip
-                  key={day.id}
-                  /* 오늘이 어느 칩인지 한눈에 보여야 길 위에서 헤매지 않습니다. */
-                  label={
-                    day.iso === todayIso()
-                      ? `오늘 · ${day.date || day.shortName || day.label}`
-                      : day.date || day.shortName || day.label
-                  }
-                  selected={activeDay === i}
-                  onPress={() => {
-                    setActiveDay(i);
-                    setActivePlaceId(null);
-                  }}
-                />
-              ))}
-            </Row>
-          ) : null}
-
-          <Row gap={Spacing.xs}>
-            <Chip label="안 보기" selected={mode === null} onPress={() => setMode(null)} />
-            {me.supported ? (
-              <>
-                {/* 켜 두면 네 시간 뒤 스스로 꺼집니다. 지나온 자리는 남지
-                    않고 마지막 자리만 동행자에게 보입니다. */}
-                <Chip
-                  label={sharing ? '위치 공유 끄기' : '위치 공유'}
-                  selected={sharing}
-                  onPress={toggleSharing}
-                />
-                <Chip label="여기 있다고 꽂기" selected={false} onPress={dropPin} />
-              </>
-            ) : null}
-            {MODES.map((m) => (
-              <Chip
-                key={m.value}
-                label={m.label}
-                selected={mode === m.value}
-                onPress={() => setMode(m.value)}
-              />
-            ))}
-
-          </Row>
-
-          {me.error ? <Caption tone="danger">{me.error}</Caption> : null}
-          {sharing ? (
-            <Caption tone="success" strong>
-              위치를 동행자에게 알리는 중입니다. 네 시간 뒤 저절로 꺼집니다.
-            </Caption>
-          ) : null}
-          {mates.length > 0 ? (
-            <Caption tone="secondary">
-              지금 {mates.map((m) => m.name).join(' · ')} 님이 지도에 보입니다.
-            </Caption>
-          ) : null}
-          {fromHere ? (
-            <Caption tone="accent" strong>
-              여기서{' '}
-              {fromHere.reachable
-                ? `${asDuration(fromHere.seconds)} · ${asDistance(fromHere.meters)}`
-                : '갈 수 있는 길을 찾지 못했습니다'}
-            </Caption>
-          ) : null}
-
-          {mode ? (
-            <RouteNote
-              picked={routeDayId !== null}
-              route={route}
-              busy={routing}
-              error={routeError}
-            />
-          ) : null}
-
-          {total > 0 ? <Progress done={done} total={total} /> : null}
-        </>
-      }>
+    <View style={styles.screen}>
       <Stack.Screen
         options={{
           title: data.trip.title,
-          /*
-            이 화면으로 곧장 들어오는 길이 여럿입니다. 주소를 새로고침하거나,
-            초대 링크로 들어오거나, 앱이 업데이트를 받아 다시 뜰 때입니다.
-            그때는 쌓인 기록이 없어 돌아갈 화살표가 아예 안 생깁니다.
-
-            그런 경우에만 우리가 하나 답니다. 기록이 있으면 손대지 않고
-            네비게이션이 만든 것을 그대로 씁니다.
-          */
+          /* 지도가 막대 뒤까지 이어져야 화면이 지도로 시작합니다. 잘라 두면
+             위쪽에 검은 띠가 하나 더 생긴 것처럼 보입니다. */
+          headerTransparent: true,
+          headerStyle: { backgroundColor: 'transparent' },
+          /* 막대가 비쳐 지도 위에 바로 얹히므로, 여기 단추도 지도 단추와
+             같은 생김새여야 합니다. 네모난 연회색 단추는 지도의 건물·구획과
+             섞여 어디까지가 단추인지 보이지 않습니다. */
           headerLeft: navigation.canGoBack()
             ? undefined
             : () => (
                 <IconButton
                   name="chevron-left"
                   label="내 여행으로"
+                  onMap
                   onPress={() => router.replace('/(app)/trips')}
                 />
               ),
-          /* 동행자는 가끔 여는 것이라 화면을 차지하지 않게 막대에 둡니다. */
           headerRight: () => (
             <Row gap={Spacing.xs}>
-              {/* 길 위에서는 짜는 화면이 방해입니다. 지금 갈 곳만 크게 보는
-                  쪽으로 넘어갑니다. */}
-              {/* 아직 정하지 않은 곳은 일정이 아니라 여기에 모읍니다. */}
-              <IconButton
-                name="star"
-                label="가고 싶은 곳"
-                onPress={() => router.push({ pathname: '/vote/[id]', params: { id } })}
-              />
-              {/* 다녀온 뒤 한 장으로 돌아보는 자리. */}
-              <IconButton
-                name="share-2"
-                label="여행 카드"
-                onPress={() => router.push({ pathname: '/card/[id]', params: { id } })}
-              />
               <IconButton
                 name="compass"
                 label="여행 중 화면"
+                onMap
                 onPress={() => router.push({ pathname: '/travel/[id]', params: { id } })}
               />
-              {/* 올리는 것은 주인만 할 수 있습니다. 서버도 그렇게 막습니다. */}
-              {data.trip.ownerId === user?.id ? (
-                <IconButton
-                  name="upload"
-                  label="게시판에 올리기"
-                  onPress={() => setPublishing(true)}
-                />
-              ) : null}
-              <IconButton name="users" label="동행자" onPress={() => setCompanions(true)} />
+              <IconButton
+                name="users"
+                label="동행자"
+                onMap
+                onPress={() => setCompanions(true)}
+              />
             </Row>
           ),
         }}
       />
+
+      {/* 지도가 바탕입니다. 판이 그 위에 얹힙니다. */}
+      <TripMap
+        places={mapPlaces}
+        activeId={activePlaceId}
+        onSelect={setActivePlaceId}
+        routes={routeLines}
+        here={me.here}
+        mates={mates.map((m) => ({ id: m.userId, name: m.name, lat: m.lat, lng: m.lng }))}
+        notes={pins.map((p) => ({ id: p.id, label: p.label ?? null, lat: p.lat, lng: p.lng }))}
+        bleed
+        chrome={false}
+      />
+
+      {/* 막대 바로 아래, 지도 위에 뜨는 날짜 칩. */}
+      {days.length > 1 ? (
+        /* 폰에서는 날짜가 넷만 돼도 칩이 두 줄, 세 줄로 접혀 지도를 덮습니다.
+           접지 않고 옆으로 흐르게 둡니다. */
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={[styles.floatTop, { top: insets.top + Tap.control }]}
+          contentContainerStyle={styles.chipRail}>
+          <Row gap={Spacing.xs} style={styles.chipRow}>
+            <Chip
+              label="전체"
+              selected={activeDay === ALL}
+              onPress={() => {
+                setActiveDay(ALL);
+                setActivePlaceId(null);
+              }}
+            />
+            {days.map((day, i) => (
+              <Chip
+                key={day.id}
+                label={
+                  day.iso === todayIso()
+                    ? `오늘 · ${day.date || day.shortName || day.label}`
+                    : day.date || day.shortName || day.label
+                }
+                selected={activeDay === i}
+                onPress={() => {
+                  setActiveDay(i);
+                  setActivePlaceId(null);
+                }}
+              />
+            ))}
+          </Row>
+        </ScrollView>
+      ) : null}
+
+      {/*
+        내 위치. 지도에 딸린 일이라 지도 위에 둡니다.
+
+        한 기둥으로 세로로 세웁니다. 여기저기 흩어 두면 무엇이 지도에 대한
+        단추이고 무엇이 화면에 대한 단추인지 구별되지 않습니다. 날짜 띠
+        바로 아래에서 시작해, 띠와 왼쪽 여백을 맞춥니다.
+      */}
+      {me.supported ? (
+        <View style={[styles.floatRight, { top: insets.top + Tap.control + Tap.min }]}>
+          <IconButton
+            name="crosshair"
+            label={me.watching ? '내 위치 끄기' : '내 위치 보기'}
+            active={me.watching}
+            tone="accent"
+            onMap
+            onPress={() => (me.watching ? stopLive() : me.start())}
+          />
+          {me.watching ? (
+            <>
+              {/* 켜 두면 네 시간 뒤 스스로 꺼집니다. 지나온 자리는 남지 않고
+                  마지막 자리만 동행자에게 보입니다. */}
+              <IconButton
+                name="users"
+                label={sharing ? '동행자에게 알리는 중 · 끄기' : '동행자에게 내 위치 알리기'}
+                active={sharing}
+                tone="success"
+                onMap
+                onPress={toggleSharing}
+              />
+              <IconButton
+                name="map-pin"
+                label="여기 있다고 찍어 두기"
+                onMap
+                onPress={dropPin}
+              />
+            </>
+          ) : null}
+        </View>
+      ) : null}
+
+      <DragSheet
+        peek={
+          <SheetHead
+            title={dayIndex >= 0 ? days[dayIndex]?.date || days[dayIndex]?.label || '' : '전체 일정'}
+            done={done}
+            total={total}
+            gaps={gaps}
+            gapping={gapping}
+            chosenOf={chosenOf}
+          />
+        }>
+        {actionError ? <ErrorNote message={actionError} /> : null}
+        {gapError && dayId ? <Caption tone="danger">{gapError}</Caption> : null}
+        {me.error ? <Caption tone="danger">{me.error}</Caption> : null}
+        {sharing ? (
+          <Caption tone="success" strong>
+            위치를 동행자에게 알리는 중입니다. 네 시간 뒤 저절로 꺼집니다.
+          </Caption>
+        ) : null}
+        {mates.length > 0 ? (
+          <Caption tone="secondary">
+            지금 {mates.map((m) => m.name).join(' · ')} 님이 지도에 보입니다.
+          </Caption>
+        ) : null}
+
+        {days.length === 0 ? <Empty message="아직 날짜가 없습니다." /> : null}
+
+        {days.map((day, di) =>
+          activeDay === ALL || activeDay === di ? (
+            <DayCard
+              key={day.id}
+              day={day}
+              index={di}
+              visited={marks}
+              pending={pending}
+              canEdit={canEdit}
+              activePlaceId={activePlaceId}
+              onToggle={toggle}
+              onFocus={setActivePlaceId}
+              onChanged={refresh}
+              onRemove={remove}
+              gapAfter={gapAfter}
+              chosenOf={chosenOf}
+              onPick={(fromId, mode) => setPicked((p) => ({ ...p, [fromId]: mode }))}
+              infoOf={infoOf}
+              tipCounts={tipCounts}
+              onTips={setTipFor}
+            />
+          ) : null,
+        )}
+
+        {/* 가끔 쓰는 것들. 그림만으로는 뜻이 안 통해 글자로 답니다. */}
+        <Row gap={Spacing.xs}>
+          <Button
+            label="가고 싶은 곳"
+            variant="secondary"
+            compact
+            onPress={() => router.push({ pathname: '/vote/[id]', params: { id } })}
+          />
+          <Button
+            label="여행 카드"
+            variant="secondary"
+            compact
+            onPress={() => router.push({ pathname: '/card/[id]', params: { id } })}
+          />
+          {/* 올리는 것은 주인만 할 수 있습니다. 서버도 그렇게 막습니다. */}
+          {mine ? (
+            <Button
+              label="게시판에 올리기"
+              variant="secondary"
+              compact
+              onPress={() => setPublishing(true)}
+            />
+          ) : null}
+        </Row>
+
+        {/* 되돌릴 수 없는 일이라 맨 아래, 손이 잘 닿지 않는 자리에 둡니다. */}
+        {mine ? (
+          <>
+            <Divider />
+            <Button label="여행 지우기" variant="danger" onPress={() => setDropping(true)} />
+          </>
+        ) : null}
+      </DragSheet>
 
       <CompanionsSheet
         visible={companions}
         tripId={data.trip.id}
         ownerId={data.trip.ownerId}
         onClose={() => setCompanions(false)}
-        /* 스스로 나갔으면 이 여행은 더 못 봅니다. 목록으로 돌려보냅니다. */
         onLeft={() => router.replace('/(app)/trips')}
       />
+
+      <PublishForm
+        visible={publishing}
+        tripId={data.trip.id}
+        tripTitle={data.trip.title}
+        onCancel={() => setPublishing(false)}
+        onDone={(postId) => {
+          setPublishing(false);
+          router.push({ pathname: '/community/[id]', params: { id: postId } });
+        }}
+      />
+
+      {tipFor?.placeId ? (
+        <TipSheet
+          visible
+          placeId={tipFor.placeId}
+          placeName={tipFor.name}
+          onClose={() => setTipFor(null)}
+          onChanged={countTips}
+        />
+      ) : null}
 
       <ConfirmDialog
         visible={dropping}
@@ -674,89 +716,63 @@ export default function TripScreen() {
           }
         }}
       />
-
-      {tipFor?.placeId ? (
-        <TipSheet
-          visible
-          placeId={tipFor.placeId}
-          placeName={tipFor.name}
-          onClose={() => setTipFor(null)}
-          onChanged={countTips}
-        />
-      ) : null}
-
-      <PublishForm
-        visible={publishing}
-        tripId={data.trip.id}
-        tripTitle={data.trip.title}
-        onCancel={() => setPublishing(false)}
-        onDone={(postId) => {
-          setPublishing(false);
-          router.push({ pathname: '/community/[id]', params: { id: postId } });
-        }}
-      />
-
-      {actionError ? <ErrorNote message={actionError} /> : null}
-
-      {days.length === 0 ? <Empty message="아직 날짜가 없습니다." /> : null}
-
-      {days.map((day, di) =>
-        activeDay === ALL || activeDay === di ? (
-          <DayCard
-            key={day.id}
-            day={day}
-            index={di}
-            visited={marks}
-            pending={pending}
-            canEdit={canEdit}
-            activePlaceId={activePlaceId}
-            onToggle={toggle}
-            onFocus={setActivePlaceId}
-            onChanged={refresh}
-            onRemove={remove}
-            legAfter={legAfter}
-            mode={mode}
-            infoOf={infoOf}
-            tipCounts={tipCounts}
-            onTips={setTipFor}
-          />
-        ) : null,
-      )}
-
-      {/* 지우는 것은 주인만. 되돌릴 수 없는 일이라 목록 맨 아래, 손이 잘
-          닿지 않는 자리에 둡니다. */}
-      {data.trip.ownerId === user?.id ? (
-        <>
-          <Divider />
-          <Button label="여행 지우기" variant="danger" onPress={() => setDropping(true)} />
-        </>
-      ) : null}
-    </Screen>
+    </View>
   );
 }
 
-/** 얼마나 다녀왔는지 한 줄로. 숫자만 있으면 잘 안 읽힙니다. */
-function Progress({ done, total }: { done: number; total: number }) {
+/**
+ * 판 맨 위에 늘 보이는 줄.
+ *
+ * <p>판을 내려 두어도 이것만은 보입니다. 그래서 여기에는 "지금 어느 날을 보고
+ * 있고, 얼마나 돌았고, 오늘 이동에 얼마나 쓰는지" 만 둡니다. 판을 올리지 않고도
+ * 답이 되는 것들입니다.
+ */
+function SheetHead({
+  title,
+  done,
+  total,
+  gaps,
+  gapping,
+  chosenOf,
+}: {
+  title: string;
+  done: number;
+  total: number;
+  gaps: Gap[] | null;
+  gapping: boolean;
+  chosenOf: (gap: Gap) => GapOption | null;
+}) {
   const ratio = total === 0 ? 0 : done / total;
+  const moving = (gaps ?? []).reduce((n, g) => n + (chosenOf(g)?.seconds ?? 0), 0);
+
   return (
-    <View style={styles.progress}>
-      <Row style={styles.progressLabel}>
-        <Caption tone="secondary">다녀온 곳</Caption>
-        <Caption tone={done === total ? 'success' : 'secondary'} strong>
-          {done} / {total}
+    <View style={styles.head}>
+      <Row style={styles.headTop}>
+        <Subtitle>{title}</Subtitle>
+        <Caption tone={total > 0 && done === total ? 'success' : 'secondary'} strong>
+          {done} / {total} 다녀옴
         </Caption>
       </Row>
-      <View style={styles.track}>
-        <View
-          style={[
-            styles.fill,
-            {
-              width: `${Math.round(ratio * 100)}%`,
-              backgroundColor: done === total ? Colors.success : Colors.accent,
-            },
-          ]}
-        />
-      </View>
+
+      {total > 0 ? (
+        <View style={styles.track}>
+          <View
+            style={[
+              styles.fill,
+              {
+                width: `${Math.round(ratio * 100)}%`,
+                backgroundColor: done === total ? Colors.success : Colors.accent,
+              },
+            ]}
+          />
+        </View>
+      ) : null}
+
+      {gapping ? (
+        <Caption tone="secondary">이동 시간을 알아보는 중…</Caption>
+      ) : moving > 0 ? (
+        <Caption tone="secondary">오늘 이동에 {asDuration(moving)}</Caption>
+      ) : null}
     </View>
   );
 }
@@ -772,8 +788,9 @@ function DayCard({
   onFocus,
   onChanged,
   onRemove,
-  legAfter,
-  mode,
+  gapAfter,
+  chosenOf,
+  onPick,
   infoOf,
   tipCounts,
   onTips,
@@ -788,10 +805,10 @@ function DayCard({
   onFocus: (placeId: string) => void;
   onChanged: () => void;
   onRemove: (placeId: string) => void;
-  /** 이 장소를 떠나 다음 장소로 가는 구간. 수단을 안 골랐으면 비어 있습니다. */
-  legAfter: Map<string, RouteLeg>;
-  /** 길찾기를 넘길 때 어떤 수단으로 열지. 안 골랐으면 대중교통입니다. */
-  mode: TravelMode | null;
+  /** 이 장소를 떠나 다음 장소로 가는 구간. "전체" 를 볼 때는 비어 있습니다. */
+  gapAfter: Map<string, Gap>;
+  chosenOf: (gap: Gap) => GapOption | null;
+  onPick: (fromId: string, mode: TravelMode) => void;
   /** 장소별 영업시간 등. 좌표만 직접 넣은 곳에는 없습니다. */
   infoOf: Map<string, PlaceInfo>;
   /** 구글 번호별 최근 팁 수. */
@@ -800,29 +817,22 @@ function DayCard({
 }) {
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<Place | null>(null);
-  /*
-    긴 여행은 카드가 그만큼 길어져 아래 날짜로 가려면 한참 굴려야 합니다.
-    접어 두면 날짜만 훑다가 볼 것만 펼 수 있습니다.
-
-    처음에는 펼쳐 둡니다. 접힌 채로 열리면 장소가 있는지조차 안 보입니다.
-  */
   const [folded, setFolded] = useState(false);
   const [moving, setMoving] = useState(false);
 
   /**
    * 장소 순서를 한 칸 옮깁니다.
    *
-   * <p>끌어서 옮기는 편이 보기에는 좋지만, 목록 안에서 끌면 화면 굴리기와
-   * 다투게 됩니다. 손가락으로는 그 둘을 구별하기 어려워 옮기려다 스크롤되고
-   * 굴리려다 옮겨집니다. 화살표는 못생겼어도 헷갈리지 않습니다.
+   * <p>끌어서 옮기는 편이 보기에는 좋지만, 목록 안에서 끌면 화면 굴리기·판
+   * 올리기와 셋이 다투게 됩니다. 화살표는 못생겼어도 헷갈리지 않습니다.
    */
-  async function move(index: number, by: number) {
-    const next = index + by;
+  async function move(at: number, by: number) {
+    const next = at + by;
     if (moving || next < 0 || next >= day.places.length) {
       return;
     }
     const ids = day.places.map((p) => p.id);
-    [ids[index], ids[next]] = [ids[next], ids[index]];
+    [ids[at], ids[next]] = [ids[next], ids[at]];
 
     setMoving(true);
     try {
@@ -832,14 +842,13 @@ function DayCard({
       setMoving(false);
     }
   }
+
   const done = day.places.filter((p) => visited.has(p.id)).length;
   const color = day.color || dayColor(index);
 
   return (
     <Card>
       <Row style={styles.dayHeader}>
-        {/* 머리 전체가 접었다 펴는 자리입니다. 작은 화살표만 누르게 하면
-            손가락으로는 잘 안 맞습니다. */}
         <Pressable
           onPress={() => setFolded((v) => !v)}
           accessibilityRole="button"
@@ -847,8 +856,6 @@ function DayCard({
           style={styles.dayTap}>
           <Row gap={Spacing.md} style={styles.dayTitle}>
             <View style={[styles.dayDot, { backgroundColor: color }]} />
-            {/* 위 칩이 이미 날짜로 고르게 하므로 'Day 1' 은 같은 말을 한 번 더
-                하는 셈입니다. 날짜만 남깁니다. */}
             <Subtitle>{day.date || day.label}</Subtitle>
             <Icon name={folded ? 'chevron-down' : 'chevron-up'} size={16} tone="muted" />
           </Row>
@@ -860,8 +867,6 @@ function DayCard({
               {done}/{day.places.length}
             </Caption>
           ) : null}
-          {/* 넣기 단추가 카드 맨 아래에 있으면 장소가 많을수록 굴려야 닿습니다.
-              늘 같은 자리(머리 오른쪽)에 둡니다. */}
           {canEdit ? (
             <IconButton
               name="plus"
@@ -877,58 +882,54 @@ function DayCard({
 
       {folded ? null : (
         <>
-      {day.theme ? (
-        <Body small tone="secondary">
-          {day.theme}
-        </Body>
-      ) : null}
+          {day.theme ? (
+            <Body small tone="secondary">
+              {day.theme}
+            </Body>
+          ) : null}
 
-      {day.places.length === 0 ? (
-        <Caption>이 날에는 아직 장소가 없습니다.</Caption>
-      ) : (
-        <View style={styles.places}>
-          {day.places.map((place, i) => (
-            <View key={place.id}>
-              <PlaceRow
-                place={place}
-                order={i + 1}
-                color={color}
-                visited={visited.has(place.id)}
-                busy={pending.has(place.id)}
-                active={activePlaceId === place.id}
-                canEdit={canEdit}
-                onToggle={() => onToggle(place.id)}
-                onFocus={() => onFocus(place.id)}
-                onEdit={() => setEditing(place)}
-                onRemove={() => onRemove(place.id)}
-                mode={mode}
-                info={infoOf.get(place.id)}
-                tipCount={place.placeId ? (tipCounts[place.placeId] ?? 0) : 0}
-                onTips={() => onTips(place)}
-                onUp={i > 0 ? () => move(i, -1) : undefined}
-                onDown={i < day.places.length - 1 ? () => move(i, 1) : undefined}
-                moving={moving}
-              />
-              {/* 다음 장소까지 얼마나 걸리는지. 마지막 장소 뒤에는 없습니다. */}
-              {i < day.places.length - 1 ? <Hop leg={legAfter.get(place.id)} /> : null}
+          {day.places.length === 0 ? (
+            <Caption>이 날에는 아직 장소가 없습니다.</Caption>
+          ) : (
+            <View style={styles.places}>
+              {day.places.map((place, i) => (
+                <PlaceRow
+                  key={place.id}
+                  place={place}
+                  order={i + 1}
+                  color={color}
+                  visited={visited.has(place.id)}
+                  busy={pending.has(place.id)}
+                  active={activePlaceId === place.id}
+                  canEdit={canEdit}
+                  onToggle={() => onToggle(place.id)}
+                  onFocus={() => onFocus(place.id)}
+                  onEdit={() => setEditing(place)}
+                  onRemove={() => onRemove(place.id)}
+                  info={infoOf.get(place.id)}
+                  tipCount={place.placeId ? (tipCounts[place.placeId] ?? 0) : 0}
+                  onTips={() => onTips(place)}
+                  onUp={i > 0 ? () => move(i, -1) : undefined}
+                  onDown={i < day.places.length - 1 ? () => move(i, 1) : undefined}
+                  moving={moving}
+                  gap={gapAfter.get(place.id)}
+                  chosenOf={chosenOf}
+                  onPick={onPick}
+                />
+              ))}
             </View>
-          ))}
-        </View>
-      )}
+          )}
 
-      {/*
-        영업시간과 평점은 구글에서 온 것이라, 어디서 왔는지 밝혀야 합니다.
-        약관 의무라 지우면 안 됩니다. 지도 위에 얹은 것이 아니라 목록이라
-        글자로 답니다.
-      */}
-      {day.places.some((p) => infoOf.has(p.id)) ? (
-        <Caption tone="muted">영업시간 · 평점 제공: Google</Caption>
-      ) : null}
+          {/* 영업시간과 평점은 구글에서 온 것이라 어디서 왔는지 밝혀야 합니다.
+              약관 의무라 지우면 안 됩니다. */}
+          {day.places.some((p) => infoOf.has(p.id)) ? (
+            <Caption tone="muted">영업시간 · 평점 제공: Google</Caption>
+          ) : null}
 
+          {day.budget ? <Caption tone="secondary">예산 {day.budget}</Caption> : null}
         </>
       )}
 
-      {/* 넣기와 고치기 모두 아래에서 올라오는 판으로 합니다. */}
       <PlaceForm
         visible={adding}
         dayId={day.id}
@@ -950,8 +951,6 @@ function DayCard({
           onCancel={() => setEditing(null)}
         />
       ) : null}
-
-      {day.budget ? <Caption tone="secondary">예산 {day.budget}</Caption> : null}
     </Card>
   );
 }
@@ -964,7 +963,6 @@ function PlaceRow({
   busy,
   active,
   canEdit,
-  mode,
   info,
   tipCount,
   onTips,
@@ -975,6 +973,9 @@ function PlaceRow({
   onFocus,
   onEdit,
   onRemove,
+  gap,
+  chosenOf,
+  onPick,
 }: {
   place: Place;
   order: number;
@@ -983,7 +984,6 @@ function PlaceRow({
   busy: boolean;
   active: boolean;
   canEdit: boolean;
-  mode: TravelMode | null;
   info?: PlaceInfo;
   tipCount: number;
   onTips: () => void;
@@ -995,130 +995,252 @@ function PlaceRow({
   onFocus: () => void;
   onEdit: () => void;
   onRemove: () => void;
+  /** 다음 장소까지의 이동. 마지막 장소 뒤에는 없습니다. */
+  gap?: Gap;
+  chosenOf: (gap: Gap) => GapOption | null;
+  onPick: (fromId: string, mode: TravelMode) => void;
 }) {
   const [confirming, setConfirming] = useState(false);
+  const emoji = iconOf(place.icon);
+  const chosen = gap ? chosenOf(gap) : null;
 
   return (
-    <View
-      style={[
-        styles.place,
-        { backgroundColor: active ? Colors.accentSoft : Colors.fill, opacity: busy ? 0.6 : 1 },
-        active && { borderColor: color },
-      ]}>
-      <Pressable onPress={onFocus} style={styles.placeTap}>
-        <View style={styles.placeMain}>
-          {/* 지도 핀에 적힌 번호와 같은 번호입니다. */}
-          <View style={[styles.order, { backgroundColor: color }]}>
-            <OrderLabel n={order} />
-          </View>
-
-          <View style={styles.placeText}>
-            <Row gap={Spacing.sm}>
-              {place.time ? (
-                <Body small strong tone="accent">
-                  {place.time}
-                </Body>
+    <View>
+      <View
+        style={[
+          styles.place,
+          {
+            backgroundColor: active ? Colors.accentSoft : Colors.surfaceRaised,
+            opacity: busy ? 0.6 : 1,
+          },
+          active && { borderColor: Colors.accent },
+        ]}>
+        <Pressable onPress={onFocus} style={styles.placeTap}>
+          <View style={styles.placeMain}>
+            {/* 지도 핀과 같은 것이 찍힙니다. 목록과 지도를 눈으로 잇는 고리라
+                양쪽이 반드시 같아야 합니다. */}
+            {/* 순서를 바꾸는 화살표는 순서를 적어 둔 자리 옆에 둡니다. 오른쪽
+                단추 줄에 같이 세우면 폰에서는 일곱 개가 한 줄에 안 들어가
+                두 줄로 접힙니다. */}
+            <View style={styles.orderColumn}>
+              <View
+                style={[
+                  styles.order,
+                  { backgroundColor: visited ? color : 'transparent', borderColor: color },
+                ]}>
+                {emoji ? (
+                  <Body small style={styles.orderEmoji}>
+                    {emoji}
+                  </Body>
+                ) : (
+                  /* 날짜 색이 파스텔이라 그것으로 번호를 쓰면 흰 바탕에서
+                     읽히지 않습니다. 색은 테두리가 맡고 번호는 짙게 씁니다. */
+                  <Body small strong style={styles.orderText}>
+                    {order}
+                  </Body>
+                )}
+              </View>
+              {canEdit && (onUp || onDown) ? (
+                <Row gap={0} style={styles.nudge}>
+                  <IconButton
+                    name="arrow-up"
+                    label="위로 옮기기"
+                    disabled={!onUp || moving}
+                    onPress={() => onUp?.()}
+                  />
+                  <IconButton
+                    name="arrow-down"
+                    label="아래로 옮기기"
+                    disabled={!onDown || moving}
+                    onPress={() => onDown?.()}
+                  />
+                </Row>
               ) : null}
-              <Body strong numberOfLines={2}>
-                {place.name}
-              </Body>
-            </Row>
-            {place.ja || place.en ? <Caption>{place.ja ?? place.en}</Caption> : null}
-            {place.note ? <Caption tone="secondary">{place.note}</Caption> : null}
-            {info ? <PlaceHours info={info} at={place.time} /> : null}
-            {place.cat || place.cost || place.move?.min ? (
+            </View>
+
+            <View style={styles.placeText}>
               <Row gap={Spacing.sm}>
-                {place.cat ? <Caption>{place.cat}</Caption> : null}
-                {place.cost ? <Caption>{place.cost}</Caption> : null}
-                {place.move?.min ? <Caption>이동 {place.move.min}분</Caption> : null}
+                {place.time ? (
+                  <Body small strong tone="accent">
+                    {place.time}
+                  </Body>
+                ) : null}
+                <Body strong numberOfLines={2}>
+                  {place.name}
+                </Body>
               </Row>
-            ) : null}
+              {place.ja || place.en ? <Caption>{place.ja ?? place.en}</Caption> : null}
+              {place.note ? <Caption tone="secondary">{place.note}</Caption> : null}
+              {info ? <PlaceHours info={info} at={place.time} /> : null}
+              {place.cat || place.cost ? (
+                <Row gap={Spacing.sm}>
+                  {place.cat ? <Caption>{place.cat}</Caption> : null}
+                  {place.cost ? <Caption>{place.cost}</Caption> : null}
+                </Row>
+              ) : null}
+            </View>
+
+            {visited ? <Badge label="다녀옴" tone="success" /> : null}
           </View>
+        </Pressable>
 
-          {visited ? <Badge label="다녀옴" tone="success" /> : null}
-        </View>
-      </Pressable>
-
-      <Row gap={Spacing.xs} style={styles.placeActions}>
-        {/* 실제 안내는 구글 지도에 넘깁니다. 음성 안내도 환승 정보도 그쪽이 낫고,
-            어차피 켤 것을 주소 옮겨 적게 만들 이유가 없습니다. */}
-        {canEdit ? (
-          <>
+        <Row gap={Spacing.xs} style={styles.placeActions}>
+          {/* 구글이 모르고 방금 다녀온 사람만 아는 것들이 여기 모입니다. */}
+          {place.placeId ? (
             <IconButton
-              name="arrow-up"
-              label="위로 옮기기"
-              disabled={!onUp || moving}
-              onPress={() => onUp?.()}
+              name="message-square"
+              label={tipCount > 0 ? `한 줄 ${tipCount}개 보기` : '한 줄 남기기'}
+              active={tipCount > 0}
+              onPress={onTips}
             />
-            <IconButton
-              name="arrow-down"
-              label="아래로 옮기기"
-              disabled={!onDown || moving}
-              onPress={() => onDown?.()}
-            />
-          </>
-        ) : null}
-        {/* 구글이 모르고 방금 다녀온 사람만 아는 것들이 여기 모입니다. */}
-        {place.placeId ? (
+          ) : null}
+          {/* 실제 안내는 구글 지도에 넘깁니다. 음성 안내도 환승 정보도 그쪽이
+              낫고, 어차피 켤 것을 주소 옮겨 적게 만들 이유가 없습니다. */}
           <IconButton
-            name="message-square"
-            label={tipCount > 0 ? `한 줄 ${tipCount}개 보기` : '한 줄 남기기'}
-            active={tipCount > 0}
-            onPress={onTips}
+            name="navigation"
+            label={`${place.name} 길찾기`}
+            onPress={() =>
+              openDirections(
+                { name: place.name, lat: place.lat, lng: place.lng, placeId: place.placeId },
+                chosen?.mode ?? null,
+              )
+            }
           />
-        ) : null}
-        <IconButton
-          name="navigation"
-          label={`${place.name} 길찾기`}
-          onPress={() => {
-            openDirections(
-              { name: place.name, lat: place.lat, lng: place.lng, placeId: place.placeId },
-              mode,
-            );
+          <IconButton
+            name="check"
+            label={visited ? '다녀옴 취소' : '다녀옴으로 표시'}
+            tone="success"
+            active={visited}
+            disabled={busy}
+            onPress={onToggle}
+          />
+          {canEdit ? (
+            <>
+              <IconButton name="edit-2" label="장소 고치기" onPress={onEdit} />
+              <IconButton
+                name="trash-2"
+                label="장소 지우기"
+                tone="danger"
+                onPress={() => setConfirming(true)}
+              />
+            </>
+          ) : null}
+        </Row>
+
+        <ConfirmDialog
+          visible={confirming}
+          title="이 장소를 지울까요?"
+          message={`${place.name} 이(가) 일정에서 사라집니다. 되돌릴 수 없습니다.`}
+          confirmLabel="지우기"
+          danger
+          onCancel={() => setConfirming(false)}
+          onConfirm={() => {
+            setConfirming(false);
+            onRemove();
           }}
         />
-        <IconButton
-          name="check"
-          label={visited ? '다녀옴 취소' : '다녀옴으로 표시'}
-          tone="success"
-          active={visited}
-          disabled={busy}
-          onPress={onToggle}
-        />
-        {canEdit ? (
-          <>
-            <IconButton name="edit-2" label="장소 고치기" onPress={onEdit} />
-            <IconButton
-              name="trash-2"
-              label="장소 지우기"
-              tone="danger"
-              onPress={() => setConfirming(true)}
-            />
-          </>
-        ) : null}
-      </Row>
+      </View>
 
-      <ConfirmDialog
-        visible={confirming}
-        title="이 장소를 지울까요?"
-        message={`${place.name} 이(가) 일정에서 사라집니다. 되돌릴 수 없습니다.`}
-        confirmLabel="지우기"
-        danger
-        onCancel={() => setConfirming(false)}
-        onConfirm={() => {
-          setConfirming(false);
-          onRemove();
-        }}
-      />
+      {gap ? <GapBlock gap={gap} chosen={chosen} onPick={onPick} /> : null}
     </View>
   );
 }
 
-/** 핀 번호. 색 위에 흰 글자로 올립니다. */
-function OrderLabel({ n }: { n: number }) {
-  return <Body small strong style={styles.orderText}>{n}</Body>;
+/**
+ * 장소와 장소 사이에 끼는 이동.
+ *
+ * <p>수단을 하나 고르게 하지 않고 셋을 나란히 놓습니다. "지하철 25분 / 택시
+ * 10분에 1,500엔" 이 함께 보여야 시간을 살지 돈을 살지 그 자리에서 정할 수
+ * 있습니다.
+ *
+ * <p>가장 빠른 것과 가장 싼 것에 표시를 답니다. 누르면 그 수단으로 지도의 길도
+ * 함께 바뀝니다.
+ */
+function GapBlock({
+  gap,
+  chosen,
+  onPick,
+}: {
+  gap: Gap;
+  chosen: GapOption | null;
+  onPick: (fromId: string, mode: TravelMode) => void;
+}) {
+  if (gap.options.length === 0) {
+    return (
+      <Row gap={Spacing.xs} style={styles.gap}>
+        <Caption tone="muted">이어지는 길을 찾지 못했습니다</Caption>
+      </Row>
+    );
+  }
+
+  /* 빠른 것과 싼 것이 같으면 고민할 것이 없습니다. 그럴 때는 표시를 달지
+     않습니다 — 둘 다 붙으면 무엇을 고르라는 것인지 알 수 없습니다. */
+  const oneAnswer = gap.fastest === gap.cheapest;
+
+  return (
+    <View style={styles.gap}>
+      <View style={styles.gapLine} />
+      <Row gap={Spacing.xs}>
+        {gap.options.map((option) => {
+          const on = chosen?.mode === option.mode;
+          return (
+            <Press
+              key={option.mode}
+              onPress={() => onPick(gap.fromId, option.mode)}
+              scale={0.94}
+              accessibilityState={{ selected: on }}
+              accessibilityLabel={`${MODE_LABEL[option.mode]} ${asDuration(option.seconds)}`}
+              style={[
+                styles.option,
+                on ? { borderColor: Colors.accent, backgroundColor: Colors.accentSoft } : null,
+              ]}>
+              <Row gap={Spacing.xs}>
+                <Caption tone={on ? 'accent' : 'muted'}>{MODE_LABEL[option.mode]}</Caption>
+                {!oneAnswer && option.mode === gap.fastest ? (
+                  <Caption tone="hot" strong>
+                    빠름
+                  </Caption>
+                ) : null}
+                {!oneAnswer && option.mode === gap.cheapest ? (
+                  <Caption tone="success" strong>
+                    저렴
+                  </Caption>
+                ) : null}
+              </Row>
+              <Body small strong tone={on ? 'default' : 'secondary'}>
+                {asDuration(option.seconds)}
+              </Body>
+              <Caption tone="muted">{fareText(option.fare) || asDistance(option.meters)}</Caption>
+            </Press>
+          );
+        })}
+      </Row>
+      {/* 택시 요금은 구글이 알려 주지 않아 나라별 기본요금으로 어림한 값입니다.
+          정확한 값인 척하면 그 돈만 들고 탔다가 모자랍니다. */}
+      {gap.options.some((o) => o.fare?.estimated) ? (
+        <Caption tone="muted">택시 요금은 기본요금으로 어림한 값입니다</Caption>
+      ) : null}
+    </View>
+  );
 }
 
+/** "¥1,500" 처럼. 요금이 없는 것(걷기)은 빈 문자열입니다. */
+function fareText(fare: Money | null) {
+  if (!fare) {
+    return '';
+  }
+  const sign: Record<string, string> = {
+    KRW: '₩',
+    JPY: '¥',
+    USD: '$',
+    TWD: 'NT$',
+    HKD: 'HK$',
+    SGD: 'S$',
+    THB: '฿',
+    VND: '₫',
+  };
+  return `${sign[fare.currency] ?? ''}${fare.amount.toLocaleString()}`;
+}
 
 /** 오늘 날짜를 여행의 iso 와 같은 모양으로. */
 function todayIso() {
@@ -1144,67 +1266,10 @@ function asDistance(meters: number) {
 }
 
 /**
- * 장소와 장소 사이에 끼는 줄.
- *
- * <p>아직 못 받았으면 아무것도 그리지 않습니다. 자리만 잡아 두면 목록이
- * 계산 전후로 들썩입니다.
- */
-function Hop({ leg }: { leg?: RouteLeg }) {
-  if (!leg) {
-    return null;
-  }
-  return (
-    <Row gap={Spacing.xs} style={styles.hop}>
-      <View style={styles.hopLine} />
-      <Caption tone="secondary">
-        {leg.reachable
-          ? `${asDuration(leg.seconds)} · ${asDistance(leg.meters)}`
-          : '이 수단으로는 길이 없습니다'}
-      </Caption>
-    </Row>
-  );
-}
-
-/** 수단을 고른 뒤 위쪽에 뜨는 한 줄. */
-function RouteNote({
-  picked,
-  route,
-  busy,
-  error,
-}: {
-  /** 계산할 날짜가 정해졌는지. 여러 날 중 "전체" 를 보고 있으면 아닙니다. */
-  picked: boolean;
-  route: DayRoute | null;
-  busy: boolean;
-  error: string | null;
-}) {
-  if (!picked) {
-    return <Caption tone="secondary">날짜를 하나 고르면 이동 시간을 보여 줍니다.</Caption>;
-  }
-  if (error) {
-    return <Caption tone="danger">{error}</Caption>;
-  }
-  if (busy) {
-    return <Caption tone="secondary">이동 시간을 알아보는 중…</Caption>;
-  }
-  if (!route || route.legs.length === 0) {
-    return null;
-  }
-  return (
-    <Caption tone="secondary">
-      총 이동 {asDuration(route.totalSeconds)} · {asDistance(route.totalMeters)}
-      {route.trimmed ? ' · 장소가 많아 앞부분만 계산했습니다' : ''}
-    </Caption>
-  );
-}
-
-
-/**
  * 장소 밑에 붙는 영업시간 한 줄.
  *
- * <p><b>오늘</b>이 아니라 <b>그 장소를 넣어 둔 날</b> 기준입니다. 10월 9일에
- * 갈 곳이 그날 쉬는지가 궁금한 것이지 오늘 여는지가 아닙니다. 월요일 휴관을
- * 모르고 갔다가 하루를 날리는 일이 흔합니다.
+ * <p><b>오늘</b>이 아니라 <b>그 장소를 넣어 둔 날</b> 기준입니다. 10월 9일에 갈
+ * 곳이 그날 쉬는지가 궁금한 것이지 오늘 여는지가 아닙니다.
  *
  * <p>적어 둔 시각이 영업시간 밖이면 그것도 말해 줍니다. 브레이크 타임에 맞춰
  * 가면 문 앞에서 돌아섭니다.
@@ -1228,8 +1293,8 @@ function PlaceHours({ info, at }: { info: PlaceInfo; at?: string | null }) {
     return null;
   }
 
-  /* 구글이 "월요일: 오전 9:00~오후 6:00" 처럼 요일까지 붙여 보냅니다.
-     어느 날 것인지는 카드가 이미 말하고 있으므로 요일은 덜어 냅니다. */
+  /* 구글이 "월요일: 오전 9:00~오후 6:00" 처럼 요일까지 붙여 보냅니다. 어느 날
+     것인지는 카드가 이미 말하고 있으므로 요일은 덜어 냅니다. */
   const text =
     info.spans.length > 0
       ? info.spans.map((s) => (s.end ? `${s.start}~${s.end}` : `${s.start}~`)).join(' · ')
@@ -1281,30 +1346,48 @@ function outsideHours(at: string, spans: { start: string; end?: string | null }[
 }
 
 const styles = StyleSheet.create({
-  hop: {
+  screen: {
+    flex: 1,
+    backgroundColor: Colors.abyss,
+  },
+
+  /* 지도 위에 얹는 것들. 막대와 겹치지 않게 안전영역만큼 내려서 놓습니다. */
+  floatTop: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    /* 옆으로 흐르는 띠라 높이를 내용만큼만 잡습니다. 안 잡으면 남은 화면을
+       전부 차지해 지도를 못 누릅니다. */
+    flexGrow: 0,
+  },
+  chipRail: {
+    paddingHorizontal: Gutter,
+    /* 오른쪽 기둥과 겹치지 않게 그만큼 비워 둡니다. 띠를 끝까지 밀면
+       마지막 날짜가 단추 밑으로 들어갑니다. */
+    paddingRight: Gutter + Tap.min,
+  },
+  /* 접지 않습니다. 접히면 지도를 덮습니다. */
+  chipRow: {
+    flexWrap: 'nowrap',
+  },
+  floatRight: {
+    position: 'absolute',
+    right: Gutter,
+    gap: Spacing.sm,
     alignItems: 'center',
-    paddingLeft: Spacing.md,
-    paddingVertical: Spacing.xs,
   },
-  /* 앞 장소에서 이어진다는 것을 눈으로 잇습니다. */
-  hopLine: {
-    width: StyleSheet.hairlineWidth,
-    height: 14,
-    backgroundColor: Colors.border,
-  },
+
   head: {
-    gap: Spacing.lg,
-  },
-  progress: {
     gap: Spacing.sm,
   },
-  progressLabel: {
+  headTop: {
     justifyContent: 'space-between',
+    alignItems: 'baseline',
   },
   track: {
-    height: 6,
+    height: 5,
     borderRadius: Radius.full,
-    backgroundColor: Colors.fillPressed,
+    backgroundColor: Colors.fill,
     overflow: 'hidden',
   },
   fill: {
@@ -1312,7 +1395,6 @@ const styles = StyleSheet.create({
     borderRadius: Radius.full,
   },
 
-  /* 누르는 자리를 넓게 잡아 손가락으로 맞추기 쉽게 합니다. */
   dayTap: {
     flexShrink: 1,
     paddingVertical: Spacing.xs,
@@ -1333,10 +1415,10 @@ const styles = StyleSheet.create({
   },
 
   places: {
-    gap: Spacing.sm,
+    gap: Spacing.xs,
   },
   place: {
-    borderRadius: Radius.md,
+    borderRadius: Radius.lg,
     borderWidth: 1.5,
     borderColor: 'transparent',
     overflow: 'hidden',
@@ -1351,16 +1433,31 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: Spacing.md,
   },
+  orderColumn: {
+    alignItems: 'center',
+  },
+  /* 화살표 둘을 번호 아래에 붙입니다. 사이를 벌리면 번호에서 떨어져 나가
+     무엇의 순서를 바꾸는지 알기 어려워집니다. */
+  nudge: {
+    flexWrap: 'nowrap',
+    marginTop: -Spacing.xs,
+    marginHorizontal: -Spacing.sm,
+  },
   order: {
-    width: 24,
-    height: 24,
+    width: 28,
+    height: 28,
     borderRadius: Radius.full,
+    borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 2,
   },
+  orderEmoji: {
+    /* 이모지는 글꼴이 제 높이를 갖고 있어, 줄 높이를 두면 아래로 처집니다. */
+    lineHeight: undefined,
+  },
   orderText: {
-    color: '#FFFFFF',
+    color: Colors.onDay,
   },
   placeText: {
     flex: 1,
@@ -1371,5 +1468,32 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     paddingHorizontal: Spacing.md,
     paddingBottom: Spacing.sm,
+  },
+
+  /* --------------------------------------------------- 사이사이 이동 */
+  gap: {
+    paddingLeft: Spacing.xl,
+    paddingVertical: Spacing.sm,
+    gap: Spacing.xs,
+  },
+  /* 앞 장소에서 이어진다는 것을 눈으로 잇습니다. */
+  gapLine: {
+    width: StyleSheet.hairlineWidth,
+    height: 10,
+    marginLeft: Spacing.xs,
+    backgroundColor: Colors.borderStrong,
+  },
+  option: {
+    flexGrow: 1,
+    /* 셋이 폭 360 인 폰에서도 한 줄에 서야 합니다. 이보다 넓게 잡으면
+       마지막 하나가 아래로 접혀 비교가 안 됩니다. */
+    flexBasis: 76,
+    borderRadius: Radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.border,
+    backgroundColor: Colors.fill,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    gap: 2,
   },
 });

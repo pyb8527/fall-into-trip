@@ -127,7 +127,9 @@ export default function Community() {
     <Screen>
       <View style={styles.head}>
         <Title>여행 이야기</Title>
-        <Body tone="secondary">남이 다녀온 일정을 구경하고, 마음에 들면 그대로 가져오세요.</Body>
+        <Body tone="secondary">
+          다른 사람이 다녀온 일정을 구경하고, 마음에 들면 그대로 가져오세요.
+        </Body>
       </View>
 
       <SegmentedTabs
@@ -143,6 +145,9 @@ export default function Community() {
           없고, 서버도 내 글에는 조건을 받지 않습니다. */}
       {view === 'mine' ? null : (
         <View style={styles.filters}>
+          {/* 엔터만으로 찾게 두면 자판이 없는 데스크톱에서는 무엇을 눌러야
+              하는지 알 수 없습니다. 단추를 답니다. 찾고 있는 중이면 지울
+              수도 있어야 합니다. */}
           <Field
             label="찾기"
             value={typed}
@@ -151,6 +156,27 @@ export default function Community() {
             returnKeyType="search"
             onSubmitEditing={() => refilter(() => setQ(typed.trim()))}
           />
+          <Row gap={Spacing.sm}>
+            <Button
+              label="찾기"
+              variant="secondary"
+              compact
+              onPress={() => refilter(() => setQ(typed.trim()))}
+            />
+            {q ? (
+              <Button
+                label={`"${q}" 지우기`}
+                variant="ghost"
+                compact
+                onPress={() =>
+                  refilter(() => {
+                    setTyped('');
+                    setQ('');
+                  })
+                }
+              />
+            ) : null}
+          </Row>
 
           <Row gap={Spacing.xs}>
             <Chip
@@ -253,12 +279,7 @@ function PostRow({
       {/* 글자만 늘어놓으면 어떤 동선인지 열어 봐야 압니다. 지도 한 장이면
           어디를 어떻게 도는지가 한눈에 보입니다. */}
       <Pressable onPress={onOpen} accessibilityRole="button" style={styles.tap}>
-        <Image
-          source={{ uri: `${API_BASE}/api/posts/${post.id}/map` }}
-          style={styles.thumb}
-          resizeMode="cover"
-          accessibilityLabel={`${post.title} 동선`}
-        />
+        <PostMap postId={post.id} title={post.title} height={150} />
         <Subtitle>{post.title}</Subtitle>
         {post.summary ? (
           <Body small tone="secondary" numberOfLines={2}>
@@ -286,6 +307,31 @@ function PostRow({
   );
 }
 
+
+/**
+ * 동선 그림.
+ *
+ * <p>서버가 구글에서 받아 우리 주소로 내보냅니다. 키를 안 넣어 두었거나
+ * 좌표가 하나도 없는 일정이면 못 받아 오는데, 그때 자리를 그대로 두면 회색
+ * 상자만 덩그러니 남습니다. 아예 비웁니다.
+ */
+function PostMap({ postId, title, height }: { postId: string; title: string; height: number }) {
+  const [broken, setBroken] = useState(false);
+
+  if (broken) {
+    return null;
+  }
+  return (
+    <Image
+      source={{ uri: `${API_BASE}/api/posts/${postId}/map` }}
+      style={[styles.thumb, { height }]}
+      resizeMode="cover"
+      accessibilityLabel={`${title} 동선`}
+      onError={() => setBroken(true)}
+    />
+  );
+}
+
 const styles = StyleSheet.create({
   head: {
     gap: Spacing.xs,
@@ -298,7 +344,6 @@ const styles = StyleSheet.create({
   },
   thumb: {
     width: '100%',
-    height: 150,
     borderRadius: Radius.md,
     backgroundColor: Colors.fill,
   },

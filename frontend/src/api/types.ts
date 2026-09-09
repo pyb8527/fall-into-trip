@@ -80,6 +80,13 @@ export type Place = {
    * 필요할 때 이걸로 물어봅니다. 좌표를 직접 넣은 장소에는 없습니다.
    */
   placeId: string | null;
+  /**
+   * 지도에 찍힐 그림의 이름("ramen", "onsen"…).
+   *
+   * 이모지 자체가 아니라 짧은 이름입니다. 어떤 그림을 그릴지는 화면이 정합니다
+   * (constants/place-icons.ts). 비어 있으면 번호만 찍힌 핀이 됩니다.
+   */
+  icon: string | null;
 };
 
 export type Day = {
@@ -216,6 +223,48 @@ export type RouteLeg = {
   polyline: string | null;
   /** 그 수단으로 갈 수 있는지. 섬과 뭍 사이 같은 경우가 있습니다. */
   reachable: boolean;
+  /** 대중교통은 구글이 준 값, 자동차는 우리가 어림한 값, 걷기는 없음. */
+  fare: Money | null;
+};
+
+/**
+ * 돈.
+ *
+ * @param estimated 우리가 어림한 값인지. 대중교통 요금은 구글이 계산한 것이라
+ *                  false 이고, 택시는 나라별 기본요금으로 어림한 것이라 true
+ *                  입니다. 화면은 이것을 보고 "어림" 을 붙일지 정합니다.
+ */
+export type Money = {
+  currency: string;
+  amount: number;
+  estimated: boolean;
+};
+
+/** 한 구간을 한 수단으로 갔을 때. */
+export type GapOption = {
+  mode: TravelMode;
+  seconds: number;
+  meters: number;
+  polyline: string | null;
+  fare: Money | null;
+};
+
+/**
+ * 장소와 장소 사이의 빈칸.
+ *
+ * <p>수단을 하나 고르게 하지 않고 셋을 다 계산해 나란히 놓습니다. "지하철 25분
+ * / 택시 10분" 이 함께 보여야 시간을 살지 돈을 살지 그 자리에서 정할 수
+ * 있습니다.
+ *
+ * @param fastest  가장 빨리 가는 수단
+ * @param cheapest 가장 돈이 덜 드는 수단. 둘이 같으면 고민할 것이 없습니다.
+ */
+export type Gap = {
+  fromId: string;
+  toId: string;
+  options: GapOption[];
+  fastest: TravelMode | null;
+  cheapest: TravelMode | null;
 };
 
 export type DayRoute = {
@@ -315,13 +364,15 @@ export type ItineraryPlace = {
   note: string | null;
   url: string | null;
   placeId: string | null;
+  /** 사본에 함께 담긴 핀 그림. 가져오면 그대로 따라갑니다. */
+  icon?: string | null;
 };
 
 export type PostDetail = Omit<PostCard, 'summary'> & {
   summary: string | null;
   /** 내가 쓴 글인지. 내릴 수 있는지를 이걸로 정합니다. */
   mine: boolean;
-  /** 의견을 받는 글인지. 열어 둔 글에만 댓글칸이 생깁니다. */
+  /** 댓글을 받는 글인지. 열어 둔 글에만 댓글칸이 생깁니다. */
   feedback: boolean;
   commentCount: number;
   itinerary: Itinerary;
@@ -392,6 +443,8 @@ export type SavedPlace = {
   /** 구글이 아는 번호. 있으면 영업시간도 볼 수 있습니다. */
   placeId: Maybe<string>;
   cat: Maybe<string>;
+  /** 지도에 찍힐 그림의 이름. 일정으로 옮길 때 그대로 따라갑니다. */
+  icon: Maybe<string>;
   note: Maybe<string>;
   /** 어느 글에서 담았는지. 검색이나 지도에서 담았으면 비어 있습니다. */
   fromPost: Maybe<string>;
@@ -414,6 +467,7 @@ export type Candidate = {
   lng: number;
   placeId: Maybe<string>;
   cat: Maybe<string>;
+  icon: Maybe<string>;
   note: Maybe<string>;
   addedBy: string;
   yes: number;

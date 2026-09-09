@@ -4,6 +4,7 @@ import MapView, { Circle, Marker, PROVIDER_GOOGLE, Polyline } from 'react-native
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { MapPlace, TripMapProps } from '@/components/map-types';
+import { QUIET_MAP } from '@/lib/map-style';
 import { Colors, Radius, Spacing, Tap } from '@/constants/theme';
 import { Badge, Body, Caption, Icon, IconButton, Row, Subtitle } from '@/ui';
 
@@ -37,7 +38,15 @@ export type { MapPlace } from '@/components/map-types';
    값들인데 앱 GPS 가 다음 빌드에 열립니다. 위치 권한이 매니페스트에 박히는
    것이라 다음 빌드 때 열립니다(docs/design.md). 그때 showsUserLocation 을
    켜면 됩니다. */
-export function TripMap({ places, activeId, onSelect, routes, height = 300 }: TripMapProps) {
+export function TripMap({
+  places,
+  activeId,
+  onSelect,
+  routes,
+  height = 300,
+  chrome = true,
+  bleed = false,
+}: TripMapProps) {
   const map = useRef<MapView | null>(null);
   const [full, setFull] = useState(false);
   /* 전체화면에서 핀을 눌렀을 때 아래에 뜨는 카드. 목록의 선택과 따로 둡니다. */
@@ -130,10 +139,13 @@ export function TripMap({ places, activeId, onSelect, routes, height = 300 }: Tr
       /* 안드로이드는 구글 지도로 통일합니다. 기기마다 다른 지도가 뜨면
          같은 화면을 설명하기 어렵습니다. iOS 는 애플 지도를 그대로 씁니다. */
       provider={PROVIDER_GOOGLE}
-      /* 구글은 기기가 어두운 테마면 지도도 어둡게 칠합니다. 웹에는 그런
-         동작이 없어 같은 화면이 둘로 갈립니다. 밝은 쪽으로 못박습니다.
-         이 값은 지도를 만들 때 한 번만 읽히므로 첫 그림부터 넘겨야 합니다. */
+      /* 구글은 기기가 어두운 테마면 지도도 어둡게 칠합니다. 웹에는 그런 동작이
+         없어 같은 화면이 둘로 갈립니다. 밝은 쪽으로 못박습니다. 이 값은 지도를
+         만들 때 한 번만 읽히므로 첫 그림부터 넘겨야 합니다. */
       userInterfaceStyle="light"
+      /* 웹과 같은 값을 씁니다. 둘이 갈리면 같은 여행을 폰과 브라우저에서 볼 때
+         다른 지도가 됩니다. iOS 는 애플 지도라 이 값이 먹지 않습니다. */
+      customMapStyle={QUIET_MAP as unknown as never[]}
       initialRegion={region}
       showsPointsOfInterests={false}
       toolbarEnabled={false}
@@ -185,9 +197,9 @@ export function TripMap({ places, activeId, onSelect, routes, height = 300 }: Tr
 
   return (
     <>
-      <View style={[styles.frame, { height }]}>
+      <View style={[styles.frame, bleed ? styles.frameBleed : { height }]}>
         {full ? null : body}
-        {full ? null : (
+        {full || !chrome ? null : (
           <View style={styles.overlay}>
             <IconButton name="maximize" label="전체화면으로 보기" onPress={() => setFull(true)} />
           </View>
@@ -309,13 +321,19 @@ function Pin({ place, active }: { place: MapPlace; active: boolean }) {
               width: dot,
               height: dot,
               borderRadius: dot / 2,
+              /* 다녀온 곳은 속을 날짜 색으로 채우고, 아직인 곳은 희게 비워
+                 둡니다. 지도가 채워지는 체크리스트처럼 읽힙니다. */
               backgroundColor: visited ? place.color : '#FFFFFF',
             },
           ]}>
-          {visited ? (
-            <Icon name="check" size={Math.round(dot * 0.72)} tone="inverse" />
+          {place.emoji ? (
+            /* 그림이 있으면 번호 대신 그림입니다. 둘 다 넣으면 열몇
+               픽셀 안에서 어느 쪽도 안 읽힙니다. 순서는 목록이 말해 줍니다. */
+            <Body small style={styles.pinEmoji}>
+              {place.emoji}
+            </Body>
           ) : (
-            <Body small strong style={{ color: place.color }}>
+            <Body small strong style={styles.pinNumber}>
               {place.order}
             </Body>
           )}
@@ -387,11 +405,16 @@ const styles = StyleSheet.create({
     width: '100%',
     borderRadius: Radius.lg,
     overflow: 'hidden',
-    backgroundColor: Colors.fill,
+    backgroundColor: Colors.abyss,
+  },
+  /* 지도가 화면을 꽉 채울 때. 모서리를 둥글리면 그 틈으로 바탕이 비칩니다. */
+  frameBleed: {
+    flex: 1,
+    borderRadius: 0,
   },
   fullWrap: {
     flex: 1,
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.abyss,
   },
   overlay: {
     position: 'absolute',
@@ -416,6 +439,15 @@ const styles = StyleSheet.create({
     left: 0,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  pinNumber: {
+    /* 날짜 색이 파스텔이라 그것으로 번호를 쓰면 읽히지 않습니다. 색은 방울이
+       맡고 번호는 늘 짙게 씁니다. */
+    color: Colors.onDay,
+  },
+  pinEmoji: {
+    /* 이모지는 글꼴이 제 높이를 갖고 있어, 줄 높이를 두면 아래로 처집니다. */
+    lineHeight: undefined,
   },
   dot: {
     alignItems: 'center',
