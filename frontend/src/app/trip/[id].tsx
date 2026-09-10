@@ -34,9 +34,10 @@ import { iconOf } from '@/constants/place-icons';
 import { faceOf } from '@/constants/user-marks';
 import { metersBetween, SAME_SPOT } from '@/lib/geo';
 import type { Found } from '@/components/map-types';
+import { PlaceDetailSheet, type Looked } from '@/components/place-detail-sheet';
 import { PlaceSearch } from '@/components/place-search';
 import { RecommendSheet } from '@/components/recommend-sheet';
-import { openDirections, openPlace } from '@/lib/directions';
+import { openDirections } from '@/lib/directions';
 import { keepTrip, keptAgo, keptTrip } from '@/lib/keep';
 import { canPrint, printItinerary } from '@/lib/print';
 import { useHere } from '@/lib/here';
@@ -67,6 +68,7 @@ import {
   Row,
   Screen,
   Subtitle,
+  Switch,
 } from '@/ui';
 
 /** 전체를 보는 상태. 특정 날짜가 아니라는 뜻입니다. */
@@ -173,6 +175,14 @@ export default function TripScreen() {
 
   const [asking, setAsking] = useState(false);
   const [packing, setPacking] = useState(false);
+  /*
+    일정에 넣어 둔 곳도 들여다봅니다.
+
+    전에는 이 자리가 구글 지도로 곧장 나갔습니다. 그런데 대개 알고 싶은 것은
+    "그날 문 여는지, 평점이 몇인지" 이고, 그것 때문에 앱을 나갔다 돌아오게
+    할 일이 아닙니다. 판 안에 구글로 가는 길이 그대로 있습니다.
+  */
+  const [looking, setLooking] = useState<Looked | null>(null);
   const [cloning, setCloning] = useState(false);
   const [planted, setPlanted] = useState(0);
   /** 꽂은 자리에 이미 깃발을 꽂아 두고 있던 동행자. 없으면 null. */
@@ -962,6 +972,7 @@ export default function TripScreen() {
               onPick={(fromId, mode) => setPicked((p) => ({ ...p, [fromId]: mode }))}
               infoOf={infoOf}
               holdRow={holdRow}
+              onLook={setLooking}
               twiceIn={twiceIn}
               tipCounts={tipCounts}
               onTips={setTipFor}
@@ -1035,6 +1046,14 @@ export default function TripScreen() {
         here={me.here}
         onClose={() => setAsking(false)}
         onChanged={refresh}
+      />
+
+      <PlaceDetailSheet
+        place={looking}
+        /* 날짜 하나를 보고 있으면 그날 기준으로 영업시간을 봅니다. */
+        onIso={dayIndex >= 0 ? (days[dayIndex]?.iso ?? null) : null}
+        here={me.here}
+        onClose={() => setLooking(null)}
       />
 
       <PackSheet visible={packing} tripId={id} onClose={() => setPacking(false)} />
@@ -1234,6 +1253,7 @@ function DayCard({
   onPick,
   infoOf,
   holdRow,
+  onLook,
   twiceIn,
   tipCounts,
   onTips,
@@ -1256,6 +1276,8 @@ function DayCard({
   infoOf: Map<string, PlaceInfo>;
   /** 줄이 목록의 어디쯤인지 재려고 화면 요소를 붙들어 둡니다. */
   holdRow: (placeId: string, node: unknown) => void;
+  /** 장소 하나를 들여다보는 판을 엽니다. */
+  onLook: (place: Looked) => void;
   /** 두 날에 걸쳐 들어간 곳. 구글 번호 → 그 날들의 이름. */
   twiceIn: Map<string, string[]>;
   /** 구글 번호별 최근 팁 수. */
@@ -1611,6 +1633,7 @@ function DayCard({
                           )
                         : []
                     }
+                    onLook={onLook}
                     tipCount={place.placeId ? (tipCounts[place.placeId] ?? 0) : 0}
                     onTips={() => onTips(place)}
                     dragging={from === i}
@@ -1692,6 +1715,7 @@ function PlaceRow({
   canEdit,
   info,
   alsoOn,
+  onLook,
   tipCount,
   onTips,
   dragging,
@@ -1717,6 +1741,8 @@ function PlaceRow({
   info?: PlaceInfo;
   /** 이 곳이 들어가 있는 다른 날들. 비어 있으면 이 날에만 있습니다. */
   alsoOn: string[];
+  /** 평점·영업시간을 들여다보는 판을 엽니다. */
+  onLook: (place: Looked) => void;
   tipCount: number;
   onTips: () => void;
   /** 지금 이 줄을 끌고 있는지. 끌고 있는 동안에는 조금 들어 올립니다. */
@@ -1850,14 +1876,15 @@ function PlaceRow({
             보려면 직접 검색해야 했습니다.
           */}
           <IconButton
-            name="map-pin"
-            label={`${place.name} 구글 지도에서 보기`}
+            name="info"
+            label={`${place.name} 자세히 보기`}
             onPress={() =>
-              openPlace({
+              onLook({
                 name: place.name,
                 lat: place.lat,
                 lng: place.lng,
                 placeId: place.placeId,
+                icon: place.icon,
               })
             }
           />
@@ -2419,14 +2446,22 @@ function StaySheet({
         hint="지도에 찍는 것이 아니라 적어 두고 읽는 칸입니다."
       />
 
-      <Chip
-        label={forward ? '이후 날들도 같은 곳' : '이 날만'}
-        selected={forward}
-        onPress={() => setForward((v) => !v)}
+      {/*
+        칩 하나로 켜고 끄지 않았습니다.
+
+        전에는 글자가 지금 상태를 보여 주고 눌렀을 때 뒤집혔습니다. "이후
+        날들도 같은 곳" 이라고 적혀 있을 때가 이미 켜진 상태였는데, 누르는
+        사람에게는 그것이 "이렇게 하겠다" 로 읽혀 눌렀다가 도리어 꺼졌습니다.
+
+        스위치는 그 둘이 갈리지 않습니다. 글자는 무엇에 대한 것인지만 말하고,
+        켜졌는지는 손잡이의 자리가 말합니다.
+      */}
+      <Switch
+        label="이후 날들도 같은 곳"
+        hint="아직 잘 곳을 안 적은 날만 채웁니다. 옮겨 자는 날은 그대로 둡니다."
+        value={forward}
+        onChange={setForward}
       />
-      <Caption tone="muted">
-        이후 날 중 <b>아직 잘 곳을 안 적은 날</b>만 채웁니다. 옮겨 자는 날은 그대로 둡니다.
-      </Caption>
 
       {day.stay ? (
         <Button label="잘 곳 지우기" variant="danger" onPress={() => save(true)} busy={busy} />
@@ -2520,6 +2555,9 @@ function CloneSheet({
 }
 
 const styles = StyleSheet.create({
+  pick: {
+    gap: Spacing.xs,
+  },
   packRow: {
     gap: Spacing.xs,
     paddingVertical: Spacing.xs,

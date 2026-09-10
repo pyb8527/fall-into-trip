@@ -76,13 +76,14 @@ export default function Home() {
             onPress={() => router.push('/community')}
           />
         </Rise>
-        {/* 가계부는 여행 하나에 딸립니다. 여기서 바로 열 수 없어 여행을
-            고르는 곳으로 보냅니다 — "어느 여행의 가계부" 가 먼저입니다. */}
+        {/* 가계부는 여행 하나에 딸립니다. 먼저 어느 여행인지를 고르고,
+            고르면 곧장 그 여행의 가계부로 갑니다 — 일정 화면을 거치지
+            않습니다. */}
         <Rise order={3} style={styles.half}>
           <MenuCard
             title="가계부"
             caption="누가 얼마 냈는지"
-            onPress={() => router.push('/(app)/trips')}
+            onPress={() => router.push('/(app)/trips?for=money')}
           />
         </Rise>
         {user?.role === 'ADMIN' ? (

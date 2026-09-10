@@ -634,6 +634,75 @@ export function Chip({
   );
 }
 
+/**
+ * 켜고 끄는 스위치.
+ *
+ * <h3>왜 칩이 아닌가</h3>
+ *
+ * <p>칩 하나로 켜고 끄면 글자가 두 가지 뜻으로 읽힙니다. "이후 날들도 같은
+ * 곳" 이라고 적혀 있을 때 그것이 <b>지금 그렇다</b> 는 말인지 <b>누르면
+ * 그렇게 된다</b> 는 말인지가 갈립니다. 실제로 이미 켜져 있는 것을 누르려다
+ * 끄는 일이 생겼습니다.
+ *
+ * <p>스위치는 그 둘이 갈리지 않습니다. 글자는 무엇에 대한 것인지만 말하고,
+ * 켜졌는지는 손잡이의 자리가 말합니다.
+ */
+export function Switch({
+  label,
+  hint,
+  value,
+  onChange,
+}: {
+  label: string;
+  /** 켰을 때 무슨 일이 일어나는지. 필요할 때만 답니다. */
+  hint?: string;
+  value: boolean;
+  onChange: (next: boolean) => void;
+}) {
+  /* 손잡이가 미끄러져 갑니다. 툭 바뀌면 눌렸는지 알기 어렵습니다. */
+  const slide = useRef(new Animated.Value(value ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.timing(slide, {
+      toValue: value ? 1 : 0,
+      duration: Motion.tap,
+      useNativeDriver: true,
+    }).start();
+  }, [value, slide]);
+
+  return (
+    <Pressable
+      onPress={() => onChange(!value)}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: value }}
+      accessibilityLabel={label}
+      hitSlop={Tap.compactSlop}
+      style={styles.switchRow}>
+      <View style={styles.switchText}>
+        <Text style={styles.switchLabel}>{label}</Text>
+        {hint ? <Text style={styles.switchHint}>{hint}</Text> : null}
+      </View>
+
+      <View
+        style={[
+          styles.switchTrack,
+          { backgroundColor: value ? Colors.accent : Colors.fillPressed },
+        ]}>
+        <Animated.View
+          style={[
+            styles.switchKnob,
+            {
+              transform: [
+                { translateX: slide.interpolate({ inputRange: [0, 1], outputRange: [0, 20] }) },
+              ],
+            },
+          ]}
+        />
+      </View>
+    </Pressable>
+  );
+}
+
 /** 상태를 한눈에 보여 주는 작은 표식. 누르는 것이 아닙니다. */
 export function Badge({ label, tone = 'muted' }: { label: string; tone?: Tone }) {
   return (
@@ -733,6 +802,7 @@ export function MenuCard({
 /** 쓰는 아이콘 이름만 열어 둡니다. 아무거나 부르면 화면마다 결이 흐트러집니다. */
 export type IconName =
   | 'check'
+  | 'info'
   | 'credit-card'
   | 'home'
   /* 동선 정리. 순서를 다시 세운다는 뜻으로 이만한 그림이 없습니다. */
@@ -1670,6 +1740,44 @@ const styles = StyleSheet.create({
     /* 어두운 바탕에서 칩과 판은 밝기가 비슷합니다. 실선이 없으면 칩이
        어디서 끝나는지 보이지 않습니다. */
     borderWidth: StyleSheet.hairlineWidth,
+  },
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    paddingVertical: Spacing.xs,
+  },
+  switchText: {
+    flex: 1,
+    gap: 2,
+  },
+  switchLabel: {
+    ...Type.body,
+    color: Colors.text,
+  },
+  switchHint: {
+    ...Type.caption,
+    color: Colors.textMuted,
+  },
+  switchTrack: {
+    width: 46,
+    height: 26,
+    borderRadius: 13,
+    padding: 3,
+    justifyContent: 'center',
+  },
+  switchKnob: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: Colors.surface,
+    /* 켜졌을 때 강조색 위에서, 꺼졌을 때 회색 위에서 둘 다 떠 보여야
+       합니다. 옅은 그림자 하나로 충분합니다. */
+    shadowColor: '#000000',
+    shadowOpacity: 0.18,
+    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 2,
   },
   chipLabel: {
     ...Type.bodySmall,

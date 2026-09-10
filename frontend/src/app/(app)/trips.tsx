@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
@@ -49,9 +49,28 @@ const GROUPS: { value: Group; label: string }[] = [
   { value: 'folder', label: '폴더별' },
 ];
 
+/**
+ * 무엇 때문에 여행을 고르는지.
+ *
+ * <p>홈에서 "가계부" 를 누르면 여기로 옵니다. 그때 여행을 고르면 일정이
+ * 아니라 그 여행의 가계부로 가야 합니다 — 안 그러면 가계부를 누른 사람이
+ * 일정 화면에 서서 다시 길을 찾아야 합니다.
+ *
+ * <p>비어 있으면 여느 때처럼 일정으로 갑니다.
+ */
+type PickFor = 'money' | null;
+
 export default function Trips() {
   const { user } = useAuth();
   const router = useRouter();
+  const { for: pickFor } = useLocalSearchParams<{ for?: string }>();
+  const goal: PickFor = pickFor === 'money' ? 'money' : null;
+
+  /** 고른 여행을 어디로 데려갈지. */
+  const open = (tripId: string) =>
+    goal === 'money'
+      ? router.push({ pathname: '/money/[id]', params: { id: tripId } })
+      : router.push({ pathname: '/trip/[id]', params: { id: tripId } });
   const [creating, setCreating] = useState(false);
   const [group, setGroup] = useState<Group>('when');
   const [placing, setPlacing] = useState<TripSummary | null>(null);
@@ -96,6 +115,11 @@ export default function Trips() {
       safeTop
       /* 주 동작은 아래에 붙입니다. 한 손으로 쥐었을 때 엄지가 닿는 자리입니다. */
       footer={<Button label="새 여행 만들기" onPress={() => setCreating(true)} />}>
+      {/* 무엇 때문에 고르는 중인지. 여느 때는 말할 것이 없습니다. */}
+      {goal === 'money' ? (
+        <Caption tone="secondary">어느 여행의 가계부를 볼까요?</Caption>
+      ) : null}
+
       {/* 몇 개 안 될 때는 찾을 것이 없습니다. 칸만 자리를 차지합니다. */}
       {all.length > 4 ? (
         <Field
@@ -166,7 +190,7 @@ export default function Trips() {
                   key={trip.id}
                   trip={trip}
                   mine={trip.ownerId === user?.id}
-                  onOpen={() => router.push({ pathname: '/trip/[id]', params: { id: trip.id } })}
+                  onOpen={() => open(trip.id)}
                   onFolder={() => setPlacing(trip)}
                 />
               ))}
@@ -187,7 +211,7 @@ export default function Trips() {
               key={trip.id}
               trip={trip}
               mine={trip.ownerId === user?.id}
-              onOpen={() => router.push({ pathname: '/trip/[id]', params: { id: trip.id } })}
+              onOpen={() => open(trip.id)}
             />
           ))}
         </View>
