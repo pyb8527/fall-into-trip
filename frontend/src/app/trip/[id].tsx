@@ -879,6 +879,13 @@ export default function TripScreen() {
             label="투표장"
             onPress={() => router.push({ pathname: '/vote/[id]', params: { id } })}
           />
+          {/* 여행에서 서로 껄끄러워지는 자리는 돈입니다. 쓴 김에 적어 두면
+              돌아와서 카톡을 거슬러 올라갈 일이 없습니다. */}
+          <Shortcut
+            icon="credit-card"
+            label="가계부"
+            onPress={() => router.push({ pathname: '/money/[id]', params: { id } })}
+          />
           <Shortcut
             icon="bookmark"
             label="추억"

@@ -78,6 +78,7 @@ export default function RootLayout() {
             <Stack.Screen name="travel/[id]" options={stackHeader('여행 중', { toTrip: true })} />
             <Stack.Screen name="vote/[id]" options={stackHeader('가고 싶은 곳', { toTrip: true })} />
             <Stack.Screen name="card/[id]" options={stackHeader('여행 카드', { toTrip: true })} />
+            <Stack.Screen name="money/[id]" options={stackHeader('가계부', { toTrip: true })} />
             <Stack.Screen name="community" options={{ headerShown: false }} />
             <Stack.Screen name="admin" options={{ headerShown: false }} />
           </Stack>

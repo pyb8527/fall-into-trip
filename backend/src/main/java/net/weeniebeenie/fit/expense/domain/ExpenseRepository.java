@@ -8,4 +8,6 @@ import java.util.List;
 public interface ExpenseRepository extends JpaRepository<Expense, String> {
 
     List<Expense> findAllByTripIdOrderByCreatedAtAsc(String tripId);
+
+    long countByTripId(String tripId);
 }

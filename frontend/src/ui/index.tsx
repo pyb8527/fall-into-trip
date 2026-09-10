@@ -733,6 +733,7 @@ export function MenuCard({
 /** 쓰는 아이콘 이름만 열어 둡니다. 아무거나 부르면 화면마다 결이 흐트러집니다. */
 export type IconName =
   | 'check'
+  | 'credit-card'
   | 'home'
   /* 동선 정리. 순서를 다시 세운다는 뜻으로 이만한 그림이 없습니다. */
   | 'shuffle'
