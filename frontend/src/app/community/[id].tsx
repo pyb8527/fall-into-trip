@@ -1,8 +1,8 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Image, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
-import { api, API_BASE, ApiError, query, UNEXPECTED } from '@/api/client';
+import { api, ApiError, query, UNEXPECTED } from '@/api/client';
 import type { ItineraryDay, ItineraryPlace, PostDetail } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
@@ -13,6 +13,7 @@ import {
   useComments,
 } from '@/components/comment-list';
 import type { MapPlace } from '@/components/map-types';
+import { PostMap } from '@/components/post-map';
 import { SignUpGate } from '@/components/signup-gate';
 import { TripMap } from '@/components/trip-map';
 import { iconOf } from '@/constants/place-icons';
@@ -629,38 +630,9 @@ function today() {
 }
 
 
-/**
- * 동선 그림.
- *
- * <p>서버가 구글에서 받아 우리 주소로 내보냅니다. 키를 안 넣어 두었거나
- * 좌표가 하나도 없는 일정이면 못 받아 오는데, 그때 자리를 그대로 두면 회색
- * 상자만 덩그러니 남습니다. 아예 비웁니다.
- */
-function PostMap({ postId, title, height }: { postId: string; title: string; height: number }) {
-  const [broken, setBroken] = useState(false);
-
-  if (broken) {
-    return null;
-  }
-  return (
-    <Image
-      source={{ uri: `${API_BASE}/api/posts/${postId}/map` }}
-      style={[styles.thumb, { height }]}
-      resizeMode="cover"
-      accessibilityLabel={`${title} 동선`}
-      onError={() => setBroken(true)}
-    />
-  );
-}
-
 const styles = StyleSheet.create({
   head: {
     gap: Spacing.xs,
-  },
-  thumb: {
-    width: '100%',
-    borderRadius: Radius.none,
-    backgroundColor: Colors.fill,
   },
   grow: {
     flex: 1,

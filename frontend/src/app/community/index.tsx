@@ -1,13 +1,14 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Image, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
-import { api, API_BASE, query } from '@/api/client';
+import { api, query } from '@/api/client';
 import type { PostCard, PostDays, PostPage, PostSort } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
+import { PostMap } from '@/components/post-map';
 import { SignUpGate } from '@/components/signup-gate';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 import type { Comeback } from '@/lib/comeback';
 import {
   Body,
@@ -314,41 +315,12 @@ function PostRow({
 }
 
 
-/**
- * 동선 그림.
- *
- * <p>서버가 구글에서 받아 우리 주소로 내보냅니다. 키를 안 넣어 두었거나
- * 좌표가 하나도 없는 일정이면 못 받아 오는데, 그때 자리를 그대로 두면 회색
- * 상자만 덩그러니 남습니다. 아예 비웁니다.
- */
-function PostMap({ postId, title, height }: { postId: string; title: string; height: number }) {
-  const [broken, setBroken] = useState(false);
-
-  if (broken) {
-    return null;
-  }
-  return (
-    <Image
-      source={{ uri: `${API_BASE}/api/posts/${postId}/map` }}
-      style={[styles.thumb, { height }]}
-      resizeMode="cover"
-      accessibilityLabel={`${title} 동선`}
-      onError={() => setBroken(true)}
-    />
-  );
-}
-
 const styles = StyleSheet.create({
   filters: {
     gap: Spacing.sm,
   },
   tap: {
     gap: Spacing.xs,
-  },
-  thumb: {
-    width: '100%',
-    borderRadius: Radius.none,
-    backgroundColor: Colors.fill,
   },
   meta: {
     justifyContent: 'space-between',
