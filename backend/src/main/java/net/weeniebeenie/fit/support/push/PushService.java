@@ -182,7 +182,11 @@ public class PushService {
             return;
         }
 
-        List<String> targets = userIds.stream().filter(id -> !id.equals(actorId)).toList();
+        /* 고친 사람에게는 보내지 않습니다. 다만 "내일입니다" 처럼 누가 한
+           일이 아닌 알림은 actorId 없이 오고, 그때는 전원이 받습니다. */
+        List<String> targets = actorId == null
+                ? userIds
+                : userIds.stream().filter(id -> !id.equals(actorId)).toList();
         if (targets.isEmpty()) {
             return;
         }

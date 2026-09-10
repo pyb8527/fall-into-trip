@@ -270,7 +270,12 @@ function TripRow({
         <ListRow
           title={trip.title}
           subtitle={`${formatRange(trip.startIso, trip.endIso)} · ${trip.dayCount}일 · 장소 ${trip.placeCount}곳`}
-          right={mine ? undefined : <Badge label="동행" tone="muted" />}
+          right={
+            <Row gap={Spacing.xs}>
+              {countdownOf(trip.startIso, trip.endIso)}
+              {mine ? null : <Badge label="동행" tone="muted" />}
+            </Row>
+          }
           onPress={onOpen}
         />
       </View>
@@ -282,6 +287,39 @@ function TripRow({
       ) : null}
     </Row>
   );
+}
+
+/**
+ * 며칠 남았는지.
+ *
+ * <p>목록에서 가장 먼저 보고 싶은 것입니다. 날짜를 읽고 오늘과 견주는 일을
+ * 사람이 하게 두면, 그것만으로 목록을 훑는 데 시간이 걸립니다.
+ *
+ * <p>다녀온 여행에는 안 붙입니다. "D+40" 은 알아서 뭐 하나 싶은 값입니다.
+ */
+function countdownOf(startIso: string | null, endIso: string | null) {
+  if (!startIso) {
+    return null;
+  }
+  const today = todayIso();
+  const end = endIso ?? startIso;
+
+  if (end < today) {
+    return null;
+  }
+  if (startIso <= today) {
+    return <Badge label="여행 중" tone="success" />;
+  }
+
+  const left = daysBetween(today, startIso);
+  return <Badge label={left === 0 ? '내일' : `D-${left}`} tone={left <= 7 ? 'accent' : 'muted'} />;
+}
+
+/** 두 날짜 사이의 날 수. 자정을 기준으로 세므로 시각은 보지 않습니다. */
+function daysBetween(from: string, to: string) {
+  const a = new Date(`${from}T00:00:00`);
+  const b = new Date(`${to}T00:00:00`);
+  return Math.max(0, Math.round((b.getTime() - a.getTime()) / 86_400_000) - 1);
 }
 
 type Section = { title: string; trips: TripSummary[] };

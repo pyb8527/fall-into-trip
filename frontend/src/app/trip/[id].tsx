@@ -11,8 +11,7 @@ import {
 } from 'react-native';
 
 import { api, ApiError, UNEXPECTED } from '@/api/client';
-import type {
-  Day,
+import type { Companion,Day,
   Gap,
   GapOption,
   LivePin,
@@ -38,6 +37,7 @@ import type { Found } from '@/components/map-types';
 import { PlaceSearch } from '@/components/place-search';
 import { RecommendSheet } from '@/components/recommend-sheet';
 import { openDirections, openPlace } from '@/lib/directions';
+import { keepTrip, keptAgo, keptTrip } from '@/lib/keep';
 import { canPrint, printItinerary } from '@/lib/print';
 import { useHere } from '@/lib/here';
 import { decodePolyline } from '@/lib/polyline';
@@ -98,10 +98,33 @@ export default function TripScreen() {
   const router = useRouter();
   const navigation = useNavigation();
   const { user } = useAuth();
-  const { data, error, loading, reload } = useAsync<TripDetail>(
+  const { data: fresh, error, loading, reload } = useAsync<TripDetail>(
     (signal) => api.get(`/api/trip?trip=${encodeURIComponent(id)}`, signal),
     [id],
   );
+
+  /*
+    데이터가 안 터져도 일정은 보여야 합니다.
+
+    지하철, 산속, 로밍이 끊긴 순간 — 정작 일정이 가장 필요한 자리가 그런
+    데입니다. 받아 올 때마다 이 기기에 한 벌 두었다가, 못 받아 오면 그것을
+    꺼냅니다.
+
+    서비스 워커에 맡기지 않습니다. 워커가 API 응답을 담으면 다음 사람에게
+    남의 것이 보일 수 있습니다. 여기서는 사람 번호를 열쇠에 넣고 로그아웃
+    할 때 지웁니다.
+  */
+  useEffect(() => {
+    if (fresh) {
+      keepTrip(user?.id ?? null, id, fresh);
+    }
+  }, [fresh, user?.id, id]);
+
+  const kept = useMemo(
+    () => (fresh || !error ? null : keptTrip(user?.id ?? null, id)),
+    [fresh, error, user?.id, id],
+  );
+  const data = fresh ?? kept?.data ?? null;
 
   const [companions, setCompanions] = useState(false);
   const [publishing, setPublishing] = useState(false);
@@ -149,6 +172,7 @@ export default function TripScreen() {
   }, []);
 
   const [asking, setAsking] = useState(false);
+  const [packing, setPacking] = useState(false);
   const [cloning, setCloning] = useState(false);
   const [planted, setPlanted] = useState(0);
   /** 꽂은 자리에 이미 깃발을 꽂아 두고 있던 동행자. 없으면 null. */
@@ -616,7 +640,9 @@ export default function TripScreen() {
       </Screen>
     );
   }
-  if (error) {
+  /* 저장해 둔 것조차 없을 때만 오류 화면입니다. 있으면 그것을 보여 주고
+     위에 한 줄로 밝힙니다. */
+  if (error && !data) {
     return (
       <Screen>
         <ErrorNote message={error} onRetry={reload} />
@@ -631,7 +657,10 @@ export default function TripScreen() {
     );
   }
 
-  const canEdit = data.myRole === 'EDITOR';
+  /* 저장해 둔 것을 보고 있으면 고치지 못하게 둡니다. 눌러 봐야 서버에
+     닿지 못해 되돌아가는데, 그러면 고쳐진 줄 알았다가 아닌 것을 나중에
+     알게 됩니다. */
+  const canEdit = data.myRole === 'EDITOR' && !kept;
   const shown = activeDay === ALL ? days : days.filter((_, i) => i === activeDay);
   const total = shown.reduce((n, d) => n + d.places.length, 0);
   const done = shown.reduce((n, d) => n + d.places.filter((p) => marks.has(p.id)).length, 0);
@@ -797,6 +826,17 @@ export default function TripScreen() {
             chosenOf={chosenOf}
           />
         }>
+        {/*
+          저장해 둔 것을 새것인 양 보여 주면, 동행자가 어제 고친 것을 못 본
+          채로 옛 가게에 갑니다. 언제 것인지 밝힙니다.
+        */}
+        {kept ? (
+          <Caption tone="warning" strong>
+            지금은 저장해 둔 것을 보고 있습니다({keptAgo(kept.at)} 기준). 고치는 것은 연결된
+            뒤에 됩니다.
+          </Caption>
+        ) : null}
+
         {actionError ? <ErrorNote message={actionError} /> : null}
         {gapError && dayId ? <Caption tone="danger">{gapError}</Caption> : null}
         {me.error ? <Caption tone="danger">{me.error}</Caption> : null}
@@ -881,6 +921,8 @@ export default function TripScreen() {
             label="투표장"
             onPress={() => router.push({ pathname: '/vote/[id]', params: { id } })}
           />
+          {/* 떠나기 전에 서로 "그거 챙겼어?" 를 몇 번씩 묻게 됩니다. */}
+          <Shortcut icon="check" label="챙길 것" onPress={() => setPacking(true)} />
           {/* 여행에서 서로 껄끄러워지는 자리는 돈입니다. 쓴 김에 적어 두면
               돌아와서 카톡을 거슬러 올라갈 일이 없습니다. */}
           <Shortcut
@@ -994,6 +1036,8 @@ export default function TripScreen() {
         onClose={() => setAsking(false)}
         onChanged={refresh}
       />
+
+      <PackSheet visible={packing} tripId={id} onClose={() => setPacking(false)} />
 
       <CloneSheet
         visible={cloning}
@@ -2134,6 +2178,158 @@ function outsideHours(at: string, spans: { start: string; end?: string | null }[
 }
 
 /**
+ * 챙길 것.
+ *
+ * <p>여권, 어댑터, 약, 우산. 떠나기 전에 서로 "그거 챙겼어?" 를 몇 번씩
+ * 묻게 되는 것들입니다.
+ *
+ * <p>누가 챙길지를 함께 적습니다. 그것이 없으면 목록이 "각자 알아서" 가
+ * 되고, 그러면 어댑터가 셋이거나 없거나 둘 중 하나가 됩니다.
+ *
+ * <p>체크는 동행자 누구나 합니다. 맡은 사람만 체크하게 하면 "내 것 체크 좀
+ * 해 줘" 를 부탁하게 됩니다.
+ */
+function PackSheet({
+  visible,
+  tripId,
+  onClose,
+}: {
+  visible: boolean;
+  tripId: string;
+  onClose: () => void;
+}) {
+  const { data, reload } = useAsync<{ items: Packed[] }>(
+    (signal) =>
+      visible ? api.get(`/api/trips/${tripId}/items`, signal) : Promise.resolve({ items: [] }),
+    [tripId, visible],
+  );
+  /* 동행자는 여기서 따로 받습니다. 위 화면이 들고 있는 mates 는 지금 어디
+     있는지를 켜 둔 사람들이라, 안 켠 사람은 빠집니다. */
+  const { data: crew } = useAsync<{ members: Companion[] }>(
+    (signal) =>
+      visible
+        ? api.get(`/api/trips/${tripId}/members`, signal)
+        : Promise.resolve({ members: [] }),
+    [tripId, visible],
+  );
+
+  const [text, setText] = useState('');
+  const [failed, setFailed] = useState<string | null>(null);
+
+  const items = data?.items ?? [];
+  const people = crew?.members ?? [];
+  const done = items.filter((i) => i.done).length;
+
+  async function run(action: () => Promise<unknown>) {
+    setFailed(null);
+    try {
+      await action();
+      reload();
+      return true;
+    } catch (e) {
+      setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
+      return false;
+    }
+  }
+
+  async function add() {
+    const name = text.trim();
+    if (!name) {
+      return;
+    }
+    /* 성공했을 때만 비웁니다. 실패에도 비우면 친 것이 날아갑니다. */
+    if (await run(() => api.post(`/api/trips/${tripId}/items`, { name }))) {
+      setText('');
+    }
+  }
+
+  return (
+    <BottomSheet
+      visible={visible}
+      title="챙길 것"
+      onClose={onClose}
+      footer={
+        <Field
+          label="더 적기"
+          value={text}
+          onChangeText={setText}
+          placeholder="여권, 어댑터, 상비약"
+          returnKeyType="done"
+          onSubmitEditing={add}
+          action={{ icon: 'plus', label: '더 적기', disabled: !text.trim(), onPress: add }}
+        />
+      }>
+      {items.length > 0 ? (
+        <Caption tone={done === items.length ? 'success' : 'secondary'} strong>
+          {done === items.length ? '다 챙겼습니다' : `${done}/${items.length} 챙김`}
+        </Caption>
+      ) : (
+        <Caption tone="secondary">
+          떠나기 전에 서로 "그거 챙겼어?" 를 묻게 되는 것들을 적어 두세요. 누가 챙길지도 함께
+          정하면 어댑터가 셋이 되는 일이 없습니다.
+        </Caption>
+      )}
+
+      {items.map((item) => (
+        <View key={item.id} style={styles.packRow}>
+          <Row gap={Spacing.sm} style={styles.stayRow}>
+            <IconButton
+              name="check"
+              label={item.done ? `${item.name} 안 챙김으로` : `${item.name} 챙김으로`}
+              tone="success"
+              active={item.done}
+              onPress={() => run(() => api.patch(`/api/items/${item.id}`, { done: !item.done }))}
+            />
+            <View style={styles.grow}>
+              <Body small strong={!item.done} tone={item.done ? 'muted' : 'default'}>
+                {item.name}
+              </Body>
+            </View>
+            <IconButton
+              name="trash-2"
+              label={`${item.name} 지우기`}
+              tone="danger"
+              onPress={() => run(() => api.delete(`/api/items/${item.id}`))}
+            />
+          </Row>
+
+          {/* 누가 챙길지. 아무도 안 맡으면 "각자 알아서" 가 됩니다. */}
+          {people.length > 1 ? (
+            <Row gap={Spacing.xs} style={styles.packWho}>
+              {people.map((p) => (
+                <Chip
+                  key={p.id}
+                  label={p.name}
+                  selected={item.ownerId === p.id}
+                  onPress={() =>
+                    run(() =>
+                      api.patch(`/api/items/${item.id}`, {
+                        ownerId: item.ownerId === p.id ? '' : p.id,
+                      }),
+                    )
+                  }
+                />
+              ))}
+            </Row>
+          ) : null}
+        </View>
+      ))}
+
+      {failed ? <ErrorNote message={failed} /> : null}
+    </BottomSheet>
+  );
+}
+
+/** 챙길 것 하나. */
+type Packed = {
+  id: string;
+  name: string;
+  ownerId: string | null;
+  ownerName: string | null;
+  done: boolean;
+};
+
+/**
  * 잘 곳 정하기.
  *
  * <p>장소로 넣지 않습니다. 숙소는 "들르는 곳" 이 아닙니다 — 동선에 끼면
@@ -2324,6 +2520,14 @@ function CloneSheet({
 }
 
 const styles = StyleSheet.create({
+  packRow: {
+    gap: Spacing.xs,
+    paddingVertical: Spacing.xs,
+  },
+  packWho: {
+    flexWrap: 'wrap',
+    paddingLeft: Tap.min,
+  },
   dayExtra: {
     alignItems: 'center',
   },

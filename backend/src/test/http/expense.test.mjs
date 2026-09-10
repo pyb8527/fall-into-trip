@@ -181,5 +181,55 @@ T("정산도 막힌다", r.status === 403 || r.status === 404, r.data);
 r = await call("GET", `/api/trips/${tripId}/expenses`);
 T("로그인 없이는 못 본다", r.status === 401, r.data);
 
+console.log("\n[10] 챙길 것");
+r = await call("GET", `/api/trips/${tripId}/items`, { token: A });
+T("처음에는 비어 있다", r.data.items.length === 0, r.data.items);
+
+r = await call("POST", `/api/trips/${tripId}/items`, { token: A, body: { name: "여권" } });
+T("적힌다", r.status === 200 && !!r.data.id, r.data);
+const passport = r.data.id;
+await call("POST", `/api/trips/${tripId}/items`, { token: B, body: { name: "어댑터", ownerId: bId } });
+
+r = await call("GET", `/api/trips/${tripId}/items`, { token: C });
+T("동행자도 본다", r.data.items.length === 2, r.data.items);
+T("맡은 사람 이름이 온다", r.data.items[1].ownerName === "나", r.data.items[1]);
+T("안 맡은 것은 비어 있다", !r.data.items[0].ownerId, r.data.items[0]);
+
+r = await call("POST", `/api/trips/${tripId}/items`, { token: A, body: { name: "  " } });
+T("빈 이름은 거절", r.status === 400 && /무엇을/.test(r.data.error), r.data);
+r = await call("POST", `/api/trips/${tripId}/items`, { token: A, body: { name: "약", ownerId: "없는사람" } });
+T("동행자가 아니면 거절", r.status === 400 && /동행자/.test(r.data.error), r.data);
+r = await call("POST", `/api/trips/${tripId}/items`, { token: X, body: { name: "남의 것" } });
+T("남은 못 적는다", r.status === 403 || r.status === 404, r.data);
+
+/* 체크는 동행자 누구나 한다. 맡은 사람만 체크하게 하면 "내 것 체크 좀 해 줘"
+   를 부탁하게 된다 */
+r = await call("PATCH", `/api/items/${passport}`, { token: C, body: { done: true } });
+T("남이 아닌 동행자는 체크한다", r.status === 200, r.data);
+r = await call("GET", `/api/trips/${tripId}/items`, { token: A });
+T("체크가 남는다", r.data.items[0].done === true, r.data.items[0]);
+
+r = await call("PATCH", `/api/items/${passport}`, { token: B, body: { ownerId: cId } });
+r = await call("GET", `/api/trips/${tripId}/items`, { token: A });
+T("맡은 사람을 바꾼다", r.data.items[0].ownerName === "다", r.data.items[0]);
+r = await call("PATCH", `/api/items/${passport}`, { token: B, body: { ownerId: "" } });
+r = await call("GET", `/api/trips/${tripId}/items`, { token: A });
+T("빈 값이면 아무도 안 맡은 것으로", !r.data.items[0].ownerId, r.data.items[0]);
+
+r = await call("PATCH", `/api/items/${passport}`, { token: X, body: { done: false } });
+T("남은 못 고친다", r.status === 403 || r.status === 404, r.data);
+r = await call("DELETE", `/api/items/${passport}`, { token: X });
+T("남은 못 지운다", r.status === 403 || r.status === 404, r.data);
+r = await call("DELETE", `/api/items/${passport}`, { token: C });
+T("동행자가 지운다", r.status === 200, r.data);
+r = await call("GET", `/api/trips/${tripId}/items`, { token: A });
+T("사라진다", r.data.items.length === 1, r.data.items);
+
+r = await call("GET", `/api/trips/${tripId}/items`, { token: X });
+T("남은 못 본다", r.status === 403 || r.status === 404, r.data);
+r = await call("GET", `/api/trips/${tripId}/items`);
+T("로그인 없이는 못 본다", r.status === 401, r.data);
+
+
 console.log(`\n결과: ${pass} 통과 / ${fail} 실패`);
 process.exit(fail ? 1 : 0);

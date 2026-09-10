@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 
 import { api, refreshSession, request, setAccessToken, setSessionEndedHandler } from '@/api/client';
 import type { AuthState, TokenResponse, User } from '@/api/types';
+import { forgetTrips } from '@/lib/keep';
 
 /**
  * 로그인 상태.
@@ -48,6 +49,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const clear = useCallback(() => {
     setAccessToken(null);
     setUser(null);
+    /* 이 기기에 저장해 둔 일정도 함께 지웁니다. 남의 폰을 빌려 잠깐
+       로그인하는 일이 있고, 나간 뒤에 내 일정이 그 폰에 남아 있으면
+       안 됩니다. */
+    forgetTrips();
   }, []);
 
   /* 토큰이 끝내 되살아나지 않으면 화면에서도 로그아웃 상태가 돼야 합니다. */
