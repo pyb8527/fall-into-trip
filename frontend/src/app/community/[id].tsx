@@ -277,7 +277,6 @@ export default function Post() {
           {data.viewCount.toLocaleString()}
           {data.feedback ? ` · 댓글 ${data.commentCount}` : ''}
         </Caption>
-        {data.feedback ? <Badge label="댓글 환영" tone="accent" /> : null}
       </View>
 
       {notice ? <Body tone="success">{notice}</Body> : null}
@@ -500,8 +499,10 @@ function DayBlock({
             scale={0.99}
             accessibilityLabel={`${place.name} 지도에서 보기`}
             style={styles.placeTap}>
-          <View style={[styles.order, { backgroundColor: color }]}>
-            <Body small strong style={styles.orderText}>
+          {/* 같은 이유로 여기도 상자를 걷습니다. 날짜는 위 제목 줄의
+              점이 말하고 있습니다. */}
+          <View style={styles.order}>
+            <Body small style={styles.orderText}>
               {iconOf(place.icon) || i + 1}
             </Body>
           </View>
@@ -698,13 +699,9 @@ const styles = StyleSheet.create({
   },
   order: {
     width: 22,
-    height: 22,
-    borderRadius: 0,
     alignItems: 'center',
-    justifyContent: 'center',
   },
   orderText: {
-    /* 날짜 색이 파스텔이라 흰 글자는 읽히지 않습니다. 짙게 씁니다. */
-    color: Colors.onDay,
+    color: Colors.textMuted,
   },
 });

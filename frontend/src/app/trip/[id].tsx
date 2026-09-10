@@ -1785,23 +1785,26 @@ function PlaceRow({
         <Row gap={0} style={styles.placeTop}>
         <Pressable onPress={onFocus} style={styles.placeTap}>
           <View style={styles.placeMain}>
-            {/* 지도 핀과 같은 것이 찍힙니다. 목록과 지도를 눈으로 잇는 고리라
-                양쪽이 반드시 같아야 합니다. */}
-            <View
-              style={[
-                styles.order,
-                { backgroundColor: visited ? color : 'transparent', borderColor: color },
-              ]}>
+            {/*
+              그림 하나, 또는 번호 하나.
+
+              전에는 여기에 날짜 색 테두리를 두르고 다녀온 곳은 속을
+              채웠습니다. 둘 다 아무것도 말하지 않고 있었습니다 — 하루
+              카드 안에서는 모든 줄이 같은 날이라 색이 늘 같고, 다녀왔다는
+              것은 줄 끝의 체크가 이미 말합니다.
+
+              남은 것은 테두리 스물여덟 개뿐이었습니다. 걷어 냅니다. 자리
+              너비는 그대로 두어 이름들이 한 줄로 섭니다.
+            */}
+            <View style={styles.order}>
               {emoji ? (
                 <Body small style={styles.orderEmoji}>
                   {emoji}
                 </Body>
               ) : (
-                /* 다녀온 곳은 속이 날짜 색으로 차 있어 흰 글자, 아직인 곳은
-                   속이 비어 있어 짙은 글자. */
-                <Body small strong style={{ color: visited ? Colors.onDay : Colors.text }}>
+                <Caption tone={visited ? 'muted' : 'default'} strong>
                   {order}
-                </Body>
+                </Caption>
               )}
             </View>
 
@@ -2726,13 +2729,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.accentSoft,
   },
   order: {
-    width: 28,
-    height: 28,
-    borderRadius: Radius.none,
-    borderWidth: 1.5,
+    width: 24,
     alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 2,
+    marginTop: 3,
   },
   orderEmoji: {
     /* 이모지는 글꼴이 제 높이를 갖고 있어, 줄 높이를 두면 아래로 처집니다. */

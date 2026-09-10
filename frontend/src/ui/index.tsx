@@ -1707,6 +1707,15 @@ const styles = StyleSheet.create({
     /* 자리를 미리 잡아 둡니다. 굵어질 때 글자가 밀리지 않게. */
     borderBottomWidth: 1.5,
     borderBottomColor: Colors.border,
+    /*
+      웹에서 칸을 누르면 브라우저가 제 테두리를 사각으로 둘러 줍니다.
+      밑줄만 남기려고 상자를 걷었는데 손이 닿는 순간 그 상자가 도로
+      나타났습니다.
+
+      끄고, 대신 밑줄이 검게 굵어지는 것으로 대신합니다. 자판만 쓰는
+      사람에게도 지금 어느 칸에 있는지가 그대로 보입니다.
+    */
+    outlineWidth: 0,
   },
   inputWithAction: {
     paddingRight: Tap.min,

@@ -53,10 +53,10 @@ export default function Home() {
           {user?.name ? (
             <>
               <Title tone="accent">{user.name}</Title>
-              {' 님, 오늘은 어디에 반해 볼까요?'}
+              {' 님, 어디로 떠나 볼까요?'}
             </>
           ) : (
-            '오늘은 어디에 반해 볼까요?'
+            '어디로 떠나 볼까요?'
           )}
         </Title>
       </View>
