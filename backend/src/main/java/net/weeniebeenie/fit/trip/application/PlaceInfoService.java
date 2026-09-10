@@ -144,6 +144,26 @@ public class PlaceInfoService {
         return out;
     }
 
+    /**
+     * 번호 하나로 그 장소의 그날 사정을 봅니다.
+     *
+     * <p>추천이 씁니다. 일정에 아직 없는 곳이라 {@link #ofDay} 로는 닿지
+     * 않습니다.
+     *
+     * <p>권한을 보지 않습니다 — 구글에 공개된 가게 정보이고, 어느 여행에도
+     * 매여 있지 않습니다. 대신 이 자리로 오는 길(추천)은 이미 그 여행을 볼
+     * 수 있는 사람만 지나갑니다.
+     *
+     * @param on 그날. 없으면 그 장소가 있는 곳의 오늘로 봅니다.
+     */
+    public Info about(String googleId, LocalDate on) {
+        if (!enabled() || googleId == null || googleId.isBlank()) {
+            return null;
+        }
+        Raw raw = lookup(googleId);
+        return raw == null ? null : viewOf(googleId, raw, on);
+    }
+
     private Raw lookup(String googleId) {
         Cached hit = cache.get(googleId);
         if (hit != null && hit.until().isAfter(Instant.now())) {

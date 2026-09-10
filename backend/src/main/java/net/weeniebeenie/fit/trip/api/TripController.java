@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import net.weeniebeenie.fit.account.infrastructure.security.AuthPrincipal;
 import net.weeniebeenie.fit.account.infrastructure.security.CurrentUser;
 import net.weeniebeenie.fit.trip.api.dto.TripDtos;
+import net.weeniebeenie.fit.trip.application.RecommendService;
 import net.weeniebeenie.fit.trip.api.dto.TripDtos.*;
 import net.weeniebeenie.fit.trip.application.TripQueryService;
 import net.weeniebeenie.fit.trip.application.FolderService;
@@ -25,6 +26,7 @@ public class TripController {
     private final FolderService folders;
     private final TripQueryService query;
     private final ObjectMapper mapper;
+    private final RecommendService recommend;
 
     /** 내가 볼 수 있는 여행 목록. */
     @GetMapping("/trips")
@@ -56,6 +58,41 @@ public class TripController {
                                     @Valid @RequestBody DuplicateTripRequest req) {
         Trip made = trips.duplicate(me, id, req.title(), req.startIso());
         return Map.of("trip", TripView.of(made));
+    }
+
+    /**
+     * 말로 묻고 갈 곳을 받습니다.
+     *
+     * <p>지금 어디 있는지를 <b>본문</b>으로 받습니다. 주소에 실으면 nginx 접근
+     * 기록과 브라우저 방문 기록에 남습니다 — 사람이 어디 있었는지는 거기 남길
+     * 값이 아닙니다.
+     *
+     * <p>물어본 문장도 기록에 남기지 않습니다. "혼자 울기 좋은 곳" 이 로그에
+     * 남을 이유가 없습니다.
+     */
+    @PostMapping("/trips/{id}/recommend")
+    public Map<String, Object> recommend(@CurrentUser AuthPrincipal me,
+                                         @PathVariable String id,
+                                         @RequestBody RecommendRequest req) {
+        RecommendService.Result got = recommend.recommend(
+                me, id, req.query(), req.dayId(),
+                req.here() == null ? null : req.here().lat(),
+                req.here() == null ? null : req.here().lng(),
+                req.intent());
+        Map<String, Object> out = new java.util.HashMap<>();
+        out.put("places", got.places());
+        out.put("note", got.note());
+        return out;
+    }
+
+    /**
+     * @param intent 기기 안의 모델이 문장을 미리 쪼개 온 것. 웹에서는 늘
+     *               비어 있습니다 — 거기에는 모델이 없습니다.
+     */
+    public record RecommendRequest(String query, String dayId, At here,
+                                   RecommendService.Intent intent) {
+        public record At(Double lat, Double lng) {
+        }
     }
 
     @PatchMapping("/trips/{id}")

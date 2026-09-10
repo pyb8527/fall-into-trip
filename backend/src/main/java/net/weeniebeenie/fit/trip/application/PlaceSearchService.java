@@ -52,6 +52,23 @@ public class PlaceSearchService {
     }
 
     public List<Found> search(String query) {
+        return search(query, null, null, null);
+    }
+
+    /**
+     * 어느 언저리에서 찾을지를 함께 일러 줍니다.
+     *
+     * <p>"조용한 카페" 만으로는 구글이 어디 카페인지 모릅니다. 서울에서 짜는
+     * 오사카 일정에 서울 카페가 올라옵니다. 여행에 이미 꽂힌 핀들의 한가운데를
+     * 넘겨 주면 그 언저리에서 찾습니다.
+     *
+     * <p>가운데를 모르면(아직 아무것도 안 넣은 여행) 그냥 넘어갑니다. 억지로
+     * 어딘가를 찍는 것보다 넓게 찾는 편이 낫습니다.
+     *
+     * @param radiusM 반경(미터). 이 밖도 나올 수 있습니다 — 구글에게 이것은
+     *                울타리가 아니라 기울기입니다.
+     */
+    public List<Found> search(String query, Double lat, Double lng, Integer radiusM) {
         String q = query == null ? "" : query.trim();
         if (q.isEmpty()) {
             return List.of();
@@ -63,11 +80,17 @@ public class PlaceSearchService {
         JsonNode body;
         try {
             body = client.get()
-                    .uri(uri -> uri.path("/maps/api/place/textsearch/json")
-                            .queryParam("query", q)
-                            .queryParam("language", "ko")
-                            .queryParam("key", key)
-                            .build())
+                    .uri(uri -> {
+                        uri.path("/maps/api/place/textsearch/json")
+                                .queryParam("query", q)
+                                .queryParam("language", "ko")
+                                .queryParam("key", key);
+                        if (lat != null && lng != null) {
+                            uri.queryParam("location", lat + "," + lng);
+                            uri.queryParam("radius", radiusM == null ? 20000 : radiusM);
+                        }
+                        return uri.build();
+                    })
                     .retrieve()
                     .body(JsonNode.class);
         } catch (Exception e) {
@@ -112,7 +135,11 @@ public class PlaceSearchService {
                     at.path("lat").asDouble(),
                     at.path("lng").asDouble(),
                     r.path("place_id").asText(null),
-                    PlaceKind.guess(types, name)));
+                    PlaceKind.guess(types, name),
+                    /* 평점은 검색 응답에 이미 딸려 옵니다. 이것 때문에 장소마다
+                       한 번 더 물어볼 이유가 없습니다. */
+                    r.hasNonNull("rating") ? r.path("rating").asDouble() : null,
+                    r.hasNonNull("user_ratings_total") ? r.path("user_ratings_total").asInt() : null));
             if (out.size() >= LIMIT) {
                 break;
             }
@@ -126,6 +153,6 @@ public class PlaceSearchService {
      *                필요할 때마다 이 번호로 다시 물어봅니다.
      */
     public record Found(String name, String address, double lat, double lng, String placeId,
-                        String icon) {
+                        String icon, Double rating, Integer ratingCount) {
     }
 }

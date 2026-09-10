@@ -34,6 +34,7 @@ import { TripMap, type MapPlace } from '@/components/trip-map';
 import { iconOf } from '@/constants/place-icons';
 import { faceOf } from '@/constants/user-marks';
 import { metersBetween, SAME_SPOT } from '@/lib/geo';
+import { RecommendSheet } from '@/components/recommend-sheet';
 import { openDirections } from '@/lib/directions';
 import { canPrint, printItinerary } from '@/lib/print';
 import { useHere } from '@/lib/here';
@@ -145,6 +146,7 @@ export default function TripScreen() {
     sheet.current?.reveal(rowNodes.current.get(placeId));
   }, []);
 
+  const [asking, setAsking] = useState(false);
   const [cloning, setCloning] = useState(false);
   const [planted, setPlanted] = useState(0);
   /** 꽂은 자리에 이미 깃발을 꽂아 두고 있던 동행자. 없으면 null. */
@@ -858,6 +860,12 @@ export default function TripScreen() {
           줄도 모르고 지나갔습니다. 판을 열면 바로 보이는 자리로 올립니다.
         */}
         <Row gap={Spacing.xs} style={styles.shortcuts}>
+          {/* 갈 곳의 이름을 알아야만 넣을 수 있었습니다. "비 올 때 갈 만한
+              실내" 는 적을 데가 없어서, 블로그를 뒤져 이름을 알아낸 다음에야
+              여기로 돌아와야 했습니다. */}
+          {canEdit ? (
+            <Shortcut icon="search" label="어디 갈까" onPress={() => setAsking(true)} />
+          ) : null}
           {/* 길 위에서는 짜는 화면이 방해입니다. 지금 갈 곳만 크게 보는 쪽으로
               넘어갑니다. */}
           <Shortcut
@@ -949,6 +957,19 @@ export default function TripScreen() {
           </>
         ) : null}
       </DragSheet>
+
+      <RecommendSheet
+        visible={asking}
+        tripId={id}
+        /* 날짜를 하나 골라 보고 있으면 그 날 기준으로 묻습니다. 전체를 보고
+           있으면 날짜를 안 넘깁니다 — 아무 날이나 골라 주면 그 날 휴무를
+           엉뚱한 날의 사실로 읽게 됩니다. */
+        dayId={dayIndex >= 0 ? (days[dayIndex]?.id ?? null) : null}
+        dayLabel={dayIndex >= 0 ? (days[dayIndex]?.date || days[dayIndex]?.label || null) : null}
+        here={me.here}
+        onClose={() => setAsking(false)}
+        onChanged={refresh}
+      />
 
       <CloneSheet
         visible={cloning}
