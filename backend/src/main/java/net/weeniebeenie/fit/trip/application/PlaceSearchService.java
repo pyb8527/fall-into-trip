@@ -6,10 +6,14 @@ import net.weeniebeenie.fit.shared.error.ApiException;
 import net.weeniebeenie.fit.trip.domain.PlaceKind;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.http.MediaType;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 이름으로 장소를 찾습니다.
@@ -34,8 +38,26 @@ public class PlaceSearchService {
     /** 한 번에 돌려줄 개수. 더 많이 보여 줘도 고르기만 어려워집니다. */
     private static final int LIMIT = 6;
 
+    /**
+     * 달라고 할 것.
+     *
+     * <p>새 API 는 무엇을 달라고 했는지에 따라 요금 등급이 갈립니다. 넓게
+     * 적으면 비싼 쪽으로 넘어가므로 화면이 실제로 쓰는 것만 적습니다.
+     *
+     * <p>사진과 후기는 넣지 않습니다 — 그쪽은 글쓴이 이름과 프로필을 함께
+     * 띄워야 하는 별도의 의무가 따라붙습니다.
+     */
+    private static final String FIELDS = String.join(",",
+            "places.id",
+            "places.displayName",
+            "places.formattedAddress",
+            "places.location",
+            "places.types",
+            "places.rating",
+            "places.userRatingCount");
+
     private final RestClient client = RestClient.builder()
-            .baseUrl("https://maps.googleapis.com")
+            .baseUrl("https://places.googleapis.com")
             .build();
 
     /**
@@ -77,25 +99,51 @@ public class PlaceSearchService {
             throw ApiException.badRequest("장소 검색이 꺼져 있습니다. 좌표를 직접 넣어 주세요.");
         }
 
+        /*
+          찾을 것과 어디쯤인지를 몸통에 실어 보냅니다.
+
+          옛 API 는 이것을 주소에 붙였는데, 새 API 는 POST 로 받습니다. 찾는
+          말이 주소에 실리지 않는 편이 낫기도 합니다 — 중간의 기록에 남지
+          않습니다.
+         */
+        Map<String, Object> ask = new LinkedHashMap<>();
+        ask.put("textQuery", q);
+        ask.put("languageCode", "ko");
+        ask.put("maxResultCount", LIMIT);
+        if (lat != null && lng != null) {
+            /* 울타리가 아니라 기울기입니다 — 이 밖의 곳도 나올 수 있고,
+               나와야 합니다. 근교의 온천처럼 일부러 멀리 나가는 곳이 있습니다. */
+            ask.put("locationBias", Map.of("circle", Map.of(
+                    "center", Map.of("latitude", lat, "longitude", lng),
+                    "radius", (double) (radiusM == null ? 20000 : radiusM))));
+        }
+
         JsonNode body;
         try {
-            body = client.get()
-                    .uri(uri -> {
-                        uri.path("/maps/api/place/textsearch/json")
-                                .queryParam("query", q)
-                                .queryParam("language", "ko")
-                                .queryParam("key", key);
-                        if (lat != null && lng != null) {
-                            uri.queryParam("location", lat + "," + lng);
-                            uri.queryParam("radius", radiusM == null ? 20000 : radiusM);
-                        }
-                        return uri.build();
-                    })
+            body = client.post()
+                    .uri("/v1/places:searchText")
+                    .header("X-Goog-Api-Key", key)
+                    .header("X-Goog-FieldMask", FIELDS)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(ask)
                     .retrieve()
                     .body(JsonNode.class);
+        } catch (RestClientResponseException e) {
+            /*
+              왜 거절했는지는 본문에 적혀 있습니다.
+
+              이것을 버리면 "못 찾았습니다" 만 남아, 키가 잘못된 것인지
+              콘솔에서 이 API 를 안 켠 것인지 알 길이 없습니다. 옛 API 에서
+              옮겨 온 뒤 가장 흔한 것이 바로 그 "안 켬" 입니다.
+             */
+            String why = e.getResponseBodyAsString();
+            log.warn("장소 검색이 거절됐습니다 ({}): {}", e.getStatusCode(),
+                    why.length() > 300 ? why.substring(0, 300) : why);
+            throw new ApiException(org.springframework.http.HttpStatus.BAD_GATEWAY,
+                    "장소 검색을 쓸 수 없습니다. 좌표를 직접 넣어 주세요.");
         } catch (Exception e) {
             /* 구글이 느리거나 막혔습니다. 우리 잘못이 아니라는 것만 알려 줍니다. */
-            log.warn("장소 검색 요청이 실패했습니다: {}", q, e);
+            log.warn("장소 검색 요청이 실패했습니다: {}", e.getMessage());
             throw new ApiException(org.springframework.http.HttpStatus.BAD_GATEWAY,
                     "장소를 찾지 못했습니다. 잠시 뒤 다시 시도해 주세요.");
         }
@@ -103,26 +151,16 @@ public class PlaceSearchService {
         if (body == null) {
             return List.of();
         }
-        String status = body.path("status").asText("");
-        if ("ZERO_RESULTS".equals(status)) {
-            return List.of();
-        }
-        if (!"OK".equals(status)) {
-            /* 상태 코드를 그대로 보여 주면 쓰는 사람은 무슨 말인지 모릅니다.
-               자세한 것은 로그에만 남기고, 화면에는 다음에 할 일만 말합니다. */
-            log.warn("장소 검색이 거절됐습니다: status={} message={}",
-                    status, body.path("error_message").asText(""));
-            throw new ApiException(org.springframework.http.HttpStatus.BAD_GATEWAY,
-                    "장소 검색을 쓸 수 없습니다. 좌표를 직접 넣어 주세요.");
-        }
 
+        /* 새 API 는 status 를 보내지 않습니다. 찾은 것이 없으면 places 가
+           아예 없습니다 — 그것이 옛 ZERO_RESULTS 자리입니다. */
         List<Found> out = new ArrayList<>();
-        for (JsonNode r : body.path("results")) {
-            JsonNode at = r.path("geometry").path("location");
-            if (!at.hasNonNull("lat") || !at.hasNonNull("lng")) {
+        for (JsonNode r : body.path("places")) {
+            JsonNode at = r.path("location");
+            if (!at.hasNonNull("latitude") || !at.hasNonNull("longitude")) {
                 continue;
             }
-            String name = r.path("name").asText(q);
+            String name = r.path("displayName").path("text").asText(q);
             /* 갈래는 검색 결과에 이미 딸려 옵니다. 이것으로 핀 그림을 미리
                찍어 두면 구글을 한 번도 더 부르지 않고 지도가 알아봅니다. */
             List<String> types = new ArrayList<>();
@@ -131,15 +169,15 @@ public class PlaceSearchService {
             }
             out.add(new Found(
                     name,
-                    r.path("formatted_address").asText(""),
-                    at.path("lat").asDouble(),
-                    at.path("lng").asDouble(),
-                    r.path("place_id").asText(null),
+                    r.path("formattedAddress").asText(""),
+                    at.path("latitude").asDouble(),
+                    at.path("longitude").asDouble(),
+                    r.path("id").asText(null),
                     PlaceKind.guess(types, name),
                     /* 평점은 검색 응답에 이미 딸려 옵니다. 이것 때문에 장소마다
                        한 번 더 물어볼 이유가 없습니다. */
                     r.hasNonNull("rating") ? r.path("rating").asDouble() : null,
-                    r.hasNonNull("user_ratings_total") ? r.path("user_ratings_total").asInt() : null));
+                    r.hasNonNull("userRatingCount") ? r.path("userRatingCount").asInt() : null));
             if (out.size() >= LIMIT) {
                 break;
             }

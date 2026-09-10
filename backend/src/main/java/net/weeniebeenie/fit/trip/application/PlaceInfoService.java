@@ -13,6 +13,7 @@ import net.weeniebeenie.fit.trip.domain.TripAccessPolicy;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -74,22 +75,22 @@ public class PlaceInfoService {
      * 나라마다 표기가 달라 깨집니다.
      */
     private static final String FIELDS = String.join(",",
-            "opening_hours/weekday_text",
-            "opening_hours/periods",
-            "utc_offset_minutes",
-            "formatted_phone_number",
-            "website",
+            "regularOpeningHours.weekdayDescriptions",
+            "regularOpeningHours.periods",
+            "utcOffsetMinutes",
+            "nationalPhoneNumber",
+            "websiteUri",
             "rating",
-            "user_ratings_total",
-            "business_status",
-            "url");
+            "userRatingCount",
+            "businessStatus",
+            "googleMapsUri");
 
     private final TripAccessPolicy access;
     private final DayRepository days;
     private final PlaceRepository places;
 
     private final RestClient client = RestClient.builder()
-            .baseUrl("https://maps.googleapis.com")
+            .baseUrl("https://places.googleapis.com")
             .build();
 
     @Value("${fit.google.maps-key:}")
@@ -222,49 +223,48 @@ public class PlaceInfoService {
     }
 
     private Raw ask(String googleId) {
-        JsonNode body;
+        JsonNode r;
         try {
-            body = client.get()
-                    .uri(uri -> uri.path("/maps/api/place/details/json")
-                            .queryParam("place_id", googleId)
-                            .queryParam("fields", FIELDS)
-                            .queryParam("language", "ko")
-                            .queryParam("key", key)
-                            .build())
+            r = client.get()
+                    .uri(uri -> uri.path("/v1/places/{id}")
+                            .queryParam("languageCode", "ko")
+                            .build(googleId))
+                    .header("X-Goog-Api-Key", key)
+                    .header("X-Goog-FieldMask", FIELDS)
                     .retrieve()
                     .body(JsonNode.class);
+        } catch (RestClientResponseException e) {
+            /* 왜 거절했는지는 본문에 적혀 있습니다. 이것을 버리면 콘솔에서
+               이 API 를 안 켠 것인지 알 길이 없습니다. */
+            String why = e.getResponseBodyAsString();
+            log.warn("장소 정보가 거절됐습니다 ({}): {}", e.getStatusCode(),
+                    why.length() > 300 ? why.substring(0, 300) : why);
+            return null;
         } catch (Exception e) {
             /* 한 곳을 못 받았다고 하루 전체를 막을 이유는 없습니다. */
             log.warn("장소 정보를 받지 못했습니다: {}", e.getMessage());
             return null;
         }
 
-        if (body == null) {
-            return null;
-        }
-        String status = body.path("status").asText("");
-        if (!"OK".equals(status)) {
-            log.warn("장소 정보가 거절됐습니다: status={} message={}",
-                    status, body.path("error_message").asText(""));
+        if (r == null) {
             return null;
         }
 
-        JsonNode r = body.path("result");
         List<String> hours = new ArrayList<>();
-        for (JsonNode line : r.path("opening_hours").path("weekday_text")) {
+        for (JsonNode line : r.path("regularOpeningHours").path("weekdayDescriptions")) {
             hours.add(line.asText());
         }
 
         return new Raw(
                 hours,
-                spansOf(r.path("opening_hours").path("periods")),
-                r.hasNonNull("utc_offset_minutes") ? r.path("utc_offset_minutes").asInt() : null,
-                text(r, "formatted_phone_number"),
-                text(r, "website"),
+                spansOf(r.path("regularOpeningHours").path("periods")),
+                r.hasNonNull("utcOffsetMinutes") ? r.path("utcOffsetMinutes").asInt() : null,
+                text(r, "nationalPhoneNumber"),
+                text(r, "websiteUri"),
                 r.hasNonNull("rating") ? r.path("rating").asDouble() : null,
-                r.hasNonNull("user_ratings_total") ? r.path("user_ratings_total").asInt() : null,
-                "CLOSED_PERMANENTLY".equals(r.path("business_status").asText("")),
-                text(r, "url"));
+                r.hasNonNull("userRatingCount") ? r.path("userRatingCount").asInt() : null,
+                "CLOSED_PERMANENTLY".equals(r.path("businessStatus").asText("")),
+                text(r, "googleMapsUri"));
     }
 
     /**
@@ -280,23 +280,28 @@ public class PlaceInfoService {
         Map<Integer, List<Span>> byDay = new LinkedHashMap<>();
         for (JsonNode period : periods) {
             JsonNode open = period.path("open");
-            if (!open.hasNonNull("day") || !open.hasNonNull("time")) {
+            if (!open.hasNonNull("day") || !open.hasNonNull("hour")) {
                 continue;
             }
             /* 닫는 시각이 없으면 24시간 영업입니다. */
-            String close = period.path("close").path("time").asText(null);
+            JsonNode close = period.path("close");
             byDay.computeIfAbsent(open.path("day").asInt(), d -> new ArrayList<>())
-                    .add(new Span(clock(open.path("time").asText()), clock(close)));
+                    .add(new Span(clock(open), close.hasNonNull("hour") ? clock(close) : null));
         }
         return byDay;
     }
 
-    /** 구글은 "1130" 처럼 붙여 보냅니다. 사람이 읽는 모양으로 바꿉니다. */
-    private static String clock(String raw) {
-        if (raw == null || raw.length() != 4) {
-            return null;
-        }
-        return raw.substring(0, 2) + ":" + raw.substring(2);
+    /**
+     * 시각을 사람이 읽는 모양으로.
+     *
+     * <p>옛 API 는 "1130" 처럼 붙여 보냈고 새 API 는 시와 분을 숫자로 따로
+     * 보냅니다. 자리를 맞춰 붙이면 됩니다 — 잘라 붙이던 것보다 오히려
+     * 튼튼합니다. 세 자리로 오던 것에 걸려 넘어지지 않습니다.
+     */
+    private static String clock(JsonNode at) {
+        int hour = at.path("hour").asInt();
+        int minute = at.path("minute").asInt();
+        return String.format("%02d:%02d", hour, minute);
     }
 
     private static String text(JsonNode node, String field) {
