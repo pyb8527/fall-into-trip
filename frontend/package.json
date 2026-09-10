@@ -15,6 +15,7 @@
   "dependencies": {
     "@expo/vector-icons": "^15.1.1",
     "@kesha-antonov/react-native-background-downloader": "^4.6.2",
+    "@mlc-ai/web-llm": "^0.2.85",
     "@react-native-community/datetimepicker": "^9.1.0",
     "expo": "~57.0.20",
     "expo-build-properties": "~57.0.17",

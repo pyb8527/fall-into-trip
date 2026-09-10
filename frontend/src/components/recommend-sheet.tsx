@@ -4,7 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import { api, ApiError, UNEXPECTED } from '@/api/client';
 import { iconOf } from '@/constants/place-icons';
 import type { IntentState } from '@/lib/intent-types';
-import { canParseHere, fetchModel, intentState, parseIntent } from '@/lib/intent';
+import { canParseHere, fetchModel, intentState, modelNote, parseIntent } from '@/lib/intent';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import {
   Badge,
@@ -169,8 +169,8 @@ export function RecommendSheet({
           <Row gap={Spacing.sm} style={styles.brain}>
             <View style={styles.grow}>
               <Caption tone="secondary">
-                지금은 물어본 문장이 서버를 거쳐 구글로 갑니다. 기기 안에서 먼저 추리게 하면
-                문장은 폰 밖으로 나가지 않습니다. 한 번만 받으면 됩니다(약 1GB).
+                지금은 물어본 문장이 서버를 거쳐 구글로 갑니다. 여기서 먼저 추리게 하면 문장은
+                이 기기 밖으로 나가지 않습니다. {modelNote()}
               </Caption>
             </View>
             <Button label="받기" variant="ghost" compact onPress={pullModel} />
@@ -179,7 +179,7 @@ export function RecommendSheet({
       ) : null}
 
       {canParseHere && brain === 'ready' ? (
-        <Caption tone="success">이 문장은 폰 밖으로 나가지 않습니다.</Caption>
+        <Caption tone="success">이 문장은 이 기기 밖으로 나가지 않습니다.</Caption>
       ) : null}
 
       {busy ? <Loading label="찾는 중" /> : null}
