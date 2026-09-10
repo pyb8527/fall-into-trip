@@ -241,7 +241,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.md,
     backgroundColor: Colors.accentSoft,
-    borderRadius: Radius.md,
+    borderRadius: Radius.none,
     padding: Spacing.lg,
   },
   spotText: {

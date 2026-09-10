@@ -49,7 +49,7 @@ export default function Document({ children }: PropsWithChildren) {
           그쪽은 "공유 → 홈 화면에 추가" 로만 됩니다.
         */}
         <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#FAFAFA" />
+        <meta name="theme-color" content="#FFFFFF" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="FIT" />

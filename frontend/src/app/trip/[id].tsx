@@ -2631,7 +2631,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: Spacing.xs,
     paddingVertical: Spacing.md,
-    borderRadius: Radius.lg,
+    borderRadius: Radius.none,
     backgroundColor: Colors.fill,
   },
   live: {
@@ -2648,13 +2648,13 @@ const styles = StyleSheet.create({
   },
   track: {
     height: 5,
-    borderRadius: Radius.full,
+    borderRadius: Radius.none,
     backgroundColor: Colors.fill,
     overflow: 'hidden',
   },
   fill: {
     height: '100%',
-    borderRadius: Radius.full,
+    borderRadius: Radius.none,
   },
 
   dayTap: {
@@ -2673,14 +2673,14 @@ const styles = StyleSheet.create({
   dayDot: {
     width: 10,
     height: 10,
-    borderRadius: Radius.full,
+    borderRadius: Radius.none,
   },
 
   places: {
     gap: Spacing.xs,
   },
   place: {
-    borderRadius: Radius.lg,
+    borderRadius: Radius.none,
     borderWidth: 1.5,
     borderColor: 'transparent',
     overflow: 'hidden',
@@ -2704,7 +2704,7 @@ const styles = StyleSheet.create({
   /* 여기로 들어간다는 표시. */
   landing: {
     height: 2,
-    borderRadius: Radius.full,
+    borderRadius: Radius.none,
     marginBottom: Spacing.xs,
   },
   placeTop: {
@@ -2717,7 +2717,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: Spacing.sm,
-    borderRadius: Radius.md,
+    borderRadius: Radius.none,
     /* 브라우저가 이 자리에서 화면을 굴리지 않게 합니다. 안 막으면 손잡이를
        끌어도 목록만 위아래로 움직입니다. */
     touchAction: 'none',
@@ -2728,7 +2728,7 @@ const styles = StyleSheet.create({
   order: {
     width: 28,
     height: 28,
-    borderRadius: Radius.full,
+    borderRadius: Radius.none,
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
@@ -2767,7 +2767,7 @@ const styles = StyleSheet.create({
     /* 셋이 폭 360 인 폰에서도 한 줄에 서야 합니다. 이보다 넓게 잡으면
        마지막 하나가 아래로 접혀 비교가 안 됩니다. */
     flexBasis: 76,
-    borderRadius: Radius.md,
+    borderRadius: Radius.none,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: Colors.border,
     backgroundColor: Colors.fill,

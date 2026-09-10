@@ -5,16 +5,7 @@ import { StyleSheet, View } from 'react-native';
 import { ApiError, UNEXPECTED } from '@/api/client';
 import { useAuth } from '@/auth/auth-provider';
 import { Spacing } from '@/constants/theme';
-import {
-  Body,
-  Button,
-  Card,
-  ErrorNote,
-  Field,
-  Screen,
-  SegmentedTabs,
-  Title,
-} from '@/ui';
+import { Body, Button, ErrorNote, Field, Screen, SegmentedTabs, Title } from '@/ui';
 import { LogoLockup } from '@/ui/logo';
 
 /** 서버의 AuthService.PASSWORD_MIN 과 같아야 합니다. */
@@ -129,7 +120,8 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
         </Body>
       </View>
 
-      <Card>
+      {/* 칸이 줄로 바뀌었으니 그것을 다시 상자에 담지 않습니다. */}
+      <View style={styles.form}>
         <Field
           label="이메일"
           value={email}
@@ -172,18 +164,22 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
           onPress={submit}
           busy={busy}
         />
-      </Card>
+      </View>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   brand: {
-    alignItems: 'center',
+    alignItems: 'flex-start',
     paddingTop: Spacing.xxl,
-    paddingBottom: Spacing.sm,
+    paddingBottom: Spacing.lg,
   },
   head: {
     gap: Spacing.sm,
+  },
+  form: {
+    gap: Spacing.xl,
+    paddingTop: Spacing.sm,
   },
 });

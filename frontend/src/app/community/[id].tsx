@@ -658,7 +658,7 @@ const styles = StyleSheet.create({
   },
   thumb: {
     width: '100%',
-    borderRadius: Radius.lg,
+    borderRadius: Radius.none,
     backgroundColor: Colors.fill,
   },
   grow: {
@@ -670,12 +670,12 @@ const styles = StyleSheet.create({
   dot: {
     width: 10,
     height: 10,
-    borderRadius: 5,
+    borderRadius: 0,
   },
   place: {
     alignItems: 'flex-start',
     flexWrap: 'nowrap',
-    borderRadius: Radius.md,
+    borderRadius: Radius.none,
     borderWidth: 1.5,
     borderColor: 'transparent',
   },
@@ -699,7 +699,7 @@ const styles = StyleSheet.create({
   order: {
     width: 22,
     height: 22,
-    borderRadius: 11,
+    borderRadius: 0,
     alignItems: 'center',
     justifyContent: 'center',
   },

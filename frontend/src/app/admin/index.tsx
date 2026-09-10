@@ -132,7 +132,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     flexBasis: 80,
     backgroundColor: Colors.fill,
-    borderRadius: Radius.md,
+    borderRadius: Radius.none,
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.lg,
     gap: Spacing.xs,

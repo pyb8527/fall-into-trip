@@ -18,104 +18,87 @@ import { Platform } from 'react-native';
 /* ------------------------------------------------------------------- 색 */
 
 /**
- * 흰 종이와 바이올렛.
+ * 검정과 흰색, 그리고 그 사이.
  *
- * <p>밝은 화면 한 벌만 씁니다. 두 벌을 두면 어느 한쪽은 늘 덜 손질된 채로
- * 남고, 색을 하나 고칠 때마다 두 군데를 맞춰야 합니다.
+ * <p>강조색을 따로 두지 않습니다. <b>가장 진한 것이 곧 강조</b>입니다.
+ * 색으로 끌던 눈길을 이제 굵기와 여백이 대신합니다.
  *
- * <p>회색은 <b>어느 쪽으로도 기울이지 않았습니다.</b> 따뜻하게 두면 종이처럼
- * 보이지만 그만큼 누렇고, 차게 두면 금융 앱의 얼굴이 됩니다. 순수한 회색
- * 위에서는 얹히는 색이 제 색으로 보입니다.
+ * <p>회색은 어느 쪽으로도 기울이지 않았습니다. 지도의 색(날짜 구분)만은
+ * 그대로 두기로 했는데, 바탕이 조금이라도 기울면 그 색들이 다르게
+ * 보입니다.
  *
- * <p>층을 나누는 것은 선이 아니라 <b>그림자</b>입니다. 흰 카드가 거의 흰 바탕
- * 위에 떠 있으므로, 실선을 두르면 그 선이 먼저 눈에 띕니다. 아주 옅고 넓게
- * 퍼지는 그림자면 선 없이도 떠 보입니다.
+ * <p>층은 그림자가 아니라 <b>선 한 가닥</b>이 나눕니다. 그림자는 카드가
+ * 여럿 놓이면 화면 전체가 부옇게 뜨고, 무엇을 먼저 봐야 할지 흐립니다.
  */
-const Zinc = {
-  /** 화면 바탕 */
-  50: '#FAFAFA',
-  /** 카드 안에서 한 겹 더 눌러 앉는 자리(입력칸·칩) */
-  100: '#F4F4F5',
-  /** 눌렀을 때, 그리고 선 */
-  200: '#E4E4E7',
+const Ink = {
+  /** 종이 */
+  0: '#FFFFFF',
+  /** 눌러 앉은 자리(입력칸) */
+  50: '#F7F7F7',
+  /** 눌렸을 때 */
+  100: '#EFEFEF',
+  /** 선 */
+  200: '#E4E4E4',
   /** 진한 선 */
-  300: '#D4D4D8',
+  300: '#D2D2D2',
   /** 못 누르는 글자 */
-  400: '#A1A1AA',
+  400: '#B0B0B0',
   /** 곁다리 글자 */
-  500: '#71717A',
+  500: '#8A8A8A',
   /** 보조 설명 */
-  600: '#52525B',
-  /** 본문 */
-  900: '#18181B',
+  700: '#5A5A5A',
+  /** 본문, 그리고 강조 */
+  900: '#0E0E0E',
 } as const;
-
-/**
- * 강조색 둘.
- *
- * <p>바이올렛 하나만 "누르면 일이 벌어지는 것" 에 씁니다.
- *
- * <p>산호색은 "지금·오늘·여기" 처럼 시간이 걸린 것에만 씁니다. 바이올렛과
- * 색상환에서 멀리 떨어져 있어 둘이 나란히 있어도 서로를 죽이지 않습니다.
- * 이쪽을 단추에 쓰지는 않습니다 — 눌러야 할 곳이 둘이 되면 어느 쪽을 눌러야
- * 하는지 매번 고르게 됩니다.
- */
-const Violet = {
-  core: '#6366F1',
-  deep: '#4F46E5',
-  soft: '#EEF2FF',
-  softOn: '#E0E7FF',
-  /** 뱃지·글자로 쓸 때. 옅은 배경 위에서 읽히려면 한 단 짙어야 합니다. */
-  text: '#4F46E5',
-} as const;
-const Coral = { core: '#FF385C', soft: '#FFF1F3' } as const;
-const Red = { core: '#DC2626', soft: '#FEF2F2', softOn: '#FEE2E2' } as const;
-const Emerald = { core: '#059669', soft: '#ECFDF5' } as const;
-const Amber = { core: '#D97706', soft: '#FFFBEB' } as const;
 
 export const Colors = {
   /* 글자 */
-  text: Zinc[900],
-  textSecondary: Zinc[600],
-  textMuted: Zinc[500],
-  textDisabled: Zinc[400],
+  text: Ink[900],
+  textSecondary: Ink[700],
+  textMuted: Ink[500],
+  textDisabled: Ink[400],
 
-  /* 바탕 — 거의 흰 판 위에 완전히 흰 카드가 그림자로 떠 있습니다. */
-  background: Zinc[50],
+  /* 바탕 — 흰 종이 한 장입니다. 카드에 따로 색을 주지 않습니다. */
+  background: Ink[0],
   /** 지도 뒤에 깔리는 바닥. 지도가 뜨기 전에 잠깐 보입니다. */
-  abyss: Zinc[100],
-  surface: '#FFFFFF',
-  /** 판 위에 다시 얹히는 것(바텀시트 안의 카드) */
-  surfaceRaised: Zinc[50],
-  fill: Zinc[100],
-  fillPressed: Zinc[200],
-  border: Zinc[200],
-  borderStrong: Zinc[300],
-  divider: Zinc[100],
+  abyss: Ink[100],
+  surface: Ink[0],
+  /** 판 위에 다시 얹히는 것(바텀시트 안의 칸) */
+  surfaceRaised: Ink[50],
+  fill: Ink[50],
+  fillPressed: Ink[100],
+  border: Ink[200],
+  borderStrong: Ink[300],
+  divider: Ink[200],
 
-  /* 강조 — 주 동작 */
-  accent: Violet.core,
-  accentPressed: Violet.deep,
-  accentSoft: Violet.soft,
-  accentSoftPressed: Violet.softOn,
-  accentText: '#FFFFFF',
-  /** 강조를 글자·아이콘으로 쓸 때. 칠할 때는 위의 accent 를 씁니다. */
-  accentInk: Violet.text,
+  /* 강조 — 주 동작. 색이 아니라 검정입니다. */
+  accent: Ink[900],
+  accentPressed: '#000000',
+  accentSoft: Ink[100],
+  accentSoftPressed: Ink[200],
+  accentText: Ink[0],
+  /** 강조를 글자·아이콘으로 쓸 때. */
+  accentInk: Ink[900],
 
   /* 지금·오늘·여기 */
-  hot: Coral.core,
-  hotSoft: Coral.soft,
+  hot: Ink[900],
+  hotSoft: Ink[100],
 
-  /* 알림 */
-  danger: Red.core,
-  dangerSoft: Red.soft,
-  dangerSoftPressed: Red.softOn,
-  success: Emerald.core,
-  successSoft: Emerald.soft,
-  warning: Amber.core,
-  warningSoft: Amber.soft,
+  /*
+    알림.
 
-  /** 색으로 채운 자리 위에 얹는 글자. 강조색도 날짜 색도 모두 진합니다. */
+    무채색이라 색으로는 못 가립니다. 위험한 것은 <b>모양</b>으로 가릅니다 —
+    되돌릴 수 없는 단추만 테두리를 두르고, 그 앞에는 늘 확인 판이 섭니다.
+   */
+  danger: Ink[900],
+  dangerSoft: Ink[0],
+  dangerSoftPressed: Ink[100],
+  success: Ink[900],
+  successSoft: Ink[50],
+  warning: Ink[700],
+  warningSoft: Ink[50],
+
+  /** 색으로 채운 자리 위에 얹는 글자. 날짜 색은 모두 진합니다. */
   onDay: '#FFFFFF',
 } as const;
 
@@ -144,25 +127,22 @@ export const DayColors = [
 export const dayColor = (index: number) => DayColors[index % DayColors.length];
 
 /**
- * 떠 있는 것.
+ * 떠 있는 것 — 이제 뜨지 않습니다.
  *
- * <p>거의 흰 바탕 위에 완전히 흰 카드를 얹으므로, 층을 나누는 것은 실선이
- * 아니라 그림자입니다. 실선을 두르면 그 선이 카드 안의 글자보다 먼저 눈에
- * 띕니다.
+ * <p>흰 카드가 옅은 그림자로 떠 있던 것을 걷었습니다. 카드가 서넛만
+ * 놓여도 화면 전체가 부옇게 뜨고, 그 상태에서는 무엇을 먼저 봐야 할지
+ * 눈이 고르지 못합니다.
  *
- * <p>아주 옅고(5%) 넓게(20) 퍼뜨립니다. 진한 그림자는 카드를 무겁게 만들고,
- * 좁은 그림자는 테두리처럼 보입니다. 붉은 기 없이 순수한 검정으로만 깔아야
- * 흰 바탕이 탁해지지 않습니다.
- *
- * <p>안드로이드는 그림자 색·번짐을 정할 수 없고 elevation 한 값만 받습니다.
- * 그래서 그쪽에서는 조금 다르게 보입니다 — 어쩔 수 없는 차이입니다.
+ * <p>층은 선 한 가닥과 여백이 나눕니다. 이름은 남겨 둡니다 — 쓰는 자리가
+ * 여럿이라 지우면 그만큼 고칠 데가 늘고, 언젠가 한 곳에서만 다시
+ * 띄우고 싶을 때 여기만 고치면 됩니다.
  */
 export const Lift = {
   shadowColor: '#000000',
-  shadowOpacity: 0.05,
-  shadowRadius: 20,
-  shadowOffset: { width: 0, height: 4 },
-  elevation: 2,
+  shadowOpacity: 0,
+  shadowRadius: 0,
+  shadowOffset: { width: 0, height: 0 },
+  elevation: 0,
 } as const;
 
 /**
@@ -233,14 +213,27 @@ const family = Platform.OS === 'web' ? { fontFamily: Fonts.sans } : {};
  * 자간은 한글에서 살짝 좁혀야 성기지 않습니다. 큰 글자일수록 더 좁힙니다.
  */
 export const Type = {
-  display: { ...family, fontSize: 30, lineHeight: 40, letterSpacing: -0.8 },
-  title: { ...family, fontSize: 26, lineHeight: 35, letterSpacing: -0.7 },
-  heading: { ...family, fontSize: 22, lineHeight: 31, letterSpacing: -0.5 },
-  subheading: { ...family, fontSize: 20, lineHeight: 29, letterSpacing: -0.4 },
+  /*
+    색을 걷어 냈으므로 위계를 글자가 혼자 집니다. 그래서 큰 것은 더
+    크고 더 좁게, 작은 것은 더 조용하게 벌립니다. 단계 사이가 가까우면
+    무채색 화면에서는 아무 단계도 없는 것처럼 보입니다.
+  */
+  display: { ...family, fontSize: 34, lineHeight: 40, letterSpacing: -1.4 },
+  title: { ...family, fontSize: 26, lineHeight: 33, letterSpacing: -1.0 },
+  heading: { ...family, fontSize: 21, lineHeight: 28, letterSpacing: -0.7 },
+  subheading: { ...family, fontSize: 18, lineHeight: 26, letterSpacing: -0.5 },
   /** 본문·입력칸. 16 아래로 내리면 iOS 사파리가 입력할 때 화면을 확대합니다. */
-  body: { ...family, fontSize: 17, lineHeight: 25.5, letterSpacing: -0.3 },
-  bodySmall: { ...family, fontSize: 15, lineHeight: 22.5, letterSpacing: -0.2 },
-  caption: { ...family, fontSize: 13, lineHeight: 19.5, letterSpacing: -0.1 },
+  body: { ...family, fontSize: 16, lineHeight: 25, letterSpacing: -0.3 },
+  bodySmall: { ...family, fontSize: 14, lineHeight: 21, letterSpacing: -0.2 },
+  caption: { ...family, fontSize: 12, lineHeight: 18, letterSpacing: -0.1 },
+  /**
+   * 구역 이름표.
+   *
+   * <p>제목을 하나 더 늘리는 대신 이것을 씁니다. 아주 작고 넓게 벌린
+   * 대문자는 읽으라고 있는 것이 아니라 <b>여기서부터 다른 이야기</b>
+   * 라는 표시라, 화면에 글자가 늘어도 눈이 걸리지 않습니다.
+   */
+  label: { ...family, fontSize: 11, lineHeight: 16, letterSpacing: 1.4 },
 } as const;
 
 export const Weight = {
@@ -248,6 +241,8 @@ export const Weight = {
   medium: '500',
   semibold: '600',
   bold: '700',
+  /* 무채색에서 "가장 강한 것" 을 만들 방법은 굵기뿐입니다. */
+  heavy: '800',
 } as const;
 
 /* ---------------------------------------------------------------- 치수 */
@@ -264,13 +259,20 @@ export const Spacing = {
   huge: 40,
 } as const;
 
+/**
+ * 모서리.
+ *
+ * <p>둥근 모서리를 걷었습니다. 카드·단추·입력칸·시트가 모두 직각입니다.
+ * 둥근 것이 여럿 겹치면 화면이 물러 보이고, 무엇이 무엇 위에 놓였는지가
+ * 모서리가 아니라 그림자에 기대게 됩니다.
+ *
+ * <p><b>full 은 지도에만 남깁니다.</b> 핀은 어느 지도에서나 동그라미라,
+ * 그것까지 각지게 하면 지도 위의 점이 우리 UI 조각처럼 보입니다.
+ * 도장도 마찬가지입니다 — 네모난 도장은 도장으로 안 읽힙니다.
+ */
 export const Radius = {
-  sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 20,
-  /** 화면 아래에서 올라오는 큰 판. 모서리가 커야 "얹혀 있다" 로 읽힙니다. */
-  xxl: 28,
+  none: 0,
+  /** 지도 핀과 도장. 그 밖에는 쓰지 않습니다. */
   full: 999,
 } as const;
 

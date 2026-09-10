@@ -417,7 +417,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: Spacing.xs,
     backgroundColor: Colors.surface,
-    borderRadius: Radius.lg,
+    borderRadius: Radius.none,
     padding: Spacing.lg,
   },
   section: {

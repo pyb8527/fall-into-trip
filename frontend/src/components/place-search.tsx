@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
   },
   results: {
     backgroundColor: Colors.fill,
-    borderRadius: Radius.md,
+    borderRadius: Radius.none,
     overflow: 'hidden',
   },
   row: {

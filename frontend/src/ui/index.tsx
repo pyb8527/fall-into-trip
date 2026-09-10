@@ -562,14 +562,27 @@ export function Button({
 
   /* 못 누르는 버튼은 흐리게 만드는 대신 아예 다른 색으로 둡니다. 투명도만
      낮추면 그 아래 배경이 비쳐 글자가 읽기 어려워집니다. */
+  /*
+    색이 없으니 단추의 세기는 채움과 테두리가 나눕니다.
+
+      주 동작   검정으로 꽉 채운 것 — 화면에 하나
+      보조      흰 바탕에 가는 선
+      위험      흰 바탕에 굵은 선 — 되돌릴 수 없다는 표시
+      곁다리    아무것도 없는 글자
+
+    위험을 굵은 선으로 두는 것은, 빨강을 뺀 자리에 무언가는 있어야 하기
+    때문입니다. 그리고 그 앞에는 늘 확인 판이 한 번 더 섭니다.
+  */
   const palette: Record<ButtonVariant, { bg: string; pressed: string; fg: string }> = {
     primary: { bg: Colors.accent, pressed: Colors.accentPressed, fg: Colors.accentText },
-    secondary: { bg: Colors.fill, pressed: Colors.fillPressed, fg: Colors.textSecondary },
-    danger: { bg: Colors.dangerSoft, pressed: Colors.dangerSoftPressed, fg: Colors.danger },
-    ghost: { bg: 'transparent', pressed: Colors.fill, fg: Colors.textSecondary },
+    secondary: { bg: Colors.surface, pressed: Colors.fill, fg: Colors.text },
+    danger: { bg: Colors.surface, pressed: Colors.fill, fg: Colors.text },
+    ghost: { bg: 'transparent', pressed: Colors.fill, fg: Colors.textMuted },
   };
   const c = palette[variant];
-  const offBg = variant === 'ghost' ? 'transparent' : Colors.fill;
+  const offBg = variant === 'ghost' || variant === 'secondary' || variant === 'danger'
+    ? 'transparent'
+    : Colors.fill;
 
   return (
     <Press
@@ -583,9 +596,9 @@ export function Button({
         styles.button,
         compact ? styles.buttonCompact : styles.buttonFull,
         { backgroundColor: off ? offBg : c.bg },
-        /* 주 동작에는 제 색을 옅게 흘려 둡니다. 어두운 화면에서 라임 하나가
-           떠 있으면 어디를 눌러야 하는지 찾을 필요가 없습니다. */
-        !off && variant === 'primary' ? styles.buttonGlow : null,
+        /* 테두리가 세기를 나눕니다. 위험한 것만 굵게 두릅니다. */
+        variant === 'danger' ? styles.buttonEdge : null,
+        variant === 'secondary' ? styles.buttonHair : null,
       ]}>
       {busy ? (
         <ActivityIndicator color={off ? Colors.textDisabled : c.fg} size="small" />
@@ -622,12 +635,15 @@ export function Chip({
       style={[
         styles.chip,
         {
-          backgroundColor: selected ? Colors.accent : Colors.fill,
+          backgroundColor: selected ? Colors.accent : Colors.surface,
           borderColor: selected ? Colors.accent : Colors.border,
         },
       ]}>
       <Text
-        style={[styles.chipLabel, { color: selected ? Colors.accentText : Colors.textSecondary }]}>
+        style={[
+          styles.chipLabel,
+          { color: selected ? Colors.accentText : Colors.textMuted },
+        ]}>
         {label}
       </Text>
     </Press>
@@ -706,7 +722,7 @@ export function Switch({
 /** 상태를 한눈에 보여 주는 작은 표식. 누르는 것이 아닙니다. */
 export function Badge({ label, tone = 'muted' }: { label: string; tone?: Tone }) {
   return (
-    <View style={[styles.badge, { backgroundColor: toneSoft[tone] }]}>
+    <View style={[styles.badge, { borderColor: toneColor[tone] }]}>
       <Text style={[styles.badgeLabel, { color: toneColor[tone] }]}>{label}</Text>
     </View>
   );
@@ -1523,20 +1539,30 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
 
+  /*
+    카드는 상자가 아니라 묶음입니다.
+
+    전에는 흰 바탕 위에 흰 카드를 그림자로 띄웠습니다. 그림자가 하나면
+    떠 보이지만 넷이 놓이면 화면 전체가 부옇게 뜨고, 그 상태에서는 어느
+    것을 먼저 봐야 할지 눈이 고르지 못합니다.
+
+    이제 선 한 가닥이 테두리를 대신합니다. 굵기는 기기가 그릴 수 있는
+    가장 가는 선이라, 안의 글자보다 앞에 나서지 않습니다.
+  */
   card: {
     backgroundColor: Colors.surface,
-    borderRadius: Radius.xl,
-    /* 거의 흰 바탕 위의 흰 카드입니다. 실선을 두르면 그 선이 카드 안의
-       글자보다 먼저 눈에 띕니다. 옅고 넓은 그림자로만 띄웁니다. */
-    ...Lift,
-    padding: Spacing.xl,
+    borderRadius: Radius.none,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.border,
+    padding: Spacing.lg,
     gap: Spacing.md,
   },
 
   listRow: {
     backgroundColor: Colors.surface,
-    ...Lift,
-    borderRadius: Radius.lg,
+    borderRadius: Radius.none,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.border,
     paddingVertical: Spacing.lg,
     paddingHorizontal: Spacing.xl,
     minHeight: Tap.min + Spacing.lg,
@@ -1572,8 +1598,8 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     backgroundColor: Colors.surface,
-    borderTopLeftRadius: Radius.xxl,
-    borderTopRightRadius: Radius.xxl,
+    borderTopLeftRadius: Radius.none,
+    borderTopRightRadius: Radius.none,
     /* 지도 위에 얹히는 판이라 위쪽으로 그림자를 드리웁니다. 실선만 두면
        지도의 길과 섞여 판의 시작이 보이지 않습니다. */
     shadowColor: '#000000',
@@ -1596,7 +1622,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     width: 44,
     height: 4,
-    borderRadius: Radius.full,
+    borderRadius: Radius.none,
     backgroundColor: Colors.borderStrong,
   },
   /* 넓은 화면에서 글줄이 지나치게 길어지지 않게 가운데로 모읍니다. 판이
@@ -1661,16 +1687,26 @@ const styles = StyleSheet.create({
     fontWeight: Weight.semibold,
     color: Colors.textSecondary,
   },
+  /*
+    입력칸은 상자가 아니라 줄입니다.
+
+    회색으로 채운 칸이 한 화면에 서넛 놓이면 그 회색 덩어리들이 먼저
+    눈에 들어옵니다. 정작 봐야 할 것은 거기 적힌 글자인데도요.
+
+    밑줄 하나면 "여기에 적는다" 가 그대로 전해지고, 화면에서 도형이
+    그만큼 줍니다. 쓰는 동안에는 그 줄이 검게 굵어집니다 — 색을 못 쓰니
+    지금 어느 칸에 있는지는 굵기가 말합니다.
+  */
   input: {
     height: Tap.control,
-    borderRadius: Radius.md,
-    backgroundColor: Colors.fill,
-    paddingHorizontal: Spacing.lg,
+    borderRadius: Radius.none,
+    backgroundColor: 'transparent',
+    paddingHorizontal: 0,
     ...Type.body,
     color: Colors.text,
-    /* 자리를 미리 잡아 둡니다. 눌렸을 때 테두리가 생기며 글자가 밀리지 않게. */
-    borderWidth: 1.5,
-    borderColor: Colors.fill,
+    /* 자리를 미리 잡아 둡니다. 굵어질 때 글자가 밀리지 않게. */
+    borderBottomWidth: 1.5,
+    borderBottomColor: Colors.border,
   },
   inputWithAction: {
     paddingRight: Tap.min,
@@ -1689,12 +1725,13 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
   inputFocused: {
-    backgroundColor: Colors.surface,
-    borderColor: Colors.accent,
+    borderBottomColor: Colors.text,
   },
+  /* 색으로 못 가리므로 줄을 한 단 더 굵힙니다. 무엇이 잘못됐는지는
+     바로 아래 줄이 말합니다. */
   inputError: {
-    backgroundColor: Colors.surface,
-    borderColor: Colors.danger,
+    borderBottomWidth: 2.5,
+    borderBottomColor: Colors.text,
   },
   hint: {
     ...Type.caption,
@@ -1711,17 +1748,26 @@ const styles = StyleSheet.create({
   },
   buttonFull: {
     height: Tap.control,
-    borderRadius: Radius.lg,
+    borderRadius: Radius.none,
     paddingHorizontal: Spacing.xl,
   },
   buttonCompact: {
     height: Tap.compact,
-    borderRadius: Radius.full,
+    borderRadius: Radius.none,
     paddingHorizontal: Spacing.lg,
   },
-  /* 주 동작도 카드와 같은 그림자로 띄웁니다. 색 그림자를 깔면 단추 아래가
-     물들어 탁해집니다. */
-  buttonGlow: Lift,
+  /* 주 동작은 뜨지 않습니다. 검정 채움 자체가 화면에서 가장 강한 것이라
+     그림자를 더 얹을 이유가 없습니다. */
+  buttonGlow: {},
+  /* 되돌릴 수 없는 단추만 두른 테두리. 색을 못 쓰니 굵기로 가릅니다. */
+  buttonEdge: {
+    borderWidth: 1.5,
+    borderColor: Colors.text,
+  },
+  buttonHair: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.borderStrong,
+  },
   buttonLabel: {
     ...Type.body,
     fontWeight: Weight.semibold,
@@ -1733,7 +1779,7 @@ const styles = StyleSheet.create({
 
   chip: {
     height: Tap.compact,
-    borderRadius: Radius.full,
+    borderRadius: Radius.none,
     paddingHorizontal: Spacing.lg,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1762,14 +1808,14 @@ const styles = StyleSheet.create({
   switchTrack: {
     width: 46,
     height: 26,
-    borderRadius: 13,
+    borderRadius: 0,
     padding: 3,
     justifyContent: 'center',
   },
   switchKnob: {
     width: 20,
     height: 20,
-    borderRadius: 10,
+    borderRadius: 0,
     backgroundColor: Colors.surface,
     /* 켜졌을 때 강조색 위에서, 꺼졌을 때 회색 위에서 둘 다 떠 보여야
        합니다. 옅은 그림자 하나로 충분합니다. */
@@ -1784,42 +1830,52 @@ const styles = StyleSheet.create({
     fontWeight: Weight.semibold,
   },
 
+  /*
+    띠는 상자가 아니라 밑줄입니다.
+
+    전에는 회색 상자 안에 칸을 넣고 고른 칸만 더 밝게 두었습니다. 색을
+    걷어 내니 그 두 밝기가 거의 같아져 어느 것이 켜졌는지 보이지
+    않았습니다. 그리고 상자가 하나 줄면 화면의 도형도 하나 줍니다.
+
+    이제 고른 칸 아래에만 굵은 선이 그어집니다. 밝기가 아니라 있고 없음
+    이라 흑백에서도 한눈에 갈립니다.
+  */
   segment: {
     flexDirection: 'row',
-    /* 판(surface)보다 한 단 어둡게 눌러 앉힙니다. 고른 칸만 다시 떠오릅니다. */
-    backgroundColor: Colors.abyss,
-    borderRadius: Radius.lg,
-    padding: Spacing.xs,
-    gap: Spacing.xs,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: Colors.border,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.border,
   },
   segmentItem: {
     flex: 1,
     height: Tap.min,
-    borderRadius: Radius.md,
     alignItems: 'center',
     justifyContent: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+    /* 컨테이너의 가는 선 위에 겹쳐 그어야 두 줄로 보이지 않습니다. */
+    marginBottom: -StyleSheet.hairlineWidth,
   },
   segmentItemOn: {
-    backgroundColor: Colors.fill,
+    borderBottomColor: Colors.text,
   },
   segmentLabel: {
     ...Type.bodySmall,
-    fontWeight: Weight.semibold,
+    fontWeight: Weight.medium,
     color: Colors.textMuted,
   },
   segmentLabelOn: {
-    color: Colors.accentInk,
+    color: Colors.text,
+    fontWeight: Weight.semibold,
   },
 
   menuCard: {
     backgroundColor: Colors.surface,
-    borderRadius: Radius.xl,
-    ...Lift,
-    padding: Spacing.xl,
-    minHeight: 104,
-    justifyContent: 'center',
+    borderRadius: Radius.none,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.border,
+    padding: Spacing.lg,
+    minHeight: 96,
+    justifyContent: 'flex-end',
   },
   /* 아직 없는 것은 띄우지 않습니다. 못 누른다는 것이 글자(준비 중) 말고
      생김새로도 읽혀야 합니다 — 떠 있지 않으면 손이 가지 않습니다. */
@@ -1865,26 +1921,29 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
   },
 
+  /* 옅은 채움으로 구분하던 것을 가는 테두리로 바꿉니다. 무채색에서는
+     옅은 채움끼리 밝기가 같아 아무 표시도 아닌 것이 됩니다. */
   badge: {
-    borderRadius: Radius.full,
-    paddingVertical: Spacing.xs,
-    paddingHorizontal: Spacing.md - 2,
+    borderRadius: Radius.none,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 2,
+    paddingHorizontal: Spacing.sm - 1,
   },
   badgeLabel: {
-    ...Type.caption,
-    fontWeight: Weight.bold,
+    ...Type.label,
+    fontWeight: Weight.semibold,
   },
 
   iconButton: {
     width: Tap.min,
     height: Tap.min,
-    borderRadius: Radius.md,
+    borderRadius: Radius.none,
     alignItems: 'center',
     justifyContent: 'center',
   },
   /* 지도 위에 떠 있는 단추. 동그랗고, 실선과 그림자로 지도에서 떼어 놓습니다. */
   iconButtonOnMap: {
-    borderRadius: Radius.full,
+    borderRadius: Radius.none,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: Colors.border,
     shadowColor: '#000000',
@@ -1905,7 +1964,9 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 360,
     backgroundColor: Colors.surface,
-    borderRadius: Radius.xl,
+    borderRadius: Radius.none,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.borderStrong,
     padding: Spacing.xl,
     gap: Spacing.md,
   },
@@ -1931,8 +1992,11 @@ const styles = StyleSheet.create({
   },
   sheet: {
     backgroundColor: Colors.surface,
-    borderTopLeftRadius: Radius.xxl,
-    borderTopRightRadius: Radius.xxl,
+    borderTopLeftRadius: Radius.none,
+    borderTopRightRadius: Radius.none,
+    /* 모서리를 각지게 두었으니 판이 어디서 시작하는지는 선이 말합니다. */
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.borderStrong,
     paddingTop: Spacing.md,
     /* 화면을 다 덮지 않습니다. 뒤가 조금 보여야 어디로 돌아가는지 압니다. */
     maxHeight: '88%',
@@ -1946,7 +2010,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     width: 40,
     height: 4,
-    borderRadius: Radius.full,
+    borderRadius: Radius.none,
     backgroundColor: Colors.fillPressed,
   },
   sheetHead: {
@@ -1978,7 +2042,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: Colors.fill,
-    borderRadius: Radius.md,
+    borderRadius: Radius.none,
     paddingHorizontal: Spacing.sm,
     height: Tap.control,
   },
@@ -1994,10 +2058,15 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.huge,
     gap: Spacing.sm,
   },
+  /* 옅은 붉은 상자였습니다. 색을 걷으니 흰 바탕에 흰 상자가 되어
+     아무 표시도 아니게 됐습니다. 상자 대신 왼쪽에 선 한 줄을 세웁니다 —
+     도형이 하나 줄고, 무엇에 대한 말인지는 그대로 보입니다. */
   note: {
-    backgroundColor: Colors.dangerSoft,
-    borderRadius: Radius.md,
-    padding: Spacing.lg,
+    backgroundColor: 'transparent',
+    borderLeftWidth: 2,
+    borderLeftColor: Colors.text,
+    paddingLeft: Spacing.md,
+    paddingVertical: Spacing.xs,
     gap: Spacing.xs,
   },
   noteText: {

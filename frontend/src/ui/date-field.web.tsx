@@ -34,7 +34,7 @@ export function DateField({
         onChange={(e) => onChange(e.target.value)}
         style={{
           height: Tap.control,
-          borderRadius: Radius.md,
+          borderRadius: Radius.none,
           backgroundColor: Colors.fill,
           border: `1.5px solid ${Colors.fill}`,
           paddingLeft: Spacing.lg,

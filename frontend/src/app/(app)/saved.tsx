@@ -524,7 +524,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.sm,
     backgroundColor: Colors.surface,
-    borderRadius: Radius.lg,
+    borderRadius: Radius.none,
     borderWidth: 1.5,
     borderColor: 'transparent',
     paddingVertical: Spacing.sm,
@@ -543,7 +543,7 @@ const styles = StyleSheet.create({
   mark: {
     width: 36,
     height: 36,
-    borderRadius: Radius.full,
+    borderRadius: Radius.none,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: Colors.fill,

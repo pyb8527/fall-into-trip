@@ -657,7 +657,7 @@ function PlaceSheet({
 const styles = StyleSheet.create({
   frame: {
     width: '100%',
-    borderRadius: Radius.lg,
+    borderRadius: Radius.none,
     overflow: 'hidden',
     backgroundColor: Colors.abyss,
   },
@@ -721,8 +721,8 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     backgroundColor: Colors.surface,
-    borderTopLeftRadius: Radius.xl,
-    borderTopRightRadius: Radius.xl,
+    borderTopLeftRadius: Radius.none,
+    borderTopRightRadius: Radius.none,
     paddingHorizontal: Spacing.xl,
     paddingTop: Spacing.md,
     gap: Spacing.md,
@@ -755,7 +755,7 @@ const styles = StyleSheet.create({
     minHeight: Tap.min,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: Radius.md,
+    borderRadius: Radius.none,
     backgroundColor: Colors.fill,
   },
   sheetClosePressed: {

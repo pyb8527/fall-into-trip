@@ -92,7 +92,7 @@ const styles = StyleSheet.create({
   },
   box: {
     height: Tap.control,
-    borderRadius: Radius.md,
+    borderRadius: Radius.none,
     backgroundColor: Colors.fill,
     paddingHorizontal: Spacing.lg,
     justifyContent: 'center',

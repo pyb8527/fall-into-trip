@@ -320,7 +320,7 @@ const styles = StyleSheet.create({
   mark: {
     width: 44,
     height: 44,
-    borderRadius: Radius.full,
+    borderRadius: Radius.none,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: Colors.border,
     backgroundColor: Colors.fill,

@@ -65,7 +65,7 @@ const styles = StyleSheet.create({
   },
   kind: {
     minWidth: 56,
-    borderRadius: Radius.md,
+    borderRadius: Radius.none,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: Colors.border,
     backgroundColor: Colors.fill,

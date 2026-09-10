@@ -5,20 +5,8 @@ import { api } from '@/api/client';
 import type { TripSummary } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
-import { Colors, Radius, Spacing } from '@/constants/theme';
-import {
-  Body,
-  Button,
-  Caption,
-  Card,
-  IconButton,
-  MenuCard,
-  Rise,
-  Row,
-  Screen,
-  Subtitle,
-  Title,
-} from '@/ui';
+import { Spacing } from '@/constants/theme';
+import { Button, Card, IconButton, MenuCard, Rise, Row, Screen, Subtitle, Title } from '@/ui';
 import { LogoMark } from '@/ui/logo';
 
 /**
@@ -71,7 +59,6 @@ export default function Home() {
             '오늘은 어디에 반해 볼까요?'
           )}
         </Title>
-        <Body tone="secondary">함께 그리고, 주워 담고, 두고두고 꺼내 봅니다.</Body>
       </View>
 
       {/* 카드가 한 번에 툭 나타나면 화면이 갈아 끼워진 것처럼 보입니다.
@@ -144,9 +131,6 @@ function FirstSteps() {
     <Rise order={5}>
       <Card>
         <Subtitle>어디서 시작할까요?</Subtitle>
-        <Body small tone="secondary">
-          빈 종이부터 채워도 되고, 남이 다녀온 길을 통째로 가져와 고쳐도 됩니다.
-        </Body>
 
         <Row gap={Spacing.sm} style={styles.steps}>
           <View style={styles.grow}>
@@ -163,13 +147,6 @@ function FirstSteps() {
             />
           </View>
         </Row>
-
-        <View style={styles.after}>
-          <Caption tone="secondary">
-            여행을 만들고 나면 동행자를 부를 수 있습니다. 부른 사람과 같은 일정을 같이 고치고,
-            서로 고친 것이 알림으로 옵니다.
-          </Caption>
-        </View>
       </Card>
     </Rise>
   );
@@ -200,12 +177,5 @@ const styles = StyleSheet.create({
   },
   grow: {
     flex: 1,
-  },
-  /* 다음 이야기라는 것이 보이게 한 칸 띄우고 옅은 선 위에 둡니다. */
-  after: {
-    borderTopWidth: 1,
-    borderTopColor: Colors.divider,
-    borderRadius: Radius.sm,
-    paddingTop: Spacing.sm,
   },
 });

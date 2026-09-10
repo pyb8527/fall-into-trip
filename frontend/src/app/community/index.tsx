@@ -136,11 +136,6 @@ export default function Community() {
 
   return (
     <Screen>
-      {/* 위 막대가 이미 이름을 적고 있습니다. */}
-      <Body tone="secondary">
-        남이 다녀온 길을 구경하고, 탐나면 통째로 가져오세요.
-      </Body>
-
       <SegmentedTabs
         items={user ? TABS : TABS.filter((t) => !PRIVATE.includes(t.value))}
         value={view}
@@ -352,7 +347,7 @@ const styles = StyleSheet.create({
   },
   thumb: {
     width: '100%',
-    borderRadius: Radius.md,
+    borderRadius: Radius.none,
     backgroundColor: Colors.fill,
   },
   meta: {

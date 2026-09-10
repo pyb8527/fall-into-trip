@@ -583,7 +583,7 @@ const styles = StyleSheet.create({
   chit: {
     width: 30,
     height: 30,
-    borderRadius: 15,
+    borderRadius: 0,
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
