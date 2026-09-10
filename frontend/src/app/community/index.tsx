@@ -6,7 +6,9 @@ import { api, API_BASE, query } from '@/api/client';
 import type { PostCard, PostDays, PostPage, PostSort } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
+import { SignUpGate } from '@/components/signup-gate';
 import { Colors, Radius, Spacing } from '@/constants/theme';
+import type { Comeback } from '@/lib/comeback';
 import {
   Body,
   Button,
@@ -67,6 +69,8 @@ export default function Community() {
   const { user } = useAuth();
   const [view, setView] = useState<Tab>('hot');
   const [page, setPage] = useState(0);
+  /** 계정이 있어야 되는 것을 눌렀을 때. 이유를 말하는 판이 올라옵니다. */
+  const [gate, setGate] = useState<Comeback | null>(null);
 
   /* 글자를 칠 때마다 부르면 요청이 쏟아집니다. 확인 버튼으로만 보냅니다. */
   const [typed, setTyped] = useState('');
@@ -106,7 +110,9 @@ export default function Community() {
    */
   function toggleLike(post: PostCard) {
     if (!user) {
-      router.push('/(auth)/login?next=/community');
+      /* 말없이 로그인 화면으로 튕기면 왜 그랬는지 모른 채로 닫습니다.
+         하트가 어디에 쌓이는지를 그 자리에서 말합니다. */
+      setGate({ where: '/community', what: 'like' });
       return;
     }
     const next = !post.liked;
@@ -262,6 +268,8 @@ export default function Community() {
           />
         </Row>
       ) : null}
+
+      <SignUpGate intent={gate} onClose={() => setGate(null)} />
     </Screen>
   );
 }

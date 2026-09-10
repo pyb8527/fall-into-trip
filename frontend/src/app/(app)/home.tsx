@@ -1,9 +1,24 @@
 import { useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
+import { api } from '@/api/client';
+import type { TripSummary } from '@/api/types';
+import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
-import { Spacing } from '@/constants/theme';
-import { Body, Caption, IconButton, MenuCard, Rise, Row, Screen, Title } from '@/ui';
+import { Colors, Radius, Spacing } from '@/constants/theme';
+import {
+  Body,
+  Button,
+  Caption,
+  Card,
+  IconButton,
+  MenuCard,
+  Rise,
+  Row,
+  Screen,
+  Subtitle,
+  Title,
+} from '@/ui';
 import { LogoMark } from '@/ui/logo';
 
 /**
@@ -20,6 +35,13 @@ import { LogoMark } from '@/ui/logo';
 export default function Home() {
   const router = useRouter();
   const { user } = useAuth();
+
+  /* 여행이 하나도 없는 사람에게는 메뉴만으로 부족합니다. 그 판단에 필요한
+     것이 개수 하나뿐이라 목록을 그대로 받아 씁니다. */
+  const { data: mine } = useAsync<{ trips: TripSummary[] }>(
+    (signal) => api.get('/api/trips', signal),
+    [],
+  );
 
   return (
     <Screen safeTop>
@@ -97,7 +119,59 @@ export default function Home() {
           </Rise>
         ) : null}
       </Row>
+
+      {/*
+        갓 가입한 사람의 홈은 텅 비어 있습니다. 메뉴 넷이 있지만 무엇부터
+        눌러야 하는지는 말해 주지 않습니다.
+
+        아래에 둡니다. 위에 두면 목록을 받아 온 순간 메뉴가 아래로 밀려
+        내려가, 이미 손이 가 있던 카드가 달아납니다.
+
+        여행 수를 서버에 따로 표시해 두지 않습니다. 개수가 0인지로 그냥
+        알 수 있고, 표시를 만들면 그때부터 그 값이 진짜와 어긋납니다.
+        덤으로 여행을 다 지운 사람에게도 맞는 안내가 됩니다.
+      */}
+      {mine && mine.trips.length === 0 ? <FirstSteps /> : null}
     </Screen>
+  );
+}
+
+/** 아직 아무것도 없는 사람에게, 어디서 시작하는지. */
+function FirstSteps() {
+  const router = useRouter();
+
+  return (
+    <Rise order={5}>
+      <Card>
+        <Subtitle>어디서 시작할까요?</Subtitle>
+        <Body small tone="secondary">
+          빈 종이부터 채워도 되고, 남이 다녀온 길을 통째로 가져와 고쳐도 됩니다.
+        </Body>
+
+        <Row gap={Spacing.sm} style={styles.steps}>
+          <View style={styles.grow}>
+            <Button
+              label="첫 여행 만들기"
+              onPress={() => router.push('/(app)/trips?new=1')}
+            />
+          </View>
+          <View style={styles.grow}>
+            <Button
+              label="남의 길 구경하기"
+              variant="secondary"
+              onPress={() => router.push('/community')}
+            />
+          </View>
+        </Row>
+
+        <View style={styles.after}>
+          <Caption tone="secondary">
+            여행을 만들고 나면 동행자를 부를 수 있습니다. 부른 사람과 같은 일정을 같이 고치고,
+            서로 고친 것이 알림으로 옵니다.
+          </Caption>
+        </View>
+      </Card>
+    </Rise>
   );
 }
 
@@ -120,5 +194,18 @@ const styles = StyleSheet.create({
   },
   wide: {
     width: '100%',
+  },
+  steps: {
+    flexWrap: 'nowrap',
+  },
+  grow: {
+    flex: 1,
+  },
+  /* 다음 이야기라는 것이 보이게 한 칸 띄우고 옅은 선 위에 둡니다. */
+  after: {
+    borderTopWidth: 1,
+    borderTopColor: Colors.divider,
+    borderRadius: Radius.sm,
+    paddingTop: Spacing.sm,
   },
 });

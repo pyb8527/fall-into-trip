@@ -63,7 +63,7 @@ type PickFor = 'money' | null;
 export default function Trips() {
   const { user } = useAuth();
   const router = useRouter();
-  const { for: pickFor } = useLocalSearchParams<{ for?: string }>();
+  const { for: pickFor, new: fresh } = useLocalSearchParams<{ for?: string; new?: string }>();
   const goal: PickFor = pickFor === 'money' ? 'money' : null;
 
   /** 고른 여행을 어디로 데려갈지. */
@@ -71,7 +71,9 @@ export default function Trips() {
     goal === 'money'
       ? router.push({ pathname: '/money/[id]', params: { id: tripId } })
       : router.push({ pathname: '/trip/[id]', params: { id: tripId } });
-  const [creating, setCreating] = useState(false);
+  /* 첫걸음 안내에서 "첫 여행 만들기" 로 들어왔으면 만드는 판을 바로 엽니다.
+     목록만 띄워 놓고 어디를 눌러야 하는지 다시 찾게 하면 안내가 아닙니다. */
+  const [creating, setCreating] = useState(fresh === '1');
   const [group, setGroup] = useState<Group>('when');
   const [placing, setPlacing] = useState<TripSummary | null>(null);
 

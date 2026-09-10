@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
 
+import { useAuth } from '@/auth/auth-provider';
 import { Spacing } from '@/constants/theme';
 import { IconButton, Row } from '@/ui';
 
@@ -20,6 +21,15 @@ import { IconButton, Row } from '@/ui';
  * <p>주소를 새로고침하거나 링크로 곧장 들어오면 밑에 쌓인 것이 없어 화살표가
  * 아무 데도 데려가지 못합니다. 그때는 이 화면이 속한 자리로 돌려보냅니다 —
  * 여행에 딸린 화면이면 그 일정으로, 아니면 처음으로.
+ *
+ * <h3>"처음" 은 사람마다 다릅니다</h3>
+ *
+ * <p>둘러보기는 계정 없이도 열립니다. 그런데 집 그림이 늘 /(app)/home 을
+ * 가리키면, 구경하던 사람이 그것을 누르는 순간 로그인 화면이 뜹니다.
+ * 방금 없앤 막다른 길이 헤더에 그대로 남아 있는 셈입니다.
+ *
+ * <p>로그인하지 않았으면 문(welcome)으로 보냅니다. 거기에는 다시
+ * 둘러보기로 들어가는 길과 로그인 단추가 함께 있습니다.
  */
 export function NavLeft({
   navigation,
@@ -32,8 +42,12 @@ export function NavLeft({
   toTrip?: boolean;
 }) {
   const router = useRouter();
+  const { user } = useAuth();
   const params = route?.params as { id?: unknown } | undefined;
   const tripId = typeof params?.id === 'string' ? params.id : null;
+
+  /** 이 사람에게 "처음" 은 어디인가. */
+  const start = user ? '/(app)/home' : '/(auth)/welcome';
 
   function back() {
     if (navigation.canGoBack()) {
@@ -44,13 +58,14 @@ export function NavLeft({
       router.replace({ pathname: '/trip/[id]', params: { id: tripId } });
       return;
     }
-    router.replace('/(app)/trips');
+    /* 계정이 없는 사람을 내 여행으로 보내면 로그인 화면이 뜹니다. */
+    router.replace(user ? '/(app)/trips' : '/(auth)/welcome');
   }
 
   return (
     <Row gap={Spacing.xs}>
       <IconButton name="chevron-left" label="뒤로" bare onPress={back} />
-      <IconButton name="home" label="처음으로" bare onPress={() => router.replace('/(app)/home')} />
+      <IconButton name="home" label="처음으로" bare onPress={() => router.replace(start)} />
     </Row>
   );
 }

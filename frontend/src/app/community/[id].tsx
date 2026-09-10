@@ -1,5 +1,5 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Image, StyleSheet, View } from 'react-native';
 
 import { api, API_BASE, ApiError, query, UNEXPECTED } from '@/api/client';
@@ -13,9 +13,11 @@ import {
   useComments,
 } from '@/components/comment-list';
 import type { MapPlace } from '@/components/map-types';
+import { SignUpGate } from '@/components/signup-gate';
 import { TripMap } from '@/components/trip-map';
 import { iconOf } from '@/constants/place-icons';
 import { Colors, dayColor, Radius, Spacing } from '@/constants/theme';
+import { takeComeback, type Comeback, type ComebackDo } from '@/lib/comeback';
 import {
   Badge,
   Body,
@@ -66,6 +68,8 @@ export default function Post() {
   /** 댓글 판을 열어 둔 장소. */
   const [at, setAt] = useState<{ dayIndex: number; placeIndex: number } | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
+  /** 계정이 있어야 되는 것을 눌렀을 때 올라오는 판. */
+  const [gate, setGate] = useState<Comeback | null>(null);
 
   /*
     댓글은 한 번만 받아 옵니다. 장소마다 몇 개인지 세는 것과 판에 펼쳐 보여
@@ -109,14 +113,19 @@ export default function Post() {
     [data],
   );
 
-  /** 로그인이 필요한 동작 앞에서 한 번 걸러 줍니다. */
-  function needLogin() {
-    router.push(`/(auth)/login?next=${encodeURIComponent(`/community/${id}`)}`);
+  /**
+   * 계정이 필요한 동작 앞에서 한 번 걸러 줍니다.
+   *
+   * <p>튕겨 보내는 대신 왜 필요한지를 그 자리에서 말합니다. 무엇을 하려
+   * 했는지도 함께 적어 두어, 가입하고 돌아오면 그 자리에서 이어집니다.
+   */
+  function needLogin(what: ComebackDo = 'copy', arg?: string) {
+    setGate({ where: `/community/${id}`, what, arg });
   }
 
   function toggleLike() {
     if (!user || !data) {
-      needLogin();
+      needLogin('like');
       return;
     }
     const next = !data.liked;
@@ -168,6 +177,49 @@ export default function Post() {
     }
   }
 
+  /*
+    가입하고 돌아왔으면 하려던 것을 이어서 합니다.
+
+    이것이 없으면 가입을 마치고 돌아온 사람이 방금 무엇을 누르려 했는지
+    다시 찾아 다시 눌러야 합니다. 거기서 많이 빠집니다.
+
+    기억은 이 탭의 메모리에만 있고(lib/intent), 꺼내면 지워집니다. 주소에
+    싣지 않으므로 링크를 받은 남에게 옮아가지 않습니다.
+  */
+  useEffect(() => {
+    if (!user || !data) {
+      return;
+    }
+    const back = takeComeback(`/community/${id}`);
+    if (!back) {
+      return;
+    }
+    if (back.what === 'copy') {
+      setCopying(true);
+    } else if (back.what === 'report') {
+      setReporting(true);
+    } else if (back.what === 'like') {
+      /* 이미 눌러져 있으면 그대로 둡니다. 되풀이하면 방금 누른 것이 취소됩니다. */
+      if (!data.liked) {
+        toggleLike();
+      }
+    } else if (back.what === 'save' && back.arg) {
+      const [di, pi] = back.arg.split(':').map(Number);
+      const place = data.itinerary.days[di]?.places[pi];
+      if (place) {
+        save(place);
+      }
+    } else if (back.what === 'comment' && back.arg) {
+      const [dayIndex, placeIndex] = back.arg.split(':').map(Number);
+      if (data.itinerary.days[dayIndex]?.places[placeIndex]) {
+        setAt({ dayIndex, placeIndex });
+      }
+    }
+    /* data 가 바뀔 때마다 다시 돌지만, 위에서 이미 꺼내 비웠으므로
+       두 번째부터는 곧장 빠져나옵니다. */
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, data, id]);
+
   if (loading && !data) {
     return (
       <Screen>
@@ -210,7 +262,7 @@ export default function Post() {
           <View style={styles.grow}>
             <Button
               label="내 여행으로 가져오기"
-              onPress={() => (user ? setCopying(true) : needLogin())}
+              onPress={() => (user ? setCopying(true) : needLogin('copy'))}
             />
           </View>
         </Row>
@@ -253,7 +305,7 @@ export default function Post() {
               return next;
             })
           }
-          onSave={(place) => (user ? save(place) : needLogin())}
+          onSave={(place, at) => (user ? save(place) : needLogin('save', `${i}:${at}`))}
           savedNames={savedNames}
           feedback={data.feedback}
           countAt={(placeIndex) => perPlace.get(`${i}:${placeIndex}`) ?? 0}
@@ -279,7 +331,7 @@ export default function Post() {
             comments={talk.comments}
             failed={talk.failed}
             reload={talk.reload}
-            onNeedLogin={needLogin}
+            onNeedLogin={() => needLogin('comment')}
             onCountChanged={reload}
           />
         </>
@@ -295,7 +347,7 @@ export default function Post() {
             label="신고"
             variant="ghost"
             compact
-            onPress={() => (user ? setReporting(true) : needLogin())}
+            onPress={() => (user ? setReporting(true) : needLogin('report'))}
           />
         )}
       </Row>
@@ -323,7 +375,7 @@ export default function Post() {
           comments={talk.comments}
           failed={talk.failed}
           reload={talk.reload}
-          onNeedLogin={needLogin}
+          onNeedLogin={() => needLogin('comment', `${at.dayIndex}:${at.placeIndex}`)}
           onCountChanged={reload}
           at={at}
         />
@@ -350,6 +402,8 @@ export default function Post() {
           }
         }}
       />
+
+      <SignUpGate intent={gate} onClose={() => setGate(null)} />
 
       <ConfirmDialog
         visible={reporting}
@@ -387,7 +441,8 @@ function DayBlock({
   /** 펼쳐 두었는지. 접혀 있으면 제목 줄만 보입니다. */
   open: boolean;
   onToggle: () => void;
-  onSave: (place: ItineraryPlace) => void;
+  /** @param at 이 날에서 몇 번째 장소인지. 가입하고 돌아왔을 때 그 자리를 다시 찾는 데 씁니다. */
+  onSave: (place: ItineraryPlace, at: number) => void;
   /** 이미 담은 곳. 별을 채워 두면 두 번 누르지 않습니다. */
   savedNames: Set<string>;
   /** 댓글을 받는 글인지. 안 열었으면 댓글 단추를 두지 않습니다. */
@@ -506,7 +561,7 @@ function DayBlock({
             label={`${place.name} 담기`}
             tone={savedNames.has(place.name) ? 'accent' : 'default'}
             active={savedNames.has(place.name)}
-            onPress={() => onSave(place)}
+            onPress={() => onSave(place, i)}
           />
         </Row>
           ))}
