@@ -7,6 +7,8 @@ import type { SavedPlace, TripDetail, TripSummary } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { IconPicker } from '@/components/icon-picker';
 import type { MapPlace } from '@/components/map-types';
+import { PlaceSearch } from '@/components/place-search';
+import { RecommendSheet } from '@/components/recommend-sheet';
 import { TripMap } from '@/components/trip-map';
 import { PLACE_ICONS, iconOf, labelOf } from '@/constants/place-icons';
 import { Colors, Radius, Spacing } from '@/constants/theme';
@@ -16,6 +18,7 @@ import {
   BottomSheet,
   Button,
   Caption,
+  Card,
   Chip,
   Empty,
   Field,
@@ -52,6 +55,8 @@ export default function Saved() {
   const [failed, setFailed] = useState<string | null>(null);
   /** 거르고 있는 갈래. 비우면 전부 봅니다. */
   const [kind, setKind] = useState<string | null>(null);
+  /** 말로 물어보는 판을 열어 두었는지. */
+  const [asking, setAsking] = useState(false);
   /** 지도에서 켜 둔 곳. 목록의 그 줄도 함께 켜집니다. */
   const [activeId, setActiveId] = useState<string | null>(null);
   /** 그림을 바꾸려고 열어 둔 곳. */
@@ -128,6 +133,28 @@ export default function Saved() {
     [shown],
   );
 
+  /**
+   * 찾은 곳을 바로 담습니다.
+   *
+   * <p>고르는 것과 담는 것이 여기서는 같은 일입니다 — 이 화면에는 넣을
+   * 일정이 없고 보석함뿐입니다.
+   */
+  async function keepFound(found: { name: string; lat: number; lng: number; placeId?: string | null; icon?: string | null }) {
+    setFailed(null);
+    try {
+      await api.post('/api/saved', {
+        name: found.name,
+        lat: found.lat,
+        lng: found.lng,
+        placeId: found.placeId,
+        icon: found.icon,
+      });
+      reload();
+    } catch (e) {
+      setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
+    }
+  }
+
   function toggle(id: string) {
     setPicked((prev) => {
       const next = new Set(prev);
@@ -199,6 +226,22 @@ export default function Saved() {
           height={240}
         />
       ) : null}
+
+      {/*
+        여기서 바로 담습니다.
+
+        전에는 담으려면 여행 상세나 둘러보기로 들어가야 했습니다. 그런데
+        보석함은 "다음에 가면 갈 데" 를 모아 두는 자리라, 아직 여행을 만들지도
+        않았을 때 쓰는 곳입니다. 담으려고 여행을 먼저 만들게 하는 것은 순서가
+        뒤집힌 일입니다.
+      */}
+      <Card>
+        <Row style={styles.addHead}>
+          <Subtitle>여기 담기</Subtitle>
+          <Button label="어디 갈까" variant="ghost" compact onPress={() => setAsking(true)} />
+        </Row>
+        <PlaceSearch onPick={keepFound} />
+      </Card>
 
       {/* 몇 개 안 될 때는 찾을 것이 없습니다. 칸만 자리를 차지합니다. */}
       {all.length > 4 ? (
@@ -313,7 +356,18 @@ export default function Saved() {
           <Caption tone="secondary">
             지도에 이 그림으로 찍힙니다. 일정에 넣을 때도 그대로 따라갑니다.
           </Caption>
-          <IconPicker
+          {/* 여행에 매이지 않고 묻습니다. 담아 둔 곳들의 한가운데에서 찾습니다. */}
+      <RecommendSheet
+        visible={asking}
+        tripId={null}
+        dayId={null}
+        dayLabel={null}
+        onClose={() => setAsking(false)}
+        onChanged={reload}
+        here={null}
+      />
+
+      <IconPicker
             value={tagging.icon ?? null}
             onChange={(next) => retag(tagging, next)}
             noneLabel="별"
@@ -446,6 +500,10 @@ function PourSheet({
 }
 
 const styles = StyleSheet.create({
+  addHead: {
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   list: {
     gap: Spacing.xs,
   },

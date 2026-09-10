@@ -93,5 +93,30 @@ console.log("\n[6] 동행자도 물어볼 수 있다");
 r = await ask({ query: "카페" }, mate);
 T("동행자는 부를 수 있다", r.status === 400 && /검색이 꺼져/.test(r.data.error), r.data);
 
+console.log("\n[7] 여행 없이도 물어본다 — 보석함에서");
+/* 보석함은 "다음에 가면 갈 데" 를 모아 두는 자리다. 담으려고 여행을 먼저
+   만들게 하는 것은 순서가 뒤집힌 일이다 */
+r = await call("POST", "/api/recommend", { token: host, body: { query: "조용한 카페" } });
+T("여행 없이 부를 수 있다", r.status === 400 && /검색이 꺼져/.test(r.data.error), r.data);
+r = await call("POST", "/api/recommend", { token: host, body: { query: "" } });
+T("빈 질의는 여기서도 거절", r.status === 400 && /한 줄/.test(r.data.error), r.data);
+r = await call("POST", "/api/recommend", { body: { query: "카페" } });
+T("로그인은 필요하다", r.status === 401, r.data);
+r = await call("POST", "/api/recommend", { token: host, body: { query: "카페", dayId: days[0].id } });
+T("여행 없이 날짜만 고를 수는 없다", r.status === 400 && /여행 없이/.test(r.data.error), r.data);
+
+console.log("\n[8] 장소 하나의 사정");
+/* 이 서버에는 구글 키가 없다. 그때는 빈 것을 돌려준다 — 오류가 아니다.
+   화면은 이름과 주소만으로 그린다 */
+r = await call("GET", "/api/places/ChIJN1t_tDeuEmsRUsoyG83frY4/info", { token: host });
+T("키가 없으면 빈 것을 돌려준다", r.status === 200 && !r.data.info, r.data);
+r = await call("GET", "/api/places/abc/info?on=2026-11-02", { token: host });
+T("날짜를 함께 줘도 된다", r.status === 200, r.data);
+r = await call("GET", "/api/places/abc/info?on=%EC%96%B8%EC%A0%A0%EA%B0%80", { token: host });
+T("이상한 날짜는 거절", r.status === 400, r.data);
+r = await call("GET", "/api/places/abc/info");
+T("로그인 없이는 못 본다", r.status === 401, r.data);
+
+
 console.log(`\n결과: ${pass} 통과 / ${fail} 실패`);
 process.exit(fail ? 1 : 0);

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { api, ApiError, UNEXPECTED } from '@/api/client';
+import { PlaceDetailSheet } from '@/components/place-detail-sheet';
 import { iconOf } from '@/constants/place-icons';
 import type { IntentState } from '@/lib/intent-types';
 import { canParseHere, fetchModel, intentState, modelNote, parseIntent } from '@/lib/intent';
@@ -14,8 +15,10 @@ import {
   Caption,
   Divider,
   ErrorNote,
+  Chip,
   Field,
   Loading,
+  Press,
   Row,
 } from '@/ui';
 
@@ -36,26 +39,50 @@ export function RecommendSheet({
   tripId,
   dayId,
   dayLabel,
+  dayIso,
   here,
+  anchors = [],
   onClose,
   onChanged,
 }: {
   visible: boolean;
-  tripId: string;
+  /** 매인 여행. 없으면 보석함에서 물은 것입니다. */
+  tripId: string | null;
   /** 어느 날에 넣을지. 있으면 그 날짜로 영업 여부를 봅니다. */
   dayId: string | null;
   dayLabel: string | null;
+  /** 그날이 며칠인지. 들여다보는 판이 그날 기준으로 영업시간을 봅니다. */
+  dayIso?: string | null;
   /** 지금 서 있는 자리. 있으면 여행의 한가운데보다 이쪽을 먼저 봅니다. */
   here: { lat: number; lng: number } | null;
+  /**
+   * 기준으로 삼을 수 있는 곳들.
+   *
+   * <p>일정에 이미 넣어 둔 장소들입니다. "숙소 근처 아침 먹을 데" 처럼
+   * 어디를 기준으로 찾을지가 정해진 물음이 많습니다.
+   */
+  anchors?: { id: string; name: string; lat: number; lng: number }[];
   onClose: () => void;
   onChanged: () => void;
 }) {
   const [query, setQuery] = useState('');
+  /*
+    어디를 기준으로 찾을지.
+
+    비워 두면 여행 전체(핀들의 한가운데)입니다. 그런데 실제로 묻는 것은
+    대개 "숙소 근처", "이 절 근처" 처럼 한 곳을 기준으로 한 물음입니다.
+    여행 전체의 한가운데는 아무 데도 아닌 논밭일 때가 있습니다.
+
+    'here' 는 지금 서 있는 자리입니다 — 길 위에서 묻는 것은 대개 그 뜻입니다.
+  */
+  const [from, setFrom] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
   const [result, setResult] = useState<Recommended | null>(null);
   /** 이미 담은 것. 눌렀는데 아무 일도 안 일어난 것처럼 보이지 않게. */
   const [kept, setKept] = useState<Record<string, Where>>({});
+  /** 들여다보는 중인 곳. 카드를 누르면 지도와 사정이 뜹니다. */
+  const [looking, setLooking] = useState<Card | null>(null);
 
   /*
     기기 안에서 먼저 쪼개기.
@@ -88,14 +115,24 @@ export function RecommendSheet({
          그때는 문장이 그대로 갑니다. */
       const intent = brain === 'ready' ? await parseIntent(q) : null;
 
-      const got = await api.post<Recommended>(`/api/trips/${tripId}/recommend`, {
-        query: q,
-        dayId,
-        /* 주소가 아니라 본문으로 보냅니다. 어디 있는지는 접근 기록에 남길
-           값이 아닙니다. */
-        here,
-        intent,
-      });
+      /* 여행에 매여 있으면 그 여행의 맥락으로, 아니면(보석함에서 물었으면)
+         담아 둔 곳들의 한가운데로 찾습니다. */
+      const at =
+        from === 'here'
+          ? here
+          : (anchors.find((a) => a.id === from) ?? null);
+
+      const got = await api.post<Recommended>(
+        tripId ? `/api/trips/${tripId}/recommend` : '/api/recommend',
+        {
+          query: q,
+          dayId,
+          /* 주소가 아니라 본문으로 보냅니다. 어디 있는지는 접근 기록에 남길
+             값이 아닙니다. */
+          here: at ? { lat: at.lat, lng: at.lng } : null,
+          intent,
+        },
+      );
       setResult(got);
       setKept({});
     } catch (e) {
@@ -117,7 +154,7 @@ export function RecommendSheet({
     try {
       if (where === 'trip' && dayId) {
         await api.post('/api/places', { dayId, ...body });
-      } else if (where === 'candidate') {
+      } else if (where === 'candidate' && tripId) {
         await api.post(`/api/trips/${tripId}/candidates`, body);
       } else {
         await api.post('/api/saved', body);
@@ -152,6 +189,41 @@ export function RecommendSheet({
           onPress: ask,
         }}
       />
+
+      {/*
+        어디를 기준으로 찾을지.
+
+        여행 전체의 한가운데는 아무 데도 아닌 논밭일 때가 있습니다. 실제로
+        묻는 것은 대개 "숙소 근처 아침 먹을 데" 처럼 한 곳을 기준으로 한
+        물음입니다.
+      */}
+      {here || anchors.length > 0 ? (
+        <View style={styles.from}>
+          <Caption tone="secondary">어디 근처에서 찾을까요?</Caption>
+          <Row gap={Spacing.xs} style={styles.chips}>
+            <Chip
+              label={tripId ? '여행 전체' : '담아 둔 곳 언저리'}
+              selected={from === null}
+              onPress={() => setFrom(null)}
+            />
+            {here ? (
+              <Chip
+                label="지금 내 자리"
+                selected={from === 'here'}
+                onPress={() => setFrom(from === 'here' ? null : 'here')}
+              />
+            ) : null}
+            {anchors.map((a) => (
+              <Chip
+                key={a.id}
+                label={a.name}
+                selected={from === a.id}
+                onPress={() => setFrom(from === a.id ? null : a.id)}
+              />
+            ))}
+          </Row>
+        </View>
+      ) : null}
 
       {/*
         기기 안에서 쪼개기.
@@ -191,6 +263,12 @@ export function RecommendSheet({
         <View key={`${card.name}${card.placeId ?? ''}`} style={styles.card}>
           <Divider />
 
+          {/* 이름과 평점만으로는 두 곳을 견줄 수가 없습니다. 누르면 지도에
+              찍어 보고 영업시간까지 봅니다. */}
+          <Press
+            onPress={() => setLooking(card)}
+            scale={0.995}
+            accessibilityLabel={`${card.name} 자세히 보기`}>
           <Row gap={Spacing.sm} style={styles.head}>
             <Body strong numberOfLines={2}>
               {`${iconOf(card.icon)} ${card.name}`.trim()}
@@ -222,38 +300,68 @@ export function RecommendSheet({
               </Caption>
             ) : null}
           </Row>
+          </Press>
 
-          {kept[card.name] ? (
-            <Caption tone="success" strong>
-              {KEPT[kept[card.name]]}
-            </Caption>
-          ) : (
-            <Row gap={Spacing.sm}>
-              {dayId ? (
-                <Button label="일정에" compact onPress={() => keep(card, 'trip')} />
-              ) : null}
-              <Button
-                label="투표장에"
-                variant="secondary"
-                compact
-                onPress={() => keep(card, 'candidate')}
-              />
-              <Button
-                label="보석함에"
-                variant="ghost"
-                compact
-                onPress={() => keep(card, 'saved')}
-              />
-            </Row>
-          )}
+          <Keep card={card} kept={kept} onKeep={keep} dayId={dayId} inTrip={!!tripId} />
         </View>
       ))}
+
+      <PlaceDetailSheet
+        place={looking}
+        onIso={dayIso}
+        here={here}
+        onClose={() => setLooking(null)}
+        actions={looking ? <Keep card={looking} kept={kept} onKeep={keep} dayId={dayId} inTrip={!!tripId} /> : null}
+      />
 
       {/* 구글 약관이 요구하는 표시입니다. 결과가 있을 때만 답니다. */}
       {result && result.places.length > 0 ? (
         <Caption tone="muted">제공: Google</Caption>
       ) : null}
     </BottomSheet>
+  );
+}
+
+/**
+ * 이 곳을 어디에 담을지.
+ *
+ * <p>카드 아래에도, 들여다보는 판 안에도 같은 것이 섭니다. 두 곳에 따로
+ * 적어 두면 한쪽만 고쳤을 때 같은 자리에서 다른 것이 됩니다.
+ */
+function Keep({
+  card,
+  kept,
+  onKeep,
+  dayId,
+  inTrip,
+}: {
+  card: Card;
+  kept: Record<string, Where>;
+  onKeep: (card: Card, where: Where) => void;
+  dayId: string | null;
+  inTrip: boolean;
+}) {
+  if (kept[card.name]) {
+    return (
+      <Caption tone="success" strong>
+        {KEPT[kept[card.name]]}
+      </Caption>
+    );
+  }
+  return (
+    <Row gap={Spacing.sm}>
+      {dayId ? <Button label="일정에" compact onPress={() => onKeep(card, 'trip')} /> : null}
+      {/* 투표장은 여행에 딸린 자리입니다. 보석함에서 물었으면 갈 데가 없습니다. */}
+      {inTrip ? (
+        <Button
+          label="투표장에"
+          variant="secondary"
+          compact
+          onPress={() => onKeep(card, 'candidate')}
+        />
+      ) : null}
+      <Button label="보석함에" variant="ghost" compact onPress={() => onKeep(card, 'saved')} />
+    </Row>
   );
 }
 
@@ -297,6 +405,12 @@ function km(meters: number) {
 const styles = StyleSheet.create({
   card: {
     gap: Spacing.xs,
+  },
+  from: {
+    gap: Spacing.xs,
+  },
+  chips: {
+    flexWrap: 'wrap',
   },
   brain: {
     alignItems: 'center',

@@ -4,7 +4,8 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { api, ApiError, UNEXPECTED } from '@/api/client';
 import type { Found, PlaceSearchProps } from '@/components/map-types';
 import { Colors, Radius, Spacing, Tap } from '@/constants/theme';
-import { Body, Caption, Divider, Field, IconButton, Loading, Row } from '@/ui';
+import { PlaceDetailSheet } from '@/components/place-detail-sheet';
+import { Body, Button, Caption, Divider, Field, IconButton, Loading, Row } from '@/ui';
 
 /**
  * 이름으로 장소 찾기.
@@ -16,8 +17,10 @@ import { Body, Caption, Divider, Field, IconButton, Loading, Row } from '@/ui';
  * <p>고르면 좌표가 뒤에서 채워집니다. 쓰는 사람은 위도·경도를 볼 일이
  * 없습니다.
  */
-export function PlaceSearch({ onPick }: PlaceSearchProps) {
+export function PlaceSearch({ onPick, here }: PlaceSearchProps) {
   const [query, setQuery] = useState('');
+  /** 들여다보는 중인 곳. 누르면 지도와 사정이 뜹니다. */
+  const [looking, setLooking] = useState<Found | null>(null);
   const [results, setResults] = useState<Found[] | null>(null);
   /* 담은 것을 기억해 별을 채웁니다. 서버는 같은 곳을 두 번 담지 않지만,
      화면이 그것을 모르면 눌러도 아무 일도 안 일어난 것처럼 보입니다. */
@@ -89,18 +92,51 @@ export function PlaceSearch({ onPick }: PlaceSearchProps) {
 
       {results && results.length === 0 ? <Caption>찾지 못했습니다.</Caption> : null}
 
+      <PlaceDetailSheet
+        place={looking}
+        here={here}
+        onClose={() => setLooking(null)}
+        actions={
+          looking ? (
+            <Row gap={Spacing.sm}>
+              <Button
+                label="여기로 고르기"
+                compact
+                onPress={() => {
+                  onPick(looking);
+                  setLooking(null);
+                  setResults(null);
+                  setQuery('');
+                }}
+              />
+              <Button
+                label={kept.has(looking.name) ? '보석함에 담김' : '보석함에 담기'}
+                variant="secondary"
+                compact
+                disabled={kept.has(looking.name)}
+                onPress={() => keep(looking)}
+              />
+            </Row>
+          ) : null
+        }
+      />
+
       {results && results.length > 0 ? (
         <View style={styles.results}>
           {results.map((r, i) => (
             <View key={`${r.lat},${r.lng},${i}`}>
               {i > 0 ? <Divider /> : null}
               <Row style={styles.resultRow}>
+                {/*
+                  누르면 바로 넣지 않고 들여다봅니다.
+
+                  이름과 주소만으로는 "이치란 도톤보리점" 과 "이치란 난바점"
+                  중 어느 쪽인지 고를 수가 없었습니다. 지도에 찍어 보고 평점과
+                  영업시간을 본 뒤에 넣는 것이 순서입니다.
+                */}
                 <Pressable
-                  onPress={() => {
-                    onPick(r);
-                    setResults(null);
-                    setQuery('');
-                  }}
+                  onPress={() => setLooking(r)}
+                  accessibilityLabel={`${r.name} 자세히 보기`}
                   style={({ pressed }) => [styles.row, styles.grow, pressed && styles.rowPressed]}>
                   <Body strong numberOfLines={1}>
                     {r.name}

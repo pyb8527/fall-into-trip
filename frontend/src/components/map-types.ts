@@ -151,6 +151,8 @@ export type Found = {
 
 export type PlaceSearchProps = {
   onPick: (found: Found) => void;
+  /** 지금 서 있는 자리. 있으면 찾은 곳이 여기서 얼마나 먼지 적습니다. */
+  here?: { lat: number; lng: number } | null;
 };
 
 /**

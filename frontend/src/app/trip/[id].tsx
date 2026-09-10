@@ -35,7 +35,7 @@ import { iconOf } from '@/constants/place-icons';
 import { faceOf } from '@/constants/user-marks';
 import { metersBetween, SAME_SPOT } from '@/lib/geo';
 import { RecommendSheet } from '@/components/recommend-sheet';
-import { openDirections } from '@/lib/directions';
+import { openDirections, openPlace } from '@/lib/directions';
 import { canPrint, printItinerary } from '@/lib/print';
 import { useHere } from '@/lib/here';
 import { decodePolyline } from '@/lib/polyline';
@@ -966,6 +966,17 @@ export default function TripScreen() {
            엉뚱한 날의 사실로 읽게 됩니다. */
         dayId={dayIndex >= 0 ? (days[dayIndex]?.id ?? null) : null}
         dayLabel={dayIndex >= 0 ? (days[dayIndex]?.date || days[dayIndex]?.label || null) : null}
+        dayIso={dayIndex >= 0 ? (days[dayIndex]?.iso ?? null) : null}
+        /*
+          기준으로 삼을 수 있는 곳들.
+
+          날짜를 하나 골라 보고 있으면 그 날의 장소만, 전체를 보고 있으면
+          여행 전부. 스무 개가 칩으로 늘어서면 고르는 것이 아니라 훑는 일이
+          되므로, 보고 있는 만큼만 냅니다.
+        */
+        anchors={(dayIndex >= 0 ? (days[dayIndex]?.places ?? []) : days.flatMap((d) => d.places)).map(
+          (p) => ({ id: p.id, name: p.name, lat: p.lat, lng: p.lng }),
+        )}
         here={me.here}
         onClose={() => setAsking(false)}
         onChanged={refresh}
@@ -1716,6 +1727,26 @@ function PlaceRow({
               onPress={onTips}
             />
           ) : null}
+          {/*
+            길찾기와 다릅니다.
+
+            길찾기는 "어떻게 가지" 이고 이쪽은 "여기가 어떤 데지" 입니다 —
+            사진, 후기, 메뉴, 거리뷰. 우리가 갖고 있지 않은 것들이 거기 다
+            있습니다. 길찾기 단추만 있고 이것이 없어서, 정작 그 가게를 다시
+            보려면 직접 검색해야 했습니다.
+          */}
+          <IconButton
+            name="map-pin"
+            label={`${place.name} 구글 지도에서 보기`}
+            onPress={() =>
+              openPlace({
+                name: place.name,
+                lat: place.lat,
+                lng: place.lng,
+                placeId: place.placeId,
+              })
+            }
+          />
           {/* 실제 안내는 구글 지도에 넘깁니다. 음성 안내도 환승 정보도 그쪽이
               낫고, 어차피 켤 것을 주소 옮겨 적게 만들 이유가 없습니다. */}
           <IconButton

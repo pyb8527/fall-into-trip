@@ -8,14 +8,17 @@ import net.weeniebeenie.fit.account.infrastructure.security.CurrentUser;
 import net.weeniebeenie.fit.shared.error.ApiException;
 import net.weeniebeenie.fit.trip.api.dto.TripDtos;
 import net.weeniebeenie.fit.trip.api.dto.TripDtos.ReorderRequest;
+import net.weeniebeenie.fit.trip.application.PlaceInfoService;
 import net.weeniebeenie.fit.trip.application.PlaceSearchService;
 import net.weeniebeenie.fit.trip.application.PlaceService;
 import net.weeniebeenie.fit.trip.application.PlaceService.PlaceDraft;
 import net.weeniebeenie.fit.trip.application.RouteService;
+import net.weeniebeenie.fit.trip.domain.DayLabels;
 import net.weeniebeenie.fit.trip.domain.Place;
 import net.weeniebeenie.fit.trip.domain.RouteTidy;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.Map;
 
 @RestController
@@ -25,6 +28,7 @@ public class PlaceController {
 
     private final PlaceService places;
     private final PlaceSearchService search;
+    private final PlaceInfoService infos;
     private final RouteService routes;
     private final ObjectMapper mapper;
 
@@ -97,6 +101,37 @@ public class PlaceController {
      *
      * <p>보기만 합니다. 받아들이면 화면이 아래 reorder 로 저장합니다.
      */
+    /**
+     * 구글 번호 하나로 그 가게의 사정을 봅니다.
+     *
+     * <p>일정에 넣기 전에 고르는 자리에서 씁니다. 이름과 주소만으로는 두 곳을
+     * 견줄 수가 없습니다 — 평점이 몇인지, 그날 문을 여는지, 브레이크 타임이
+     * 있는지가 있어야 고릅니다.
+     *
+     * <p>{@code /places-info} 와 다릅니다. 그쪽은 일정에 이미 들어간 날짜
+     * 전체를 훑고, 이쪽은 아직 아무 데도 안 들어간 곳 하나를 봅니다.
+     *
+     * <p>로그인한 사람만 부를 수 있습니다(/api/** 규칙). 열어 두면 남이 우리
+     * 사용량을 태웁니다.
+     *
+     * @param on 그날. 없으면 그 장소가 있는 곳의 오늘로 봅니다.
+     */
+    @GetMapping("/{placeId}/info")
+    public Map<String, Object> info(@PathVariable String placeId,
+                                    @RequestParam(required = false) String on) {
+        LocalDate date = null;
+        if (on != null && !on.isBlank()) {
+            date = DayLabels.parse(on);
+        }
+        PlaceInfoService.Info got = infos.about(placeId, date);
+        Map<String, Object> out = new java.util.HashMap<>();
+        /* 못 받아 왔으면 빈 것을 돌려줍니다. 오류가 아닙니다 — 구글이 모르는
+           곳이거나 검색이 꺼져 있는 서버입니다. 화면은 이름과 주소만으로
+           그립니다. */
+        out.put("info", got);
+        return out;
+    }
+
     @GetMapping("/tidy")
     public Map<String, Object> tidy(@CurrentUser AuthPrincipal me, @RequestParam String dayId) {
         RouteTidy.Tidied made = places.tidy(me, dayId);

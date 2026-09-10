@@ -63,3 +63,38 @@ export async function openDirections(to: Destination, mode: TravelMode | null) {
     return false;
   }
 }
+
+/**
+ * 그 장소를 구글 지도에서 엽니다.
+ *
+ * <p>길찾기와 다릅니다. 길찾기는 "어떻게 가지" 이고 이쪽은 "여기가 어떤
+ * 데지" 입니다 — 사진, 후기, 메뉴, 거리뷰. 우리가 갖고 있지 않은 것들이
+ * 거기 다 있고, 우리가 그것을 옮겨 오는 것은 약관상으로도 품으로도 할 일이
+ * 아닙니다.
+ *
+ * <p>구글이 그 장소의 주소를 직접 알려 준 것이 있으면 그것을 씁니다(가장
+ * 정확합니다). 없으면 좌표와 번호로 만듭니다 — 번호가 있으면 길 건너 엉뚱한
+ * 건물이 열리는 일이 없습니다.
+ */
+export function placeUrl(at: Destination, mapUrl?: string | null) {
+  if (mapUrl) {
+    return mapUrl;
+  }
+  const params = new URLSearchParams({
+    api: '1',
+    query: `${at.lat},${at.lng}`,
+  });
+  if (at.placeId) {
+    params.set('query_place_id', at.placeId);
+  }
+  return `https://www.google.com/maps/search/?${params.toString()}`;
+}
+
+export async function openPlace(at: Destination, mapUrl?: string | null) {
+  try {
+    await Linking.openURL(placeUrl(at, mapUrl));
+    return true;
+  } catch {
+    return false;
+  }
+}

@@ -70,6 +70,32 @@ public class TripController {
      * <p>물어본 문장도 기록에 남기지 않습니다. "혼자 울기 좋은 곳" 이 로그에
      * 남을 이유가 없습니다.
      */
+    /**
+     * 여행에 매이지 않고 묻습니다.
+     *
+     * <p>보석함에서 쓰는 길입니다. 아직 어느 여행에 넣을지 안 정했을 때 —
+     * "다음에 오사카 가면 갈 데" 를 모아 두는 자리 — 여행을 먼저 만들게
+     * 하는 것은 순서가 뒤집힌 일입니다.
+     *
+     * <p>어디쯤인지는 담아 둔 곳들의 한가운데로 봅니다. 담아 둔 것에도 그
+     * 사람이 어디를 다니는지가 담겨 있습니다.
+     */
+    @PostMapping("/recommend")
+    public Map<String, Object> recommendLoose(@CurrentUser AuthPrincipal me,
+                                              @RequestBody RecommendRequest req) {
+        /* 날짜를 함께 보냈으면 그대로 넘깁니다. 여기서 조용히 버리면 "왜 그날
+           기준으로 안 보나" 를 알 길이 없습니다 — 서비스가 거절합니다. */
+        RecommendService.Result got = recommend.recommend(
+                me, null, req.query(), req.dayId(),
+                req.here() == null ? null : req.here().lat(),
+                req.here() == null ? null : req.here().lng(),
+                req.intent());
+        Map<String, Object> out = new java.util.HashMap<>();
+        out.put("places", got.places());
+        out.put("note", got.note());
+        return out;
+    }
+
     @PostMapping("/trips/{id}/recommend")
     public Map<String, Object> recommend(@CurrentUser AuthPrincipal me,
                                          @PathVariable String id,

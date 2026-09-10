@@ -79,13 +79,18 @@ public class RecommendService {
     }
 
     /**
+     * @param tripId 없어도 됩니다. 보석함에서 물을 때는 매인 여행이 없습니다 —
+     *               그때는 담아 둔 곳들의 한가운데를 봅니다.
      * @param intent 기기 안의 모델이 문장을 미리 쪼개 온 것. 없어도 됩니다 —
      *               없으면 문장을 그대로 구글에 넘깁니다.
      */
     @Transactional(readOnly = true)
     public Result recommend(AuthPrincipal me, String tripId, String query,
                             String dayId, Double hereLat, Double hereLng, Intent intent) {
-        access.requireCanRead(tripId, me.id());
+        boolean inTrip = tripId != null && !tripId.isBlank();
+        if (inTrip) {
+            access.requireCanRead(tripId, me.id());
+        }
 
         String q = query == null ? "" : query.trim();
         if (q.isEmpty()) {
@@ -95,16 +100,31 @@ public class RecommendService {
             throw ApiException.badRequest("너무 깁니다. 한 문장으로 줄여 주세요.");
         }
 
-        List<Place> mine = places.findAllOfTrip(tripId);
+        List<Place> mine = inTrip ? places.findAllOfTrip(tripId) : List.of();
 
-        /* 어디쯤인가. 지금 서 있는 자리가 있으면 그쪽이 먼저입니다 — 길 위에서
-           묻는 것은 대개 "지금 여기 근처" 라는 뜻입니다. */
+        /*
+          어디쯤인가.
+
+          지금 서 있는 자리가 있으면 그쪽이 먼저입니다 — 길 위에서 묻는 것은
+          대개 "지금 여기 근처" 라는 뜻입니다.
+
+          없으면 여행에 꽂힌 핀들의 한가운데를 보고, 그것도 없으면(보석함에서
+          물었거나 텅 빈 여행이면) 담아 둔 곳들의 한가운데를 봅니다. 담아 둔
+          것에도 그 사람이 어디를 다니는지가 담겨 있습니다.
+         */
         Coordinates around = hereLat != null && hereLng != null
                 ? Coordinates.of(hereLat, hereLng)
                 : middleOf(mine);
+        List<SavedPlace> box = saved.findAllByUserIdOrderByCreatedAtDesc(me.id());
+        if (around == null) {
+            around = middleOfSaved(box);
+        }
 
         LocalDate on = null;
         if (dayId != null && !dayId.isBlank()) {
+            if (!inTrip) {
+                throw ApiException.badRequest("여행 없이 날짜만 고를 수는 없습니다.");
+            }
             Day day = days.findById(dayId)
                     .orElseThrow(() -> ApiException.notFound("날짜를 찾을 수 없습니다."));
             if (!day.getTripId().equals(tripId)) {
@@ -119,7 +139,7 @@ public class RecommendService {
                 around == null ? null : around.lng(),
                 around == null ? null : NEAR);
 
-        Map<String, String> had = alreadyHave(me, tripId, mine);
+        Map<String, String> had = alreadyHave(box, inTrip ? tripId : null, mine);
 
         List<Card> cards = new ArrayList<>();
         for (PlaceSearchService.Found f : found) {
@@ -244,6 +264,26 @@ public class RecommendService {
     }
 
     /**
+     * 보석함에 담아 둔 곳들의 한가운데.
+     *
+     * <p>여행에 매이지 않은 자리(보석함)에서 물을 때 씁니다. 담아 둔 것에도
+     * 그 사람이 어디를 다니는지가 담겨 있습니다 — 오사카를 스무 곳 담아 둔
+     * 사람에게 서울 카페를 내놓을 이유가 없습니다.
+     *
+     * <p>최근 것 열 곳만 셉니다. 몇 년치를 다 세면 예전에 다녀온 동네가
+     * 지금 짜는 것을 끌어당깁니다.
+     */
+    private static Coordinates middleOfSaved(List<SavedPlace> box) {
+        List<SavedPlace> recent = box.size() > 10 ? box.subList(0, 10) : box;
+        if (recent.isEmpty()) {
+            return null;
+        }
+        double lat = recent.stream().mapToDouble(SavedPlace::getLat).average().orElse(0);
+        double lng = recent.stream().mapToDouble(SavedPlace::getLng).average().orElse(0);
+        return new Coordinates(lat, lng);
+    }
+
+    /**
      * 이미 어딘가에 담아 둔 곳들.
      *
      * <p>구글 번호로 봅니다. 이름은 사람마다 다르게 적고, 좌표는 같은 건물
@@ -252,19 +292,21 @@ public class RecommendService {
      * <p>먼저 담은 자리가 이깁니다 — 일정에 이미 들어 있으면 보석함에도
      * 있더라도 "일정에 있음" 이 더 알아야 할 말입니다.
      */
-    private Map<String, String> alreadyHave(AuthPrincipal me, String tripId, List<Place> mine) {
+    private Map<String, String> alreadyHave(List<SavedPlace> box, String tripId, List<Place> mine) {
         Map<String, String> out = new HashMap<>();
 
-        saved.findAllByUserIdOrderByCreatedAtDesc(me.id()).forEach(s -> {
+        box.forEach(s -> {
             if (s.getPlaceId() != null) {
                 out.put(s.getPlaceId(), "saved");
             }
         });
-        candidates.findAllByTripIdOrderByCreatedAtAsc(tripId).forEach(c -> {
-            if (c.getPlaceId() != null) {
-                out.put(c.getPlaceId(), "candidate");
-            }
-        });
+        if (tripId != null) {
+            candidates.findAllByTripIdOrderByCreatedAtAsc(tripId).forEach(c -> {
+                if (c.getPlaceId() != null) {
+                    out.put(c.getPlaceId(), "candidate");
+                }
+            });
+        }
         mine.forEach(p -> {
             if (p.getPlaceId() != null) {
                 out.put(p.getPlaceId(), "trip");
@@ -287,7 +329,7 @@ public class RecommendService {
                     : "찾은 곳이 없습니다. 조금 다르게 물어보세요.";
         }
         if (around == null) {
-            return "이 여행에 아직 장소가 없어 지역을 좁히지 못했습니다. 한 곳이라도 넣어 두면 그 언저리에서 찾습니다.";
+            return "어디쯤인지 몰라 넓게 찾았습니다. 지역 이름을 함께 넣으면 더 가까운 곳이 나옵니다.";
         }
         return null;
     }
