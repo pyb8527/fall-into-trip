@@ -965,18 +965,18 @@ export default function TripScreen() {
            있으면 날짜를 안 넘깁니다 — 아무 날이나 골라 주면 그 날 휴무를
            엉뚱한 날의 사실로 읽게 됩니다. */
         dayId={dayIndex >= 0 ? (days[dayIndex]?.id ?? null) : null}
-        dayLabel={dayIndex >= 0 ? (days[dayIndex]?.date || days[dayIndex]?.label || null) : null}
-        dayIso={dayIndex >= 0 ? (days[dayIndex]?.iso ?? null) : null}
         /*
-          기준으로 삼을 수 있는 곳들.
+          기준점은 날을 먼저 좁힌 뒤에 고릅니다.
 
-          날짜를 하나 골라 보고 있으면 그 날의 장소만, 전체를 보고 있으면
-          여행 전부. 스무 개가 칩으로 늘어서면 고르는 것이 아니라 훑는 일이
-          되므로, 보고 있는 만큼만 냅니다.
+          여행 전부의 장소를 한 줄에 늘어놓으면 닷새짜리는 스무 개가 넘어가고,
+          그때부터는 고르는 것이 아니라 훑는 일이 됩니다.
         */
-        anchors={(dayIndex >= 0 ? (days[dayIndex]?.places ?? []) : days.flatMap((d) => d.places)).map(
-          (p) => ({ id: p.id, name: p.name, lat: p.lat, lng: p.lng }),
-        )}
+        days={days.map((d) => ({
+          id: d.id,
+          label: d.date || d.label,
+          iso: d.iso,
+          places: d.places.map((p) => ({ id: p.id, name: p.name, lat: p.lat, lng: p.lng })),
+        }))}
         here={me.here}
         onClose={() => setAsking(false)}
         onChanged={refresh}

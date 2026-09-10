@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { api, ApiError, UNEXPECTED } from '@/api/client';
@@ -38,30 +38,36 @@ export function RecommendSheet({
   visible,
   tripId,
   dayId,
-  dayLabel,
-  dayIso,
+  days = [],
   here,
-  anchors = [],
   onClose,
   onChanged,
 }: {
   visible: boolean;
   /** 매인 여행. 없으면 보석함에서 물은 것입니다. */
   tripId: string | null;
-  /** 어느 날에 넣을지. 있으면 그 날짜로 영업 여부를 봅니다. */
+  /**
+   * 여행 상세에서 이미 골라 둔 날.
+   *
+   * <p>날짜 하나를 보고 있다가 열었으면 그 날로 시작합니다. 전체를 보다가
+   * 열었으면 비어 있고, 판 안에서 고릅니다.
+   */
   dayId: string | null;
-  dayLabel: string | null;
-  /** 그날이 며칠인지. 들여다보는 판이 그날 기준으로 영업시간을 봅니다. */
-  dayIso?: string | null;
+  /**
+   * 이 여행의 날들.
+   *
+   * <p>기준점은 여기서 나옵니다 — 먼저 날을 고르고, 그 날의 장소 중에서
+   * 고릅니다. 여행 전부를 한 줄에 늘어놓으면 닷새짜리는 스무 개가 넘어가고,
+   * 그때부터는 고르는 것이 아니라 훑는 일이 됩니다.
+   */
+  days?: {
+    id: string;
+    label: string;
+    iso: string | null;
+    places: { id: string; name: string; lat: number; lng: number }[];
+  }[];
   /** 지금 서 있는 자리. 있으면 여행의 한가운데보다 이쪽을 먼저 봅니다. */
   here: { lat: number; lng: number } | null;
-  /**
-   * 기준으로 삼을 수 있는 곳들.
-   *
-   * <p>일정에 이미 넣어 둔 장소들입니다. "숙소 근처 아침 먹을 데" 처럼
-   * 어디를 기준으로 찾을지가 정해진 물음이 많습니다.
-   */
-  anchors?: { id: string; name: string; lat: number; lng: number }[];
   onClose: () => void;
   onChanged: () => void;
 }) {
@@ -76,6 +82,27 @@ export function RecommendSheet({
     'here' 는 지금 서 있는 자리입니다 — 길 위에서 묻는 것은 대개 그 뜻입니다.
   */
   const [from, setFrom] = useState<string | null>(null);
+  /*
+    어느 날을 볼지.
+
+    기준점을 고르기 전에 날부터 좁힙니다. 그리고 이 날은 "그날 문 여는지" 를
+    보는 기준이기도 합니다 — 셋째 날에 갈 곳을 찾는데 오늘 영업시간을 보면
+    아무 뜻이 없습니다.
+  */
+  const [onDay, setOnDay] = useState<string | null>(dayId);
+
+  /* 판을 열 때마다 보고 있던 날로 맞춥니다. 안 그러면 이틀째를 보다 닫고
+     사흘째에서 다시 열었을 때 이틀째가 골라진 채로 뜹니다. */
+  useEffect(() => {
+    if (visible) {
+      setOnDay(dayId);
+      setFrom(null);
+    }
+  }, [visible, dayId]);
+
+  const day = days.find((d) => d.id === onDay) ?? null;
+  const anchors = day?.places ?? [];
+
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
   const [result, setResult] = useState<Recommended | null>(null);
@@ -126,7 +153,7 @@ export function RecommendSheet({
         tripId ? `/api/trips/${tripId}/recommend` : '/api/recommend',
         {
           query: q,
-          dayId,
+          dayId: onDay,
           /* 주소가 아니라 본문으로 보냅니다. 어디 있는지는 접근 기록에 남길
              값이 아닙니다. */
           here: at ? { lat: at.lat, lng: at.lng } : null,
@@ -152,8 +179,8 @@ export function RecommendSheet({
       icon: card.icon,
     };
     try {
-      if (where === 'trip' && dayId) {
-        await api.post('/api/places', { dayId, ...body });
+      if (where === 'trip' && onDay) {
+        await api.post('/api/places', { dayId: onDay, ...body });
       } else if (where === 'candidate' && tripId) {
         await api.post(`/api/trips/${tripId}/candidates`, body);
       } else {
@@ -169,9 +196,11 @@ export function RecommendSheet({
   return (
     <BottomSheet visible={visible} title="어디 갈지 물어보기" onClose={onClose}>
       <Caption tone="secondary">
-        {dayLabel
-          ? `${dayLabel} 기준으로 찾습니다. 그날 문 여는지도 함께 봅니다.`
-          : '이 여행에 넣어 둔 곳들 언저리에서 찾습니다.'}
+        {day
+          ? `${day.label} 기준으로 찾습니다. 그날 문 여는지도 함께 봅니다.`
+          : tripId
+            ? '이 여행에 넣어 둔 곳들 언저리에서 찾습니다. 날을 고르면 그날 문 여는지도 봅니다.'
+            : '보석함에 담아 둔 곳들 언저리에서 찾습니다.'}
       </Caption>
 
       <Field
@@ -197,12 +226,45 @@ export function RecommendSheet({
         묻는 것은 대개 "숙소 근처 아침 먹을 데" 처럼 한 곳을 기준으로 한
         물음입니다.
       */}
+      {/* 먼저 날을 좁힙니다. 여행 전부의 장소를 한 줄에 늘어놓으면 닷새짜리는
+          스무 개가 넘어가고, 그때부터는 고르는 것이 아니라 훑는 일이 됩니다. */}
+      {days.length > 0 ? (
+        <View style={styles.from}>
+          <Caption tone="secondary">어느 날 갈 곳인가요?</Caption>
+          <Row gap={Spacing.xs} style={styles.chips}>
+            <Chip
+              label="아직 모름"
+              selected={onDay === null}
+              onPress={() => {
+                setOnDay(null);
+                setFrom(null);
+              }}
+            />
+            {days.map((d) => (
+              <Chip
+                key={d.id}
+                label={d.label}
+                selected={onDay === d.id}
+                onPress={() => {
+                  setOnDay(onDay === d.id ? null : d.id);
+                  /* 날이 바뀌면 기준으로 골라 둔 장소는 그 날의 것이
+                     아닙니다. 함께 풉니다. */
+                  setFrom(null);
+                }}
+              />
+            ))}
+          </Row>
+        </View>
+      ) : null}
+
       {here || anchors.length > 0 ? (
         <View style={styles.from}>
           <Caption tone="secondary">어디 근처에서 찾을까요?</Caption>
           <Row gap={Spacing.xs} style={styles.chips}>
             <Chip
-              label={tripId ? '여행 전체' : '담아 둔 곳 언저리'}
+              label={
+                day ? `${day.label} 언저리` : tripId ? '여행 전체' : '담아 둔 곳 언저리'
+              }
               selected={from === null}
               onPress={() => setFrom(null)}
             />
@@ -302,16 +364,16 @@ export function RecommendSheet({
           </Row>
           </Press>
 
-          <Keep card={card} kept={kept} onKeep={keep} dayId={dayId} inTrip={!!tripId} />
+          <Keep card={card} kept={kept} onKeep={keep} dayId={onDay} inTrip={!!tripId} />
         </View>
       ))}
 
       <PlaceDetailSheet
         place={looking}
-        onIso={dayIso}
+        onIso={day?.iso ?? null}
         here={here}
         onClose={() => setLooking(null)}
-        actions={looking ? <Keep card={looking} kept={kept} onKeep={keep} dayId={dayId} inTrip={!!tripId} /> : null}
+        actions={looking ? <Keep card={looking} kept={kept} onKeep={keep} dayId={onDay} inTrip={!!tripId} /> : null}
       />
 
       {/* 구글 약관이 요구하는 표시입니다. 결과가 있을 때만 답니다. */}

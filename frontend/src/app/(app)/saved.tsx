@@ -361,7 +361,6 @@ export default function Saved() {
         visible={asking}
         tripId={null}
         dayId={null}
-        dayLabel={null}
         onClose={() => setAsking(false)}
         onChanged={reload}
         here={null}
