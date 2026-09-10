@@ -5,6 +5,14 @@ import { api, ApiError, UNEXPECTED } from '@/api/client';
 import type { Found, PlaceSearchProps } from '@/components/map-types';
 import { Colors, Radius, Spacing, Tap } from '@/constants/theme';
 import { PlaceDetailSheet } from '@/components/place-detail-sheet';
+import {
+  SORT_GIVEN,
+  SORT_NEAR,
+  SORT_RATING,
+  SortBar,
+  sortPlaces,
+  type SortBy,
+} from '@/components/sort-bar';
 import { Body, Button, Caption, Divider, Field, IconButton, Loading, Row } from '@/ui';
 
 /**
@@ -21,6 +29,9 @@ export function PlaceSearch({ onPick, here }: PlaceSearchProps) {
   const [query, setQuery] = useState('');
   /** 들여다보는 중인 곳. 누르면 지도와 사정이 뜹니다. */
   const [looking, setLooking] = useState<Found | null>(null);
+  /* 구글이 준 순서는 "이 말과 얼마나 맞는가" 입니다. 고를 때 보는 눈은
+     그것 하나가 아닙니다. */
+  const [by, setBy] = useState<SortBy>('given');
   const [results, setResults] = useState<Found[] | null>(null);
   /* 담은 것을 기억해 별을 채웁니다. 서버는 같은 곳을 두 번 담지 않지만,
      화면이 그것을 모르면 눌러도 아무 일도 안 일어난 것처럼 보입니다. */
@@ -121,9 +132,17 @@ export function PlaceSearch({ onPick, here }: PlaceSearchProps) {
         }
       />
 
+      {results && results.length > 1 ? (
+        <SortBar
+          options={here ? [SORT_GIVEN, SORT_RATING, SORT_NEAR] : [SORT_GIVEN, SORT_RATING]}
+          value={by}
+          onChange={setBy}
+        />
+      ) : null}
+
       {results && results.length > 0 ? (
         <View style={styles.results}>
-          {results.map((r, i) => (
+          {sortPlaces(results, by, here).map((r, i) => (
             <View key={`${r.lat},${r.lng},${i}`}>
               {i > 0 ? <Divider /> : null}
               <Row style={styles.resultRow}>

@@ -9,6 +9,7 @@ import { IconPicker } from '@/components/icon-picker';
 import type { MapPlace } from '@/components/map-types';
 import { PlaceSearch } from '@/components/place-search';
 import { RecommendSheet } from '@/components/recommend-sheet';
+import { SORT_GIVEN, SORT_NAME, SortBar, sortPlaces, type SortBy } from '@/components/sort-bar';
 import { TripMap } from '@/components/trip-map';
 import { PLACE_ICONS, iconOf, labelOf } from '@/constants/place-icons';
 import { Colors, Radius, Spacing } from '@/constants/theme';
@@ -90,19 +91,21 @@ export default function Saved() {
     이름은 기억나지 않고 메모만 기억나는 일이 있습니다.
   */
   const [q, setQ] = useState('');
+  /* 담은 순서가 기본입니다. 최근 담은 것이 대개 지금 짜는 것과 가깝습니다. */
+  const [by, setBy] = useState<SortBy>('given');
 
   const shown = useMemo(() => {
     const byKind = kind === null ? all : all.filter((p) => p.icon === kind);
     const needle = q.trim().toLowerCase();
-    if (!needle) {
-      return byKind;
-    }
-    return byKind.filter((p) =>
-      [p.name, p.cat, p.note]
-        .filter(Boolean)
-        .some((field) => String(field).toLowerCase().includes(needle)),
-    );
-  }, [all, kind, q]);
+    const found = !needle
+      ? byKind
+      : byKind.filter((p) =>
+          [p.name, p.cat, p.note]
+            .filter(Boolean)
+            .some((field) => String(field).toLowerCase().includes(needle)),
+        );
+    return sortPlaces(found, by);
+  }, [all, kind, q, by]);
 
   /** 지도에 얹을 것. 거른 것만 올립니다 — 지도와 목록이 어긋나면 안 됩니다. */
   const pins = useMemo<MapPlace[]>(
@@ -268,6 +271,16 @@ export default function Saved() {
             />
           ))}
         </Row>
+      ) : null}
+
+      {/* 담아 둔 곳에는 평점이 없습니다. 번호만 저장하고 내용은 저장하지
+          않으니까요 — 이름순만 냅니다. */}
+      {all.length > 2 ? (
+        <SortBar
+          options={[{ ...SORT_GIVEN, label: '담은 순' }, SORT_NAME]}
+          value={by}
+          onChange={setBy}
+        />
       ) : null}
 
       {data && all.length > 0 && shown.length === 0 ? (

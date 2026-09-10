@@ -1,8 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { api, ApiError, UNEXPECTED } from '@/api/client';
 import { PlaceDetailSheet } from '@/components/place-detail-sheet';
+import {
+  SORT_GIVEN,
+  SORT_NEAR,
+  SORT_RATING,
+  SortBar,
+  sortPlaces,
+  type SortBy,
+} from '@/components/sort-bar';
 import { iconOf } from '@/constants/place-icons';
 import type { IntentState } from '@/lib/intent-types';
 import { canParseHere, fetchModel, intentState, modelNote, parseIntent } from '@/lib/intent';
@@ -103,6 +111,7 @@ export function RecommendSheet({
   const day = days.find((d) => d.id === onDay) ?? null;
   const anchors = day?.places ?? [];
 
+
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
   const [result, setResult] = useState<Recommended | null>(null);
@@ -110,6 +119,23 @@ export function RecommendSheet({
   const [kept, setKept] = useState<Record<string, Where>>({});
   /** 들여다보는 중인 곳. 카드를 누르면 지도와 사정이 뜹니다. */
   const [looking, setLooking] = useState<Card | null>(null);
+  /* 서버가 준 순서는 구글이 매긴 순서입니다. 고르는 눈은 그것 하나가
+     아닙니다. */
+  const [by, setBy] = useState<SortBy>('given');
+  /*
+    세운 순서.
+
+    서버가 이미 거리를 재 두었으므로(distanceM) 가까운순은 그것으로 셉니다.
+    기준을 어디로 잡았든 서버가 잰 그 기준이라, 화면이 다시 재면 도리어
+    어긋납니다.
+  */
+  const sorted = useMemo(() => {
+    const list = result?.places ?? [];
+    if (by === 'near') {
+      return [...list].sort((a, b) => (a.distanceM ?? 1e9) - (b.distanceM ?? 1e9));
+    }
+    return sortPlaces(list, by);
+  }, [result, by]);
 
   /*
     기기 안에서 먼저 쪼개기.
@@ -149,6 +175,7 @@ export function RecommendSheet({
           ? here
           : (anchors.find((a) => a.id === from) ?? null);
 
+      setBy('given');
       const got = await api.post<Recommended>(
         tripId ? `/api/trips/${tripId}/recommend` : '/api/recommend',
         {
@@ -321,7 +348,19 @@ export function RecommendSheet({
 
       {result?.note ? <Caption tone="secondary">{result.note}</Caption> : null}
 
-      {result?.places.map((card) => (
+      {result && result.places.length > 1 ? (
+        <SortBar
+          options={
+            result.places.some((c) => c.distanceM != null)
+              ? [SORT_GIVEN, SORT_RATING, SORT_NEAR]
+              : [SORT_GIVEN, SORT_RATING]
+          }
+          value={by}
+          onChange={setBy}
+        />
+      ) : null}
+
+      {sorted.map((card) => (
         <View key={`${card.name}${card.placeId ?? ''}`} style={styles.card}>
           <Divider />
 
