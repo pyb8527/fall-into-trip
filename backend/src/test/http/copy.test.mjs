@@ -178,5 +178,59 @@ T("꺼진 것으로 보인다", r.data.on === false, r.data);
 r = await call("GET", "/api/push/state");
 T("로그인 없이는 상태를 못 본다", r.status === 401, r.data);
 
+console.log("\n[10] 잘 곳");
+r = await call("GET", `/api/trip?trip=${tripId}`, { token: host });
+let d0 = r.data.days[0];
+T("처음에는 없다", !d0.stay, d0.stay);
+
+r = await call("PATCH", `/api/days/${d0.id}`, { token: host, body: {
+  version: d0.version, stayName: "난바 호텔", stayLat: 34.6650, stayLng: 135.5010,
+  stayNote: "체크인 15시", stayForward: true } });
+T("정해진다", r.status === 200, r.data);
+
+r = await call("GET", `/api/trip?trip=${tripId}`, { token: host });
+T("좌표까지 온다", r.data.days[0].stay.lat === 34.665, r.data.days[0].stay);
+T("메모도 온다", r.data.days[0].stay.note === "체크인 15시", r.data.days[0].stay);
+/* 이박 삼일이면 다음 날도 같은 숙소다. 날마다 다시 넣게 할 일이 아니다 */
+T("이후 날에도 이어진다", r.data.days[1].stay.name === "난바 호텔", r.data.days[1].stay);
+T("셋째 날에도", r.data.days[2].stay.name === "난바 호텔", r.data.days[2].stay);
+
+/* 이미 다른 데를 적어 둔 날은 덮어쓰지 않는다. 옮겨 자는 일정에서
+   조용히 하나가 사라지면 안 된다 */
+let d2 = (await call("GET", `/api/trip?trip=${tripId}`, { token: host })).data.days[2];
+await call("PATCH", `/api/days/${d2.id}`, { token: host, body: {
+  version: d2.version, stayName: "교토 료칸", stayLat: 35.0, stayLng: 135.76 } });
+d0 = (await call("GET", `/api/trip?trip=${tripId}`, { token: host })).data.days[0];
+await call("PATCH", `/api/days/${d0.id}`, { token: host, body: {
+  version: d0.version, stayName: "난바 호텔2", stayLat: 34.666, stayLng: 135.502,
+  stayForward: true } });
+r = await call("GET", `/api/trip?trip=${tripId}`, { token: host });
+T("적어 둔 날은 그대로", r.data.days[2].stay.name === "교토 료칸", r.data.days[2].stay);
+
+console.log("\n[11] 편과 지우기");
+d0 = r.data.days[0];
+r = await call("PATCH", `/api/days/${d0.id}`, { token: host, body: {
+  version: d0.version, flight: "OZ112 09:20 인천 T1" } });
+T("편이 적힌다", r.status === 200, r.data);
+r = await call("GET", `/api/trip?trip=${tripId}`, { token: host });
+T("편이 온다", r.data.days[0].flight === "OZ112 09:20 인천 T1", r.data.days[0].flight);
+
+d0 = r.data.days[0];
+r = await call("PATCH", `/api/days/${d0.id}`, { token: host, body: {
+  version: d0.version, stayName: "" } });
+r = await call("GET", `/api/trip?trip=${tripId}`, { token: host });
+/* 이름만 지우면 좌표가 남아 "이름 없는 어딘가" 가 된다 */
+T("이름을 지우면 통째로 사라진다", !r.data.days[0].stay, r.data.days[0].stay);
+T("편은 남는다", r.data.days[0].flight === "OZ112 09:20 인천 T1", r.data.days[0].flight);
+
+d0 = r.data.days[0];
+r = await call("PATCH", `/api/days/${d0.id}`, { token: host, body: {
+  version: d0.version, stayName: "이상한 곳", stayLat: 999, stayLng: 999 } });
+T("이상한 좌표는 거절", r.status === 400, r.data);
+
+r = await call("PATCH", `/api/days/${d0.id}`, { token: stranger, body: { stayName: "남의 것" } });
+T("남은 못 정한다", r.status === 403 || r.status === 404, r.data);
+
+
 console.log(`\n결과: ${pass} 통과 / ${fail} 실패`);
 process.exit(fail ? 1 : 0);

@@ -3,6 +3,7 @@ package net.weeniebeenie.fit.trip.application;
 import lombok.RequiredArgsConstructor;
 import net.weeniebeenie.fit.account.infrastructure.security.AuthPrincipal;
 import net.weeniebeenie.fit.shared.domain.Versioned;
+import net.weeniebeenie.fit.shared.domain.Coordinates;
 import net.weeniebeenie.fit.shared.error.ApiException;
 import net.weeniebeenie.fit.support.audit.AuditService;
 import net.weeniebeenie.fit.trip.domain.*;
@@ -73,6 +74,52 @@ public class DayService {
         if (patch.color() != null) day.setColor(blankToNull(patch.color()));
         if (patch.budget() != null) day.setBudget(blankToNull(patch.budget()));
         if (patch.flight() != null) day.setFlight(blankToNull(patch.flight()));
+
+        /*
+          숙소.
+
+          이름만 지우면 좌표가 남아 "이름 없는 어딘가" 가 됩니다. 이름을
+          비우는 것은 "숙소 없음" 이라는 뜻이므로 좌표도 함께 걷습니다.
+         */
+        if (patch.stayName() != null) {
+            String name = blankToNull(patch.stayName());
+            day.setStayName(name);
+            if (name == null) {
+                day.setStayLat(null);
+                day.setStayLng(null);
+                day.setStayPlaceId(null);
+                day.setStayNote(null);
+            }
+        }
+        if (patch.stayLat() != null && patch.stayLng() != null) {
+            Coordinates at = Coordinates.of(patch.stayLat(), patch.stayLng());
+            day.setStayLat(at.lat());
+            day.setStayLng(at.lng());
+        }
+        if (patch.stayPlaceId() != null) day.setStayPlaceId(blankToNull(patch.stayPlaceId()));
+        if (patch.stayNote() != null) day.setStayNote(blankToNull(patch.stayNote()));
+
+        /*
+          같은 데서 이어 자는 날들.
+
+          이박 삼일이면 첫날과 둘째 날이 같은 숙소입니다. 날마다 다시 찾아
+          넣게 하면 그것이 일이 되고, 한 곳만 고쳐 두고 다른 날은 옛것으로
+          남는 일이 생깁니다.
+
+          <b>비어 있는 날만</b> 채웁니다. 이미 다른 숙소를 적어 둔 날을
+          덮어쓰면, 옮겨 자는 일정에서 조용히 하나가 사라집니다.
+         */
+        if (Boolean.TRUE.equals(patch.stayForward()) && day.getStayName() != null) {
+            for (Day later : days.findAllByTripIdOrderBySortAsc(day.getTripId())) {
+                if (later.getSort() > day.getSort() && later.getStayName() == null) {
+                    later.setStayName(day.getStayName());
+                    later.setStayLat(day.getStayLat());
+                    later.setStayLng(day.getStayLng());
+                    later.setStayPlaceId(day.getStayPlaceId());
+                    later.setStayNote(day.getStayNote());
+                }
+            }
+        }
         if (patch.iso() != null && !patch.iso().isBlank()) {
             LocalDate date = DayLabels.parse(patch.iso());
             day.setIso(date);
@@ -113,7 +160,13 @@ public class DayService {
         return t.isEmpty() ? null : t;
     }
 
+    /**
+     * @param stayForward 이후 날들 중 숙소가 비어 있는 날에도 같은 곳을 채울지.
+     */
     public record DayPatch(String label, String shortName, String iso, String theme,
-                           String color, String budget, String flight, Long version) {
+                           String color, String budget, String flight,
+                           String stayName, Double stayLat, Double stayLng,
+                           String stayPlaceId, String stayNote, Boolean stayForward,
+                           Long version) {
     }
 }

@@ -34,6 +34,8 @@ import { TripMap, type MapPlace } from '@/components/trip-map';
 import { iconOf } from '@/constants/place-icons';
 import { faceOf } from '@/constants/user-marks';
 import { metersBetween, SAME_SPOT } from '@/lib/geo';
+import type { Found } from '@/components/map-types';
+import { PlaceSearch } from '@/components/place-search';
 import { RecommendSheet } from '@/components/recommend-sheet';
 import { openDirections, openPlace } from '@/lib/directions';
 import { canPrint, printItinerary } from '@/lib/print';
@@ -983,6 +985,10 @@ export default function TripScreen() {
           label: d.date || d.label,
           iso: d.iso,
           places: d.places.map((p) => ({ id: p.id, name: p.name, lat: p.lat, lng: p.lng })),
+          stay:
+            d.stay && d.stay.lat != null && d.stay.lng != null
+              ? { name: d.stay.name, lat: d.stay.lat, lng: d.stay.lng }
+              : null,
         }))}
         here={me.here}
         onClose={() => setAsking(false)}
@@ -1289,6 +1295,8 @@ function DayCard({
     시간을 안 적어 둔 곳들의 순서에는 "여기 들렀다 저녁 먹으러" 같은 뜻이
     담겨 있을 수 있고, 그것은 서버가 알 길이 없습니다.
   */
+  /** 잘 곳을 정하는 판을 열어 두었는지. */
+  const [staying, setStaying] = useState(false);
   const [tidy, setTidy] = useState<Tidy | null>(null);
   const [tidying, setTidying] = useState(false);
   /*
@@ -1406,6 +1414,51 @@ function DayCard({
           ) : null}
 
           {/*
+            그날 밤 어디서 자는지, 그날 무엇을 타는지.
+
+            여행 앱인데 잠자리가 없었습니다. 일정에는 들를 곳만 있고, 정작
+            매일 돌아가는 자리는 어디에도 안 적혀 있었습니다.
+          */}
+          <Row gap={Spacing.sm} style={styles.dayExtra}>
+            <View style={styles.grow}>
+              {day.stay ? (
+                <Press
+                  onPress={() => (canEdit ? setStaying(true) : undefined)}
+                  scale={0.995}
+                  accessibilityLabel={`${day.stay.name} 숙소 고치기`}>
+                  <Row gap={Spacing.xs} style={styles.stayRow}>
+                    <Icon name="home" size={14} tone="accent" />
+                    <Body small strong numberOfLines={1}>
+                      {day.stay.name}
+                    </Body>
+                    {day.stay.note ? (
+                      <Caption tone="secondary" numberOfLines={1}>
+                        {day.stay.note}
+                      </Caption>
+                    ) : null}
+                  </Row>
+                </Press>
+              ) : canEdit ? (
+                <Button
+                  label="잘 곳 정하기"
+                  variant="ghost"
+                  compact
+                  onPress={() => setStaying(true)}
+                />
+              ) : null}
+
+              {day.flight ? (
+                <Row gap={Spacing.xs} style={styles.stayRow}>
+                  <Icon name="navigation" size={14} tone="muted" />
+                  <Caption tone="secondary" numberOfLines={1}>
+                    {day.flight}
+                  </Caption>
+                </Row>
+              ) : null}
+            </View>
+          </Row>
+
+          {/*
             제안을 받았을 때만 뜹니다. 얼마나 짧아지는지 적어 두지 않으면
             무엇을 받아들이는 것인지 모르는 채로 누르게 됩니다.
           */}
@@ -1463,6 +1516,16 @@ function DayCard({
               </Row>
             </Card>
           ) : null}
+
+          <StaySheet
+            visible={staying}
+            day={day}
+            onClose={() => setStaying(false)}
+            onDone={() => {
+              setStaying(false);
+              onChanged();
+            }}
+          />
 
           {day.places.length === 0 ? (
             <Caption>이 날에는 아직 장소가 없습니다.</Caption>
@@ -2070,6 +2133,114 @@ function outsideHours(at: string, spans: { start: string; end?: string | null }[
   });
 }
 
+/**
+ * 잘 곳 정하기.
+ *
+ * <p>장소로 넣지 않습니다. 숙소는 "들르는 곳" 이 아닙니다 — 동선에 끼면
+ * "3번 호텔" 이 되고, 스탬프를 찍는 자리가 되고, 다녀온 곳 수에 들어갑니다.
+ *
+ * <p>좌표까지 받습니다. 이름만으로는 "숙소 근처 아침 먹을 데" 를 찾을 수
+ * 없고, 하루 동선을 펼 때 어디서 시작하는지도 알 수 없습니다.
+ */
+function StaySheet({
+  visible,
+  day,
+  onClose,
+  onDone,
+}: {
+  visible: boolean;
+  day: Day;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [picked, setPicked] = useState<Found | null>(null);
+  const [note, setNote] = useState(day.stay?.note ?? '');
+  const [flight, setFlight] = useState(day.flight ?? '');
+  /* 이박 삼일이면 첫날과 둘째 날이 같은 숙소입니다. 날마다 다시 찾아 넣게
+     하면 그것이 일이 됩니다. */
+  const [forward, setForward] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
+
+  async function save(clear = false) {
+    setFailed(null);
+    setBusy(true);
+    try {
+      await api.patch(`/api/days/${day.id}`, {
+        version: day.version,
+        flight: flight.trim(),
+        stayName: clear ? '' : (picked?.name ?? day.stay?.name ?? ''),
+        stayLat: clear ? null : (picked?.lat ?? day.stay?.lat ?? null),
+        stayLng: clear ? null : (picked?.lng ?? day.stay?.lng ?? null),
+        stayPlaceId: clear ? '' : (picked?.placeId ?? day.stay?.placeId ?? ''),
+        stayNote: clear ? '' : note.trim(),
+        stayForward: !clear && forward,
+      });
+      setPicked(null);
+      onDone();
+    } catch (e) {
+      setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const name = picked?.name ?? day.stay?.name ?? null;
+
+  return (
+    <BottomSheet
+      visible={visible}
+      title={`${day.date || day.label} 잘 곳`}
+      onClose={onClose}
+      footer={<Button label="저장" onPress={() => save()} busy={busy} />}>
+      {name ? (
+        <Row gap={Spacing.sm} style={styles.stayRow}>
+          <Icon name="home" size={16} tone="accent" />
+          <Body strong numberOfLines={1}>
+            {name}
+          </Body>
+        </Row>
+      ) : (
+        <Caption tone="secondary">숙소를 찾아서 골라 주세요. 좌표까지 함께 잡힙니다.</Caption>
+      )}
+
+      <PlaceSearch onPick={setPicked} />
+
+      <Field
+        label="메모"
+        value={note}
+        onChangeText={setNote}
+        placeholder="체크인 15시 · 305호"
+        maxLength={200}
+      />
+
+      {/* 이 칸은 서버까지 진작 뚫려 있었는데 화면이 한 번도 안 썼습니다. */}
+      <Field
+        label="그날 타는 편"
+        value={flight}
+        onChangeText={setFlight}
+        placeholder="OZ112 09:20 인천 T1 → 간사이"
+        hint="지도에 찍는 것이 아니라 적어 두고 읽는 칸입니다."
+      />
+
+      <Chip
+        label={forward ? '이후 날들도 같은 곳' : '이 날만'}
+        selected={forward}
+        onPress={() => setForward((v) => !v)}
+      />
+      <Caption tone="muted">
+        이후 날 중 <b>아직 잘 곳을 안 적은 날</b>만 채웁니다. 옮겨 자는 날은 그대로 둡니다.
+      </Caption>
+
+      {day.stay ? (
+        <Button label="잘 곳 지우기" variant="danger" onPress={() => save(true)} busy={busy} />
+      ) : null}
+
+      {failed ? <ErrorNote message={failed} /> : null}
+    </BottomSheet>
+  );
+}
+
 /** 동선 정리 제안. 서버가 재 보고 "이렇게 돌면 얼마나 덜 걷는다" 를 돌려줍니다. */
 type Tidy = {
   placeIds: string[];
@@ -2153,6 +2324,12 @@ function CloneSheet({
 }
 
 const styles = StyleSheet.create({
+  dayExtra: {
+    alignItems: 'center',
+  },
+  stayRow: {
+    alignItems: 'center',
+  },
   /* 제안은 목록 위에 얹힙니다. 줄들과 같은 결이면 그중 하나로 읽혀
      지나칩니다. */
   tidyCard: {

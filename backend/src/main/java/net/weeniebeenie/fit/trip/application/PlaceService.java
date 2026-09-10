@@ -167,7 +167,12 @@ public class PlaceService {
                 .orElseThrow(() -> ApiException.notFound("날짜를 찾을 수 없습니다."));
         access.requireCanRead(day.getTripId(), me.id());
 
-        return RouteTidy.tidy(places.findAllByDayIdOrderBySortAsc(dayId));
+        /* 하루는 자던 자리에서 시작합니다. 숙소를 적어 두었으면 거기서
+           출발한다고 보고 세웁니다. */
+        Coordinates from = day.getStayLat() != null && day.getStayLng() != null
+                ? new Coordinates(day.getStayLat(), day.getStayLng())
+                : null;
+        return RouteTidy.tidy(places.findAllByDayIdOrderBySortAsc(dayId), from);
     }
 
     /** 손으로 끌어 옮긴 순서를 그대로 저장합니다. */

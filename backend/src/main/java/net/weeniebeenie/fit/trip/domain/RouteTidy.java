@@ -19,8 +19,9 @@ import java.util.List;
  * 그것들이 기둥이 되고, 시간을 안 적은 곳들만 기둥 사이 가장 덜 돌아가는
  * 자리에 끼워 넣습니다. 동선이 조금 길어지더라도 예약을 어기는 것보다 낫습니다.
  *
- * <p>시간이 하나도 없으면 첫 곳만 그대로 두고 나머지를 다시 세웁니다. 첫 곳은
- * 대개 숙소나 아침에 들르는 데라, 거기서 출발한다는 것 자체가 뜻을 가집니다.
+ * <p>시간이 하나도 없으면 <b>숙소에서 출발</b>한다고 보고 다시 세웁니다.
+ * 하루는 자던 자리에서 시작하니까요. 숙소를 안 적어 두었으면 첫 곳을 그대로
+ * 두고 나머지만 세웁니다 — 거기서 출발한다는 것 자체가 뜻을 가집니다.
  *
  * <h3>재는 법</h3>
  *
@@ -47,6 +48,13 @@ public final class RouteTidy {
      * @param current 지금 순서대로의 장소들
      */
     public static Tidied tidy(List<Place> current) {
+        return tidy(current, null);
+    }
+
+    /**
+     * @param from 하루를 시작하는 자리(숙소). 없으면 첫 곳에서 시작합니다.
+     */
+    public static Tidied tidy(List<Place> current, Coordinates from) {
         double before = totalOf(current);
         if (current.size() < 3) {
             /* 둘 이하면 바꿀 순서가 없습니다. */
@@ -63,8 +71,8 @@ public final class RouteTidy {
 
         List<Place> built;
         if (pinned.isEmpty()) {
-            built = fromNearest(current);
-            built = untangle(built);
+            built = fromNearest(current, from);
+            built = untangle(built, from);
         } else {
             built = new ArrayList<>(pinned);
             for (Place p : loose) {
@@ -78,27 +86,38 @@ public final class RouteTidy {
     /**
      * 가장 가까운 데를 차례로 집습니다.
      *
-     * <p>첫 곳은 그대로 둡니다. 여기서 출발한다는 뜻이 이미 담겨 있습니다.
+     * <p>숙소가 있으면 거기서 출발합니다 — 하루는 자던 자리에서 시작합니다.
+     * 없으면 첫 곳을 그대로 두고 시작합니다. 거기서 출발한다는 뜻이 이미
+     * 담겨 있습니다.
      */
-    private static List<Place> fromNearest(List<Place> places) {
+    private static List<Place> fromNearest(List<Place> places, Coordinates from) {
         List<Place> rest = new ArrayList<>(places);
         List<Place> out = new ArrayList<>();
-        out.add(rest.remove(0));
+
+        if (from == null) {
+            out.add(rest.remove(0));
+        } else {
+            out.add(rest.remove(nearestTo(from, rest)));
+        }
 
         while (!rest.isEmpty()) {
             Place last = out.get(out.size() - 1);
-            int best = 0;
-            double bestGap = Double.MAX_VALUE;
-            for (int i = 0; i < rest.size(); i++) {
-                double gap = metersBetween(last, rest.get(i));
-                if (gap < bestGap) {
-                    bestGap = gap;
-                    best = i;
-                }
-            }
-            out.add(rest.remove(best));
+            out.add(rest.remove(nearestTo(coordOf(last), rest)));
         }
         return out;
+    }
+
+    private static int nearestTo(Coordinates from, List<Place> rest) {
+        int best = 0;
+        double bestGap = Double.MAX_VALUE;
+        for (int i = 0; i < rest.size(); i++) {
+            double gap = from.metersTo(coordOf(rest.get(i)));
+            if (gap < bestGap) {
+                bestGap = gap;
+                best = i;
+            }
+        }
+        return best;
     }
 
     /**
@@ -108,15 +127,18 @@ public final class RouteTidy {
      * 일이 생깁니다. 길이 스스로 교차하는 자리를 찾아 그 구간을 뒤집으면
      * 반드시 짧아집니다. 열 곳 남짓이라 몇 번 돌아도 눈 깜짝할 사이입니다.
      */
-    private static List<Place> untangle(List<Place> route) {
+    private static List<Place> untangle(List<Place> route, Coordinates from) {
         List<Place> best = new ArrayList<>(route);
         boolean moved = true;
         int guard = 0;
 
+        /* 숙소에서 출발하면 첫 곳도 바꿀 수 있습니다. 숙소가 없을 때만
+           첫 곳을 그대로 둡니다. */
+        int start = from == null ? 1 : 0;
+
         while (moved && guard++ < 40) {
             moved = false;
-            /* 첫 곳은 건드리지 않으므로 i 는 1 부터입니다. */
-            for (int i = 1; i < best.size() - 1; i++) {
+            for (int i = start; i < best.size() - 1; i++) {
                 for (int k = i + 1; k < best.size(); k++) {
                     List<Place> tried = new ArrayList<>(best);
                     /* i..k 구간을 통째로 뒤집습니다. */
@@ -125,7 +147,7 @@ public final class RouteTidy {
                         tried.set(a, tried.get(b));
                         tried.set(b, swap);
                     }
-                    if (totalOf(tried) < totalOf(best) - 1) {
+                    if (lengthOf(tried, from) < lengthOf(best, from) - 1) {
                         best = tried;
                         moved = true;
                     }
@@ -133,6 +155,15 @@ public final class RouteTidy {
             }
         }
         return best;
+    }
+
+    /** 숙소에서 나가는 몫까지 더한 길이. 출발점이 있으면 그것도 걷는 길입니다. */
+    private static double lengthOf(List<Place> route, Coordinates from) {
+        double sum = totalOf(route);
+        if (from != null && !route.isEmpty()) {
+            sum += from.metersTo(coordOf(route.get(0)));
+        }
+        return sum;
     }
 
     /** 가장 덜 돌아가는 자리에 끼워 넣습니다. */
@@ -171,7 +202,10 @@ public final class RouteTidy {
     }
 
     private static double metersBetween(Place a, Place b) {
-        return new Coordinates(a.getLat(), a.getLng())
-                .metersTo(new Coordinates(b.getLat(), b.getLng()));
+        return coordOf(a).metersTo(coordOf(b));
+    }
+
+    private static Coordinates coordOf(Place p) {
+        return new Coordinates(p.getLat(), p.getLng());
     }
 }

@@ -73,6 +73,8 @@ export function RecommendSheet({
     label: string;
     iso: string | null;
     places: { id: string; name: string; lat: number; lng: number }[];
+    /** 그날 잘 곳. 아침 먹을 데를 찾을 때 가장 자주 쓰는 기준입니다. */
+    stay?: { name: string; lat: number; lng: number } | null;
   }[];
   /** 지금 서 있는 자리. 있으면 여행의 한가운데보다 이쪽을 먼저 봅니다. */
   here: { lat: number; lng: number } | null;
@@ -109,7 +111,16 @@ export function RecommendSheet({
   }, [visible, dayId]);
 
   const day = days.find((d) => d.id === onDay) ?? null;
-  const anchors = day?.places ?? [];
+  /* 잘 곳을 맨 앞에 둡니다. "숙소 근처 아침 먹을 데" 가 이 판에서 가장
+     자주 묻는 것입니다. */
+  const anchors = day
+    ? [
+        ...(day.stay
+          ? [{ id: 'stay', name: `🏠 ${day.stay.name}`, lat: day.stay.lat, lng: day.stay.lng }]
+          : []),
+        ...day.places,
+      ]
+    : [];
 
 
   const [busy, setBusy] = useState(false);

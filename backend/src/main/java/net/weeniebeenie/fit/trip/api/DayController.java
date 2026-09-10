@@ -35,7 +35,10 @@ public class DayController {
                                       @RequestBody UpdateDayRequest req) {
         Day day = days.update(me, id, new DayService.DayPatch(
                 req.label(), req.shortName(), req.iso(),
-                req.theme(), req.color(), req.budget(), req.flight(), req.version()));
+                req.theme(), req.color(), req.budget(), req.flight(),
+                req.stayName(), req.stayLat(), req.stayLng(),
+                req.stayPlaceId(), req.stayNote(), req.stayForward(),
+                req.version()));
         return Map.of("day", TripDtos.dayView(day, List.of(), mapper));
     }
 

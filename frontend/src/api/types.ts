@@ -106,9 +106,27 @@ export type Day = {
   theme: string | null;
   color: string | null;
   budget: string | null;
-  flight: unknown;
+  /** 그날 타는 편. "OZ112 09:20 인천 T1" 처럼 적어 두고 읽는 것입니다. */
+  flight: Maybe<string>;
+  /** 그날 밤 어디서 자는지. 안 적었으면 비어 있습니다. */
+  stay: Maybe<Stay>;
   version: number;
   places: Place[];
+};
+
+/**
+ * 잠자리.
+ *
+ * 장소가 아닙니다 — 동선에 끼면 "3번 호텔" 이 되고 스탬프를 찍는 자리가
+ * 됩니다. 그날에 딸린 다른 종류의 값입니다. 좌표가 있어야 "숙소 근처" 를
+ * 찾고 하루 동선의 출발점이 됩니다.
+ */
+export type Stay = {
+  name: string;
+  lat: Maybe<number>;
+  lng: Maybe<number>;
+  placeId: Maybe<string>;
+  note: Maybe<string>;
 };
 
 export type TripDetail = {

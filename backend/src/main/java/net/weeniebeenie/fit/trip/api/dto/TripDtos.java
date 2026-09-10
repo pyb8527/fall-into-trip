@@ -67,6 +67,8 @@ public final class TripDtos {
 
     public record UpdateDayRequest(String label, String shortName, String iso, String theme,
                                    String color, String budget, String flight,
+                                   String stayName, Double stayLat, Double stayLng,
+                                   String stayPlaceId, String stayNote, Boolean stayForward,
                                    Long version) {
     }
 
@@ -97,9 +99,16 @@ public final class TripDtos {
         }
     }
 
+    /**
+     * @param stay 그날 밤 어디서 자는지. 안 적었으면 비어 있습니다.
+     */
     public record DayView(String id, int sort, String label, String shortName, String date,
                           LocalDate iso, String theme, String color, String budget,
-                          Object flight, long version, List<PlaceView> places) {
+                          String flight, StayView stay, long version, List<PlaceView> places) {
+    }
+
+    /** 숙소. 좌표가 있어야 "숙소 근처" 와 동선의 출발점이 됩니다. */
+    public record StayView(String name, Double lat, Double lng, String placeId, String note) {
     }
 
     public record PlaceView(String id, int sort, String name, String ja, String en,
@@ -114,7 +123,11 @@ public final class TripDtos {
     public static DayView dayView(Day d, List<Place> places, ObjectMapper mapper) {
         return new DayView(d.getId(), d.getSort(), d.getLabel(), d.getShortName(), d.getDate(),
                 d.getIso(), d.getTheme(), d.getColor(), d.getBudget(),
-                json(d.getFlight(), mapper), d.getVersion(),
+                d.getFlight(),
+                d.getStayName() == null ? null : new StayView(
+                        d.getStayName(), d.getStayLat(), d.getStayLng(),
+                        d.getStayPlaceId(), d.getStayNote()),
+                d.getVersion(),
                 places.stream().map(p -> placeView(p, mapper)).toList());
     }
 
