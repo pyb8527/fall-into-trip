@@ -19,6 +19,7 @@ import type { Companion,Day,
   Money,
   Place,
   PlaceInfo,
+  Spend,
   TravelMode,
   TripDetail,
 } from '@/api/types';
@@ -39,6 +40,7 @@ import { PlaceSearch } from '@/components/place-search';
 import { RecommendSheet } from '@/components/recommend-sheet';
 import { openDirections } from '@/lib/directions';
 import { keepTrip, keptAgo, keptTrip } from '@/lib/keep';
+import { money } from '@/lib/money';
 import { canPrint, printItinerary } from '@/lib/print';
 import { useHere } from '@/lib/here';
 import { decodePolyline } from '@/lib/polyline';
@@ -140,6 +142,45 @@ export default function TripScreen() {
     [fresh, error, user?.id, id],
   );
   const data = fresh ?? kept?.data ?? null;
+
+  /*
+    그 날 실제로 쓴 돈.
+
+    하루 카드에 "예산 3만엔" 이 적혀 있었지만 그것은 글자일 뿐이라, 정말
+    얼마를 썼는지는 가계부를 따로 열어야 알 수 있었습니다. 가계부의 지출에는
+    이미 어느 날 것인지가 붙어 있으므로(dayId) 여기서 날짜별로 묶기만 하면
+    됩니다.
+
+    여기서 고치지 않는 값이라 여행을 다시 받아 올 때 따라 오지 않습니다.
+    적는 자리는 가계부 화면이고, 돌아오면 이 화면이 다시 뜹니다.
+  */
+  const { data: spending } = useAsync<{ expenses: Spend[] }>(
+    (signal) => api.get(`/api/trips/${encodeURIComponent(id)}/expenses`, signal),
+    [id],
+  );
+
+  /**
+   * 날짜 → 통화별 합계.
+   *
+   * <p>엔과 원을 더하지 않습니다. 가계부가 그렇게 서 있고(ExpenseService),
+   * 환율로 합치면 "언제 환율로" 가 남습니다.
+   *
+   * <p>어느 날 것인지 안 정한 지출은 어느 날에도 붙이지 않습니다. 아무 날에나
+   * 얹으면 그 날 예산이 까닭 없이 넘칩니다.
+   */
+  const spentByDay = useMemo(() => {
+    const box = new Map<string, Map<string, { sum: number; decimals: number }>>();
+    for (const e of spending?.expenses ?? []) {
+      if (!e.dayId) {
+        continue;
+      }
+      const perCurrency = box.get(e.dayId) ?? new Map();
+      const had = perCurrency.get(e.currency) ?? { sum: 0, decimals: e.decimals };
+      perCurrency.set(e.currency, { sum: had.sum + e.amount, decimals: e.decimals });
+      box.set(e.dayId, perCurrency);
+    }
+    return box;
+  }, [spending]);
 
   const [companions, setCompanions] = useState(false);
   const [publishing, setPublishing] = useState(false);
@@ -989,6 +1030,7 @@ export default function TripScreen() {
               twiceIn={twiceIn}
               tipCounts={tipCounts}
               onTips={setTipFor}
+              spent={spentByDay.get(day.id) ?? null}
             />
           ) : null,
         )}
@@ -1270,6 +1312,7 @@ function DayCard({
   twiceIn,
   tipCounts,
   onTips,
+  spent,
 }: {
   day: Day;
   index: number;
@@ -1296,6 +1339,8 @@ function DayCard({
   /** 구글 번호별 최근 팁 수. */
   tipCounts: Record<string, number>;
   onTips: (place: Place) => void;
+  /** 이 날 실제로 쓴 돈. 통화마다 하나씩. 아직 안 적었으면 비어 있습니다. */
+  spent: Map<string, { sum: number; decimals: number }> | null;
 }) {
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<Place | null>(null);
@@ -1690,7 +1735,7 @@ function DayCard({
             <Caption tone="muted">영업시간 · 평점 제공: Google</Caption>
           ) : null}
 
-          {day.budget ? <Caption tone="secondary">예산 {day.budget}</Caption> : null}
+          <DayMoney budget={day.budget} spent={spent} />
         </>
       )}
 
@@ -1716,6 +1761,52 @@ function DayCard({
         />
       ) : null}
     </Card>
+  );
+}
+
+/**
+ * 하루 카드 맨 아래, 돈 한 줄.
+ *
+ * <h3>왜 나란히 두는가</h3>
+ *
+ * <p>지금까지 여기에는 "예산 3만엔" 만 적혀 있었습니다. 그것은 사람이 손으로
+ * 친 글자일 뿐이라, 정말 얼마를 썼는지는 가계부를 따로 열어야 알 수
+ * 있었습니다. 잡아 둔 것과 쓴 것이 다른 화면에 있으면 아무도 맞춰 보지
+ * 않습니다.
+ *
+ * <p>지출에는 이미 어느 날 것인지가 붙어 있습니다. 나란히 놓기만 하면 됩니다.
+ *
+ * <h3>넘었는지는 말하지 않습니다</h3>
+ *
+ * <p>예산 칸은 자유롭게 적는 자리입니다 — "3만엔", "빡빡하게", "숙소 빼고
+ * 5만". 이것을 숫자로 읽어 내려 들면 "5만" 을 오만 엔으로 볼지 오만 원으로
+ * 볼지부터 갈리고, 틀리면 멀쩡한 계획에 빨간 글씨가 붙습니다. 두 값을 같은
+ * 줄에 놓는 데까지가 우리 몫이고, 넘었는지는 보는 사람이 압니다.
+ *
+ * <p>통화도 더하지 않습니다. 엔과 원을 합치려면 "언제 환율로" 가 남고, 그
+ * 답은 사람마다 다릅니다. 가계부가 그렇게 서 있으므로 여기도 같습니다.
+ */
+function DayMoney({
+  budget,
+  spent,
+}: {
+  budget: string | null;
+  spent: Map<string, { sum: number; decimals: number }> | null;
+}) {
+  const totals = spent ? [...spent.entries()] : [];
+  if (!budget && totals.length === 0) {
+    return null;
+  }
+
+  return (
+    <Row gap={Spacing.sm}>
+      {budget ? <Caption tone="secondary">예산 {budget}</Caption> : null}
+      {totals.length > 0 ? (
+        <Caption tone="secondary" strong>
+          쓴 돈 {totals.map(([currency, t]) => money(t.sum, currency, t.decimals)).join(' · ')}
+        </Caption>
+      ) : null}
+    </Row>
   );
 }
 

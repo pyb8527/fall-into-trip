@@ -3,9 +3,10 @@ import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { api, ApiError, UNEXPECTED } from '@/api/client';
-import type { Companion, TripDetail } from '@/api/types';
+import type { Books, Companion, Spend, TripDetail } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { Colors, Spacing } from '@/constants/theme';
+import { money } from '@/lib/money';
 import {
   Badge,
   Body,
@@ -437,31 +438,6 @@ function AddSheet({
 
 /* ------------------------------------------------------------------ 조각 */
 
-type Spend = {
-  id: string;
-  dayId: string | null;
-  payerId: string;
-  payerName: string;
-  cat: string | null;
-  name: string;
-  amount: number;
-  currency: string;
-  /** 이 통화가 소수점 아래 몇 자리를 쓰는지. 엔·원은 0. */
-  decimals: number;
-  pay: string | null;
-  /** 나눠 낼 사람들. 비어 있으면 전원. */
-  share: string[];
-  version: number;
-};
-
-type Books = {
-  currency: string;
-  decimals: number;
-  total: number;
-  balances: { userId: string; name: string; balance: number }[];
-  transfers: { fromName: string; toName: string; amount: number }[];
-};
-
 /**
  * 자주 쓰는 통화의 자릿수.
  *
@@ -498,15 +474,6 @@ function unitsOf(raw: string, decimals: number): number | null {
     return null;
   }
   return Math.round(value * 10 ** decimals);
-}
-
-/** 가장 작은 단위를 사람이 읽는 모양으로. */
-function money(units: number, currency: string, decimals: number) {
-  const value = units / 10 ** decimals;
-  return `${value.toLocaleString(undefined, {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  })} ${currency}`;
 }
 
 /** 날짜별로 묶고, 묶음마다 통화별 합계를 답니다. */

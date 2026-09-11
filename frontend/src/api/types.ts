@@ -552,3 +552,44 @@ export type LiveWhere = {
   accuracy: Maybe<number>;
   updatedAt: string;
 };
+
+/* ---------------------------------------------------------------- 가계부 */
+
+/**
+ * 쓴 돈 하나.
+ *
+ * <p>금액은 <b>그 통화의 가장 작은 단위</b>입니다 — 12.50달러는 1250 이고
+ * 9000엔은 9000 입니다. 실수로 들고 다니면 셋이 나눠 낼 때마다 끝자리가
+ * 흐려지고, 그 흐려짐이 정산에서 드러납니다.
+ */
+export type Spend = {
+  id: string;
+  /** 어느 날 것인지. 아직 안 정했으면 비어 있습니다. */
+  dayId: Maybe<string>;
+  payerId: string;
+  payerName: string;
+  cat: Maybe<string>;
+  name: string;
+  amount: number;
+  currency: string;
+  /** 이 통화가 소수점 아래 몇 자리를 쓰는지. 엔·원은 0. */
+  decimals: number;
+  pay: Maybe<string>;
+  /** 나눠 낼 사람들. 비어 있으면 전원. */
+  share: string[];
+  version: number;
+};
+
+/**
+ * 한 통화의 정산 결과.
+ *
+ * <p>엔으로 받을 돈과 원으로 낼 돈은 더하지 않습니다. 환율로 합칠 수도
+ * 있지만 그러면 "언제 환율로" 가 남고, 그 답은 사람마다 다릅니다.
+ */
+export type Books = {
+  currency: string;
+  decimals: number;
+  total: number;
+  balances: { userId: string; name: string; balance: number }[];
+  transfers: { fromName: string; toName: string; amount: number }[];
+};
