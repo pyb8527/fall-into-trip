@@ -267,12 +267,29 @@ npx eas-cli@latest update --branch preview --message "무엇을 고쳤는지"
 HTTP 로 실제 서버를 두드리는 방식입니다. 서버를 먼저 띄워 두세요.
 
 ```bash
-node backend/src/test/http/auth.test.mjs      # 인증·토큰
-node backend/src/test/http/invite.test.mjs    # 가입·초대·공동 편집
-node backend/src/test/http/trip.test.mjs      # 여행·날짜·장소
-node backend/src/test/http/admin.test.mjs     # 운영자 계정 관리·감사 로그
-node backend/src/test/http/place.test.mjs     # 장소 찾기
+node backend/src/test/http/auth.test.mjs       # 인증·토큰 회전·재사용 감지
+node backend/src/test/http/invite.test.mjs     # 가입·초대 링크·공동 편집
+node backend/src/test/http/trip.test.mjs       # 여행·날짜·장소·동선 그림
+node backend/src/test/http/copy.test.mjs       # 여행 복제·동선 정리·알림
+node backend/src/test/http/admin.test.mjs      # 운영자 계정 관리·감사 로그
+node backend/src/test/http/guest.test.mjs      # 계정 없이 어디까지 되는지
+node backend/src/test/http/community.test.mjs  # 글 올리기·복제·링크 미리보기
+node backend/src/test/http/comment.test.mjs    # 댓글과 신고
+node backend/src/test/http/tip.test.mjs        # 장소 팁과 신고
+node backend/src/test/http/expense.test.mjs    # 가계부와 정산
+node backend/src/test/http/candidate.test.mjs  # 후보와 투표
+node backend/src/test/http/saved.test.mjs      # 보석함
+node backend/src/test/http/folder.test.mjs     # 여행 폴더
+node backend/src/test/http/live.test.mjs       # 임시 핀과 실시간 위치
+node backend/src/test/http/icon.test.mjs       # 핀 그림과 이동 비교
+node backend/src/test/http/place.test.mjs      # 장소 찾기
+node backend/src/test/http/recommend.test.mjs  # 말로 묻고 갈 곳 받기
 ```
+
+`place`·`recommend` 와 동선 그림은 구글 키가 있어야 끝까지 갑니다. 키가
+없으면 그 앞의 울타리(권한·검증·꺼져 있을 때의 안내)만 봅니다 — 거기까지가
+눈으로 지키기 어려운 자리이고, 결과가 맞는지는 키를 넣고 사람이 눌러 봐야
+아는 일입니다.
 
 각 묶음은 깨끗한 DB 에서 하나씩 돌려야 합니다. 서로의 계정과 여행이 남아
 있으면 뒤엣것이 어긋납니다.
