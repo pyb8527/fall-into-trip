@@ -9,6 +9,7 @@ import { useAuth } from '@/auth/auth-provider';
 import { FolderSheet } from '@/components/folder-sheet';
 import { TripForm } from '@/components/trip-form';
 import { Colors, Radius, Spacing } from '@/constants/theme';
+import { countdownIsNear, countdownLabel, countdownOf, todayIso } from '@/lib/countdown';
 import {
   Badge,
   Body,
@@ -298,7 +299,7 @@ function TripRow({
           subtitle={`${formatRange(trip.startIso, trip.endIso)} · ${trip.dayCount}일 · 장소 ${trip.placeCount}곳`}
           right={
             <Row gap={Spacing.xs}>
-              {countdownOf(trip.startIso, trip.endIso)}
+              {countdownBadge(trip.startIso, trip.endIso)}
               {mine ? null : <Badge label="동행" tone="muted" />}
             </Row>
           }
@@ -316,36 +317,28 @@ function TripRow({
 }
 
 /**
- * 며칠 남았는지.
+ * 며칠 남았는지, 뱃지로.
  *
  * <p>목록에서 가장 먼저 보고 싶은 것입니다. 날짜를 읽고 오늘과 견주는 일을
  * 사람이 하게 두면, 그것만으로 목록을 훑는 데 시간이 걸립니다.
  *
- * <p>다녀온 여행에는 안 붙입니다. "D+40" 은 알아서 뭐 하나 싶은 값입니다.
+ * <p>세는 일은 <code>lib/countdown</code> 이 합니다. 홈도 같은 답을 써야
+ * 하는데, 같은 셈을 각자 들고 있으면 한쪽만 고치는 날이 옵니다. 여기서는
+ * 그 답을 뱃지로 그리는 일만 합니다.
+ *
+ * <p>여행 중은 초록입니다. 남은 날과 다른 종류의 소식이라 색으로 가릅니다.
  */
-function countdownOf(startIso: string | null, endIso: string | null) {
-  if (!startIso) {
+function countdownBadge(startIso: string | null, endIso: string | null) {
+  const at = countdownOf(startIso, endIso);
+  if (!at) {
     return null;
   }
-  const today = todayIso();
-  const end = endIso ?? startIso;
-
-  if (end < today) {
-    return null;
-  }
-  if (startIso <= today) {
-    return <Badge label="여행 중" tone="success" />;
-  }
-
-  const left = daysBetween(today, startIso);
-  return <Badge label={left === 0 ? '내일' : `D-${left}`} tone={left <= 7 ? 'accent' : 'muted'} />;
-}
-
-/** 두 날짜 사이의 날 수. 자정을 기준으로 세므로 시각은 보지 않습니다. */
-function daysBetween(from: string, to: string) {
-  const a = new Date(`${from}T00:00:00`);
-  const b = new Date(`${to}T00:00:00`);
-  return Math.max(0, Math.round((b.getTime() - a.getTime()) / 86_400_000) - 1);
+  return (
+    <Badge
+      label={countdownLabel(at)}
+      tone={at.kind === 'going' ? 'success' : countdownIsNear(at) ? 'accent' : 'muted'}
+    />
+  );
 }
 
 type Section = { title: string; trips: TripSummary[] };
@@ -387,12 +380,6 @@ function byWhen(trips: TripSummary[]): Section[] {
     { title: '곧 떠납니다', trips: coming },
     { title: '다녀왔습니다', trips: done },
   ].filter((s) => s.trips.length > 0);
-}
-
-function todayIso() {
-  const now = new Date();
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }
 
 function formatRange(start: string | null, end: string | null) {

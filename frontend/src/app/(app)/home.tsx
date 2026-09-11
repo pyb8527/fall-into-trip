@@ -1,4 +1,5 @@
 import { useRouter } from 'expo-router';
+import { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { api } from '@/api/client';
@@ -6,7 +7,22 @@ import type { TripSummary } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
 import { Spacing } from '@/constants/theme';
-import { Button, Card, IconButton, MenuCard, Rise, Row, Screen, Subtitle, Title } from '@/ui';
+import type { Countdown } from '@/lib/countdown';
+import { countdownIsNear, countdownLabel, countdownOf } from '@/lib/countdown';
+import {
+  Badge,
+  Button,
+  Caption,
+  Card,
+  IconButton,
+  MenuCard,
+  Press,
+  Rise,
+  Row,
+  Screen,
+  Subtitle,
+  Title,
+} from '@/ui';
 import { LogoMark } from '@/ui/logo';
 
 /**
@@ -19,6 +35,10 @@ import { LogoMark } from '@/ui/logo';
  * 하나도 없습니다 — 지도와 동행자는 여행 안에서 이미 되는데도 자리
  * 채우기로 남아, 되는 것을 안 된다고 말하고 있었습니다. 다시 붙일 일이
  * 생기면 정말 없는 것에만 붙입니다.
+ *
+ * <p>메뉴 아래에는 지금 이 사람에게 맞는 줄 하나가 옵니다. 여행이 하나도
+ * 없으면 어디서 시작하는지를, 다가올 여행이 있으면 며칠 남았는지를
+ * 말합니다. 둘은 함께 뜨지 않습니다 — 여행이 없으면 셀 날도 없습니다.
  */
 export default function Home() {
   const router = useRouter();
@@ -30,6 +50,27 @@ export default function Home() {
     (signal) => api.get('/api/trips', signal),
     [],
   );
+
+  /*
+    가장 가까운 여행 하나.
+
+    사람들은 여행 전에 날짜를 셉니다. 앱이 없어도 하는 행동이라, 그 답이
+    첫 화면에 있으면 그것만으로 열어 볼 이유가 됩니다. 목록에는 이미
+    있었지만(trips.tsx) 여기까지 오려면 한 단 더 들어가야 했습니다.
+
+    하나만 답니다. 둘 이상을 세로로 늘어놓으면 그것은 목록이고, 목록은
+    「내 여행」 이 이미 하는 일입니다.
+
+    시작일이 이른 것부터 봅니다 — 이미 떠난 여행이 아직 안 떠난 것보다
+    앞서므로, 여행 중인 것이 저절로 먼저 잡힙니다.
+  */
+  const next = useMemo(() => {
+    const rows = (mine?.trips ?? [])
+      .map((trip) => ({ trip, at: countdownOf(trip.startIso, trip.endIso) }))
+      .filter((row): row is { trip: TripSummary; at: Countdown } => row.at !== null);
+    rows.sort((a, b) => (a.trip.startIso ?? '').localeCompare(b.trip.startIso ?? ''));
+    return rows[0] ?? null;
+  }, [mine]);
 
   return (
     <Screen safeTop>
@@ -119,7 +160,45 @@ export default function Home() {
         덤으로 여행을 다 지운 사람에게도 맞는 안내가 됩니다.
       */}
       {mine && mine.trips.length === 0 ? <FirstSteps /> : null}
+      {next ? <NextTrip trip={next.trip} at={next.at} /> : null}
     </Screen>
+  );
+}
+
+/**
+ * 다음 여행까지 며칠.
+ *
+ * <p>세는 일은 <code>lib/countdown</code> 이 합니다. 여행 목록의 뱃지와
+ * 같은 답을 써야 해서입니다 — 두 화면이 다른 날짜를 말하면 어느 쪽이
+ * 맞는지 알 수 없습니다.
+ *
+ * <p>누르면 그 여행의 일정으로 갑니다. 여행 중이면 일정 화면이 알아서
+ * 오늘 날짜를 펼쳐 줍니다(<code>trip/[id].tsx</code>).
+ */
+function NextTrip({ trip, at }: { trip: TripSummary; at: Countdown }) {
+  const router = useRouter();
+
+  return (
+    <Rise order={5}>
+      <Press
+        onPress={() => router.push(`/trip/${trip.id}`)}
+        accessibilityLabel={`${trip.title} — ${countdownLabel(at)}`}>
+        <Card>
+          <Row style={styles.nextRow}>
+            <View style={styles.grow}>
+              {/* 무엇에 대한 줄인지 먼저 말합니다. 제목만 있으면 이것이
+                  다음 여행인지 방금 본 여행인지 알 수 없습니다. */}
+              <Caption tone="secondary">{at.kind === 'going' ? '지금 그 길 위' : '다음 여행'}</Caption>
+              <Subtitle>{trip.title}</Subtitle>
+            </View>
+            <Badge
+              label={countdownLabel(at)}
+              tone={at.kind === 'going' ? 'success' : countdownIsNear(at) ? 'accent' : 'muted'}
+            />
+          </Row>
+        </Card>
+      </Press>
+    </Rise>
   );
 }
 
@@ -174,6 +253,10 @@ const styles = StyleSheet.create({
   },
   steps: {
     flexWrap: 'nowrap',
+  },
+  nextRow: {
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   grow: {
     flex: 1,
