@@ -6,8 +6,8 @@
 > |---|---|
 > | **끝남** — [`docs/done/`](../done/) 으로 옮겼습니다 | 홈의 D-day, 장소 비용, 영수증의 쓴 돈, 구글 문턱 |
 > | **끝남** — 계획 문서가 없던 것 | `verdict.md` §11.1 (커밋 `5e2126b`) |
+> | **끝남** — `V21` | [`plan-news.md`](plan-news.md) (커밋 `39e2f14`, 접기는 `a8fe6bd`) |
 > | **반쯤** | [`plan-places-fields.md`](plan-places-fields.md) · [`plan-booking-paste.md`](plan-booking-paste.md) |
-> | **하는 중** | [`plan-news.md`](plan-news.md) |
 > | **아직 안 함** | [`plan-tip-used.md`](plan-tip-used.md) · [`plan-search-along-route.md`](plan-search-along-route.md) · [`plan-app-offline.md`](plan-app-offline.md) · [`plan-widget.md`](plan-widget.md) |
 >
 > **마이그레이션 번호가 당겨졌습니다.** `V20` 을 장소 비용이,
@@ -195,7 +195,7 @@ PC 의 디스크가 모자라 모델을 못 받았습니다. 앱 쪽은 EAS 빌�
 | | 계획 | 갈래 | 상태 |
 |---|---|---|---|
 | 5 | [`plan-places-fields.md`](plan-places-fields.md) | A | **반쯤** — 9.1 은 `7a01fbd`. 나머지 셋은 **구글 키가 있어야** 재 볼 수 있어 멈췄습니다 |
-| 6 | [`plan-news.md`](plan-news.md) | B | **하는 중** — 앞단(§11.1)은 `5e2126b`. `V21__news_seen.sql` 이 아직 커밋 전입니다 |
+| ~~6~~ | [`plan-news.md`](plan-news.md) | B | **끝남** — 앞단(§11.1)은 `5e2126b`, 본체는 `39e2f14`(`V21`). 올린 당일 추천·댓글·표를 한 줄로 접었습니다(`a8fe6bd`) — §11 |
 | 7 | [`plan-tip-used.md`](plan-tip-used.md) | B | 아직. `plan-news.md` 와 같은 화면의 아래층. 마이그레이션은 **`V22`** |
 | 8 | [`plan-search-along-route.md`](plan-search-along-route.md) | A | 아직 |
 
