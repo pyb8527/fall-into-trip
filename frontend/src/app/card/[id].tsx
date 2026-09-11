@@ -3,11 +3,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { api, API_BASE } from '@/api/client';
-import type { Companion, TripDetail } from '@/api/types';
+import type { Books, Companion, TripDetail } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { TripMap } from '@/components/trip-map';
 import { Colors, dayColor, Radius, Spacing } from '@/constants/theme';
 import { iconOf } from '@/constants/place-icons';
+import { money } from '@/lib/money';
 import { shareLink } from '@/lib/share';
 import {
   Body,
@@ -29,8 +30,9 @@ import {
  * <p>두 가지로 봅니다.
  *
  * <ul>
- *   <li><b>영수증</b> — 들른 곳과 거리를 고정폭 글자로 늘어놓습니다. 사진이
- *       없어도 성립하고, 지어낸 수치를 쓰지 않습니다.</li>
+ *   <li><b>영수증</b> — 날마다 몇 곳을 들렀고 얼마를 썼는지 고정폭 글자로
+ *       늘어놓습니다. 사진이 없어도 성립하고, 지어낸 수치를 쓰지
+ *       않습니다.</li>
  *   <li><b>다시 보기</b> — 동선이 지도 위에 순서대로 그려집니다. 영상으로
  *       만들면 인코딩이 필요한데, 그릴 것을 늘려 가며 보여 주면 같은 것을
  *       훨씬 가볍게 할 수 있습니다.</li>
@@ -53,6 +55,12 @@ export default function Card() {
   );
   const { data: mates } = useAsync<{ members: Companion[] }>(
     (signal) => api.get(`/api/trips/${encodeURIComponent(id)}/members`, signal),
+    [id],
+  );
+  /* 통화마다 하나씩 옵니다. 곁다리라 못 받아 와도 영수증은 뜹니다 —
+     그 줄만 빠집니다. 동행자 목록과 같은 방식입니다. */
+  const { data: spent } = useAsync<{ books: Books[] }>(
+    (signal) => api.get(`/api/trips/${encodeURIComponent(id)}/settlement`, signal),
     [id],
   );
 
@@ -78,7 +86,7 @@ export default function Card() {
       <SegmentedTabs items={FACES} value={face} onChange={setFace} />
 
       {face === 'receipt' ? (
-        <Receipt trip={data} mates={mates?.members ?? []} />
+        <Receipt trip={data} mates={mates?.members ?? []} books={spent?.books ?? []} />
       ) : (
         <Replay trip={data} />
       )}
@@ -116,7 +124,16 @@ function sharableUrl(id: string) {
  * <p>고정폭 글자와 점선뿐입니다. 사진이 없어도 성립하고, 지어낸 점수 대신
  * 실제로 눌러 표시한 "다녀옴" 을 씁니다.
  */
-function Receipt({ trip, mates }: { trip: TripDetail; mates: Companion[] }) {
+function Receipt({
+  trip,
+  mates,
+  books,
+}: {
+  trip: TripDetail;
+  mates: Companion[];
+  /** 통화마다 하나. 적어 둔 것이 없으면 빈 배열입니다. */
+  books: Books[];
+}) {
   const visited = new Set(trip.visited);
   const places = trip.days.flatMap((d) => d.places);
   const done = places.filter((p) => visited.has(p.id)).length;
@@ -153,6 +170,27 @@ function Receipt({ trip, mates }: { trip: TripDetail; mates: Companion[] }) {
           {done} / {places.length}
         </Caption>
       </Row>
+      {/*
+        쓴 돈.
+
+        통화를 더하지 않습니다. 엔과 원을 합치려면 "언제 환율로" 가 남고 —
+        여행 중 환율인지, 카드 청구 환율인지, 오늘 환율인지 — 그 답은
+        사람마다 다릅니다. 서버가 이미 통화별로 갈라 두었으므로 화면도
+        갈라 둡니다.
+
+        1인당 얼마도 안 적습니다. 정산은 균등 분할이 아니라서, 총액을 사람
+        수로 나눈 값은 아무와도 맞지 않습니다. 그 답은 가계부가 정확히
+        보여 줍니다.
+
+        적어 둔 것이 없으면 줄이 아예 안 나옵니다 — 아래 "함께한 사람" 이
+        혼자일 때 빠지는 것과 같습니다.
+      */}
+      {books.map((book, i) => (
+        <Row key={book.currency} style={styles.line}>
+          <Caption>{i === 0 ? '쓴 돈' : ''}</Caption>
+          <Caption>{money(book.total, book.currency, book.decimals)}</Caption>
+        </Row>
+      ))}
       {mates.length > 1 ? (
         <Row style={styles.line}>
           <Caption>함께한 사람</Caption>
