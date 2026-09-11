@@ -81,6 +81,19 @@ const MODE_LABEL: Record<TravelMode, string> = {
 };
 
 /**
+ * 적어 둔 시각에 못 닿을 때, 그래도 되는 수단을 말해 주는 한 줄.
+ *
+ * <p>위의 이름을 그대로 잇지 않습니다. 칩에 붙는 "걸어서" 는 그 자리에서는
+ * 맞지만 뒤에 조사를 달면 "걸어서면" 이 됩니다. 셋이 각각 다른 조사를
+ * 받으므로 문장째로 적어 둡니다.
+ */
+const MODE_FITS: Record<TravelMode, string> = {
+  WALK: '걸어서 가면 닿습니다',
+  TRANSIT: '대중교통으로 가면 닿습니다',
+  DRIVE: '택시로 가면 닿습니다',
+};
+
+/**
  * 일정 화면.
  *
  * <p><b>지도가 화면입니다.</b> 전에는 지도를 위에 260픽셀만 얹고 아래를 목록으로
@@ -1662,6 +1675,7 @@ function DayCard({
                       }
                     }}
                     gap={gapAfter.get(place.id)}
+                    arriveBy={order[i + 1]?.time ?? null}
                     chosenOf={chosenOf}
                     onPick={onPick}
                   />
@@ -1728,6 +1742,7 @@ function PlaceRow({
   onEdit,
   onRemove,
   gap,
+  arriveBy,
   chosenOf,
   onPick,
 }: {
@@ -1757,6 +1772,8 @@ function PlaceRow({
   onRemove: () => void;
   /** 다음 장소까지의 이동. 마지막 장소 뒤에는 없습니다. */
   gap?: Gap;
+  /** 다음 장소에 적어 둔 시각. 안 적었으면 비어 있습니다. */
+  arriveBy: string | null;
   chosenOf: (gap: Gap) => GapOption | null;
   onPick: (fromId: string, mode: TravelMode) => void;
 }) {
@@ -1939,7 +1956,15 @@ function PlaceRow({
         />
       </View>
 
-      {gap ? <GapBlock gap={gap} chosen={chosen} onPick={onPick} /> : null}
+      {gap ? (
+        <GapBlock
+          gap={gap}
+          chosen={chosen}
+          leaveAt={place.time}
+          arriveBy={arriveBy}
+          onPick={onPick}
+        />
+      ) : null}
     </View>
   );
 }
@@ -2017,14 +2042,30 @@ function DragHandle({
  *
  * <p>가장 빠른 것과 가장 싼 것에 표시를 답니다. 누르면 그 수단으로 지도의 길도
  * 함께 바뀝니다.
+ *
+ * <h3>적어 둔 시각과 맞춰 봅니다</h3>
+ *
+ * <p>두 값이 여기 나란히 있으면서도 서로를 본 적이 없었습니다. 14:00 에
+ * 떠나 14:30 에 닿기로 해 두고 그 사이가 지하철로 50분인 일정이, 화면에
+ * 그 둘을 다 띄워 놓고도 아무 말을 하지 않았습니다. 영업시간은 "적어 둔
+ * 시각에 안 엽니다" 까지 짚어 주면서 정작 갈 수 없는 자리는 조용했습니다.
+ *
+ * <p>재는 데 드는 것이 없습니다. 두 시각도 이동 시간도 이미 받아 온
+ * 것이라 구글을 다시 부르지 않습니다.
  */
 function GapBlock({
   gap,
   chosen,
+  leaveAt,
+  arriveBy,
   onPick,
 }: {
   gap: Gap;
   chosen: GapOption | null;
+  /** 이 장소에 적어 둔 시각. */
+  leaveAt: string | null;
+  /** 다음 장소에 적어 둔 시각. */
+  arriveBy: string | null;
   onPick: (fromId: string, mode: TravelMode) => void;
 }) {
   if (gap.options.length === 0) {
@@ -2038,6 +2079,18 @@ function GapBlock({
   /* 빠른 것과 싼 것이 같으면 고민할 것이 없습니다. 그럴 때는 표시를 달지
      않습니다 — 둘 다 붙으면 무엇을 고르라는 것인지 알 수 없습니다. */
   const oneAnswer = gap.fastest === gap.cheapest;
+
+  const spare = spareMinutes(leaveAt, arriveBy);
+  /* 지금 보고 있는 수단으로 몇 분 늦는지. 시각을 안 적었거나 고른 수단이
+     없으면 맞춰 볼 것이 없습니다 — 어느 수단 이야기인지 모르는 경고는
+     도움이 안 됩니다. */
+  const late = spare === null || chosen === null ? 0 : Math.round(chosen.seconds / 60) - spare;
+  /* 다른 수단으로는 닿는지. 가장 빠른 것이 못 가면 나머지도 못 갑니다. */
+  const rescue =
+    late > 0 && spare !== null
+      ? (gap.options.find((o) => o.mode === gap.fastest && Math.round(o.seconds / 60) <= spare) ??
+        null)
+      : null;
 
   return (
     <View style={styles.gap}>
@@ -2077,6 +2130,24 @@ function GapBlock({
           );
         })}
       </Row>
+      {/*
+        적어 둔 시각까지 못 닿는 자리.
+
+        얼마나 모자라는지를 함께 적습니다. "빠듯합니다" 만으로는 5분을
+        당기면 되는 것인지 계획을 다시 짜야 하는 것인지 알 수 없습니다.
+
+        다른 수단으로 닿으면 그것을 말해 줍니다. 안 되는 것만 말하고 되는
+        길을 안 말하면 사람이 셋을 하나씩 눌러 보며 다시 재야 합니다.
+      */}
+      {late > 0 ? (
+        <Row gap={Spacing.sm}>
+          <Caption tone="danger" strong>
+            {arriveBy} 까지 {asDuration(late * 60)} 모자랍니다
+          </Caption>
+          {rescue ? <Caption tone="secondary">{MODE_FITS[rescue.mode]}</Caption> : null}
+        </Row>
+      ) : null}
+
       {/* 택시 요금은 구글이 알려 주지 않아 나라별 기본요금으로 어림한 값입니다.
           정확한 값인 척하면 그 돈만 들고 탔다가 모자랍니다. */}
       {gap.options.some((o) => o.fare?.estimated) ? (
@@ -2084,6 +2155,35 @@ function GapBlock({
       ) : null}
     </View>
   );
+}
+
+/**
+ * 적어 둔 두 시각 사이에 남는 분.
+ *
+ * <p>둘 중 하나라도 안 적었으면 <code>null</code> 입니다. 안 적은 것은
+ * "아무 때나" 라는 뜻이므로 맞춰 볼 것이 없습니다.
+ *
+ * <p>뒤엣것이 앞엣것보다 이르면 자정을 넘긴 자리입니다. 그때도
+ * <code>null</code> 로 둡니다 — 24시간을 더해 재면 "열여덟 시간 남았다" 가
+ * 되어 아무 말도 못 하게 되고, 아니라면 이미 순서가 잘못된 것이라 이동
+ * 시간으로 할 이야기가 아닙니다.
+ */
+function spareMinutes(leaveAt: string | null, arriveBy: string | null) {
+  const from = minutesOfDay(leaveAt);
+  const to = minutesOfDay(arriveBy);
+  if (from === null || to === null || to < from) {
+    return null;
+  }
+  return to - from;
+}
+
+/** "14:30" 을 자정부터의 분으로. 모양이 다르면 null 입니다. */
+function minutesOfDay(at: string | null) {
+  if (!at || !/^\d{2}:\d{2}$/.test(at)) {
+    return null;
+  }
+  const [h, m] = at.split(':').map(Number);
+  return h * 60 + m;
 }
 
 /** "¥1,500" 처럼. 요금이 없는 것(걷기)은 빈 문자열입니다. */
