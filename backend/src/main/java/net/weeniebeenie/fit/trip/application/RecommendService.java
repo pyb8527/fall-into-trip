@@ -148,9 +148,10 @@ public class RecommendService {
                날짜를 정해 놓고 물었을 때만 그 값을 치릅니다. */
             if (on != null && cards.size() < ASK_HOURS_FOR && f.placeId() != null) {
                 PlaceInfoService.Info got = info.about(f.placeId(), on);
-                if (got != null) {
-                    open = !got.closedOnDay() && !got.permanentlyClosed();
-                }
+                /* 아는 것만 말합니다. 모르는 형편(아직 안 연 가게, 구글이
+                   안 보낸 경우, 우리가 모르는 새 값)은 비워 둡니다 — 전에는
+                   그것이 전부 "영업 중" 으로 흘렀습니다. */
+                open = PlaceInfoService.opensOn(got, got != null && got.closedOnDay());
             }
 
             Integer away = around == null ? null

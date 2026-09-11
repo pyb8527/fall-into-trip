@@ -59,6 +59,49 @@ public class PlaceInfoService {
     private static final int CACHE_MAX = 1000;
 
     /**
+     * 구글이 말하는 가게의 형편.
+     *
+     * <p>전에는 이 자리를 <b>{@code CLOSED_PERMANENTLY} 인지 아닌지</b>로만
+     * 읽었습니다. 그래서 우리가 모르는 값이 오면 전부 "아닌 것" 으로 묶여
+     * 영업 중으로 흘렀습니다.
+     *
+     * <p>2026-03-17 에 구글이 {@code FUTURE_OPENING} 을 새로 냈습니다. 아직
+     * 문도 안 연 가게가 그 길로 추천 카드에 "그날 영업" 으로 떴습니다. 안 연
+     * 곳은 휴무보다 나쁩니다 — 휴무는 다음에 가면 되지만 안 연 곳은 갈 수가
+     * 없습니다.
+     *
+     * <p>그래서 <b>아는 값만 안다고 말합니다.</b> 여기 없는 것이 오면 모르는
+     * 것으로 둡니다. 구글이 또 새 값을 내도 같은 일이 되풀이되지 않습니다.
+     */
+    static final String OPERATIONAL = "OPERATIONAL";
+    static final String CLOSED_TEMPORARILY = "CLOSED_TEMPORARILY";
+    static final String CLOSED_PERMANENTLY = "CLOSED_PERMANENTLY";
+
+    /**
+     * 그날 문을 여는가.
+     *
+     * <p>세 갈래입니다 — 연다({@code TRUE}), 안 연다({@code FALSE}), 모른다
+     * ({@code null}). 모르는 것을 "안 엶" 으로 적으면 멀쩡한 가게가 목록에서
+     * 밀려나고, "엶" 으로 적으면 닫힌 문 앞에 사람을 보냅니다.
+     *
+     * @param closedOnDay 그 날짜에 쉬는지. 영업시간을 보고 이미 판단한 값입니다.
+     */
+    public static Boolean opensOn(Info info, boolean closedOnDay) {
+        if (info == null) {
+            return null;
+        }
+        if (CLOSED_PERMANENTLY.equals(info.status()) || CLOSED_TEMPORARILY.equals(info.status())) {
+            /* 아주 닫았거나 잠시 닫았습니다. 둘 다 지금 가면 못 들어갑니다. */
+            return false;
+        }
+        if (!OPERATIONAL.equals(info.status())) {
+            /* FUTURE_OPENING 이거나, 구글이 안 보냈거나, 우리가 모르는 새 값. */
+            return null;
+        }
+        return !closedOnDay;
+    }
+
+    /**
      * 한 번에 물어볼 장소의 최대치.
      *
      * <p>장소마다 요금이 붙습니다. 하루에 열 곳을 넘게 넣는 일정은 드뭅니다.
@@ -211,7 +254,7 @@ public class PlaceInfoService {
 
         return new Info(placeId, text, closed, spans, raw.hours(),
                 raw.phone(), raw.website(), raw.rating(), raw.ratingCount(),
-                raw.permanentlyClosed(), raw.mapUrl());
+                CLOSED_PERMANENTLY.equals(raw.status()), raw.status(), raw.mapUrl());
     }
 
     /**
@@ -271,7 +314,7 @@ public class PlaceInfoService {
                 text(r, "websiteUri"),
                 r.hasNonNull("rating") ? r.path("rating").asDouble() : null,
                 r.hasNonNull("userRatingCount") ? r.path("userRatingCount").asInt() : null,
-                "CLOSED_PERMANENTLY".equals(r.path("businessStatus").asText("")),
+                text(r, "businessStatus"),
                 text(r, "googleMapsUri"));
     }
 
@@ -327,18 +370,21 @@ public class PlaceInfoService {
      * @param closedOnDay  그날 쉬는지
      * @param spans        그날 여는 구간들. 둘 이상이면 사이가 브레이크 타임입니다.
      * @param hours        요일별 전체. 월요일부터입니다.
+     * @param permanentlyClosed 아주 문을 닫았는지. 화면이 "문을 닫은 곳입니다" 에 씁니다
+     * @param status       구글이 말한 형편 그대로. 우리가 모르는 값도 그대로 옵니다 —
+     *                     아는 것만 안다고 말하려면 원본이 있어야 합니다
      */
     public record Info(String id, String onDay, boolean closedOnDay, List<Span> spans,
                        List<String> hours, String phone, String website,
                        Double rating, Integer ratingCount,
-                       boolean permanentlyClosed, String mapUrl) {
+                       boolean permanentlyClosed, String status, String mapUrl) {
     }
 
     /** 구글에서 받은 주간 원본. 날짜에 매이지 않아 캐시에 둘 수 있습니다. */
     private record Raw(List<String> hours, Map<Integer, List<Span>> spansByDay,
                        Integer utcOffsetMinutes, String phone, String website,
                        Double rating, Integer ratingCount,
-                       boolean permanentlyClosed, String mapUrl) {
+                       String status, String mapUrl) {
     }
 
     private record Cached(Raw raw, Instant until) {
