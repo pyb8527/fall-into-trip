@@ -1,7 +1,10 @@
 package net.weeniebeenie.fit.trip.application;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.weeniebeenie.fit.support.quota.GoogleQuota;
+import net.weeniebeenie.fit.support.quota.GoogleQuotaKey;
 import net.weeniebeenie.fit.shared.error.ApiException;
 import net.weeniebeenie.fit.trip.domain.PlaceKind;
 import org.springframework.beans.factory.annotation.Value;
@@ -33,6 +36,7 @@ import java.util.Map;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class PlaceSearchService {
 
     /** 한 번에 돌려줄 개수. 더 많이 보여 줘도 고르기만 어려워집니다. */
@@ -55,6 +59,9 @@ public class PlaceSearchService {
             "places.types",
             "places.rating",
             "places.userRatingCount");
+
+    private final GoogleQuota quota;
+    private final GoogleQuotaKey quotaKey;
 
     private final RestClient client = RestClient.builder()
             .baseUrl("https://places.googleapis.com")
@@ -117,6 +124,10 @@ public class PlaceSearchService {
                     "center", Map.of("latitude", lat, "longitude", lng),
                     "radius", (double) (radiusM == null ? 20000 : radiusM))));
         }
+
+        /* 여기까지 왔으면 정말 나갑니다. 키가 꺼져 있으면 위에서 이미
+           빠져나갔고, 검색은 캐시를 두지 않습니다 — 찾는 말이 매번 다릅니다. */
+        quota.spend(quotaKey.current(), 1);
 
         JsonNode body;
         try {

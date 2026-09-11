@@ -284,6 +284,7 @@ node backend/src/test/http/live.test.mjs       # 임시 핀과 실시간 위치
 node backend/src/test/http/icon.test.mjs       # 핀 그림과 이동 비교
 node backend/src/test/http/place.test.mjs      # 장소 찾기
 node backend/src/test/http/recommend.test.mjs  # 말로 묻고 갈 곳 받기
+node backend/src/test/http/quota.test.mjs      # 구글 호출 문턱
 ```
 
 `place`·`recommend` 와 동선 그림은 구글 키가 있어야 끝까지 갑니다. 키가

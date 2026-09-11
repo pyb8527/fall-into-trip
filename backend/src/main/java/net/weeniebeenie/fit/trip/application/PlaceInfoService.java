@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.weeniebeenie.fit.account.infrastructure.security.AuthPrincipal;
+import net.weeniebeenie.fit.support.quota.GoogleQuota;
+import net.weeniebeenie.fit.support.quota.GoogleQuotaKey;
 import net.weeniebeenie.fit.shared.error.ApiException;
 import net.weeniebeenie.fit.trip.domain.Day;
 import net.weeniebeenie.fit.trip.domain.DayRepository;
@@ -85,6 +87,8 @@ public class PlaceInfoService {
             "businessStatus",
             "googleMapsUri");
 
+    private final GoogleQuota quota;
+    private final GoogleQuotaKey quotaKey;
     private final TripAccessPolicy access;
     private final DayRepository days;
     private final PlaceRepository places;
@@ -223,6 +227,10 @@ public class PlaceInfoService {
     }
 
     private Raw ask(String googleId) {
+        /* 캐시에 맞은 장소는 여기까지 안 옵니다. 하루를 펼칠 때 열둘을 미리
+           빼던 것이 여기로 내려왔습니다 — 실제로 물어본 것만 셉니다. */
+        quota.spend(quotaKey.current(), 1);
+
         JsonNode r;
         try {
             r = client.get()

@@ -1,6 +1,9 @@
 package net.weeniebeenie.fit.trip.application;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.weeniebeenie.fit.support.quota.GoogleQuota;
+import net.weeniebeenie.fit.support.quota.GoogleQuotaKey;
 import net.weeniebeenie.fit.shared.error.ApiException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -27,6 +30,7 @@ import java.util.Map;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class StaticMapService {
 
     /**
@@ -49,6 +53,9 @@ public class StaticMapService {
 
     /** 들고 있을 그림의 수. 하나에 수십 KB 라 넉넉히 잡아도 됩니다. */
     private static final int CACHE_MAX = 200;
+
+    private final GoogleQuota quota;
+    private final GoogleQuotaKey quotaKey;
 
     private final RestClient client = RestClient.builder()
             .baseUrl("https://maps.googleapis.com")
@@ -96,6 +103,10 @@ public class StaticMapService {
             path.append('|').append(at);
             marks.append('|').append(at);
         }
+
+        /* 캐시에 맞은 그림은 위에서 돌아갔습니다. 여기까지 온 것만 셉니다 —
+           같은 글의 썸네일을 여럿이 봐도 구글은 여섯 시간에 한 번입니다. */
+        quota.spend(quotaKey.current(), 1);
 
         byte[] png;
         try {

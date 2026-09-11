@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.weeniebeenie.fit.account.infrastructure.security.AuthPrincipal;
+import net.weeniebeenie.fit.support.quota.GoogleQuota;
+import net.weeniebeenie.fit.support.quota.GoogleQuotaKey;
 import net.weeniebeenie.fit.shared.domain.Coordinates;
 import net.weeniebeenie.fit.shared.error.ApiException;
 import net.weeniebeenie.fit.trip.domain.Day;
@@ -65,6 +67,8 @@ public class RouteService {
     /** 들고 있을 답의 개수. 넘으면 오래 안 쓴 것부터 버립니다. */
     private static final int CACHE_MAX = 2000;
 
+    private final GoogleQuota quota;
+    private final GoogleQuotaKey quotaKey;
     private final TripAccessPolicy access;
     private final DayRepository days;
     private final PlaceRepository places;
@@ -296,6 +300,11 @@ public class RouteService {
     }
 
     private Leg ask(Place from, Place to, Mode mode) {
+        /* 여기가 실제로 나가는 자리입니다. 캐시에 맞은 구간은 여기까지 안
+           오므로 세지 않습니다. leg() 와 fromHere() 둘 다 이 앞을 지나므로
+           한 곳만 적어 두면 빠뜨릴 자리가 없습니다. */
+        quota.spend(quotaKey.current(), 1);
+
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("origin", point(from.getLat(), from.getLng()));
         body.put("destination", point(to.getLat(), to.getLng()));
