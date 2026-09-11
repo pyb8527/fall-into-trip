@@ -27,6 +27,12 @@ import type { IconName } from '@/ui';
  *
  * <p>점이 꺼져도 <b>줄은 그대로 남습니다.</b> 30일치가 늘 있습니다 — 열어 본
  * 뒤에 어제 것이 사라지면 "아까 그게 뭐였더라" 를 할 수 없습니다.
+ *
+ * <h3>한 곳에서 온 것은 한 줄입니다</h3>
+ *
+ * <p>글 하나가 좀 받은 날 추천이 서른 줄이 되면, 동행자가 고친 일정은 그
+ * 아래로 밀려납니다. 그래서 서버가 글마다·후보마다 접어서 보냅니다. 여럿이
+ * 접힌 줄에는 이름이 없고 몇 사람인지만 있습니다.
  */
 export default function NewsScreen() {
   const { data, error, loading, reload } = useAsync<News>(
@@ -102,9 +108,16 @@ function NewsRow({ item }: { item: NewsItem }) {
         <Icon name={iconOf(item.kind)} tone={item.fresh ? 'default' : 'muted'} />
       </View>
       <View style={styles.text}>
+        {/* 이름이 없는 줄이 있습니다. 여럿이 한 줄로 접힌 것이고, 그때는
+            몇 사람인지가 문장 안에 이미 들어 있습니다. */}
         <Body>
-          <Body strong>{item.actorName}</Body>
-          {` 님이 ${item.text}`}
+          {item.actorName ? (
+            <>
+              <Body strong>{item.actorName}</Body>
+              {' 님이 '}
+            </>
+          ) : null}
+          {item.text}
         </Body>
         {/* 어느 여행·어느 글인지와 얼마나 지났는지를 한 줄에 둡니다. 둘 다
             그 자체로는 볼 것이 아니고, 위 문장을 어디에 놓을지 정해 줍니다. */}

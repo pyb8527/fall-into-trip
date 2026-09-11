@@ -29,6 +29,17 @@ import java.util.List;
  * <p>그래서 {@code SELECT new} 로 못박습니다. 칸 수와 차례가 어긋나면 뜰
  * 때 바로 걸립니다 — 돌다가 500 이 나는 것보다 낫습니다.
  *
+ * <h3>같은 곳에서 온 것은 접습니다</h3>
+ *
+ * <p>추천·댓글·표는 한 곳에 여럿 쌓입니다. 그것을 줄 하나씩 올리면 글
+ * 하나가 좀 받은 날 목록이 그것만으로 차고, 동행자가 고친 일정이 그 아래로
+ * 밀려납니다. 그래서 {@code GROUP BY} 로 접어서 가져옵니다 — <b>세는 일을
+ * 데이터베이스에 맡기면</b> 몇 줄만 읽어 와서 세는 것과 달리 아는 것보다
+ * 적게 말하지 않습니다.
+ *
+ * <p>장소와 후보는 접을 것이 없습니다. 벌어진 일이 아니라 지금 있는 줄을
+ * 읽으므로 애초에 하나씩입니다.
+ *
  * <h3>왜 하나하나 다른 질의인가</h3>
  *
  * <p>다섯을 한 번에 긁고 싶지만 JPQL 에 {@code union} 이 없고, 네이티브로
@@ -93,24 +104,32 @@ public class NewsFeed {
     }
 
     /**
-     * 남이 던진 표.
+     * 남이 던진 표. <b>후보마다 한 줄로 접습니다.</b>
      *
      * <p>후보를 거쳐 여행에 닿습니다. 표 자체에는 어느 여행인지가 없습니다 —
      * 그래서 후보가 내려가면 그 표도 여기서 저절로 빠집니다.
+     *
+     * <p>{@code min(v.userId)} 은 <b>한 사람일 때</b> 그 한 사람입니다.
+     * 여럿이면 이름을 안 붙이므로 누가 뽑히든 상관없습니다. 세는 일과 이름을
+     * 찾는 일을 질의 하나로 끝내려고 이렇게 씁니다.
      */
-    public List<VoteRow> votes(List<String> tripIds, String me, Instant since, int limit) {
+    public List<VoteAggRow> votes(List<String> tripIds, String me, Instant since, int limit) {
         if (tripIds.isEmpty()) {
             return List.of();
         }
         return em.createQuery("""
-                       SELECT new %sVoteRow(c.name, t.id, t.title, v.userId, v.yes, v.createdAt)
+                       SELECT new %sVoteAggRow(
+                              c.name, t.id, t.title,
+                              count(v), sum(CASE WHEN v.yes THEN 1L ELSE 0L END),
+                              max(v.createdAt), min(v.userId))
                        FROM CandidateVote v, TripCandidate c, Trip t
                        WHERE v.candidateId = c.id AND c.tripId = t.id
                          AND t.id IN :tripIds
                          AND v.createdAt > :since
                          AND v.userId <> :me
-                       ORDER BY v.createdAt DESC
-                       """.formatted(ROW), VoteRow.class)
+                       GROUP BY c.id, c.name, t.id, t.title
+                       ORDER BY max(v.createdAt) DESC
+                       """.formatted(ROW), VoteAggRow.class)
                 .setParameter("tripIds", tripIds)
                 .setParameter("me", me)
                 .setParameter("since", since)
@@ -119,39 +138,51 @@ public class NewsFeed {
     }
 
     /**
-     * 내 글에 붙은 추천.
+     * 내 글에 붙은 추천. <b>글마다 한 줄로 접습니다.</b>
      *
      * <p>내려간 글은 뺍니다. 운영자가 감춘 글의 소식이 글쓴이에게만 남아
      * 있으면, 눌러 들어가서 없는 글을 봅니다.
      */
-    public List<PostRow> likes(String me, Instant since, int limit) {
+    public List<PostAggRow> likes(String me, Instant since, int limit) {
         return em.createQuery("""
-                       SELECT new %sPostRow(p.id, p.title, l.userId, l.createdAt)
+                       SELECT new %sPostAggRow(
+                              p.id, p.title, count(l), max(l.createdAt), min(l.userId))
                        FROM PostLike l, TripPost p
                        WHERE l.postId = p.id
                          AND p.authorId = :me AND p.hidden = false
                          AND l.createdAt > :since
                          AND l.userId <> :me
-                       ORDER BY l.createdAt DESC
-                       """.formatted(ROW), PostRow.class)
+                       GROUP BY p.id, p.title
+                       ORDER BY max(l.createdAt) DESC
+                       """.formatted(ROW), PostAggRow.class)
                 .setParameter("me", me)
                 .setParameter("since", since)
                 .setMaxResults(limit)
                 .getResultList();
     }
 
-    /** 내 글에 달린 댓글. 감춰진 댓글과 내려간 글은 뺍니다. */
-    public List<PostRow> comments(String me, Instant since, int limit) {
+    /**
+     * 내 글에 달린 댓글. <b>글마다 한 줄로 접습니다.</b>
+     *
+     * <p>댓글에는 읽을 것이 있으니 하나씩 올리고 싶지만, 그러면 말이 오간 글
+     * 하나가 목록을 통째로 먹습니다. 무엇이라고 했는지는 어차피 들어가야
+     * 보입니다.
+     *
+     * <p>감춰진 댓글과 내려간 글은 뺍니다.
+     */
+    public List<PostAggRow> comments(String me, Instant since, int limit) {
         return em.createQuery("""
-                       SELECT new %sPostRow(p.id, p.title, c.userId, c.createdAt)
+                       SELECT new %sPostAggRow(
+                              p.id, p.title, count(c), max(c.createdAt), min(c.userId))
                        FROM PostComment c, TripPost p
                        WHERE c.postId = p.id
                          AND p.authorId = :me AND p.hidden = false
                          AND c.hidden = false
                          AND c.createdAt > :since
                          AND c.userId <> :me
-                       ORDER BY c.createdAt DESC
-                       """.formatted(ROW), PostRow.class)
+                       GROUP BY p.id, p.title
+                       ORDER BY max(c.createdAt) DESC
+                       """.formatted(ROW), PostAggRow.class)
                 .setParameter("me", me)
                 .setParameter("since", since)
                 .setMaxResults(limit)

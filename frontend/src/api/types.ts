@@ -628,6 +628,9 @@ export type Books = {
  * <p>{@code tripId} 와 {@code postId} 는 <b>둘 중 하나만</b> 찹니다. 여행에서
  * 벌어진 일과 내 글에서 벌어진 일은 갈 곳이 다릅니다. 어디로 갈지는 서버가
  * 정해서 {@code url} 로 내려보냅니다.
+ *
+ * <p><b>한 곳에서 온 것은 한 줄입니다.</b> 추천·댓글·표는 글마다·후보마다
+ * 접혀서 옵니다 — 안 접으면 글 하나가 좀 받은 날 목록이 그것만으로 찹니다.
  */
 export type NewsItem = {
   at: string;
@@ -638,8 +641,13 @@ export type NewsItem = {
     | 'candidate.vote'
     | 'post.like'
     | 'post.comment';
-  /** 한 일을 한 사람. 지워진 계정이면 "누군가" 입니다. */
-  actorName: string;
+  /**
+   * 한 일을 한 사람. 지워진 계정이면 "누군가" 입니다.
+   *
+   * <p><b>없을 수 있습니다.</b> 여럿이 한 줄로 접힌 것이고, 그때는 몇
+   * 사람인지가 {@code text} 안에 들어 있습니다.
+   */
+  actorName?: string | null;
   tripId?: string | null;
   tripTitle?: string | null;
   postId?: string | null;

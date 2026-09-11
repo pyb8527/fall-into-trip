@@ -109,6 +109,8 @@ got = await news(a);
 T("표가 실림",
   find(got.items, (i) => i.kind === "candidate.vote" && i.text === "「우메다 공중정원」 에 좋다고 했습니다.").length === 1,
   got.items);
+T("한 사람이면 이름이 붙고 좋다·아니라를 그대로",
+  find(got.items, (i) => i.kind === "candidate.vote")[0]?.actorName === "나", got.items);
 
 console.log("\n[8] 내 글의 추천과 댓글");
 r = await call("POST", `/api/trips/${trip}/publish`, { token: a, body: { summary: "먹으러만 다닌 일정", feedback: true } });
@@ -124,12 +126,41 @@ got = await news(a);
 T("추천이 실림",
   find(got.items, (i) => i.kind === "post.like" && i.text === "「오사카 3박 4일」 를 추천했습니다.").length === 1,
   got.items);
+T("한 사람이면 이름이 붙음", find(got.items, (i) => i.kind === "post.like")[0]?.actorName === "다", got.items);
 T("댓글이 실림",
   find(got.items, (i) => i.kind === "post.comment" && i.text === "「오사카 3박 4일」 에 댓글을 남겼습니다.").length === 1,
   got.items);
 T("글로 가는 길", find(got.items, (i) => i.kind === "post.like")[0]?.url === `/community/${post}`, got.items);
 /* 글에서 벌어진 일에는 여행 번호가 안 붙습니다. 둘 중 하나만 찹니다. */
 T("여행 번호는 안 붙음", !find(got.items, (i) => i.kind === "post.like")[0]?.tripId, got.items);
+
+console.log("\n[8-1] 여럿이 붙어도 한 줄입니다");
+/* 이것이 안 되면 글 하나가 좀 받은 날 목록이 추천으로만 찹니다. 서른 줄이
+   전부 "추천했습니다" 가 되고 동행자가 고친 일정은 그 아래로 밀려납니다. */
+const crowd = [];
+for (let k = 0; k < 12; k += 1) {
+  r = await reg(`fan${k}`, `팬${k}`);
+  crowd.push(r.data.accessToken);
+}
+for (const who of crowd) {
+  await call("POST", `/api/posts/${post}/like`, { token: who });
+  await call("POST", `/api/posts/${post}/comments`, { token: who, body: { text: "잘 봤습니다" } });
+}
+
+got = await news(a);
+const likes = find(got.items, (i) => i.kind === "post.like");
+const said = find(got.items, (i) => i.kind === "post.comment");
+T("추천 13건이 한 줄", likes.length === 1, likes.length);
+T("댓글 13건이 한 줄", said.length === 1, said.length);
+T("몇 사람인지 적음", likes[0]?.text === "「오사카 3박 4일」 를 13명이 추천했습니다.", likes[0]);
+T("댓글도 몇 사람인지 적음", said[0]?.text === "「오사카 3박 4일」 에 13명이 댓글을 남겼습니다.", said[0]);
+T("여럿이면 이름을 안 붙임", !likes[0]?.actorName && !said[0]?.actorName, likes[0]);
+/* 접는 목적은 자리를 비우는 것입니다. 여행 쪽 소식이 그대로 남아 있어야
+   접은 보람이 있습니다. */
+T("여행 소식이 안 밀려남",
+  find(got.items, (i) => i.kind.startsWith("place.") || i.kind.startsWith("candidate.")).length === 3,
+  got.items.map((i) => i.kind));
+T("목록이 짧게 유지됨", got.items.length === 5, got.items.length);
 
 console.log("\n[9] 남의 글에 붙은 것은 안 실립니다");
 r = await call("POST", "/api/places", { token: c, body: { dayId: otherDay, name: "또 한 곳", lat: 1, lng: 1 } });
