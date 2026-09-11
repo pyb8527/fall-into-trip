@@ -41,6 +41,8 @@ import { PlaceSearch } from '@/components/place-search';
 import { RecommendSheet } from '@/components/recommend-sheet';
 import { openDirections } from '@/lib/directions';
 import { ago } from '@/lib/countdown';
+import type { Booking } from '@/lib/intent-types';
+import { canParseBookingHere, intentState, parseBooking } from '@/lib/intent';
 import { canKeep, keepTrip, keepTripMap, keptAgo, keptTrip, keptTripMap } from '@/lib/keep';
 import { costLabel, money } from '@/lib/money';
 import { canPrint, printItinerary } from '@/lib/print';
@@ -2849,6 +2851,37 @@ function StaySheet({
         <Caption tone="secondary">숙소를 찾아서 골라 주세요. 좌표까지 함께 잡힙니다.</Caption>
       )}
 
+      {/*
+        예약 확인서 붙여 넣기.
+
+        아래 칸들이 기다리는 것은 예약 확인 메일에 이미 다 적혀 있습니다.
+        지금 사람이 하는 일은 메일 앱을 열고, 편명을 외우고, 여기로 돌아와
+        적고, 맞는지 다시 보러 메일로 돌아가는 것입니다. 칸이 셋이니 그
+        왕복이 셋입니다.
+
+        쪼개는 일은 이 기기 안에서 끝납니다. 붙여 넣은 글에는 이름·예약번호·
+        카드 뒷자리가 들어 있어서 서버로 보내지 않습니다. 그래서 모델이 없는
+        기기에서는 이 칸을 아예 안 냅니다 — 미끄러질 자리를 만들지 않는 것이
+        이 기능에서 가장 중요한 한 줄입니다(추천과 갈리는 자리입니다).
+
+        읽어도 저장하지 않습니다. 아래 칸에 채워 놓고 멈춥니다. 모델이 날짜를
+        하루 틀리면 멀쩡한 일정이 하루 밀리는데, 그때 사람은 자기가 안 한
+        변경을 찾아내야 합니다.
+      */}
+      {canParseBookingHere && intentState() === 'ready' ? (
+        <BookingPaste
+          dayIso={day.iso}
+          onRead={(read) => {
+            if (read.stayNote) {
+              setNote(read.stayNote);
+            }
+            if (read.flight) {
+              setFlight(read.flight);
+            }
+          }}
+        />
+      ) : null}
+
       <PlaceSearch onPick={setPicked} />
 
       <Field
@@ -2894,7 +2927,84 @@ function StaySheet({
   );
 }
 
-/** 동선 정리 제안. 서버가 재 보고 "이렇게 돌면 얼마나 덜 걷는다" 를 돌려줍니다. */
+/**
+ * 예약 확인서를 붙여 넣고 읽는 칸.
+ *
+ * <p>읽은 값을 <b>저장하지 않습니다.</b> 위 칸에 채워 놓고 멈춥니다 — 사람이
+ * 보고, 고칠 것을 고치고, 지금처럼 "저장" 을 누릅니다. 동선 정리가 세워 둔
+ * 순서(제안 → 비교 → 수락)와 같습니다.
+ *
+ * <p>숙소 <b>이름</b>은 안 채웁니다. 이름만 넣으면 좌표가 빈 채로 남는데,
+ * 그 좌표가 있어야 "숙소 근처" 를 찾고 하루 동선의 출발점이 됩니다. 읽어 낸
+ * 이름을 보여만 주고, 고르는 일은 바로 아래 장소 찾기가 정확히 합니다.
+ */
+function BookingPaste({
+  dayIso,
+  onRead,
+}: {
+  /** 지금 열려 있는 날. 읽은 날짜와 다르면 말해 줍니다. */
+  dayIso: string | null;
+  onRead: (read: Booking) => void;
+}) {
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [said, setSaid] = useState<string | null>(null);
+  const [found, setFound] = useState<Booking | null>(null);
+
+  async function read() {
+    const glued = text.trim();
+    if (!glued || busy) {
+      return;
+    }
+    setBusy(true);
+    setSaid(null);
+    setFound(null);
+    try {
+      const got = await parseBooking(glued);
+      if (!got) {
+        setSaid('읽지 못했습니다. 칸에 직접 적어 주세요.');
+        return;
+      }
+      setFound(got);
+      onRead(got);
+      /* 날짜가 다르면 말해 줍니다. 조용히 채우면 3월 4일 예약을 3월 5일에
+         붙여 놓고 모릅니다. 그래도 옮기지는 않습니다 — 사람이 이 날을
+         골라서 들어온 것이고, 앱이 그 선택을 뒤집을 이유가 없습니다. */
+      setSaid(
+        got.iso && dayIso && got.iso !== dayIso
+          ? `${got.iso} 예약으로 읽혔습니다. 지금 보고 있는 날과 다릅니다.`
+          : '아래 칸에 채웠습니다. 보고 고친 뒤 저장해 주세요.',
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <View style={styles.pasteBox}>
+      <Field
+        label="예약 확인서 붙여 넣기"
+        value={text}
+        onChangeText={setText}
+        placeholder="예약 확인 메일이나 문자를 그대로 붙여 넣으세요"
+        multiline
+        hint="이 기기 안에서 읽습니다. 붙여 넣은 글은 서버로 가지 않습니다."
+      />
+      <Row gap={Spacing.sm}>
+        <Button label="읽기" variant="secondary" compact onPress={read} busy={busy} />
+        {found?.stayName ? (
+          <Caption tone="secondary" numberOfLines={1}>
+            숙소로 「{found.stayName}」 를 읽었습니다 — 아래에서 찾아 골라 주세요
+          </Caption>
+        ) : null}
+      </Row>
+      {said ? <Caption tone={found ? 'secondary' : 'warning'}>{said}</Caption> : null}
+    </View>
+  );
+}
+
+/**
+ * 동선 정리 제안. 서버가 재 보고 "이렇게 돌면 얼마나 덜 걷는다" 를 돌려줍니다. */
 type Tidy = {
   placeIds: string[];
   beforeMeters: number;
@@ -2977,6 +3087,10 @@ function CloneSheet({
 }
 
 const styles = StyleSheet.create({
+  /* 붙여 넣는 칸과 그 아래 한 줄을 한 덩이로 묶습니다. */
+  pasteBox: {
+    gap: Spacing.xs,
+  },
   /* 살아 있는 지도가 앉던 자리를 그대로 채웁니다. 바탕색도 같게 두어야
      그림이 letterbox 로 남기는 위아래가 지도의 여백처럼 읽힙니다. */
   keptMap: {

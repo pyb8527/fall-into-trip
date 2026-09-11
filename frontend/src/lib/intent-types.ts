@@ -21,6 +21,32 @@ export type Intent = {
 };
 
 /**
+ * 예약 확인서에서 뽑아낸 것.
+ *
+ * <p>{@code Day} 의 칸과 짝입니다 — {@code stayName}·{@code stayNote}·
+ * {@code flight}. 그대로 칸에 채워 놓고 사람이 보고 고칩니다.
+ *
+ * <p>좌표는 없습니다. 이름만으로 위도·경도를 짐작하지 않습니다 — 그 일은
+ * {@code PlaceSearch} 가 같은 시트 안에서 정확히 합니다.
+ */
+export type Booking = {
+  /** 숙소 예약인지 항공권인지. 둘 다 아니면 null. */
+  kind: 'stay' | 'flight' | null;
+  stayName: string | null;
+  stayNote: string | null;
+  flight: string | null;
+  /**
+   * 그 예약의 날짜.
+   *
+   * <p>이 날짜로 다른 날을 찾아가지 <b>않습니다.</b> 사람이 고른 날에서
+   * 시트가 열린 것이고 앱이 그 선택을 뒤집을 이유가 없습니다. 다만 열려
+   * 있는 날과 다르면 말해 줍니다 — 조용히 채우면 3월 4일 예약을 3월 5일에
+   * 붙여 놓고 모릅니다.
+   */
+  iso: string | null;
+};
+
+/**
  * 지금 기기가 어느 상태인지.
  *
  * <ul>

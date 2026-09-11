@@ -2,7 +2,7 @@ import { createLLMChatSession, download, models } from 'react-native-executorch'
 import type { LLMChatSession } from 'react-native-executorch';
 
 import { PROMPT, SHOTS, readIntent } from '@/lib/intent-prompt';
-import type { Intent, IntentState, Progress } from '@/lib/intent-types';
+import type { Booking, Intent, IntentState, Progress } from '@/lib/intent-types';
 
 /**
  * 기기 안에서 문장을 쪼갭니다 (앱).
@@ -134,6 +134,35 @@ export async function parseIntent(query: string): Promise<Intent | null> {
 }
 
 /** 모델을 내려놓습니다. 메모리를 꽤 차지하므로 판을 닫을 때 부릅니다. */
+/**
+ * 앱에서는 아직 예약 확인서를 못 읽습니다.
+ *
+ * <h3>왜 못 하는가</h3>
+ *
+ * <p>세션이 만들어질 때 <b>추천 지시가 물려 있습니다</b>
+ * ({@code initialMessages} + {@code resetOnTurn: true}). 거기에 예약
+ * 확인서를 넣으면 모델은 그것을 추천 문장으로 읽고 칸 셋을 내놓습니다.
+ *
+ * <p>고치는 길은 둘입니다. 자리를 하나 더 내거나(폰에서 1GB 짜리 무게를
+ * 두 벌 드는 일입니다), 일이 바뀔 때마다 세션을 갈아 끼우거나. 뒤엣것이
+ * 맞아 보이는데, 그러면 <b>이미 돌고 있는 추천 경로를 건드리게</b> 됩니다.
+ *
+ * <h3>왜 지금 안 고치는가</h3>
+ *
+ * <p>확인할 방법이 없습니다. 이 자리는 EAS 로 구운 앱에서만 돌고, 앱 빌드는
+ * 앱 작업을 할 때 한 번에 하기로 했습니다. 못 재 보는 채로 추천 경로에
+ * 손대는 것보다, 여기서 <b>안 된다고 분명히 말하는</b> 편이 낫습니다.
+ *
+ * <p>false 이므로 화면은 단추 자체를 안 냅니다. 서버로 미끄러지는 길은
+ * 만들지 않습니다 — 붙여 넣는 글에 이름과 예약번호가 들어 있습니다.
+ */
+export const canParseBookingHere = false;
+
+/** 위와 같은 이유로 늘 {@code null} 입니다. 화면이 여기까지 오지 않습니다. */
+export async function parseBooking(_text: string): Promise<Booking | null> {
+  return null;
+}
+
 export async function dropModel(): Promise<void> {
   try {
     session?.dispose();

@@ -1,4 +1,5 @@
-import type { Intent, IntentState, Progress } from '@/lib/intent-types';
+import { BOOKING_SCHEMA, PROMPT as BOOKING_PROMPT, SHOTS as BOOKING_SHOTS, readBooking } from '@/lib/booking-prompt';
+import type { Booking, Intent, IntentState, Progress } from '@/lib/intent-types';
 import { INTENT_SCHEMA, PROMPT, SHOTS, readIntent } from '@/lib/intent-prompt';
 
 /**
@@ -185,14 +186,87 @@ export async function parseIntent(query: string): Promise<Intent | null> {
   return null;
 }
 
+/**
+ * 이 기기에서 예약 확인서를 읽을 수 있는가.
+ *
+ * <p>모델을 쓸 수 있는 자리와 같습니다. 다만 <b>없을 때 서버로 미끄러지지
+ * 않는다</b>는 점이 추천과 다릅니다 — 붙여 넣는 글에 이름·예약번호·카드
+ * 뒷자리가 들어 있어서, 못 읽으면 그냥 못 읽는 채로 둡니다.
+ */
+export const canParseBookingHere = canParseHere;
+
+/**
+ * 크롬 내장 모델로 읽을 때 쓰는 따로 난 자리.
+ *
+ * <p>추천 쪽 세션은 만들 때 추천 지시를 물려 둡니다. 거기에 예약 확인서를
+ * 넣으면 추천용 칸 셋을 내놓습니다. 그래서 지시가 다른 일에는 자리를
+ * 따로 냅니다 — 내장 모델은 무게를 공유하므로 자리 하나가 더 나도
+ * 받을 것이 늘지 않습니다.
+ */
+let nativeBooking: BuiltInSession | null = null;
+
+/**
+ * 붙여 넣은 예약 확인서를 칸으로.
+ *
+ * <p><b>이 기기 밖으로 나가지 않습니다.</b> 못 읽으면 {@code null} 이고,
+ * 그때 화면은 칸을 그대로 둡니다. 추천처럼 서버로 넘기는 길을 만들지
+ * 않습니다.
+ */
+export async function parseBooking(text: string): Promise<Booking | null> {
+  if (state !== 'ready') {
+    return null;
+  }
+
+  try {
+    const chrome = builtIn();
+    if (chrome && native) {
+      if (!nativeBooking) {
+        nativeBooking = await chrome.create({
+          initialPrompts: [{ role: 'system', content: BOOKING_PROMPT }, ...BOOKING_SHOTS],
+          expectedInputs: [{ type: 'text', languages: ['ko'] }],
+          expectedOutputs: [{ type: 'text', languages: ['ko'] }],
+        });
+      }
+      const said = await nativeBooking.prompt(text, { responseConstraint: BOOKING_SCHEMA });
+      return readBooking(said);
+    }
+
+    if (engine) {
+      const reply = await engine.chat.completions.create({
+        messages: [
+          { role: 'system', content: BOOKING_PROMPT },
+          ...BOOKING_SHOTS,
+          { role: 'user', content: text },
+        ],
+        /* 뽑아내는 일에 창의성은 방해입니다. 같은 확인서에는 같은 답이
+           나와야 합니다. */
+        temperature: 0,
+        /* 추천은 96 이면 됐지만 여기는 칸이 다섯이고 숙소 이름이 깁니다.
+           크게 잡으면 모델이 말을 덧붙일 때 그만큼 기다리므로, 다섯 칸이
+           겨우 들어갈 만큼만 둡니다. */
+        max_tokens: 220,
+        response_format: { type: 'json_object', schema: JSON.stringify(BOOKING_SCHEMA) },
+      });
+      return readBooking(reply.choices?.[0]?.message?.content ?? '');
+    }
+  } catch {
+    /* 메모리가 모자라거나 탭이 흔들렸습니다. 못 읽은 것으로 둡니다 —
+       여기에는 서버로 넘기는 길이 없습니다. */
+    return null;
+  }
+  return null;
+}
+
 export async function dropModel(): Promise<void> {
   try {
     native?.destroy?.();
+    nativeBooking?.destroy?.();
     await engine?.unload?.();
   } catch {
     /* 이미 내려갔습니다. */
   }
   native = null;
+  nativeBooking = null;
   engine = null;
   state = canParseHere ? 'absent' : 'none';
 }
