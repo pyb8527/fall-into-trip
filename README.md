@@ -77,6 +77,7 @@ cp .env.example .env
 | `CORS_ORIGINS` | `https://fit.weenie-beenie.net` |
 | `JWT_SECRET`·`DB_PASSWORD`·`SETUP_TOKEN` | 각각 새로 만든 값 |
 | `EXPO_PUBLIC_GMAPS_KEY` | 지도를 쓸 때만 |
+| `TZ` | 안 건드려도 됩니다 — 기본이 `Asia/Seoul` 입니다. 한국 밖에서 돌릴 때만 |
 
 ### 3. 띄우기
 

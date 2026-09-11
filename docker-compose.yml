@@ -23,6 +23,9 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD 를 .env 에 넣어 주세요}
       # 한글 정렬·비교가 어긋나지 않게 초기화 때 로케일을 맞춰 둡니다.
       LANG: ko_KR.utf8
+      # 로그와 psql 의 시각을 api 와 같은 시계로 읽습니다. 저장되는 값
+      # (timestamptz)은 이 값과 무관합니다.
+      TZ: ${TZ:-Asia/Seoul}
     volumes:
       - fit-db:/var/lib/postgresql/data
     healthcheck:
@@ -61,6 +64,22 @@ services:
 
       # 장소 검색을 서버가 대신 합니다. 키가 앱·브라우저로 나가지 않습니다.
       GOOGLE_MAPS_KEY: ${GOOGLE_MAPS_KEY:-}
+
+      # 서버가 보는 "지금" 과 "오늘".
+      #
+      # 안 넣으면 컨테이너가 UTC 로 돕니다. 그러면 자바의 LocalDate.now() 가
+      # 아홉 시간 이른 날짜를 말하고, 정해 둔 시각에 도는 일들이 엉뚱한 때에
+      # 돕니다. 실제로 이런 일이 있었습니다.
+      #
+      #   TripReminder    "0 0 20 * * *" — 전날 저녁 여덟 시에 내일 일정을
+      #                   알리려던 것이 20:00 UTC, 곧 새벽 다섯 시에 갔습니다
+      #   PostView        "하루 한 번" 세는 경계가 오전 아홉 시였습니다
+      #   GoogleQuota     하루치 한도가 풀리는 자정이 오전 아홉 시였습니다
+      #
+      # 쓰는 사람이 한국에 있으므로 서버의 하루도 거기에 맞춥니다. 저장되는
+      # 시각(timestamptz)은 이 값과 무관하게 정확합니다 — 달라지는 것은
+      # "오늘이 며칠인가" 와 "몇 시에 도는가" 입니다.
+      TZ: ${TZ:-Asia/Seoul}
     # 포트를 밖으로 열지 않습니다. web 이 대신 받습니다.
     expose:
       - "8080"
@@ -78,6 +97,10 @@ services:
         EXPO_PUBLIC_GMAPS_KEY: ${EXPO_PUBLIC_GMAPS_KEY:-}
     container_name: fit-web
     restart: unless-stopped
+    # nginx 접속 로그의 시각도 같은 시계로 찍습니다. 세 컨테이너의 로그를
+    # 나란히 놓고 볼 일이 생깁니다.
+    environment:
+      TZ: ${TZ:-Asia/Seoul}
     depends_on:
       api:
         condition: service_healthy
