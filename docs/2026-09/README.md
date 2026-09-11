@@ -1,19 +1,23 @@
 # 2026년 9월 조사 — 어디까지 왔나
 
-> 조사 → 판단 → 계획까지 끝났습니다.
+> 조사 → 판단 → 계획까지 끝났고, **구현이 절반쯤 갔습니다** (2026-09-11).
 >
-> **구현은 하나 끝났고 하나가 반쯤 갔습니다.**
->
-> | 계획 | 상태 |
+> | 상태 | 계획 |
 > |---|---|
-> | 홈의 D-day | **끝남.** 커밋 `3653a1d`. 문서는 [`docs/done/`](../done/) 으로 |
-> | [`plan-place-cost.md`](plan-place-cost.md) | **절반.** 커밋 `70b0d8f` 이 §8 의 1~4를 했습니다. 남은 것은 5·6 — 가계부와 잇는 쪽 |
-> | 나머지 일곱 | 아직 코드가 한 줄도 안 바뀌었습니다 |
+> | **끝남** — [`docs/done/`](../done/) 으로 옮겼습니다 | 홈의 D-day, 장소 비용, 영수증의 쓴 돈, 구글 문턱 |
+> | **끝남** — 계획 문서가 없던 것 | `verdict.md` §11.1 (커밋 `5e2126b`) |
+> | **반쯤** | [`plan-places-fields.md`](plan-places-fields.md) · [`plan-booking-paste.md`](plan-booking-paste.md) |
+> | **하는 중** | [`plan-news.md`](plan-news.md) |
+> | **아직 안 함** | [`plan-tip-used.md`](plan-tip-used.md) · [`plan-search-along-route.md`](plan-search-along-route.md) · [`plan-app-offline.md`](plan-app-offline.md) · [`plan-widget.md`](plan-widget.md) |
 >
-> **마이그레이션 번호가 당겨졌습니다.** `V20` 을 `plan-place-cost` 가
-> 먼저 썼습니다(`V20__place_cost.sql`). 그래서 `plan-news.md` 의 `V20` 은
-> **`V21`**, `plan-tip-used.md` 의 `V21` 은 **`V22`** 로 갑니다. 두 문서는
-> 아직 옛 번호로 적혀 있습니다.
+> **마이그레이션 번호가 당겨졌습니다.** `V20` 을 장소 비용이,
+> `V21` 을 소식함이 썼습니다. `plan-tip-used.md` 는 **`V22`** 로 갑니다 —
+> 그 문서는 아직 옛 번호로 적혀 있습니다.
+>
+> **계획에 없던 일이 둘 나왔습니다.** `plan-quota.md` 는 조사에서 나온 것이
+> 아니라 실제로 막혀서 재 본 것이고, 장소 비용 작업 중에 원래 있던 결함
+> 둘(`Expense.placeId` 미검증, `Versioned.check` 인자 뒤집힘)이 나왔습니다.
+> 계획서가 예고한 일보다 **코드를 만지다 나온 일**이 적지 않습니다.
 
 ## 문서
 
@@ -27,7 +31,7 @@
 | [`survey.md`](survey.md) | 경쟁 앱·플랫폼·불평에서 모은 열다섯 개. 판단 없음 |
 | [`verdict.md`](verdict.md) | 그 열다섯을 코드와 규칙에 비춘 판정 |
 | [`plan-booking-paste.md`](plan-booking-paste.md) | 붙여 넣은 예약 확인서를 기기 안에서 칸으로 (2번) |
-| [`plan-receipt-spend.md`](plan-receipt-spend.md) | 영수증에 쓴 돈 한 줄. 통화는 나란히 (13.1) |
+| [`../done/plan-receipt-spend.md`](../done/plan-receipt-spend.md) | 영수증에 쓴 돈 한 줄. 통화는 나란히 (13.1) |
 | [`plan-app-offline.md`](plan-app-offline.md) | 앱에서도 안 터질 때 일정이 보이게 (1번) |
 | [`plan-widget.md`](plan-widget.md) | 잠금화면에 남은 날 (14번) |
 | [`plan-places-fields.md`](plan-places-fields.md) | Places 필드 넷을 한 번에 재고 정한다 (6·7·8·9) |
@@ -41,7 +45,7 @@
 | [`plan-dday.md`](../done/plan-dday.md) | 홈에서도 며칠 남았는지 (`ideas.md` 2번) — **끝나서 `docs/done/` 으로 옮겼습니다** |
 | [`plan-news.md`](plan-news.md) | 소식함 — 내가 없는 동안 무엇이 바뀌었나 (`ideas.md` 1번) |
 | [`plan-tip-used.md`](plan-tip-used.md) | 내가 남긴 한 줄이 쓰였다는 것 (`ideas.md` 3번) |
-| [`plan-place-cost.md`](plan-place-cost.md) | 장소의 비용과 가계부를 잇는다 |
+| [`../done/plan-place-cost.md`](../done/plan-place-cost.md) | 장소의 비용과 가계부를 잇는다 |
 
 ### 두 갈래가 만나는 곳
 
@@ -99,7 +103,7 @@
 |---|---|---|
 | `recommend.md` 머리 | "아직 코드는 한 줄도 바뀌지 않았습니다" — 0·1·3단계가 들어가 있습니다 | **고쳤습니다.** `docs/done/recommend.md` 로 옮기고 머리에 상태 상자를 얹었습니다 |
 | `recommend.md` §10 | "웹용 WASM 모델 — 하지 않기로 한 것" — `@mlc-ai/web-llm` 으로 했습니다 | **고쳤습니다.** 그 줄에 취소선과 사유를 달았습니다 |
-| `app/card/[id].tsx:32` | "들른 곳과 **거리**" — 코드에 거리가 없습니다 | **아직 안 고쳤습니다.** `plan-receipt-spend.md` §3.4 에서 주석을 고치기로 |
+| `app/card/[id].tsx:32` | "들른 곳과 **거리**" — 코드에 거리가 없습니다 | **아직 안 고쳤습니다.** `../done/plan-receipt-spend.md` §3.4 에서 주석을 고치기로 |
 
 `recommend.md` 를 고치는 것이 **0차**였고, 끝났습니다. 문서는
 [`docs/done/recommend.md`](../done/recommend.md) 에 있습니다.
@@ -120,7 +124,10 @@
 ### 0차 — 문서 (코드 변경 없음) — **끝났습니다**
 `recommend.md` 를 [`docs/done/`](../done/) 으로 옮기고 머리와 §10 을 고쳤습니다.
 
-### 0차 — 지금 사람을 막고 있는 것
+### 0차 — 지금 사람을 막고 있는 것 — **끝났습니다**
+
+> 커밋들은 [`../done/plan-quota.md`](../done/plan-quota.md) §10 에.
+> 아래는 고치기 전에 재 본 기록입니다.
 
 **이 표에 없던 것이 하나 있습니다.** 기능이 아니라 고장이라 계획 문서가
 없었는데, 재 보니 실제로 쓰는 사람을 막고 있습니다.
@@ -146,25 +153,25 @@
 두되 **진짜 나갈 때** 셉니다 — 필터는 바닥난 사람을 먼저 돌려보내기만 하고,
 구글을 실제로 부르는 네 자리가 캐시를 지나 요청을 보낼 때 1씩 씁니다.
 
-**계획 문서가 아직 없습니다.** 시작할 때 `plan-quota.md` 를 씁니다.
+**계획 문서가 아직 없습니다.** 시작할 때 `../done/plan-quota.md` 를 씁니다.
 
-### 1차 — 재빌드도 서버 변경도 없음
-| | 계획 | 갈래 |
-|---|---|---|
-| ~~0~~ | ~~홈의 D-day~~ — **끝났습니다.** 커밋 `3653a1d`. [`done/plan-dday.md`](../done/plan-dday.md) | B |
-| 1 | [`plan-place-cost.md`](plan-place-cost.md) **§8 의 5·6** — 반쯤 간 것을 끝냅니다. 지출 쪽 백엔드는 이미 다 서 있습니다 | B |
-| 2 | `verdict.md` §11.1 — 이미 내려오는 `updatedBy`·`updatedAt` 을 화면에 | A |
-| 3 | [`plan-receipt-spend.md`](plan-receipt-spend.md) — 백엔드 0, 스키마 0, 구글 0 | A |
-| 4 | [`plan-booking-paste.md`](plan-booking-paste.md) — 새 파일 하나와 함수 둘 | A |
+### 1차 — 재빌드도 서버 변경도 없음 — **거의 끝났습니다**
 
-1번이 3차에서 올라왔습니다. 절반이 이미 들어가 있어 남은 것이 화면 쪽
-둘뿐이고, **`Expense.placeId` 는 서버에 이미 다 깔려 있습니다** — 엔티티부터
-응답까지. 화면이 보내기만 하면 됩니다. 반쯤 선 것을 세워 두는 것보다
-끝내는 편이 낫습니다.
+| | 계획 | 갈래 | 상태 |
+|---|---|---|---|
+| ~~0~~ | ~~홈의 D-day~~ | B | **끝남** `3653a1d` · [`done/`](../done/plan-dday.md) |
+| ~~1~~ | ~~장소 비용 ↔ 가계부~~ | B | **끝남** `70b0d8f`·`654b4c1` · [`done/`](../done/plan-place-cost.md) |
+| ~~2~~ | ~~`verdict.md` §11.1 — 누가 손댔는지~~ | A | **끝남** `5e2126b`. 계획 문서가 없던 것입니다 |
+| ~~3~~ | ~~영수증에 쓴 돈~~ | A | **끝남** `758aac3` · [`done/`](../done/plan-receipt-spend.md) |
+| 4 | [`plan-booking-paste.md`](plan-booking-paste.md) | A | **반쯤** — 웹은 `dda7e7e`. 아래 |
 
-1번은 계획 문서가 없습니다. 남은 1차 중 가장 싸고(백엔드·스키마·구글 전부 0),
-`plan-news.md` 의 앞단이라 그쪽 문서가 순서를 적어 두었습니다.
-`verdict.md` 11 에 판정과 지킬 것이 있습니다.
+**4번만 남았고, 그것도 반쯤 갔습니다.** 웹 쪽이 들어갔지만 그 문서 §9 가
+걸어 둔 관문 — "1.5B 가 이 일을 해내는지" — 를 **못 넘었습니다.** 재려던
+PC 의 디스크가 모자라 모델을 못 받았습니다. 앱 쪽은 EAS 빌드가 필요해
+2차로 미뤘습니다.
+
+**쓰는 사람이 직접 재야 합니다.** 못 해내면 접기로 한 계획이고, 되돌리는
+법까지 §10 에 적혀 있습니다.
 
 ### 2차 — EAS 재빌드 한 번에 묶어서
 | | 계획 |
@@ -185,15 +192,18 @@
 낫습니다.
 
 ### 3차 — 서버 작업
-| | 계획 | 갈래 |
-|---|---|---|
-| 5 | [`plan-places-fields.md`](plan-places-fields.md) — 그중 9.1(`FUTURE_OPENING`)은 기능이 아니라 **이미 진 빚**입니다 | A |
-| 6 | [`plan-news.md`](plan-news.md) — 1차 2번이 먼저 서야 합니다. 마이그레이션은 **`V21`** | B |
-| 7 | [`plan-tip-used.md`](plan-tip-used.md) — `plan-news.md` 와 같은 화면의 아래층. 마이그레이션은 **`V22`** | B |
-| 8 | [`plan-search-along-route.md`](plan-search-along-route.md) | A |
+| | 계획 | 갈래 | 상태 |
+|---|---|---|---|
+| 5 | [`plan-places-fields.md`](plan-places-fields.md) | A | **반쯤** — 9.1 은 `7a01fbd`. 나머지 셋은 **구글 키가 있어야** 재 볼 수 있어 멈췄습니다 |
+| 6 | [`plan-news.md`](plan-news.md) | B | **하는 중** — 앞단(§11.1)은 `5e2126b`. `V21__news_seen.sql` 이 아직 커밋 전입니다 |
+| 7 | [`plan-tip-used.md`](plan-tip-used.md) | B | 아직. `plan-news.md` 와 같은 화면의 아래층. 마이그레이션은 **`V22`** |
+| 8 | [`plan-search-along-route.md`](plan-search-along-route.md) | A | 아직 |
 
-`plan-place-cost.md` 가 여기 있었는데 1차로 올라갔습니다 — 절반이 이미
-들어갔고 남은 것에 서버 작업이 없습니다.
+5번에서 **계획서가 짚은 것보다 한 줄이 더 나왔습니다.** `FUTURE_OPENING` 만
+문제인 줄 알았는데 `CLOSED_TEMPORARILY` 도 "영업 중" 으로 흐르고 있었습니다.
+잠시 닫은 가게도 지금 가면 못 들어갑니다.
+
+`../done/plan-place-cost.md` 가 여기 있었는데 1차로 올라갔다가 끝났습니다.
 
 갈래 B 의 순서는 `verdict-ideas.md` 가 정한 것이고, 여기서는 갈래 A 와
 섞어 놓기만 했습니다. 둘의 상대 순서는 `plan-news.md` 가 적어 둔 의존

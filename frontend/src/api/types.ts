@@ -618,3 +618,47 @@ export type Books = {
   balances: { userId: string; name: string; balance: number }[];
   transfers: { fromName: string; toName: string; amount: number }[];
 };
+
+/**
+ * 소식 한 줄.
+ *
+ * <p>내가 없는 동안 남이 한 일입니다. <b>내가 한 일은 안 옵니다</b> — 서버가
+ * 거릅니다.
+ *
+ * <p>{@code tripId} 와 {@code postId} 는 <b>둘 중 하나만</b> 찹니다. 여행에서
+ * 벌어진 일과 내 글에서 벌어진 일은 갈 곳이 다릅니다. 어디로 갈지는 서버가
+ * 정해서 {@code url} 로 내려보냅니다.
+ */
+export type NewsItem = {
+  at: string;
+  kind:
+    | 'place.add'
+    | 'place.edit'
+    | 'candidate.add'
+    | 'candidate.vote'
+    | 'post.like'
+    | 'post.comment';
+  /** 한 일을 한 사람. 지워진 계정이면 "누군가" 입니다. */
+  actorName: string;
+  tripId?: string | null;
+  tripTitle?: string | null;
+  postId?: string | null;
+  postTitle?: string | null;
+  /**
+   * 사람이 읽는 한 줄.
+   *
+   * <p>서버가 만듭니다. 푸시가 같은 순간에 쓰는 말과 맞춰야 하는데, 화면과
+   * 서버가 각자 만들면 어느 날 둘이 갈립니다.
+   */
+  text: string;
+  url: string;
+  /** 마지막으로 열어 본 뒤에 생긴 것. */
+  fresh: boolean;
+};
+
+export type News = {
+  items: NewsItem[];
+  unseen: number;
+  /** 마지막으로 열어 본 때. 한 번도 안 열었으면 없습니다. */
+  seenAt?: string | null;
+};

@@ -53,6 +53,18 @@ public class User {
     @Column(name = "last_login_at")
     private Instant lastLoginAt;
 
+    /**
+     * 소식함을 어디까지 봤는가.
+     *
+     * <p>비어 있으면 한 번도 안 연 것이고, 그때는 목록이 전부 새것입니다.
+     *
+     * <p>이 값으로 <b>거르지 않습니다.</b> 소식은 늘 30일치가 그대로 있고,
+     * 이것은 "새것" 점을 찍을지만 정합니다 — 열어 본 뒤에 어제 것이
+     * 사라지면 "아까 그게 뭐였더라" 를 할 수 없습니다.
+     */
+    @Column(name = "news_seen_at")
+    private Instant newsSeenAt;
+
     @Builder
     public User(String email, String name, String passwordHash, Role role) {
         this.id = Ids.next();

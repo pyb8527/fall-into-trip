@@ -109,6 +109,16 @@ public class Place {
     @Column(columnDefinition = "jsonb")
     private String move;
 
+    /**
+     * 이 장소가 처음 들어온 때.
+     *
+     * <p>{@code updatedAt} 과 같으면 아직 아무도 안 고친 것입니다. 소식함이
+     * "넣었습니다" 와 "고쳤습니다" 를 가르는 데 씁니다 — 푸시가 그 순간에
+     * 쓰는 말과 맞추기 위해서입니다.
+     */
+    @Column(name = "created_at", nullable = false)
+    private Instant createdAt = Instant.now();
+
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt = Instant.now();
 
@@ -151,6 +161,7 @@ public class Place {
         this.fit = fit == null || fit;
         this.move = move;
         this.placeId = placeId;
+        this.createdAt = Instant.now();
         this.updatedAt = Instant.now();
         this.updatedBy = updatedBy;
     }

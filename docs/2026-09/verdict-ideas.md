@@ -148,7 +148,7 @@
 | 스키마 변경 | `places` 에 칸 둘 |
 | 백엔드 변경 | 장소 쪽만. **지출 쪽은 한 줄도 안 바뀝니다** |
 
-계획은 `plan-place-cost.md` 입니다.
+계획은 `../done/plan-place-cost.md` 입니다.
 
 ---
 
@@ -157,7 +157,7 @@
 | | 무엇 | 어디에 |
 |---|---|---|
 | 1 | 홈의 D-day | `../done/plan-dday.md` |
-| 2 | 장소 비용 ↔ 가계부 | `plan-place-cost.md` |
+| 2 | 장소 비용 ↔ 가계부 | `../done/plan-place-cost.md` |
 | 3 | 누가 언제 고쳤는지 (11.1) | `verdict.md` §11 |
 | 4 | 소식함 — 여러 여행에 걸쳐 모으기 | `plan-news.md` |
 | 5 | 내가 남긴 한 줄이 쓰인 것 | `plan-tip-used.md` |
@@ -178,4 +178,4 @@
 - **`TripItem`·`TripMember`·`Day` 에 시각 칸을 더할지.** 소식이 읽히는지
   본 뒤입니다.
 - **장소를 지우면 거기 묶인 지출을 어떻게 할지.**
-  `plan-place-cost.md` 9 번에 적었습니다.
+  `../done/plan-place-cost.md` 9 번에 적었습니다.

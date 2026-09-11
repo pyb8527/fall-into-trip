@@ -3,7 +3,7 @@ import { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { api } from '@/api/client';
-import type { TripSummary } from '@/api/types';
+import type { News, TripSummary } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
 import { Spacing } from '@/constants/theme';
@@ -52,6 +52,17 @@ export default function Home() {
   );
 
   /*
+    소식이 와 있는지.
+
+    숫자는 안 씁니다. 점 하나면 "들어가 볼 것이 있다" 는 말이 되고, 몇
+    건인지는 열기 전에 할 일이 아닙니다.
+
+    못 받아 와도 조용히 넘어갑니다 — 첫 화면이 소식 때문에 멈추면, 소식이
+    없는 사람에게도 앱이 느려집니다.
+  */
+  const { data: news } = useAsync<News>((signal) => api.get('/api/news', signal), []);
+
+  /*
     가장 가까운 여행 하나.
 
     사람들은 여행 전에 날짜를 셉니다. 앱이 없어도 하는 행동이라, 그 답이
@@ -77,13 +88,28 @@ export default function Home() {
       <View style={styles.head}>
         <Row style={styles.headTop}>
           <LogoMark size={26} />
-          {/* 계정 설정은 늘 같은 자리(오른쪽 위)에 둡니다. 메뉴 사이에 끼워 두면
+          {/* 오른쪽 위에 둘입니다.
+
+              소식을 메뉴 카드로 만들면 넷이 다섯이 되어 2열 배치가
+              흐트러집니다. 그리고 카드는 "들어가서 할 일" 인데 소식은
+              "와 있는지 보는 것" 이라 성격이 다릅니다 — 점이 없으면 누를
+              이유도 없습니다.
+
+              계정 설정은 늘 같은 자리에 둡니다. 메뉴 사이에 끼워 두면
               쓸 일이 드문 것이 자주 쓰는 것들과 자리를 다툽니다. */}
-          <IconButton
-            name="settings"
-            label="내 계정"
-            onPress={() => router.push('/(app)/settings')}
-          />
+          <Row gap={0}>
+            <IconButton
+              name="bell"
+              label={news?.unseen ? `소식 ${news.unseen}건` : '소식'}
+              dot={!!news?.unseen}
+              onPress={() => router.push('/(app)/news')}
+            />
+            <IconButton
+              name="settings"
+              label="내 계정"
+              onPress={() => router.push('/(app)/settings')}
+            />
+          </Row>
         </Row>
         {/* 이름을 강조색으로 떼어 놓습니다. 한 덩어리로 두면 인사말이 그냥
             문장 하나로 흘러갑니다.

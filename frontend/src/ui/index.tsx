@@ -857,7 +857,9 @@ export type IconName =
   /** 끌어서 옮기는 손잡이 */
   | 'menu'
   /** 여기 있다고 꽂아 두는 깃발 */
-  | 'flag';
+  | 'flag'
+  /** 소식함. 내가 없는 동안 무엇이 바뀌었는지 */
+  | 'bell';
 
 export function Icon({
   name,
@@ -886,6 +888,7 @@ export function IconButton({
   disabled,
   onMap,
   bare,
+  dot,
 }: {
   name: IconName;
   /** 무엇을 하는 단추인지. 눈에는 안 보이고 읽어 주는 기기만 씁니다. */
@@ -911,6 +914,13 @@ export function IconButton({
    * 무엇이 눌리는 것인지 자리로 이미 알 수 있어 바탕이 필요 없습니다.
    */
   bare?: boolean;
+  /**
+   * 오른쪽 위에 찍는 점.
+   *
+   * <p>안에 볼 것이 있다는 표시입니다. 숫자를 적지 않습니다 — 몇 건인지는
+   * 열기 전에 할 일이 아니고, 두 자리가 되면 단추가 그만큼 넓어집니다.
+   */
+  dot?: boolean;
 }) {
   return (
     <Press
@@ -934,6 +944,7 @@ export function IconButton({
         active && onMap ? { borderColor: toneColor[tone] } : null,
       ]}>
       <Icon name={name} tone={disabled ? 'muted' : active ? tone : 'secondary'} />
+      {dot ? <View style={styles.iconButtonDot} /> : null}
     </Press>
   );
 }
@@ -1949,6 +1960,22 @@ const styles = StyleSheet.create({
     borderRadius: Radius.none,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  /* 안에 볼 것이 있다는 점.
+
+     이 화면은 흑백입니다. 그래서 색으로 눈에 띄게 할 수가 없고, 대신 흰
+     테두리를 둘러 그림에서 떼어 놓습니다 — 테두리가 없으면 종 그림의
+     선 하나처럼 보입니다. */
+  iconButtonDot: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: Colors.accent,
+    borderWidth: 1.5,
+    borderColor: Colors.surface,
   },
   /* 지도 위에 떠 있는 단추. 동그랗고, 실선과 그림자로 지도에서 떼어 놓습니다. */
   iconButtonOnMap: {

@@ -286,7 +286,12 @@ node backend/src/test/http/icon.test.mjs       # 핀 그림과 이동 비교
 node backend/src/test/http/place.test.mjs      # 장소 찾기
 node backend/src/test/http/recommend.test.mjs  # 말로 묻고 갈 곳 받기
 node backend/src/test/http/quota.test.mjs      # 구글 호출 문턱
+node backend/src/test/http/news.test.mjs       # 소식함 — 남의 것이 새지 않는가
 ```
+
+**묶음마다 판을 비우고 돌립니다.** 여럿이 `/api/auth/setup` 으로 운영자를
+만드는데 그 자리는 저장소에 한 번만 되므로, 이어서 돌리면 뒤쪽이 운영자
+없이 시작합니다.
 
 `place`·`recommend` 와 동선 그림은 구글 키가 있어야 끝까지 갑니다. 키가
 없으면 그 앞의 울타리(권한·검증·꺼져 있을 때의 안내)만 봅니다 — 거기까지가

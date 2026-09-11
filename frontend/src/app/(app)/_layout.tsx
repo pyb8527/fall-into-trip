@@ -43,6 +43,7 @@ export default function AppLayout() {
       <Stack.Screen name="home" options={{ headerShown: false }} />
       <Stack.Screen name="trips" options={stackHeader('내 여행')} />
       <Stack.Screen name="saved" options={stackHeader('보석함')} />
+      <Stack.Screen name="news" options={stackHeader('소식')} />
       <Stack.Screen name="settings" options={stackHeader('내 계정')} />
     </Stack>
   );
