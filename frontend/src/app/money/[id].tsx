@@ -67,6 +67,20 @@ export default function Money() {
   const [failed, setFailed] = useState<string | null>(null);
 
   const days = trip?.days ?? [];
+  /*
+    장소 번호 → 이름.
+
+    지출에 장소가 붙어 있어도 번호뿐이라 그대로는 못 보여 줍니다. 줄마다
+    날을 뒤지면 지출 수만큼 훑게 되므로 한 번만 만들어 둡니다.
+
+    지워진 장소는 여기 없습니다. 그때는 이름을 안 적습니다 — 지출은 남고
+    "어디서" 만 잃습니다.
+  */
+  const placeNames = useMemo(() => {
+    const box = new Map<string, string>();
+    days.forEach((d) => d.places.forEach((p) => box.set(p.id, p.name)));
+    return box;
+  }, [days]);
   const people = mates?.members ?? [];
   const list = spent.data?.expenses ?? [];
 
@@ -145,7 +159,13 @@ export default function Money() {
                 </Caption>
               </Row>
               {group.items.map((e) => (
-                <SpendRow key={e.id} spend={e} people={people} onRemove={() => remove(e.id)} />
+                <SpendRow
+                  key={e.id}
+                  spend={e}
+                  people={people}
+                  placeName={e.placeId ? (placeNames.get(e.placeId) ?? null) : null}
+                  onRemove={() => remove(e.id)}
+                />
               ))}
             </View>
           ))}
@@ -174,10 +194,13 @@ export default function Money() {
 function SpendRow({
   spend,
   people,
+  placeName,
   onRemove,
 }: {
   spend: Spend;
   people: Companion[];
+  /** 어디서 썼는지. 안 정했거나 그 장소가 지워졌으면 비어 있습니다. */
+  placeName: string | null;
   onRemove: () => void;
 }) {
   /* 전원이 나누면 굳이 적지 않습니다. 대개 그렇고, 매번 적으면 줄만
@@ -202,6 +225,7 @@ function SpendRow({
         <Caption tone="secondary">
           {spend.payerName} 님이 냄{shared ? ` · ${shared} 나눔` : ''}
           {spend.pay ? ` · ${spend.pay}` : ''}
+          {placeName ? ` · ${placeName}` : ''}
         </Caption>
       </View>
       <Body strong>{money(spend.amount, spend.currency, spend.decimals)}</Body>
@@ -299,6 +323,9 @@ function AddSheet({
   const [currency, setCurrency] = useState(currencies[0] ?? 'KRW');
   const [payer, setPayer] = useState<string | null>(null);
   const [dayId, setDayId] = useState<string | null>(null);
+  /* 장소는 날에 딸려 있습니다. 날을 바꾸면 비웁니다 — 안 그러면 어제 고른
+     가게가 오늘 지출에 붙습니다. */
+  const [placeId, setPlaceId] = useState<string | null>(null);
   const [cat, setCat] = useState('');
   /* 비어 있으면 전원이 나눕니다. 여행 경비는 대개 그렇습니다. */
   const [share, setShare] = useState<string[]>([]);
@@ -306,6 +333,8 @@ function AddSheet({
   const [failed, setFailed] = useState<string | null>(null);
 
   const decimals = decimalsOf(currency);
+  /** 고른 날의 장소들. 날을 안 골랐으면 비어 있습니다. */
+  const dayPlaces = days.find((d) => d.id === dayId)?.places ?? [];
 
   async function submit() {
     setFailed(null);
@@ -322,6 +351,7 @@ function AddSheet({
         currency,
         payerId: payer,
         dayId,
+        placeId,
         cat: cat.trim() || null,
         share: share.length > 0 ? share : null,
       });
@@ -422,7 +452,38 @@ function AddSheet({
                 key={d.id}
                 label={d.date || d.label}
                 selected={dayId === d.id}
-                onPress={() => setDayId(dayId === d.id ? null : d.id)}
+                onPress={() => {
+                  const next = dayId === d.id ? null : d.id;
+                  setDayId(next);
+                  setPlaceId(null);
+                }}
+              />
+            ))}
+          </Row>
+        </View>
+      ) : null}
+
+      {/*
+        어디서 썼는지.
+
+        날을 고른 뒤에만 뜹니다. 장소는 날에 딸려 있어서, 날을 모르면 고를
+        목록도 없습니다. 그 날에 장소를 아직 안 넣었으면 이 칸 자체가
+        안 뜹니다 — 빈 칸을 내밀면 뭔가 빠뜨린 것처럼 보입니다.
+
+        안 고르는 것이 기본입니다. 숙소비나 항공권처럼 어느 한 곳에 붙지
+        않는 돈이 많습니다.
+      */}
+      {dayPlaces.length > 0 ? (
+        <View style={styles.pick}>
+          <Caption tone="secondary">어디서</Caption>
+          <Row gap={Spacing.xs} style={styles.chips}>
+            <Chip label="어디랄 것 없이" selected={placeId === null} onPress={() => setPlaceId(null)} />
+            {dayPlaces.map((p) => (
+              <Chip
+                key={p.id}
+                label={p.name}
+                selected={placeId === p.id}
+                onPress={() => setPlaceId(placeId === p.id ? null : p.id)}
               />
             ))}
           </Row>

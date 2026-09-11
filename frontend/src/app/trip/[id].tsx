@@ -244,6 +244,30 @@ export default function TripScreen() {
     return box;
   }, [spending]);
 
+  /**
+   * 장소 → 통화별로 거기서 쓴 돈.
+   *
+   * <p>하루 합계와 같은 셈을 한 단 더 좁힌 것입니다. 잡아 둔 비용이 장소에
+   * 붙어 있으니 실제로 쓴 돈도 그 옆에 놓습니다.
+   *
+   * <p>어느 장소인지 안 정한 지출은 어디에도 안 붙입니다 — 숙소비나
+   * 항공권처럼 한 곳에 매이지 않는 돈이 많고, 아무 데나 얹으면 그 가게에서
+   * 그만큼 쓴 것이 됩니다.
+   */
+  const spentByPlace = useMemo(() => {
+    const box = new Map<string, Map<string, { sum: number; decimals: number }>>();
+    for (const e of spending?.expenses ?? []) {
+      if (!e.placeId) {
+        continue;
+      }
+      const perCurrency = box.get(e.placeId) ?? new Map();
+      const had = perCurrency.get(e.currency) ?? { sum: 0, decimals: e.decimals };
+      perCurrency.set(e.currency, { sum: had.sum + e.amount, decimals: e.decimals });
+      box.set(e.placeId, perCurrency);
+    }
+    return box;
+  }, [spending]);
+
   const [companions, setCompanions] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [dropping, setDropping] = useState(false);
@@ -1116,6 +1140,7 @@ export default function TripScreen() {
               tipCounts={tipCounts}
               onTips={setTipFor}
               spent={spentByDay.get(day.id) ?? null}
+              spentAt={spentByPlace}
             />
           ) : null,
         )}
@@ -1398,6 +1423,7 @@ function DayCard({
   tipCounts,
   onTips,
   spent,
+  spentAt,
 }: {
   day: Day;
   index: number;
@@ -1426,6 +1452,8 @@ function DayCard({
   onTips: (place: Place) => void;
   /** 이 날 실제로 쓴 돈. 통화마다 하나씩. 아직 안 적었으면 비어 있습니다. */
   spent: Map<string, { sum: number; decimals: number }> | null;
+  /** 장소마다 거기서 쓴 돈. 여행 전체 것이라 줄마다 꺼내 씁니다. */
+  spentAt: Map<string, Map<string, { sum: number; decimals: number }>>;
 }) {
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<Place | null>(null);
@@ -1806,6 +1834,7 @@ function DayCard({
                     }}
                     gap={gapAfter.get(place.id)}
                     arriveBy={order[i + 1]?.time ?? null}
+                    spent={spentAt.get(place.id) ?? null}
                     chosenOf={chosenOf}
                     onPick={onPick}
                   />
@@ -1919,6 +1948,7 @@ function PlaceRow({
   onRemove,
   gap,
   arriveBy,
+  spent,
   chosenOf,
   onPick,
 }: {
@@ -1950,12 +1980,19 @@ function PlaceRow({
   gap?: Gap;
   /** 다음 장소에 적어 둔 시각. 안 적었으면 비어 있습니다. */
   arriveBy: string | null;
+  /** 여기서 실제로 쓴 돈. 통화마다 하나씩. 안 적었으면 비어 있습니다. */
+  spent: Map<string, { sum: number; decimals: number }> | null;
   chosenOf: (gap: Gap) => GapOption | null;
   onPick: (fromId: string, mode: TravelMode) => void;
 }) {
   const [confirming, setConfirming] = useState(false);
   const emoji = iconOf(place.icon);
   const chosen = gap ? chosenOf(gap) : null;
+  /* 통화를 더하지 않습니다. 엔과 원을 합치려면 "언제 환율로" 가 남고 그
+     답은 사람마다 다릅니다. 나란히 둡니다. */
+  const spentHere = spent
+    ? [...spent.entries()].map(([c, t]) => money(t.sum, c, t.decimals)).join(' · ')
+    : null;
 
   return (
     <View>
@@ -2020,12 +2057,23 @@ function PlaceRow({
               {alsoOn.length > 0 ? (
                 <Caption tone="warning">{alsoOn.join(' · ')}에도 넣어 두었습니다</Caption>
               ) : null}
-              {/* 비용은 칸이 둘입니다. 숫자로 적어 둔 것이 있으면 그것을,
-                  없으면 사람이 자유롭게 적은 글자를 보여 줍니다. */}
-              {place.cat || costLabel(place) ? (
+              {/*
+                갈래와 돈.
+
+                비용은 칸이 둘입니다 — 숫자로 적어 둔 것이 있으면 그것을,
+                없으면 사람이 자유롭게 적은 글자를 보여 줍니다.
+
+                실제로 쓴 돈은 그 옆에 붙습니다. 잡아 둔 것과 쓴 것을 한 줄에
+                놓는 데까지가 우리 몫이고, 넘었는지는 보는 사람이 압니다 —
+                하루 카드에서 예산을 다룬 것과 같은 규칙입니다.
+              */}
+              {place.cat || costLabel(place) || spentHere ? (
                 <Row gap={Spacing.sm}>
                   {place.cat ? <Caption>{place.cat}</Caption> : null}
-                  {costLabel(place) ? <Caption>{costLabel(place)}</Caption> : null}
+                  {costLabel(place) ? <Caption>잡은 것 {costLabel(place)}</Caption> : null}
+                  {spentHere ? (
+                    <Caption strong>쓴 돈 {spentHere}</Caption>
+                  ) : null}
                 </Row>
               ) : null}
             </View>

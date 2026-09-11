@@ -584,6 +584,13 @@ export type Spend = {
   id: string;
   /** 어느 날 것인지. 아직 안 정했으면 비어 있습니다. */
   dayId: Maybe<string>;
+  /**
+   * 어느 장소에서 썼는지. 안 정했으면 비어 있습니다.
+   *
+   * 가리키던 장소가 지워졌을 수도 있습니다 — 그때는 지출이 남고 번호만
+   * 붕 뜹니다. 화면은 이름을 못 찾으면 그 줄을 안 적습니다.
+   */
+  placeId: Maybe<string>;
   payerId: string;
   payerName: string;
   cat: Maybe<string>;

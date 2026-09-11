@@ -231,5 +231,59 @@ r = await call("GET", `/api/trips/${tripId}/items`);
 T("로그인 없이는 못 본다", r.status === 401, r.data);
 
 
+console.log("\n[9] 지출을 장소에 묶는다");
+/*
+  이 칸은 엔티티부터 응답까지 서버에 다 깔려 있었는데 화면이 한 번도
+  안 보냈습니다. 보내기 시작하는 김에 울타리를 세웁니다 — 아무도 안
+  보내서 한 번도 확인된 적 없는 자리입니다.
+*/
+r = await call("POST", "/api/places", { token: A,
+  body: { dayId: days[0].id, name: "이치란", lat: 34.6687, lng: 135.5013 } });
+const ichiran = r.data.place?.id;
+T("장소 준비", !!ichiran, r.data);
+
+r = await call("POST", `/api/trips/${tripId}/expenses`, { token: A,
+  body: { name: "라멘", amount: 1200, currency: "JPY", dayId: days[0].id, placeId: ichiran } });
+T("장소를 달아 적는다", r.status === 200, r.data);
+const ramen = r.data.id;
+r = await call("GET", `/api/trips/${tripId}/expenses`, { token: A });
+T("응답에 실려 온다", r.data.expenses.find((e) => e.id === ramen)?.placeId === ichiran,
+  r.data.expenses.find((e) => e.id === ramen));
+
+/* 남의 여행 장소 번호를 넣어 보내는 자리 */
+r = await call("POST", "/api/trips", { token: X, body: { title: "남의 여행", startIso: "2026-12-01", nights: 1 } });
+const otherTrip = r.data.trip.id;
+r = await call("GET", `/api/trip?trip=${otherTrip}`, { token: X });
+r = await call("POST", "/api/places", { token: X,
+  body: { dayId: r.data.days[0].id, name: "남의 장소", lat: 35, lng: 139 } });
+const otherPlace = r.data.place.id;
+
+r = await call("POST", `/api/trips/${tripId}/expenses`, { token: A,
+  body: { name: "엉뚱", amount: 100, currency: "JPY", placeId: otherPlace } });
+T("남의 여행 장소는 거절", r.status === 400, r.data);
+r = await call("PATCH", `/api/expenses/${ramen}`, { token: A, body: { placeId: otherPlace } });
+T("고칠 때도 거절", r.status === 400, r.data);
+
+/* 판 번호를 안 보내면 검사하지 않습니다 — 장소·날짜 쪽과 같은 규칙입니다.
+   여기만 인자가 뒤집혀 있어서 안 보내면 500 이 났습니다. */
+r = await call("PATCH", `/api/expenses/${ramen}`, { token: A, body: { cat: "먹기" } });
+T("판 번호를 생략해도 저장된다", r.status === 200, r.data);
+r = await call("GET", `/api/trips/${tripId}/expenses`, { token: A });
+const edited = r.data.expenses.find((e) => e.id === ramen);
+T("고친 것이 남는다", edited?.cat === "먹기", edited);
+r = await call("PATCH", `/api/expenses/${ramen}`, { token: A, body: { cat: "밥", version: 999 } });
+T("옛 판으로 저장하면 409", r.status === 409, r.data);
+r = await call("POST", `/api/trips/${tripId}/expenses`, { token: A,
+  body: { name: "없는 장소", amount: 100, currency: "JPY", placeId: "ZZZZZZZZZZZZ" } });
+T("없는 장소는 404", r.status === 404, r.data);
+
+/* 장소를 지워도 돈은 남습니다. 지출까지 지우면 정산이 틀리고, 장소를 못
+   지우게 막으면 짜는 일이 막힙니다. 화면이 이름을 못 찾으면 그 줄만
+   안 적습니다. */
+r = await call("DELETE", `/api/places/${ichiran}`, { token: A });
+T("장소 삭제", r.status === 200, r.data);
+r = await call("GET", `/api/trips/${tripId}/expenses`, { token: A });
+T("지출은 남는다", !!r.data.expenses.find((e) => e.id === ramen), r.data.expenses);
+
 console.log(`\n결과: ${pass} 통과 / ${fail} 실패`);
 process.exit(fail ? 1 : 0);

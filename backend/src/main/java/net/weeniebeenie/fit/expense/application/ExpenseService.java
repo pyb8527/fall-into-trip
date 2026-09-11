@@ -10,6 +10,8 @@ import net.weeniebeenie.fit.shared.error.ApiException;
 import net.weeniebeenie.fit.support.audit.AuditService;
 import net.weeniebeenie.fit.trip.domain.Day;
 import net.weeniebeenie.fit.trip.domain.DayRepository;
+import net.weeniebeenie.fit.trip.domain.Place;
+import net.weeniebeenie.fit.trip.domain.PlaceRepository;
 import net.weeniebeenie.fit.trip.domain.TripAccessPolicy;
 import net.weeniebeenie.fit.trip.domain.TripMemberRepository;
 import org.springframework.stereotype.Service;
@@ -50,6 +52,7 @@ public class ExpenseService {
     private final ExpenseRepository expenses;
     private final TripMemberRepository members;
     private final DayRepository days;
+    private final PlaceRepository places;
     private final UserRepository users;
     private final TripAccessPolicy access;
     private final SettlementCalculator calculator;
@@ -136,7 +139,7 @@ public class ExpenseService {
         Expense made = expenses.save(Expense.builder()
                 .tripId(tripId)
                 .dayId(dayIn(tripId, draft.dayId()))
-                .placeId(blankToNull(draft.placeId()))
+                .placeId(placeIn(tripId, draft.placeId()))
                 .payerId(payer)
                 .cat(blankToNull(draft.cat()))
                 .name(name)
@@ -156,7 +159,11 @@ public class ExpenseService {
     public void update(AuthPrincipal me, String expenseId, Draft draft) {
         Expense expense = read(expenseId);
         access.requireCanEdit(expense.getTripId(), me.id());
-        Versioned.check(expense.getVersion(), draft.version());
+        /* 인자 순서가 뒤집혀 있었습니다. 앞자리는 "화면이 본 판"(없을 수
+           있음)이고 뒷자리가 실제 판입니다. 뒤집힌 채로는 판 번호를 안 보낼
+           때 null 을 long 으로 풀다가 터졌습니다 — 500 입니다. 화면에 지출
+           고치기가 없어 아무도 안 밟던 자리입니다. */
+        Versioned.check(draft.version(), expense.getVersion());
 
         List<String> memberIds = memberIdsOf(expense.getTripId());
 
@@ -183,6 +190,9 @@ public class ExpenseService {
         }
         if (draft.dayId() != null) {
             expense.setDayId(dayIn(expense.getTripId(), draft.dayId()));
+        }
+        if (draft.placeId() != null) {
+            expense.setPlaceId(placeIn(expense.getTripId(), draft.placeId()));
         }
         if (draft.share() != null) {
             expense.setShare(shareJson(draft.share(), memberIds));
@@ -217,6 +227,29 @@ public class ExpenseService {
         members.findAllByIdTripId(tripId).forEach(m -> users.findById(m.getId().getUserId())
                 .ifPresent(u -> out.put(u.getId(), u.getName())));
         return out;
+    }
+
+    /**
+     * 이 여행의 장소인지 확인합니다.
+     *
+     * <p>지금까지 이 칸은 서버에 깔려만 있고 화면이 한 번도 안 보냈습니다.
+     * 아무도 안 보내서 드러나지 않던 자리라, 보내기 시작하는 김에 막습니다 —
+     * 남의 여행 장소 번호를 넣어 보내면 그대로 저장됐습니다.
+     *
+     * <p>장소는 날짜에 딸려 있으므로 그 날짜의 여행을 봅니다.
+     */
+    private String placeIn(String tripId, String placeId) {
+        if (placeId == null || placeId.isBlank()) {
+            return null;
+        }
+        Place place = places.findById(placeId)
+                .orElseThrow(() -> ApiException.notFound("장소를 찾을 수 없습니다."));
+        Day day = days.findById(place.getDayId())
+                .orElseThrow(() -> ApiException.notFound("날짜를 찾을 수 없습니다."));
+        if (!day.getTripId().equals(tripId)) {
+            throw ApiException.badRequest("이 여행의 장소가 아닙니다.");
+        }
+        return placeId;
     }
 
     /** 이 여행의 날짜인지 확인합니다. 남의 여행 날짜에 지출을 달 수 없습니다. */
