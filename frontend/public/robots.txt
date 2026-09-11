@@ -29,3 +29,30 @@ Disallow: /admin/
 Disallow: /invite/
 
 Allow: /
+
+
+# 링크를 펼쳐 카드로 만들어 주는 것들.
+#
+# 위의 Disallow: /api/ 가 이들에게도 걸리면 og:image 로 적어 둔 동선 그림을
+# 받지 못해, 카드가 글자만 남은 채로 뜹니다. 슬랙·트위터·페이스북은
+# robots.txt 를 실제로 지키므로 여기서 그림 한 장만 따로 열어 줍니다.
+#
+# 위에서 걱정한 요금과는 다른 일입니다. 크롤러는 목록을 훑으며 전부 받아
+# 가지만, 이들은 사람이 어딘가에 붙여 넣은 글 하나만 한 번 받아 갑니다.
+#
+# robots.txt 는 자기에게 맞는 묶음 하나만 읽고 나머지는 통째로 무시합니다.
+# 그래서 위의 금지 목록을 여기에 다시 적습니다 — 빠뜨리면 그만큼 열립니다.
+User-agent: Slackbot-LinkExpanding
+User-agent: Slackbot
+User-agent: Twitterbot
+User-agent: facebookexternalhit
+Allow: /api/posts/
+Disallow: /api/
+Disallow: /trip/
+Disallow: /travel/
+Disallow: /money/
+Disallow: /vote/
+Disallow: /card/
+Disallow: /admin/
+Disallow: /invite/
+Allow: /

@@ -84,6 +84,10 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/places/*/tips").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/posts/*/comments").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/posts/*/map").permitAll()
+                        /* 링크를 펼쳐 카드로 만드는 것들이 받아 가는 한 장.
+                           토큰을 들고 다닐 수 없는 쪽이라 열려 있어야 하고,
+                           내용도 이미 공개된 글에서만 나옵니다. */
+                        .requestMatchers(HttpMethod.GET, "/api/posts/*/card").permitAll()
                         /* 알림 공개키. 공개하라고 있는 것이고, 화면이 알림을
                            켤 수 있는 서버인지 먼저 확인하는 데 씁니다. */
                         .requestMatchers(HttpMethod.GET, "/api/push/key").permitAll()

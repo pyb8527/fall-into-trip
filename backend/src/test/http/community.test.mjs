@@ -117,6 +117,49 @@ T("원본 삭제", r.status === 200, r.data);
 r = await call("GET", "/api/posts/" + postId);
 T("글은 그대로", r.status === 200 && r.data.itinerary?.days?.[0]?.places?.length === 2, r.data);
 
+console.log("\n[8-2] 링크를 붙여 넣으면 카드가 된다");
+/* 카드는 JSON 이 아니라 HTML 이라 따로 받습니다. 누가 부르는지는 보지
+   않습니다 — 사람과 펼치는 것을 가르는 일은 nginx 가 합니다. */
+async function card(id) {
+  const res = await fetch(`${BASE}/api/posts/${id}/card`);
+  return { status: res.status, type: res.headers.get("content-type") || "", body: await res.text() };
+}
+
+let c = await card(postId);
+T("로그인 없이 열림", c.status === 200, c.status);
+T("HTML 로 온다", c.type.includes("text/html"), c.type);
+T("제목이 박혀 있다", c.body.includes('property="og:title" content="오사카 2박 3일"'), null);
+T("어떤 일정인지 한 줄", c.body.includes("3일 · 2곳 · 글쓴이 — 먹으러만 다닌 일정"), null);
+/* 지도 키를 안 넣어 둔 판에서는 그림이 아예 없습니다. 그때 og:image 를
+   적어 두면 카드에 깨진 그림 자리가 남으므로, 둘은 늘 짝이어야 합니다. */
+const mapOn = (await fetch(`${BASE}/api/posts/${postId}/map`)).status === 200;
+T(
+  "지도가 켜져 있으면 그림이 붙고 넓게 편다",
+  !mapOn ||
+    (c.body.includes(`/api/posts/${postId}/map`) &&
+      c.body.includes('content="summary_large_image"')),
+  { mapOn },
+);
+T(
+  "그림이 없으면 카드도 글자만",
+  c.body.includes('property="og:image"') ||
+    c.body.includes('name="twitter:card" content="summary">'),
+  null,
+);
+T("원래 자리를 가리킨다", c.body.includes(`/community/${postId}`), null);
+T("없는 글은 404", (await card("ZZZZZZZZZZZZ")).status === 404, null);
+
+/* 제목은 사람이 적습니다. 그대로 흘리면 우리가 쓰지 않은 표가 생깁니다. */
+r = await call("POST", "/api/trips", { token: author, body: { title: '"><script>alert(1)</script>', startIso: "2026-12-01", nights: 1 } });
+T("그런 제목도 받아는 준다", r.status === 200, r.data);
+const evilTrip = r.data.trip?.id;
+r = await call("GET", "/api/trip?trip=" + evilTrip, { token: author });
+r = await call("POST", "/api/places", { token: author, body: { dayId: r.data.days?.[0]?.id, name: "어딘가", lat: 34.7, lng: 135.5 } });
+r = await call("POST", `/api/trips/${evilTrip}/publish`, { token: author, body: {} });
+c = await card(r.data.postId);
+T("괄호는 막힌다", !c.body.includes("<script>") && c.body.includes("&lt;script&gt;"), null);
+T("속성이 중간에 끊기지 않는다", !c.body.includes('content=""><'), null);
+
 console.log("\n[9] 신고와 내리기");
 r = await call("POST", `/api/posts/${postId}/report`, { token: author, body: { reason: "테스트" } });
 T("내 글은 신고 못 함", r.status === 400, r.data);
@@ -130,6 +173,7 @@ r = await call("DELETE", "/api/posts/" + postId, { token: author });
 T("내 글은 내림", r.status === 200, r.data);
 r = await call("GET", "/api/posts/" + postId);
 T("내린 글은 안 보임", r.status === 404, r.data);
+T("내린 글은 카드도 없다", (await card(postId)).status === 404, null);
 
 console.log(`\n결과: ${pass} 통과 / ${fail} 실패`);
 process.exit(fail ? 1 : 0);
