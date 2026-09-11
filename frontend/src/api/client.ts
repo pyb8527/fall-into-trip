@@ -166,7 +166,14 @@ async function send(path: string, options: Options): Promise<Response> {
   });
 }
 
-export async function request<T>(path: string, options: Options = {}): Promise<T> {
+/**
+ * 한 번은 되살려 보고, 응답을 그대로 돌려줍니다.
+ *
+ * <p>본문을 어떤 모양으로 읽을지는 부르는 쪽이 정합니다 — 거의 다 JSON
+ * 이지만 동선 그림처럼 아닌 것도 있습니다. 토큰이 만료됐을 때 되살리는
+ * 일은 그쪽과 상관없이 같아야 하므로 여기 한 곳에 둡니다.
+ */
+async function fetchOk(path: string, options: Options = {}): Promise<Response> {
   let res: Response;
   try {
     res = await send(path, options);
@@ -199,6 +206,11 @@ export async function request<T>(path: string, options: Options = {}): Promise<T
     throw await toError(res);
   }
 
+  return res;
+}
+
+export async function request<T>(path: string, options: Options = {}): Promise<T> {
+  const res = await fetchOk(path, options);
   if (res.status === 204) {
     return undefined as T;
   }
@@ -214,6 +226,15 @@ export const api = {
   /** 로그인·가입·설치처럼 토큰 없이 부르는 것. */
   anon: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: 'POST', body, anonymous: true }),
+  /**
+   * JSON 이 아닌 것. 지금은 동선 그림 한 장뿐입니다.
+   *
+   * <p>그림 주소를 &lt;Image&gt; 에 그대로 넘기지 않는 이유가 있습니다. 그
+   * 주소는 로그인해야 열리는데, 그림을 받는 것은 우리 코드가 아니라
+   * 브라우저라 토큰을 붙일 자리가 없습니다.
+   */
+  blob: (path: string, signal?: AbortSignal) =>
+    fetchOk(path, { method: 'GET', signal }).then((res) => res.blob()),
 };
 
 /** 쿼리스트링을 만듭니다. 값이 비면 아예 넣지 않습니다. */

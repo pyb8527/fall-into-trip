@@ -2,6 +2,7 @@ import { Stack, useLocalSearchParams, useNavigation, useRouter } from 'expo-rout
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
+  Image,
   PanResponder,
   Pressable,
   ScrollView,
@@ -39,7 +40,7 @@ import { PlaceDetailSheet, type Looked } from '@/components/place-detail-sheet';
 import { PlaceSearch } from '@/components/place-search';
 import { RecommendSheet } from '@/components/recommend-sheet';
 import { openDirections } from '@/lib/directions';
-import { keepTrip, keptAgo, keptTrip } from '@/lib/keep';
+import { canKeep, keepTrip, keepTripMap, keptAgo, keptTrip, keptTripMap } from '@/lib/keep';
 import { money } from '@/lib/money';
 import { canPrint, printItinerary } from '@/lib/print';
 import { useHere } from '@/lib/here';
@@ -75,6 +76,15 @@ import {
 
 /** 전체를 보는 상태. 특정 날짜가 아니라는 뜻입니다. */
 const ALL = -1;
+
+/**
+ * 동선 그림을 다시 받아 오기까지 두는 시간.
+ *
+ * <p>한 장이 곧 구글 호출 한 번입니다. 장소가 바뀔 때마다 받으면 일정을
+ * 짜는 동안에만 수십 번이 됩니다. 안 터지는 자리에서 꺼내 보는 것이
+ * 목적이라 반나절 전 것이어도 하는 일은 같습니다.
+ */
+const MAP_KEEP_FOR = 12 * 60 * 60 * 1000;
 
 const MODE_LABEL: Record<TravelMode, string> = {
   WALK: '걸어서',
@@ -142,6 +152,58 @@ export default function TripScreen() {
     [fresh, error, user?.id, id],
   );
   const data = fresh ?? kept?.data ?? null;
+
+  /*
+    안 터질 때 깔아 줄 동선 그림 한 장.
+
+    이 화면의 지도는 살아 있는 지도라 그릴 때마다 구글을 부릅니다. 그래서
+    로밍이 끊긴 골목에서는 장소 이름과 시각만 남고 "오늘 이 동네를 이렇게
+    돈다" 는 통째로 사라졌습니다.
+
+    한 장짜리 그림은 담을 수 있습니다. 받아 두었다가 그때 꺼냅니다.
+
+    자주 받지 않습니다. 한 장이 곧 구글 호출 한 번이라, 장소를 고칠 때마다
+    새로 받으면 짜는 동안 수십 번이 됩니다. 반나절에 한 번이면 안 터지는
+    자리에서 꺼내 보기에 충분하고, 그때도 화면은 "저장해 둔 것" 이라고
+    이미 밝히고 있습니다.
+  */
+  useEffect(() => {
+    if (!fresh || !user?.id || !canKeep()) {
+      return;
+    }
+    if (!fresh.days.some((d) => d.places.length > 0)) {
+      return;
+    }
+    const had = keptTripMap(user.id, id);
+    if (had && Date.now() - had.at < MAP_KEEP_FOR) {
+      return;
+    }
+
+    let alive = true;
+    const userId = user.id;
+    api
+      .blob(`/api/trips/${encodeURIComponent(id)}/map`)
+      .then(asDataUrl)
+      .then((png) => {
+        if (alive && png) {
+          keepTripMap(userId, id, png);
+        }
+      })
+      .catch(() => {
+        /* 지도 키를 안 넣어 두었거나 이미 안 터지는 판입니다. 곁다리라
+           아무 말도 하지 않습니다. */
+      });
+    return () => {
+      alive = false;
+    };
+  }, [fresh, user?.id, id]);
+
+  /* 저장해 둔 것을 보고 있을 때만 꺼냅니다. 연결돼 있으면 살아 있는 지도가
+     훨씬 낫습니다 — 손으로 끌고 넓힐 수 있습니다. */
+  const keptMap = useMemo(
+    () => (kept ? keptTripMap(user?.id ?? null, id) : null),
+    [kept, user?.id, id],
+  );
 
   /*
     그 날 실제로 쓴 돈.
@@ -761,7 +823,26 @@ export default function TripScreen() {
         }}
       />
 
-      {/* 지도가 바탕입니다. 판이 그 위에 얹힙니다. */}
+      {/*
+        지도가 바탕입니다. 판이 그 위에 얹힙니다.
+
+        안 터져서 저장해 둔 것을 보고 있고 그때 쓰려고 담아 둔 그림이 있으면,
+        살아 있는 지도 대신 그것을 깝니다. 살아 있는 쪽은 이 자리에 회색
+        바탕과 한 줄짜리 안내밖에 남기지 못합니다.
+
+        판이 덮는 만큼 아래를 비워 둡니다. 그러지 않으면 그림의 한가운데가
+        판 뒤로 들어가, 정작 보려던 동선이 안 보입니다.
+      */}
+      {keptMap ? (
+        <View style={[styles.keptMap, { paddingBottom: covered }]}>
+          <Image
+            source={{ uri: keptMap.png }}
+            style={styles.keptMapImage}
+            resizeMode="contain"
+            accessibilityLabel="저장해 둔 동선"
+          />
+        </View>
+      ) : (
       <TripMap
         places={mapPlaces}
         activeId={activePlaceId}
@@ -783,6 +864,7 @@ export default function TripScreen() {
         goHereAt={goHereAt}
         panTo={lookAt}
       />
+      )}
 
       {/* 막대 바로 아래, 지도 위에 뜨는 날짜 칩. */}
       {days.length > 1 ? (
@@ -842,7 +924,10 @@ export default function TripScreen() {
         지도 단추는 지도를 움직이는 것만 맡습니다. 나머지는 말로 설명할
         자리가 있는 판 안으로 내렸습니다.
       */}
-      {me.supported ? (
+      {/* 저장해 둔 그림을 깔고 있을 때는 뺍니다. 이 단추가 하는 일은 지도를
+          내 자리로 옮기는 것인데 그림은 움직이지 않습니다. 눌러도 아무 일이
+          안 일어나면서 자리 알림만 켜지는 것이 가장 나쁩니다. */}
+      {me.supported && !keptMap ? (
         <View style={[styles.floatRight, { bottom: covered + Spacing.md }]}>
           <IconButton
             name="crosshair"
@@ -2268,6 +2353,25 @@ function spareMinutes(leaveAt: string | null, arriveBy: string | null) {
   return to - from;
 }
 
+/**
+ * 받아 온 그림을 <code>data:</code> 주소로.
+ *
+ * <p>주소만 담아 두면 소용이 없습니다. 안 터지는 자리에서는 우리 서버도
+ * 못 부르고, 게다가 그 주소는 로그인해야 열립니다.
+ */
+function asDataUrl(png: Blob): Promise<string | null> {
+  return new Promise((done) => {
+    try {
+      const reader = new FileReader();
+      reader.onerror = () => done(null);
+      reader.onload = () => done(typeof reader.result === 'string' ? reader.result : null);
+      reader.readAsDataURL(png);
+    } catch {
+      done(null);
+    }
+  });
+}
+
 /** "14:30" 을 자정부터의 분으로. 모양이 다르면 null 입니다. */
 function minutesOfDay(at: string | null) {
   if (!at || !/^\d{2}:\d{2}$/.test(at)) {
@@ -2749,6 +2853,18 @@ function CloneSheet({
 }
 
 const styles = StyleSheet.create({
+  /* 살아 있는 지도가 앉던 자리를 그대로 채웁니다. 바탕색도 같게 두어야
+     그림이 letterbox 로 남기는 위아래가 지도의 여백처럼 읽힙니다. */
+  keptMap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.abyss,
+  },
+  keptMapImage: {
+    width: '100%',
+    height: '100%',
+  },
   pick: {
     gap: Spacing.xs,
   },

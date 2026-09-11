@@ -123,6 +123,41 @@ r = await call("GET", "/api/trip?trip=" + tripId, { token: admin });
 T("모든 날짜가 같이 이동", r.data.days.map(d => d.iso).join() === "2026-11-01,2026-11-02,2026-11-03,2026-11-04", r.data.days.map(d=>d.iso));
 T("표시 문자열도 갱신", r.data.days[0].date === "11.01 (일)", r.data.days[0].date);
 
+console.log("\n[7-2] 안 터질 때 쓸 동선 그림");
+/* PNG 라 JSON 으로 읽지 않습니다. */
+async function mapOf(token) {
+  const headers = {};
+  if (token) headers.authorization = "Bearer " + token;
+  const res = await fetch(`${BASE}/api/trips/${tripId}/map`, { headers });
+  let why = null;
+  if (res.status >= 400) { try { why = (await res.json()).error; } catch {} }
+  return { status: res.status, type: res.headers.get("content-type") || "", cache: res.headers.get("cache-control") || "", why };
+}
+
+let m = await mapOf(admin);
+/* 지도 키를 안 넣어 둔 판에서는 400 입니다. 그것도 통과입니다 — 여기서
+   보려는 것은 "동행자만 부를 수 있는가" 이지 구글이 답하는가가 아닙니다. */
+T("동행자는 부를 수 있음", m.status === 200 || m.status === 400, m);
+T("되면 PNG 로 온다", m.status !== 200 || m.type.includes("image/png"), m.type);
+/* 여행은 부른 사람들만 봅니다. 중간에 있는 캐시가 들고 있다가 다른 사람에게
+   내주면 그대로 새는 것이 됩니다. */
+T("남의 캐시에 얹히지 않음", m.status !== 200 || /private/.test(m.cache), m.cache);
+
+m = await mapOf(null);
+T("로그인 없이는 못 봄", m.status === 401, m);
+
+r = await call("POST", "/api/auth/register", { body: { email: `nosy-${Date.now()}@t.test`, name: "남", password: "pw-12345678" } });
+T("남 가입", r.status === 200, r.data);
+m = await mapOf(r.data.accessToken);
+/* 403 이면 "있긴 있다" 를 알려 주는 셈이라 404 입니다. */
+T("남의 여행은 못 봄", m.status === 404, m);
+
+r = await call("POST", "/api/trips", { token: admin, body: { title: "아직 빈 여행", startIso: "2026-12-01", nights: 1 } });
+const emptyTrip = r.data.trip.id;
+const res = await fetch(`${BASE}/api/trips/${emptyTrip}/map`, { headers: { authorization: "Bearer " + admin } });
+let emptyWhy = null; try { emptyWhy = (await res.json()).error; } catch {}
+T("장소가 없으면 그릴 것이 없다고 답함", res.status === 400, { status: res.status, emptyWhy });
+await call("DELETE", "/api/trips/" + emptyTrip, { token: admin });
 console.log("\n[8] 삭제");
 r = await call("DELETE", "/api/trips/" + tripId, { token: admin });
 T("여행 삭제", r.status === 200, r.data);
