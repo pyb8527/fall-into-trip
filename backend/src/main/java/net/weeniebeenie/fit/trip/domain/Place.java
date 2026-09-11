@@ -67,8 +67,30 @@ public class Place {
     @Column(length = 10)
     private String time;
 
+    /**
+     * 사람이 자유롭게 적는 비용.
+     *
+     * <p>"무료", "1인 2천엔", "￥1,200~1,800" 같은 것이 들어 있습니다. 숫자로
+     * 읽으려 들지 않습니다 — 틀리면 멀쩡한 계획에 틀린 돈이 붙습니다.
+     */
     @Column(length = 40)
     private String cost;
+
+    /**
+     * 셈할 수 있는 비용. 그 통화의 <b>가장 작은 단위</b>입니다.
+     *
+     * <p>12.50달러는 1250, 9000엔은 9000. {@code expenses.amount} 와 같은
+     * 규칙이라야 잡아 둔 것과 실제로 쓴 것을 나란히 놓을 수 있습니다.
+     *
+     * <p>위의 {@link #cost} 와 따로 둡니다. 하나로 합치려면 이미 적혀 있는
+     * 글자를 숫자로 읽어야 하는데, 그것을 안 하기로 했습니다.
+     */
+    @Column(name = "cost_amount")
+    private Integer costAmount;
+
+    /** 위 금액의 통화. 금액이 없으면 이것도 없습니다. */
+    @Column(name = "cost_currency", length = 3)
+    private String costCurrency;
 
     @Column(columnDefinition = "text")
     private String note;
@@ -106,6 +128,7 @@ public class Place {
     @Builder
     public Place(String dayId, int sort, String name, String ja, String en,
                  double lat, double lng, String cat, String time, String cost,
+                 Integer costAmount, String costCurrency,
                  String note, String url, Integer radius, Boolean fit, String move,
                  String placeId, String icon, String updatedBy) {
         this.id = Ids.next();
@@ -120,6 +143,8 @@ public class Place {
         this.icon = PlaceKind.clean(icon);
         this.time = time;
         this.cost = cost;
+        this.costAmount = costAmount;
+        this.costCurrency = costCurrency;
         this.note = note;
         this.url = url;
         this.radius = radius;

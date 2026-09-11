@@ -6,11 +6,13 @@ import type { Place } from '@/api/types';
 import { PlaceSearch } from '@/components/place-search';
 import { IconPicker } from '@/components/icon-picker';
 import { Colors, Radius, Spacing } from '@/constants/theme';
+import { COMMON, decimalsOf, unitsOf } from '@/lib/money';
 import {
   Body,
   BottomSheet,
   Button,
   Caption,
+  Chip,
   ErrorNote,
   Field,
   Icon,
@@ -57,6 +59,12 @@ export function PlaceForm({
   const [time, setTime] = useState(place?.time ?? '');
   const [cat, setCat] = useState(place?.cat ?? '');
   const [cost, setCost] = useState(place?.cost ?? '');
+  /* 셈할 수 있는 비용. 통화는 늘 하나 골라 둡니다 — 안 고른 상태를 두면
+     금액을 적고 통화를 안 고른 채로 저장하려다 거절당합니다. */
+  const [costAmount, setCostAmount] = useState(
+    place?.costAmount == null ? '' : String(place.costAmount / 10 ** decimalsOf(place.costCurrency ?? '')),
+  );
+  const [costCurrency, setCostCurrency] = useState(place?.costCurrency ?? COMMON[0]);
   const [note, setNote] = useState(place?.note ?? '');
   const [url, setUrl] = useState(place?.url ?? '');
 
@@ -85,6 +93,12 @@ export function PlaceForm({
     setTime(place?.time ?? '');
     setCat(place?.cat ?? '');
     setCost(place?.cost ?? '');
+    setCostAmount(
+      place?.costAmount == null
+        ? ''
+        : String(place.costAmount / 10 ** decimalsOf(place.costCurrency ?? '')),
+    );
+    setCostCurrency(place?.costCurrency ?? COMMON[0]);
     setNote(place?.note ?? '');
     setUrl(place?.url ?? '');
     setError(null);
@@ -110,6 +124,15 @@ export function PlaceForm({
       setError('먼저 찾아서 골라 주세요. 지도에 찍을 자리가 있어야 합니다.');
       return;
     }
+    /* 적어 둔 것이 숫자로 안 읽히면 여기서 멈춥니다. 서버로 보내 400 을
+       받아 오면 무엇이 틀렸는지 한 박자 늦게 압니다. */
+    const typed = costAmount.trim();
+    const costUnits = typed === '' ? null : unitsOf(typed, decimalsOf(costCurrency));
+    if (typed !== '' && costUnits === null) {
+      setError('비용은 숫자로 넣어 주세요. 통화 기호는 옆에서 고릅니다.');
+      return;
+    }
+
     setError(null);
     setBusy(true);
     try {
@@ -121,6 +144,11 @@ export function PlaceForm({
         time: time.trim(),
         cat: cat.trim(),
         cost: cost.trim(),
+        /* 금액 칸을 비우면 둘 다 지웁니다. 통화에 빈 문자열을 보내는 것이
+           "없애라" 입니다 — null 은 "손대지 마라" 라서 한 번 적은 비용을
+           도로 뺄 수가 없습니다. 그림 칸이 쓰는 방식과 같습니다. */
+        costAmount: costUnits,
+        costCurrency: costUnits === null ? '' : costCurrency,
         note: note.trim(),
         url: url.trim(),
         fit: place?.fit ?? true,
@@ -213,7 +241,46 @@ export function PlaceForm({
         </View>
       </Row>
 
-      <Field label="비용" value={cost} onChangeText={setCost} placeholder="￥1,200" />
+      {/*
+        비용은 두 칸입니다.
+
+        위는 셈할 수 있는 값입니다 — 금액과 통화. 이것만 가계부와 이어집니다.
+        통화를 고르는 칸이 없던 동안 사람들이 "￥1,200"·"1200엔"·"1인 1200" 을
+        손으로 쳐 넣었고, 그래서 같은 여행 안에서 값이 섞였습니다.
+
+        아래는 그동안 쓰던 글자 칸을 그대로 둔 것입니다. "무료", "1인 2천엔"
+        처럼 숫자로 못 읽는 것이 이미 적혀 있어서, 그것을 숫자로 옮기려 들면
+        틀린 돈이 정산에 들어갑니다. 옮기지 않고 나란히 둡니다.
+      */}
+      <Field
+        label="비용"
+        value={costAmount}
+        onChangeText={setCostAmount}
+        placeholder={decimalsOf(costCurrency) > 0 ? '12.50' : '1200'}
+        inputMode="decimal"
+        hint={
+          decimalsOf(costCurrency) > 0 ? '소수점 아래 두 자리까지 적을 수 있습니다.' : undefined
+        }
+      />
+      <Row gap={Spacing.xs} style={styles.currencies}>
+        {COMMON.map((c) => (
+          <Chip
+            key={c}
+            label={c}
+            selected={costCurrency === c}
+            onPress={() => setCostCurrency(c)}
+          />
+        ))}
+      </Row>
+
+      <Field
+        label="비용 메모"
+        value={cost}
+        onChangeText={setCost}
+        placeholder="1인 2천엔 / 무료"
+        hint="여기 적은 글자는 가계부에 안 더해집니다."
+      />
+
       <Field label="메모" value={note} onChangeText={setNote} multiline />
       <Field
         label="링크"
@@ -247,6 +314,9 @@ const styles = StyleSheet.create({
   spotText: {
     flex: 1,
     gap: 2,
+  },
+  currencies: {
+    flexWrap: 'wrap',
   },
   half: {
     flexGrow: 1,

@@ -41,7 +41,7 @@ import { PlaceSearch } from '@/components/place-search';
 import { RecommendSheet } from '@/components/recommend-sheet';
 import { openDirections } from '@/lib/directions';
 import { canKeep, keepTrip, keepTripMap, keptAgo, keptTrip, keptTripMap } from '@/lib/keep';
-import { money } from '@/lib/money';
+import { costLabel, money } from '@/lib/money';
 import { canPrint, printItinerary } from '@/lib/print';
 import { useHere } from '@/lib/here';
 import { decodePolyline } from '@/lib/polyline';
@@ -2020,10 +2020,12 @@ function PlaceRow({
               {alsoOn.length > 0 ? (
                 <Caption tone="warning">{alsoOn.join(' · ')}에도 넣어 두었습니다</Caption>
               ) : null}
-              {place.cat || place.cost ? (
+              {/* 비용은 칸이 둘입니다. 숫자로 적어 둔 것이 있으면 그것을,
+                  없으면 사람이 자유롭게 적은 글자를 보여 줍니다. */}
+              {place.cat || costLabel(place) ? (
                 <Row gap={Spacing.sm}>
                   {place.cat ? <Caption>{place.cat}</Caption> : null}
-                  {place.cost ? <Caption>{place.cost}</Caption> : null}
+                  {costLabel(place) ? <Caption>{costLabel(place)}</Caption> : null}
                 </Row>
               ) : null}
             </View>

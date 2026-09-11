@@ -71,7 +71,22 @@ export type Place = {
   lng: number;
   cat: string | null;
   time: string | null;
+  /**
+   * 사람이 자유롭게 적는 비용.
+   *
+   * "무료", "1인 2천엔", "￥1,200~1,800" 같은 것이 들어 있습니다. 숫자로
+   * 읽지 않습니다 — 틀리면 멀쩡한 계획에 틀린 돈이 붙습니다.
+   */
   cost: string | null;
+  /**
+   * 셈할 수 있는 비용. 그 통화의 가장 작은 단위입니다.
+   *
+   * 12.50달러는 1250, 9000엔은 9000. 가계부의 금액과 같은 규칙이라야 잡아 둔
+   * 것과 실제로 쓴 것을 나란히 놓을 수 있습니다. 위의 cost 와 따로 삽니다.
+   */
+  costAmount: Maybe<number>;
+  /** 위 금액의 통화. 금액이 없으면 이것도 없습니다. */
+  costCurrency: Maybe<string>;
   note: string | null;
   url: string | null;
   radius: number | null;
@@ -387,6 +402,9 @@ export type ItineraryPlace = {
   cat: string | null;
   time: string | null;
   cost: string | null;
+  /** 잡아 둔 비용. 이 칸이 생기기 전에 올린 글에는 없습니다. */
+  costAmount?: Maybe<number>;
+  costCurrency?: Maybe<string>;
   note: string | null;
   url: string | null;
   placeId: string | null;

@@ -123,6 +123,39 @@ r = await call("GET", "/api/trip?trip=" + tripId, { token: admin });
 T("모든 날짜가 같이 이동", r.data.days.map(d => d.iso).join() === "2026-11-01,2026-11-02,2026-11-03,2026-11-04", r.data.days.map(d=>d.iso));
 T("표시 문자열도 갱신", r.data.days[0].date === "11.01 (일)", r.data.days[0].date);
 
+console.log("\n[3-2] 비용 — 글자 칸과 셈할 수 있는 칸");
+r = await call("POST", "/api/places", { token: admin, body: { dayId: day1, name: "이치란", lat: 34.6687, lng: 135.5013, costAmount: 1200, costCurrency: "JPY" } });
+T("금액과 통화를 함께 넣으면 들어감", r.status === 200, r.data);
+const priced = r.data.place?.id;
+T("그대로 돌아옴", r.data.place?.costAmount === 1200 && r.data.place?.costCurrency === "JPY", r.data.place);
+
+r = await call("POST", "/api/places", { token: admin, body: { dayId: day1, name: "금액만", lat: 35, lng: 139, costAmount: 1200 } });
+T("금액만 보내면 거절", r.status === 400 && /통화/.test(r.data?.error ?? ""), r.data);
+r = await call("POST", "/api/places", { token: admin, body: { dayId: day1, name: "통화만", lat: 35, lng: 139, costCurrency: "JPY" } });
+T("통화만 보내면 거절", r.status === 400, r.data);
+r = await call("POST", "/api/places", { token: admin, body: { dayId: day1, name: "모르는 통화", lat: 35, lng: 139, costAmount: 100, costCurrency: "XYZ" } });
+T("모르는 통화는 거절", r.status === 400 && /통화/.test(r.data?.error ?? ""), r.data);
+r = await call("POST", "/api/places", { token: admin, body: { dayId: day1, name: "음수", lat: 35, lng: 139, costAmount: -1, costCurrency: "JPY" } });
+T("0보다 작으면 거절", r.status === 400, r.data);
+
+/* 사람이 자유롭게 적은 글자는 건드리지 않습니다. 둘은 따로 삽니다. */
+r = await call("PATCH", "/api/places/" + priced, { token: admin, body: { cost: "1인 2천엔" } });
+T("글자 칸은 따로 산다", r.status === 200 && r.data.place.cost === "1인 2천엔", r.data.place);
+T("글자를 고쳐도 숫자는 그대로", r.data.place.costAmount === 1200, r.data.place);
+
+r = await call("PATCH", "/api/places/" + priced, { token: admin, body: { costAmount: 1500, costCurrency: "JPY" } });
+T("숫자만 고칠 수 있다", r.status === 200 && r.data.place.costAmount === 1500, r.data.place);
+T("숫자를 고쳐도 글자는 그대로", r.data.place.cost === "1인 2천엔", r.data.place);
+
+r = await call("PATCH", "/api/places/" + priced, { token: admin, body: { costCurrency: "XYZ" } });
+T("고칠 때도 모르는 통화는 거절", r.status === 400, r.data);
+
+r = await call("GET", "/api/trip?trip=" + tripId, { token: admin });
+const back = r.data.days[0].places.find((p) => p.id === priced);
+T("일정에도 실려 온다", back?.costAmount === 1500 && back?.costCurrency === "JPY", back);
+
+await call("DELETE", "/api/places/" + priced, { token: admin });
+
 console.log("\n[7-2] 안 터질 때 쓸 동선 그림");
 /* PNG 라 JSON 으로 읽지 않습니다. */
 async function mapOf(token) {

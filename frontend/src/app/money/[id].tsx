@@ -6,7 +6,7 @@ import { api, ApiError, UNEXPECTED } from '@/api/client';
 import type { Books, Companion, Spend, TripDetail } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { Colors, Spacing } from '@/constants/theme';
-import { money } from '@/lib/money';
+import { decimalsOf, money, unitsOf } from '@/lib/money';
 import {
   Badge,
   Body,
@@ -305,7 +305,7 @@ function AddSheet({
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
 
-  const decimals = DECIMALS[currency] ?? 0;
+  const decimals = decimalsOf(currency);
 
   async function submit() {
     setFailed(null);
@@ -438,43 +438,6 @@ function AddSheet({
 
 /* ------------------------------------------------------------------ 조각 */
 
-/**
- * 자주 쓰는 통화의 자릿수.
- *
- * <p>적을 때 "12.50" 을 1250 으로 바꾸는 데 씁니다. 서버가 통화마다 정확한
- * 자릿수를 함께 보내 주지만, 그것은 이미 적힌 것에 딸려 옵니다 — 아직 안
- * 적은 것에는 없어서 여기 둡니다.
- */
-const DECIMALS: Record<string, number> = {
-  KRW: 0,
-  JPY: 0,
-  VND: 0,
-  TWD: 0,
-  USD: 2,
-  EUR: 2,
-  HKD: 2,
-  THB: 2,
-  SGD: 2,
-  CNY: 2,
-};
-
-/**
- * 사람이 친 것을 가장 작은 단위로.
- *
- * <p>"12.50" 을 1250 으로. 자릿수가 0인 통화에서는 소수점을 무시합니다 —
- * 9000.5엔 같은 것은 없습니다.
- */
-function unitsOf(raw: string, decimals: number): number | null {
-  const cleaned = raw.replace(/[,\s]/g, '');
-  if (!cleaned || !/^\d*\.?\d*$/.test(cleaned)) {
-    return null;
-  }
-  const value = Number(cleaned);
-  if (!Number.isFinite(value)) {
-    return null;
-  }
-  return Math.round(value * 10 ** decimals);
-}
 
 /** 날짜별로 묶고, 묶음마다 통화별 합계를 답니다. */
 function byDay(list: Spend[], days: TripDetail['days']) {

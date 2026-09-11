@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import net.weeniebeenie.fit.account.infrastructure.security.AuthPrincipal;
 import net.weeniebeenie.fit.shared.domain.Coordinates;
 import net.weeniebeenie.fit.shared.domain.Versioned;
+import net.weeniebeenie.fit.expense.domain.Currencies;
 import net.weeniebeenie.fit.shared.error.ApiException;
 import net.weeniebeenie.fit.support.audit.AuditService;
 import net.weeniebeenie.fit.support.push.PushService;
@@ -57,6 +58,7 @@ public class PlaceService {
         String name = requireName(draft.name());
         Coordinates at = Coordinates.of(draft.lat(), draft.lng());
         String time = normalizeTime(draft.time());
+        CostMoney money = CostMoney.of(draft.costAmount(), draft.costCurrency());
 
         Place place = places.save(Place.builder()
                 .dayId(day.getId())
@@ -69,6 +71,8 @@ public class PlaceService {
                 .cat(blankToNull(draft.cat()))
                 .time(time)
                 .cost(blankToNull(draft.cost()))
+                .costAmount(money.amount())
+                .costCurrency(money.currency())
                 .note(blankToNull(draft.note()))
                 .url(blankToNull(draft.url()))
                 .radius(draft.radius())
@@ -113,6 +117,13 @@ public class PlaceService {
            엉뚱한 가게 것으로 보여 주지 않습니다. */
         if (draft.placeId() != null) place.setPlaceId(blankToNull(draft.placeId()));
         if (draft.cost() != null) place.setCost(blankToNull(draft.cost()));
+        /* 금액과 통화는 짝입니다. 하나만 와도 둘 다 다시 세웁니다 — 한쪽만
+           남으면 "얼마인지 모르는 값" 이나 "값 없는 통화" 가 됩니다. */
+        if (draft.costAmount() != null || draft.costCurrency() != null) {
+            CostMoney money = CostMoney.of(draft.costAmount(), draft.costCurrency());
+            place.setCostAmount(money.amount());
+            place.setCostCurrency(money.currency());
+        }
         if (draft.note() != null) place.setNote(blankToNull(draft.note()));
         if (draft.url() != null) place.setUrl(blankToNull(draft.url()));
         if (draft.radius() != null) place.setRadius(draft.radius());
@@ -237,8 +248,36 @@ public class PlaceService {
         return t.isEmpty() ? null : t;
     }
 
+    /**
+     * 셈할 수 있는 비용 — 금액과 통화.
+     *
+     * <p>둘은 짝으로만 뜻이 있습니다. 금액만 있으면 얼마인지 모르고, 통화만
+     * 있으면 적은 것이 아닙니다. 그래서 한쪽만 오면 거절합니다.
+     *
+     * <p>둘 다 비어 있으면 "안 적었다" 입니다 — 그건 거절할 일이 아닙니다.
+     */
+    record CostMoney(Integer amount, String currency) {
+
+        static CostMoney of(Integer amount, String rawCurrency) {
+            String currency = rawCurrency == null || rawCurrency.isBlank() ? null : rawCurrency;
+            if (amount == null && currency == null) {
+                return new CostMoney(null, null);
+            }
+            if (amount == null || currency == null) {
+                throw ApiException.badRequest("비용은 금액과 통화를 함께 넣어 주세요.");
+            }
+            if (amount < 0) {
+                throw ApiException.badRequest("비용은 0보다 작을 수 없습니다.");
+            }
+            /* 모르는 통화는 여기서 걸립니다. 가계부가 쓰는 것과 같은 자리라
+               두 화면이 같은 통화만 받습니다. */
+            return new CostMoney(amount, Currencies.clean(currency));
+        }
+    }
+
     public record PlaceDraft(String dayId, String name, Double lat, Double lng,
                              String ja, String en, String cat, String time, String cost,
+                             Integer costAmount, String costCurrency,
                              String note, String url, Integer radius, Boolean fit, String move,
                              String placeId, String icon, Long version) {
     }

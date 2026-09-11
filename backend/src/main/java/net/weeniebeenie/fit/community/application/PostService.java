@@ -145,6 +145,11 @@ public class PostService {
                 n.put("icon", p.getIcon());
                 n.put("time", p.getTime());
                 n.put("cost", p.getCost());
+                /* 잡아 둔 비용. 가져간 사람이 얼마쯤 드는 일인지 알 수
+                   있어야 합니다. 예전에 올린 글에는 없는 칸이라, 읽는
+                   쪽은 없어도 되게 두었습니다. */
+                n.put("costAmount", p.getCostAmount());
+                n.put("costCurrency", p.getCostCurrency());
                 n.put("note", p.getNote());
                 n.put("url", p.getUrl());
                 n.put("radius", p.getRadius());
@@ -340,6 +345,8 @@ public class PostService {
                         .cat(text(p, "cat"))
                         .time(text(p, "time"))
                         .cost(text(p, "cost"))
+                        .costAmount(p.hasNonNull("costAmount") ? p.path("costAmount").asInt() : null)
+                        .costCurrency(text(p, "costCurrency"))
                         .note(text(p, "note"))
                         .url(text(p, "url"))
                         .radius(p.hasNonNull("radius") ? p.path("radius").asInt() : null)

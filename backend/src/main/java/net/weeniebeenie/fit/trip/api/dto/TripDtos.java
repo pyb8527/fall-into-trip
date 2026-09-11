@@ -113,6 +113,7 @@ public final class TripDtos {
 
     public record PlaceView(String id, int sort, String name, String ja, String en,
                             double lat, double lng, String cat, String time, String cost,
+                            Integer costAmount, String costCurrency,
                             String note, String url, Integer radius, boolean fit,
                             Object move, String placeId, String icon,
                             Instant updatedAt, String updatedBy, long version) {
@@ -133,7 +134,8 @@ public final class TripDtos {
 
     public static PlaceView placeView(Place p, ObjectMapper mapper) {
         return new PlaceView(p.getId(), p.getSort(), p.getName(), p.getJa(), p.getEn(),
-                p.getLat(), p.getLng(), p.getCat(), p.getTime(), p.getCost(), p.getNote(),
+                p.getLat(), p.getLng(), p.getCat(), p.getTime(), p.getCost(),
+                p.getCostAmount(), p.getCostCurrency(), p.getNote(),
                 p.getUrl(), p.getRadius(), p.isFit(), json(p.getMove(), mapper),
                 p.getPlaceId(), p.getIcon(),
                 p.getUpdatedAt(), p.getUpdatedBy(), p.getVersion());

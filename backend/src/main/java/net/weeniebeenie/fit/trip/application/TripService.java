@@ -117,6 +117,8 @@ public class TripService {
                         .icon(p.getIcon())
                         .time(p.getTime())
                         .cost(p.getCost())
+                        .costAmount(p.getCostAmount())
+                        .costCurrency(p.getCostCurrency())
                         .note(p.getNote())
                         .url(p.getUrl())
                         .radius(p.getRadius())
