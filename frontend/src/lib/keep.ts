@@ -1,4 +1,5 @@
 import type { TripDetail } from '@/api/types';
+import { ago } from '@/lib/countdown';
 
 /**
  * 마지막으로 본 일정을 이 기기에 둡니다.
@@ -218,10 +219,5 @@ function forgetOld(store: Storage, prefix: string) {
 
 /** 저장한 지 얼마나 됐는지, 사람이 읽는 말로. */
 export function keptAgo(at: number) {
-  const minutes = Math.max(0, Math.round((Date.now() - at) / 60_000));
-  if (minutes < 60) {
-    return `${minutes}분 전`;
-  }
-  const hours = Math.round(minutes / 60);
-  return hours < 24 ? `${hours}시간 전` : `${Math.round(hours / 24)}일 전`;
+  return ago(at);
 }

@@ -40,6 +40,7 @@ import { PlaceDetailSheet, type Looked } from '@/components/place-detail-sheet';
 import { PlaceSearch } from '@/components/place-search';
 import { RecommendSheet } from '@/components/recommend-sheet';
 import { openDirections } from '@/lib/directions';
+import { ago } from '@/lib/countdown';
 import { canKeep, keepTrip, keepTripMap, keptAgo, keptTrip, keptTripMap } from '@/lib/keep';
 import { costLabel, money } from '@/lib/money';
 import { canPrint, printItinerary } from '@/lib/print';
@@ -85,6 +86,19 @@ const ALL = -1;
  * 목적이라 반나절 전 것이어도 하는 일은 같습니다.
  */
 const MAP_KEEP_FOR = 12 * 60 * 60 * 1000;
+
+/**
+ * 손댄 자취를 얼마나 오래 보여 줄지.
+ *
+ * <p>남이 고친 것을 <b>영영</b> 붙여 두면, 몇 주에 걸쳐 짜는 여행에서는
+ * 모든 줄에 "지영 님 · 3주 전" 이 달립니다. 그러면 그것은 소식이 아니라
+ * 배경이 됩니다.
+ *
+ * <p>사흘은 어림한 값입니다. 제대로 된 답은 "내가 마지막으로 본 뒤" 인데,
+ * 그건 사람마다 칸 하나가 더 있어야 합니다(verdict.md 11.2). 그때 이 값은
+ * 없어집니다.
+ */
+const TOUCHED_FOR = 3 * 24 * 60 * 60 * 1000;
 
 const MODE_LABEL: Record<TravelMode, string> = {
   WALK: '걸어서',
@@ -216,6 +230,52 @@ export default function TripScreen() {
     여기서 고치지 않는 값이라 여행을 다시 받아 올 때 따라 오지 않습니다.
     적는 자리는 가계부 화면이고, 돌아오면 이 화면이 다시 뜹니다.
   */
+  /*
+    동행자 이름표.
+
+    장소에는 누가 고쳤는지가 사람 번호로만 남습니다(Place.updatedBy). 그
+    번호를 이름으로 바꾸려면 목록이 필요한데, 서버가 이미 내려 줍니다.
+
+    지금 어디 있는지를 켜 둔 사람들(mates)과는 다릅니다 — 그쪽은 안 켠
+    사람이 빠집니다.
+  */
+  const { data: crew } = useAsync<{ members: Companion[] }>(
+    (signal) => api.get(`/api/trips/${encodeURIComponent(id)}/members`, signal),
+    [id],
+  );
+
+  /**
+   * 이 장소를 누가 언제 손댔는지, 한 줄로.
+   *
+   * <p>붙이지 않는 경우가 셋입니다.
+   *
+   * <ul>
+   *   <li><b>내가 고친 것</b> — 목록이 내 발자국으로 찹니다. 푸시도 고친
+   *       사람에게는 안 갑니다(PlaceService.announce).</li>
+   *   <li><b>오래된 것</b> — 몇 주에 걸쳐 짜면 모든 줄에 달립니다.</li>
+   *   <li><b>이름을 모르는 것</b> — 나간 사람입니다. 번호를 보여 줄 수는
+   *       없으니 조용히 뺍니다.</li>
+   * </ul>
+   *
+   * <p>"넣었다" 나 "고쳤다" 라고 말하지 않습니다. 남아 있는 것은 마지막으로
+   * 손댄 사람과 시각뿐이라, 새로 넣은 것인지 고친 것인지 알 수가 없습니다.
+   * 아는 것만 적습니다.
+   */
+  const touchedOf = useCallback(
+    (place: Place) => {
+      if (!place.updatedBy || !place.updatedAt || place.updatedBy === user?.id) {
+        return null;
+      }
+      const at = Date.parse(place.updatedAt);
+      if (!Number.isFinite(at) || Date.now() - at > TOUCHED_FOR) {
+        return null;
+      }
+      const name = (crew?.members ?? []).find((m) => m.id === place.updatedBy)?.name;
+      return name ? `${name} 님 · ${ago(at)}` : null;
+    },
+    [crew, user?.id],
+  );
+
   const { data: spending } = useAsync<{ expenses: Spend[] }>(
     (signal) => api.get(`/api/trips/${encodeURIComponent(id)}/expenses`, signal),
     [id],
@@ -1141,6 +1201,7 @@ export default function TripScreen() {
               onTips={setTipFor}
               spent={spentByDay.get(day.id) ?? null}
               spentAt={spentByPlace}
+              touchedOf={touchedOf}
             />
           ) : null,
         )}
@@ -1221,7 +1282,12 @@ export default function TripScreen() {
         onClose={() => setLooking(null)}
       />
 
-      <PackSheet visible={packing} tripId={id} onClose={() => setPacking(false)} />
+      <PackSheet
+        visible={packing}
+        tripId={id}
+        people={crew?.members ?? []}
+        onClose={() => setPacking(false)}
+      />
 
       <CloneSheet
         visible={cloning}
@@ -1424,6 +1490,7 @@ function DayCard({
   onTips,
   spent,
   spentAt,
+  touchedOf,
 }: {
   day: Day;
   index: number;
@@ -1454,6 +1521,8 @@ function DayCard({
   spent: Map<string, { sum: number; decimals: number }> | null;
   /** 장소마다 거기서 쓴 돈. 여행 전체 것이라 줄마다 꺼내 씁니다. */
   spentAt: Map<string, Map<string, { sum: number; decimals: number }>>;
+  /** 이 장소를 누가 언제 손댔는지. 붙일 것이 없으면 null 입니다. */
+  touchedOf: (place: Place) => string | null;
 }) {
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<Place | null>(null);
@@ -1835,6 +1904,7 @@ function DayCard({
                     gap={gapAfter.get(place.id)}
                     arriveBy={order[i + 1]?.time ?? null}
                     spent={spentAt.get(place.id) ?? null}
+                    touched={touchedOf(place)}
                     chosenOf={chosenOf}
                     onPick={onPick}
                   />
@@ -1949,6 +2019,7 @@ function PlaceRow({
   gap,
   arriveBy,
   spent,
+  touched,
   chosenOf,
   onPick,
 }: {
@@ -1982,6 +2053,8 @@ function PlaceRow({
   arriveBy: string | null;
   /** 여기서 실제로 쓴 돈. 통화마다 하나씩. 안 적었으면 비어 있습니다. */
   spent: Map<string, { sum: number; decimals: number }> | null;
+  /** 남이 최근에 손댔으면 "지영 님 · 2시간 전". 아니면 비어 있습니다. */
+  touched: string | null;
   chosenOf: (gap: Gap) => GapOption | null;
   onPick: (fromId: string, mode: TravelMode) => void;
 }) {
@@ -2057,6 +2130,15 @@ function PlaceRow({
               {alsoOn.length > 0 ? (
                 <Caption tone="warning">{alsoOn.join(' · ')}에도 넣어 두었습니다</Caption>
               ) : null}
+              {/*
+                동행자가 손댄 자취.
+
+                이 값은 서버부터 화면까지 내내 내려오면서 한 번도 안 쓰이고
+                있었습니다(Place.updatedBy·updatedAt). 그래서 같이 짜는
+                사람이 무엇을 바꿔도, 들어와서 일정 전체를 다시 훑어야
+                알았습니다.
+              */}
+              {touched ? <Caption tone="muted">{touched}</Caption> : null}
               {/*
                 갈래와 돈.
 
@@ -2567,10 +2649,13 @@ function outsideHours(at: string, spans: { start: string; end?: string | null }[
 function PackSheet({
   visible,
   tripId,
+  people,
   onClose,
 }: {
   visible: boolean;
   tripId: string;
+  /** 동행자. 화면이 이미 받아 둔 것을 그대로 씁니다. */
+  people: Companion[];
   onClose: () => void;
 }) {
   const { data, reload } = useAsync<{ items: Packed[] }>(
@@ -2578,21 +2663,10 @@ function PackSheet({
       visible ? api.get(`/api/trips/${tripId}/items`, signal) : Promise.resolve({ items: [] }),
     [tripId, visible],
   );
-  /* 동행자는 여기서 따로 받습니다. 위 화면이 들고 있는 mates 는 지금 어디
-     있는지를 켜 둔 사람들이라, 안 켠 사람은 빠집니다. */
-  const { data: crew } = useAsync<{ members: Companion[] }>(
-    (signal) =>
-      visible
-        ? api.get(`/api/trips/${tripId}/members`, signal)
-        : Promise.resolve({ members: [] }),
-    [tripId, visible],
-  );
-
   const [text, setText] = useState('');
   const [failed, setFailed] = useState<string | null>(null);
 
   const items = data?.items ?? [];
-  const people = crew?.members ?? [];
   const done = items.filter((i) => i.done).length;
 
   async function run(action: () => Promise<unknown>) {

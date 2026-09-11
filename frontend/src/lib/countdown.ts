@@ -94,3 +94,22 @@ export function countdownLabel(at: Countdown) {
 export function countdownIsNear(at: Countdown) {
   return at.kind !== 'left' || at.days <= 7;
 }
+
+/**
+ * 얼마나 지났는지, 사람이 읽는 말로.
+ *
+ * <p>"3분 전", "2시간 전", "4일 전". 시각 자체를 적으면 사람이 지금과
+ * 견주는 일을 대신 해야 합니다 — 목록을 훑을 때 그것만으로 시간이
+ * 걸립니다.
+ *
+ * <p>담아 둔 일정이 언제 것인지(lib/keep)와 누가 언제 고쳤는지가 같은
+ * 말을 씁니다. 한쪽만 고치면 같은 화면에서 두 가지 말투가 섞입니다.
+ */
+export function ago(at: number) {
+  const minutes = Math.max(0, Math.round((Date.now() - at) / 60_000));
+  if (minutes < 60) {
+    return `${minutes}분 전`;
+  }
+  const hours = Math.round(minutes / 60);
+  return hours < 24 ? `${hours}시간 전` : `${Math.round(hours / 24)}일 전`;
+}
