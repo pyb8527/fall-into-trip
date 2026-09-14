@@ -83,13 +83,14 @@ public class TripController {
     @PostMapping("/recommend")
     public Map<String, Object> recommendLoose(@CurrentUser AuthPrincipal me,
                                               @RequestBody RecommendRequest req) {
-        /* 날짜를 함께 보냈으면 그대로 넘깁니다. 여기서 조용히 버리면 "왜 그날
-           기준으로 안 보나" 를 알 길이 없습니다 — 서비스가 거절합니다. */
+        /* 날짜와 두 곳 사이를 함께 보냈으면 그대로 넘깁니다. 여기서 조용히
+           버리면 "왜 그날 기준으로 안 보나", "왜 길 위에서 안 찾나" 를 알
+           길이 없습니다 — 서비스가 거절합니다. */
         RecommendService.Result got = recommend.recommend(
                 me, null, req.query(), req.dayId(),
                 req.here() == null ? null : req.here().lat(),
                 req.here() == null ? null : req.here().lng(),
-                req.intent());
+                req.intent(), req.between());
         Map<String, Object> out = new java.util.HashMap<>();
         out.put("places", got.places());
         out.put("note", got.note());
@@ -104,7 +105,7 @@ public class TripController {
                 me, id, req.query(), req.dayId(),
                 req.here() == null ? null : req.here().lat(),
                 req.here() == null ? null : req.here().lng(),
-                req.intent());
+                req.intent(), req.between());
         Map<String, Object> out = new java.util.HashMap<>();
         out.put("places", got.places());
         out.put("note", got.note());
@@ -112,11 +113,16 @@ public class TripController {
     }
 
     /**
-     * @param intent 기기 안의 모델이 문장을 미리 쪼개 온 것. 웹에서는 늘
-     *               비어 있습니다 — 거기에는 모델이 없습니다.
+     * @param intent  기기 안의 모델이 문장을 미리 쪼개 온 것. 웹에서는 늘
+     *                비어 있습니다 — 거기에는 모델이 없습니다.
+     * @param between 두 곳 <b>사이</b>에서 찾으라는 것. 번호만 받고 길은
+     *                서버가 구합니다 — 몸통으로 받는 이유는 {@code here} 와
+     *                같습니다. 어디를 다니는지는 접근 기록과 방문 기록에
+     *                남길 값이 아닙니다
      */
     public record RecommendRequest(String query, String dayId, At here,
-                                   RecommendService.Intent intent) {
+                                   RecommendService.Intent intent,
+                                   RecommendService.Between between) {
         public record At(Double lat, Double lng) {
         }
     }

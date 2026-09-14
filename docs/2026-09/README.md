@@ -6,12 +6,12 @@
 > |---|---|
 > | **끝남** — [`docs/done/`](../done/) 으로 옮겼습니다 | 홈의 D-day, 장소 비용, 영수증의 쓴 돈, 구글 문턱 |
 > | **끝남** — 계획 문서가 없던 것 | `verdict.md` §11.1 (커밋 `5e2126b`) |
-> | **끝남** — `V21` | [`plan-news.md`](plan-news.md) (커밋 `39e2f14`, 접기는 `a8fe6bd`) |
+> | **끝남** — `V21` | [`../done/plan-news.md`](../done/plan-news.md) (커밋 `39e2f14`, 접기는 `a8fe6bd`) |
 > | **반쯤** | [`plan-places-fields.md`](plan-places-fields.md) · [`plan-booking-paste.md`](plan-booking-paste.md) |
-> | **아직 안 함** | [`plan-tip-used.md`](plan-tip-used.md) · [`plan-search-along-route.md`](plan-search-along-route.md) · [`plan-app-offline.md`](plan-app-offline.md) · [`plan-widget.md`](plan-widget.md) |
+> | **아직 안 함** | [`../done/plan-tip-used.md`](../done/plan-tip-used.md) · [`plan-search-along-route.md`](plan-search-along-route.md) · [`plan-app-offline.md`](plan-app-offline.md) · [`plan-widget.md`](plan-widget.md) |
 >
 > **마이그레이션 번호가 당겨졌습니다.** `V20` 을 장소 비용이,
-> `V21` 을 소식함이 썼습니다. `plan-tip-used.md` 는 **`V22`** 로 갑니다 —
+> `V21` 을 소식함이 썼습니다. `../done/plan-tip-used.md` 는 **`V22`** 로 갑니다 —
 > 그 문서는 아직 옛 번호로 적혀 있습니다.
 >
 > **계획에 없던 일이 둘 나왔습니다.** `plan-quota.md` 는 조사에서 나온 것이
@@ -43,22 +43,22 @@
 |---|---|
 | [`verdict-ideas.md`](verdict-ideas.md) | `docs/ideas.md` 의 셋 + 장소 비용 이야기의 판정 |
 | [`plan-dday.md`](../done/plan-dday.md) | 홈에서도 며칠 남았는지 (`ideas.md` 2번) — **끝나서 `docs/done/` 으로 옮겼습니다** |
-| [`plan-news.md`](plan-news.md) | 소식함 — 내가 없는 동안 무엇이 바뀌었나 (`ideas.md` 1번) |
-| [`plan-tip-used.md`](plan-tip-used.md) | 내가 남긴 한 줄이 쓰였다는 것 (`ideas.md` 3번) |
+| [`../done/plan-news.md`](../done/plan-news.md) | 소식함 — 내가 없는 동안 무엇이 바뀌었나 (`ideas.md` 1번) |
+| [`../done/plan-tip-used.md`](../done/plan-tip-used.md) | 내가 남긴 한 줄이 쓰였다는 것 (`ideas.md` 3번) |
 | [`../done/plan-place-cost.md`](../done/plan-place-cost.md) | 장소의 비용과 가계부를 잇는다 |
 
 ### 두 갈래가 만나는 곳
 
-**`verdict.md` §11.1 과 `plan-news.md` 가 같은 것을 다룹니다.** 순서가 정해져
-있습니다 — `plan-news.md` 머리가 적어 두었습니다:
+**`verdict.md` §11.1 과 `../done/plan-news.md` 가 같은 것을 다룹니다.** 순서가 정해져
+있습니다 — `../done/plan-news.md` 머리가 적어 두었습니다:
 
 > `verdict.md` §11.1 이 이보다 한 단계 앞입니다. 새 엔드포인트 없이 일정
 > 화면에서 `updatedBy`·`updatedAt` 을 바로 쓰는 쪽이고 서버를 안 건드립니다.
 > 그것을 먼저 하고, 소식이 여러 여행에 걸쳐 모여야 할 때 이 문서로 넘어옵니다.
 
-**`verdict.md` 5번(입구 좌표)과 `plan-tip-used.md` 도 이어집니다.** 5번을
+**`verdict.md` 5번(입구 좌표)과 `../done/plan-tip-used.md` 도 이어집니다.** 5번을
 반대한 근거가 "구글에서 입구를 사 오면 `PlaceTip` 을 적을 이유가 줄어든다"
-였고, `plan-tip-used.md` 가 바로 그 `PlaceTip` 을 세우는 계획입니다.
+였고, `../done/plan-tip-used.md` 가 바로 그 `PlaceTip` 을 세우는 계획입니다.
 
 계획을 파일 하나씩 따로 쓰는 것이 규칙입니다. `plan-places-fields.md` 만
 넷을 묶었고, 그 이유를 문서 §0 에 적었습니다.
@@ -195,9 +195,9 @@ PC 의 디스크가 모자라 모델을 못 받았습니다. 앱 쪽은 EAS 빌�
 | | 계획 | 갈래 | 상태 |
 |---|---|---|---|
 | 5 | [`plan-places-fields.md`](plan-places-fields.md) | A | **반쯤** — 9.1 은 `7a01fbd`. 나머지 셋은 **구글 키가 있어야** 재 볼 수 있어 멈췄습니다 |
-| ~~6~~ | [`plan-news.md`](plan-news.md) | B | **끝남** — 앞단(§11.1)은 `5e2126b`, 본체는 `39e2f14`(`V21`). 올린 당일 추천·댓글·표를 한 줄로 접었습니다(`a8fe6bd`) — §11 |
-| 7 | [`plan-tip-used.md`](plan-tip-used.md) | B | 아직. `plan-news.md` 와 같은 화면의 아래층. 마이그레이션은 **`V22`** |
-| 8 | [`plan-search-along-route.md`](plan-search-along-route.md) | A | 아직 |
+| ~~6~~ | [`../done/plan-news.md`](../done/plan-news.md) | B | **끝남** — 앞단(§11.1)은 `5e2126b`, 본체는 `39e2f14`(`V21`). 올린 당일 추천·댓글·표를 한 줄로 접었습니다(`a8fe6bd`) — §11 |
+| 7 | [`../done/plan-tip-used.md`](../done/plan-tip-used.md) | B | 아직. `../done/plan-news.md` 와 같은 화면의 아래층. 마이그레이션은 **`V22`** |
+| 8 | [`plan-search-along-route.md`](plan-search-along-route.md) | A | **만들었습니다** — 커밋은 아래. 다만 §9 의 게이트(구글이 실제로 다르게 답하는가)는 **운영에서 사람이 재야** 합니다 |
 
 5번에서 **계획서가 짚은 것보다 한 줄이 더 나왔습니다.** `FUTURE_OPENING` 만
 문제인 줄 알았는데 `CLOSED_TEMPORARILY` 도 "영업 중" 으로 흐르고 있었습니다.
@@ -206,8 +206,8 @@ PC 의 디스크가 모자라 모델을 못 받았습니다. 앱 쪽은 EAS 빌�
 `../done/plan-place-cost.md` 가 여기 있었는데 1차로 올라갔다가 끝났습니다.
 
 갈래 B 의 순서는 `verdict-ideas.md` 가 정한 것이고, 여기서는 갈래 A 와
-섞어 놓기만 했습니다. 둘의 상대 순서는 `plan-news.md` 가 적어 둔 의존
-(1차 2번 → `plan-news.md` → `plan-tip-used.md`) 만 지켰습니다.
+섞어 놓기만 했습니다. 둘의 상대 순서는 `../done/plan-news.md` 가 적어 둔 의존
+(1차 2번 → `../done/plan-news.md` → `../done/plan-tip-used.md`) 만 지켰습니다.
 
 ## 하지 않기로 한 것
 

@@ -67,6 +67,9 @@ public class RecommendService {
     private final SavedPlaceRepository saved;
     private final PlaceSearchService search;
     private final PlaceInfoService info;
+    /* 두 곳 사이의 길을 구하는 데만 씁니다. 구간 답을 이미 6시간 들고
+       있어서, 사람이 그 날을 펼친 직후면 대개 새로 안 묻습니다. */
+    private final RouteService route;
 
     /**
      * @param dayId 없어도 됩니다. 있으면 그 날짜로 영업 여부를 봅니다.
@@ -87,6 +90,19 @@ public class RecommendService {
     @Transactional(readOnly = true)
     public Result recommend(AuthPrincipal me, String tripId, String query,
                             String dayId, Double hereLat, Double hereLng, Intent intent) {
+        return recommend(me, tripId, query, dayId, hereLat, hereLng, intent, null);
+    }
+
+    /**
+     * 두 곳 <b>사이</b>에서 찾습니다.
+     *
+     * @param between 어느 곳과 어느 곳 사이인지. 비어 있으면 지금까지처럼
+     *                점으로 찾습니다
+     */
+    @Transactional(readOnly = true)
+    public Result recommend(AuthPrincipal me, String tripId, String query,
+                            String dayId, Double hereLat, Double hereLng, Intent intent,
+                            Between between) {
         boolean inTrip = tripId != null && !tripId.isBlank();
         if (inTrip) {
             access.requireCanRead(tripId, me.id());
@@ -133,11 +149,51 @@ public class RecommendService {
             on = day.getIso();
         }
 
+        /*
+          두 곳 사이를 물었으면 길을 구해 옵니다.
+
+          못 구해도 그냥 갑니다 — 점으로 내려앉습니다. 길을 못 구한 것이
+          "찾은 것이 없음" 이 되면, 이 기능은 있는 것이 없는 것보다
+          나쁩니다.
+         */
+        String path = null;
+        if (between != null) {
+            Place[] ends = endsOf(tripId, inTrip, mine, between);
+            path = route.pathBetween(ends[0], ends[1], RouteService.Mode.WALK);
+            /* 선으로 찾을 때는 그 두 곳의 한가운데를 기울기로 함께 보냅니다.
+               길이 아주 짧으면 선만으로는 아무것도 안 나올 수 있습니다. */
+            Coordinates mid = middleOf(List.of(ends[0], ends[1]));
+            if (mid != null) {
+                around = mid;
+            }
+        }
+
         List<PlaceSearchService.Found> found = search.search(
                 queryOf(q, intent),
                 around == null ? null : around.lat(),
                 around == null ? null : around.lng(),
-                around == null ? null : NEAR);
+                around == null ? null : NEAR,
+                path);
+
+        /*
+          선으로 물었는데 아무것도 안 왔으면 점으로 다시 묻습니다.
+
+          구글 문서가 밝혀 두었습니다 — 출발점과 도착점이 같거나 아주
+          가까우면 결과가 안 올 수 있습니다. 같은 날 연달아 있는 두 곳은
+          대개 가깝습니다.
+
+          구글을 한 번 더 부릅니다. 그 값을 치를 만합니다 — 안 치르면 이
+          기능을 켠 사람만 빈 화면을 보게 되고, 그건 끄는 것보다 나쁩니다.
+         */
+        boolean alongRoute = path != null;
+        if (path != null && found.isEmpty()) {
+            found = search.search(
+                    queryOf(q, intent),
+                    around == null ? null : around.lat(),
+                    around == null ? null : around.lng(),
+                    around == null ? null : NEAR);
+            alongRoute = false;
+        }
 
         Map<String, String> had = alreadyHave(box, inTrip ? tripId : null, mine);
 
@@ -162,7 +218,52 @@ public class RecommendService {
                     f.placeId() == null ? null : had.get(f.placeId())));
         }
 
-        return new Result(cards, noteFor(cards, around));
+        return new Result(cards, noteFor(cards, around, between != null, alongRoute));
+    }
+
+    /**
+     * 어느 곳과 어느 곳 사이인지.
+     *
+     * <p>폴리라인을 화면에서 받지 않고 <b>번호만</b> 받습니다. 길은 서버가
+     * 구합니다. 화면에서 받으면 아무 길이나 실어 보낼 수 있게 되고, 그러면
+     * 우리 사용량으로 남의 질의를 태웁니다 — {@link #queryOf} 가 {@code intent}
+     * 에 대해 같은 경계를 이미 적어 두었습니다.
+     */
+    public record Between(String fromPlaceId, String toPlaceId) {}
+
+    /**
+     * 두 번호가 <b>이 여행의 것인지</b> 확인하고 꺼냅니다.
+     *
+     * <p>여기가 이 기능에서 가장 조심할 자리입니다. 번호를 받아 쓰므로,
+     * 거르지 않으면 <b>남의 여행에 그 장소가 있는지 물어보는 통로</b>가
+     * 됩니다. 이미 읽어 온 이 여행의 장소들 안에서만 찾습니다 — 저장소에
+     * 다시 묻지 않으므로 남의 것이 손에 들어올 일이 없습니다.
+     *
+     * <p>없으면 400 입니다. 404 가 아닌 이유는 이 여행 안에서 고른 것이라야
+     * 하는데 아닌 것을 보냈다는 뜻이고, 그것은 <b>요청이 틀린 것</b>이기
+     * 때문입니다. 남의 여행 번호를 넣었으면 그 앞의
+     * {@code access.requireCanRead} 에서 이미 404 로 끝납니다.
+     */
+    private Place[] endsOf(String tripId, boolean inTrip, List<Place> mine, Between between) {
+        if (!inTrip) {
+            throw ApiException.badRequest("여행 없이 두 곳 사이를 고를 수는 없습니다.");
+        }
+        Place from = pickIn(mine, between.fromPlaceId());
+        Place to = pickIn(mine, between.toPlaceId());
+        if (from == null || to == null) {
+            throw ApiException.badRequest("이 여행의 장소가 아닙니다.");
+        }
+        if (from.getId().equals(to.getId())) {
+            throw ApiException.badRequest("서로 다른 두 곳을 골라 주세요.");
+        }
+        return new Place[] {from, to};
+    }
+
+    private static Place pickIn(List<Place> mine, String placeId) {
+        if (placeId == null || placeId.isBlank()) {
+            return null;
+        }
+        return mine.stream().filter(p -> placeId.equals(p.getId())).findFirst().orElse(null);
     }
 
     /**
@@ -323,7 +424,8 @@ public class RecommendService {
      * 모릅니다. 특히 여행이 텅 비어 있어 어디를 봐야 할지 모를 때는 그것이
      * 이유입니다.
      */
-    private static String noteFor(List<Card> cards, Coordinates around) {
+    private static String noteFor(List<Card> cards, Coordinates around,
+                                  boolean askedBetween, boolean alongRoute) {
         if (cards.isEmpty()) {
             return around == null
                     ? "찾은 곳이 없습니다. 지역 이름을 함께 넣어 보세요 — \"오사카 조용한 카페\"."
@@ -331,6 +433,16 @@ public class RecommendService {
         }
         if (around == null) {
             return "어디쯤인지 몰라 넓게 찾았습니다. 지역 이름을 함께 넣으면 더 가까운 곳이 나옵니다.";
+        }
+        /*
+          길 위에서 찾아 달라고 했는데 못 그랬으면 그렇게 말합니다.
+
+          두 곳이 아주 가까우면 구글이 아무것도 안 줍니다. 그때 조용히 언저리
+          검색으로 내려앉으면, 사람은 자기가 물은 것에 답을 받은 줄 압니다.
+          <b>물은 것과 답한 것이 다르면 그것을 말해야 합니다.</b>
+         */
+        if (askedBetween && !alongRoute) {
+            return "가는 길을 못 구해서 언저리에서 찾았습니다. 두 곳이 아주 가까우면 그렇습니다.";
         }
         return null;
     }

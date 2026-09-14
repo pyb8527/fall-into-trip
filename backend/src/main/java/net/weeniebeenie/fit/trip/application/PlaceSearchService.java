@@ -98,6 +98,30 @@ public class PlaceSearchService {
      *                울타리가 아니라 기울기입니다.
      */
     public List<Found> search(String query, Double lat, Double lng, Integer radiusM) {
+        return search(query, lat, lng, radiusM, null);
+    }
+
+    /**
+     * 점이 아니라 <b>선</b> 위에서 찾습니다.
+     *
+     * <p>"오사카성에서 도톤보리 가는 길에 점심 먹을 데" 를 점으로 물으면 두
+     * 곳의 한가운데를 잡게 되는데, <b>한가운데는 길이 아닙니다.</b> 사이가
+     * 강이거나 철로면 거기엔 아무것도 없고, 길은 빙 돌아갑니다.
+     *
+     * <p>{@code searchAlongRouteParameters} 는 <b>요청 파라미터이고
+     * 필드마스크가 아닙니다.</b> 그래서 요금 등급을 올리지 않습니다 — 우리가
+     * Enterprise 에 있는 것은 {@code rating}·{@code userRatingCount} 때문이고,
+     * 이것은 거기에 아무것도 더하지 않습니다.
+     *
+     * <p><b>{@code locationBias} 를 함께 보냅니다.</b> 구글 문서가 둘을 같이
+     * 쓸 수 있다고 적어 두었고, 길이 아주 짧을 때 선만으로는 아무것도 안
+     * 나올 수 있습니다.
+     *
+     * @param polyline 인코딩된 폴리라인. 비어 있으면 점으로 묻습니다 — 길을
+     *                 못 구한 것이 "결과 없음" 이 되면 안 됩니다
+     */
+    public List<Found> search(String query, Double lat, Double lng, Integer radiusM,
+                              String polyline) {
         String q = query == null ? "" : query.trim();
         if (q.isEmpty()) {
             return List.of();
@@ -123,6 +147,10 @@ public class PlaceSearchService {
             ask.put("locationBias", Map.of("circle", Map.of(
                     "center", Map.of("latitude", lat, "longitude", lng),
                     "radius", (double) (radiusM == null ? 20000 : radiusM))));
+        }
+        if (polyline != null && !polyline.isBlank()) {
+            ask.put("searchAlongRouteParameters",
+                    Map.of("polyline", Map.of("encodedPolyline", polyline)));
         }
 
         /* 여기까지 왔으면 정말 나갑니다. 키가 꺼져 있으면 위에서 이미

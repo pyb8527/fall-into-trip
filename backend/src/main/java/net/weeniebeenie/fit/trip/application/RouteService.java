@@ -277,6 +277,34 @@ public class RouteService {
         return ask(here, to, mode).withEnds("me", to.getId());
     }
 
+    /**
+     * 두 곳 사이의 길 하나를, 지도에 그릴 모양으로만.
+     *
+     * <p>"가는 길에 있는 곳" 을 찾을 때 씁니다. 구글이 요구하는 것이 정확히
+     * 우리가 이미 받아 두는 그 {@code encodedPolyline} 입니다.
+     *
+     * <p><b>따로 캐시를 보지 않습니다.</b> {@link #leg} 가 이미 봅니다 —
+     * 있으면 거기서 나오고 없으면 구글에 묻습니다. 그리고 사람이 그 날을
+     * 펼칠 때 화면이 {@code /route} 를 부르므로, 그 날의 구간은 대개 이미
+     * 들어 있습니다(걷기·차·자전거 6시간).
+     *
+     * <p>못 구하면 {@code null} 입니다. 그때 부르는 쪽은 점으로 내려앉아야
+     * 합니다 — 길을 못 구한 것이 "찾은 것이 없음" 이 되면, 이 기능은 있는
+     * 것이 없는 것보다 나쁩니다.
+     */
+    public String pathBetween(Place from, Place to, Mode mode) {
+        if (!enabled() || from == null || to == null) {
+            return null;
+        }
+        try {
+            String line = leg(from, to, mode).polyline();
+            return line == null || line.isBlank() ? null : line;
+        } catch (RuntimeException e) {
+            /* 길을 못 구한 것으로 찾는 일까지 막지 않습니다. */
+            return null;
+        }
+    }
+
     private Leg leg(Place from, Place to, Mode mode) {
         String id = cacheKey(from, to, mode);
         Cached hit = cache.get(id);

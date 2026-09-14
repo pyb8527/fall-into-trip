@@ -118,5 +118,51 @@ r = await call("GET", "/api/places/abc/info");
 T("로그인 없이는 못 본다", r.status === 401, r.data);
 
 
+console.log("\n[9] 두 곳 사이에서 찾기 — 울타리");
+/*
+  이 서버에는 구글 키가 없다. 그래서 "실제로 선으로 찾으면 답이 달라지는가" 는
+  여기서 못 본다 — 그건 키가 있는 데서 사람이 눌러 봐야 아는 일이다.
+
+  여기서 보는 것은 그 앞이다. 무엇보다 between 이 placeId 를 받으므로, 거르지
+  않으면 그것으로 남의 여행에 그 장소가 있는지 물어볼 수 있게 된다.
+
+  키가 없으면 검색이 "꺼져 있습니다" 로 끝난다. 그 말이 나왔다는 것은 그 앞의
+  울타리를 전부 지났다는 뜻이다 — 거절은 전부 검색보다 먼저 선다.
+*/
+r = await call("POST", "/api/places", { token: host, body: { dayId: days[0].id, name: "오사카성", lat: 34.6873, lng: 135.5262 } });
+const fromId = r.data.place ? r.data.place.id : r.data.id;
+r = await call("POST", "/api/places", { token: host, body: { dayId: days[0].id, name: "도톤보리", lat: 34.6687, lng: 135.5013 } });
+const toId = r.data.place ? r.data.place.id : r.data.id;
+T("두 곳을 넣었다", !!fromId && !!toId, { fromId, toId });
+
+r = await ask({ query: "점심 먹을 데", dayId: days[0].id, between: { fromPlaceId: fromId, toPlaceId: toId } }, host);
+T("울타리를 다 지난다", r.status === 400 && /검색이 꺼져/.test(r.data.error), r.data);
+
+r = await ask({ query: "점심 먹을 데" }, host);
+T("between 없이는 지금과 같다", r.status === 400 && /검색이 꺼져/.test(r.data.error), r.data);
+
+r = await ask({ query: "점심", between: { fromPlaceId: fromId, toPlaceId: fromId } }, host);
+T("같은 곳 둘은 거절", r.status === 400 && /서로 다른/.test(r.data.error), r.data);
+
+r = await ask({ query: "점심", between: { fromPlaceId: fromId, toPlaceId: "없는곳" } }, host);
+T("이 여행에 없는 번호는 거절", r.status === 400 && /이 여행의 장소가/.test(r.data.error), r.data);
+
+/* 남의 여행에 있는 진짜 장소 번호. 이것이 통과하면 between 이 남의 여행을
+   들여다보는 통로가 된다. */
+r = await call("POST", "/api/places", { token: stranger, body: { dayId: otherDay, name: "남의 가게", lat: 35.0, lng: 135.7 } });
+const otherPlace = r.data.place ? r.data.place.id : r.data.id;
+r = await ask({ query: "점심", between: { fromPlaceId: fromId, toPlaceId: otherPlace } }, host);
+T("남의 여행 장소는 거절", r.status === 400 && /이 여행의 장소가/.test(r.data.error), r.data);
+T("있는지 없는지 새지 않는다",
+  r.data.error === (await ask({ query: "점심", between: { fromPlaceId: fromId, toPlaceId: "아예없는번호" } }, host)).data.error,
+  r.data);
+
+r = await ask({ query: "점심", between: { fromPlaceId: fromId, toPlaceId: toId } }, stranger);
+T("동행자가 아니면 못 부른다", r.status === 403 || r.status === 404, r.data);
+
+r = await call("POST", "/api/recommend",
+  { token: host, body: { query: "점심", between: { fromPlaceId: fromId, toPlaceId: toId } } });
+T("여행 없이 두 곳 사이는 안 된다", r.status === 400 && /여행 없이/.test(r.data.error), r.data);
+
 console.log(`\n결과: ${pass} 통과 / ${fail} 실패`);
 process.exit(fail ? 1 : 0);

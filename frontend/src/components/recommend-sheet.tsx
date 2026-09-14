@@ -93,6 +93,17 @@ export function RecommendSheet({
   */
   const [from, setFrom] = useState<string | null>(null);
   /*
+    가는 길 위에서 찾을 때의 도착지.
+
+    비워 두면 지금까지처럼 한 점 언저리에서 찾습니다. 채우면 두 곳 사이의
+    <b>길 위</b>에서 찾습니다 — 두 곳의 한가운데가 아닙니다. 사이가 강이거나
+    철로면 한가운데에는 아무것도 없고, 길은 빙 돌아갑니다.
+
+    폴리라인을 여기서 만들어 보내지 않습니다. 번호 둘만 보내고 길은 서버가
+    구합니다.
+  */
+  const [to, setTo] = useState<string | null>(null);
+  /*
     어느 날을 볼지.
 
     기준점을 고르기 전에 날부터 좁힙니다. 그리고 이 날은 "그날 문 여는지" 를
@@ -107,6 +118,7 @@ export function RecommendSheet({
     if (visible) {
       setOnDay(dayId);
       setFrom(null);
+      setTo(null);
     }
   }, [visible, dayId]);
 
@@ -122,6 +134,17 @@ export function RecommendSheet({
       ]
     : [];
 
+
+  /*
+    "사이" 로 물을 수 있는 출발지인가.
+
+    서버가 이 여행의 장소 번호 둘을 받습니다. 그래서 '지금 내 자리'(번호가
+    없습니다)와 잘 곳('stay' 는 장소 표의 줄이 아닙니다)은 못 씁니다.
+  */
+  const betweenFrom =
+    from && from !== 'here' && from !== 'stay' && day?.places.some((p) => p.id === from)
+      ? from
+      : null;
 
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
@@ -196,6 +219,10 @@ export function RecommendSheet({
              값이 아닙니다. */
           here: at ? { lat: at.lat, lng: at.lng } : null,
           intent,
+          /* 번호 둘만 보냅니다. 길은 서버가 구합니다 — 폴리라인을 화면에서
+             실어 보내면 아무 길이나 보낼 수 있게 되고, 그러면 우리 사용량으로
+             남의 질의를 태웁니다. */
+          between: betweenFrom && to ? { fromPlaceId: betweenFrom, toPlaceId: to } : null,
         },
       );
       setResult(got);
@@ -276,6 +303,7 @@ export function RecommendSheet({
               onPress={() => {
                 setOnDay(null);
                 setFrom(null);
+                setTo(null);
               }}
             />
             {days.map((d) => (
@@ -288,6 +316,7 @@ export function RecommendSheet({
                   /* 날이 바뀌면 기준으로 골라 둔 장소는 그 날의 것이
                      아닙니다. 함께 풉니다. */
                   setFrom(null);
+                  setTo(null);
                 }}
               />
             ))}
@@ -304,13 +333,19 @@ export function RecommendSheet({
                 day ? `${day.label} 언저리` : tripId ? '여행 전체' : '담아 둔 곳 언저리'
               }
               selected={from === null}
-              onPress={() => setFrom(null)}
+              onPress={() => {
+                setFrom(null);
+                setTo(null);
+              }}
             />
             {here ? (
               <Chip
                 label="지금 내 자리"
                 selected={from === 'here'}
-                onPress={() => setFrom(from === 'here' ? null : 'here')}
+                onPress={() => {
+                  setFrom(from === 'here' ? null : 'here');
+                  setTo(null);
+                }}
               />
             ) : null}
             {anchors.map((a) => (
@@ -318,9 +353,43 @@ export function RecommendSheet({
                 key={a.id}
                 label={a.name}
                 selected={from === a.id}
-                onPress={() => setFrom(from === a.id ? null : a.id)}
+                onPress={() => {
+                  setFrom(from === a.id ? null : a.id);
+                  setTo(null);
+                }}
               />
             ))}
+          </Row>
+        </View>
+      ) : null}
+
+      {/*
+        가는 길 위에서.
+
+        여기까지 오면 "어디 근처" 는 골라져 있습니다. 거기에 도착지를 하나 더
+        얹으면 물음이 달라집니다 — "오사카성 근처 점심" 이 아니라 "오사카성에서
+        도톤보리 가는 길에 점심" 이 됩니다.
+
+        조르지 않습니다. 안 고르면 지금까지와 똑같이 돕니다.
+
+        기준이 '지금 내 자리' 나 잘 곳이면 안 띄웁니다. 서버가 이 여행의
+        장소 번호 둘을 받는데 그 둘에는 번호가 없습니다.
+      */}
+      {betweenFrom ? (
+        <View style={styles.from}>
+          <Caption tone="secondary">어디까지 가는 길인가요?</Caption>
+          <Row gap={Spacing.xs} style={styles.chips}>
+            <Chip label="그냥 근처에서" selected={to === null} onPress={() => setTo(null)} />
+            {day?.places
+              .filter((p) => p.id !== betweenFrom)
+              .map((p) => (
+                <Chip
+                  key={p.id}
+                  label={p.name}
+                  selected={to === p.id}
+                  onPress={() => setTo(to === p.id ? null : p.id)}
+                />
+              ))}
           </Row>
         </View>
       ) : null}

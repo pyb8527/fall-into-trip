@@ -590,7 +590,7 @@ B 는 두 번째로 미룬 것입니다. `docs/2026-09/survey.md` 에서도 못 
 
 1번을 맨 뒤에 둔 이유는 스키마가 바뀌는 유일한 것이기 때문입니다.
 **마이그레이션 번호가 붐빕니다** — 디스크에는 `V20__place_cost.sql` 까지
-있고, `docs/2026-09/plan-news.md` 가 `V21`, `plan-tip-used.md` 가 `V22` 를
+있고, `docs/done/plan-news.md` 가 `V21`, `docs/done/plan-tip-used.md` 가 `V22` 를
 쓰겠다고 적어 두었습니다. 그 둘이 먼저 들어가면 이것은 `V23` 입니다.
 **계획을 쓸 때 디스크를 다시 봅니다.**
 
