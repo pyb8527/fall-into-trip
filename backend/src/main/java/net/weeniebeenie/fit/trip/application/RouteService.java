@@ -19,12 +19,18 @@ import org.springframework.web.client.RestClient;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * 장소에서 장소로 가는 데 걸리는 시간과 실제 경로.
@@ -66,6 +72,17 @@ public class RouteService {
 
     /** 들고 있을 답의 개수. 넘으면 오래 안 쓴 것부터 버립니다. */
     private static final int CACHE_MAX = 2000;
+
+    /** "09:30" 처럼 적은 것만 시각으로 읽습니다. "점심때쯤" 은 안 읽습니다. */
+    private static final Pattern CLOCK = Pattern.compile("^([01]\\d|2[0-3]):[0-5]\\d$");
+
+    /** 시각을 안 적어 둔 자리. 낮이면 대개 다닙니다. */
+    private static final LocalTime DEFAULT_DEPARTURE = LocalTime.of(9, 0);
+
+    /* 구글이 받는 창. 이 밖이면 departureTime 을 아예 안 보냅니다. 넉넉히
+       줄여 잡습니다 — 경계에서 거절당하면 그 구간만 통째로 사라집니다. */
+    private static final Duration WINDOW_PAST = Duration.ofDays(5);
+    private static final Duration WINDOW_AHEAD = Duration.ofDays(95);
 
     private final GoogleQuota quota;
     private final GoogleQuotaKey quotaKey;
@@ -124,7 +141,8 @@ public class RouteService {
         int meters = 0;
 
         for (int i = 0; i < pairs; i++) {
-            Leg leg = leg(list.get(i), list.get(i + 1), mode);
+            Leg leg = leg(list.get(i), list.get(i + 1), mode,
+                    departureFor(day, list.get(i)));
             legs.add(leg);
             if (leg.reachable()) {
                 seconds += leg.seconds();
@@ -182,7 +200,7 @@ public class RouteService {
 
             List<Option> options = new ArrayList<>(3);
             for (Mode mode : Mode.values()) {
-                Leg leg = leg(from, to, mode);
+                Leg leg = leg(from, to, mode, departureFor(day, from));
                 if (leg.reachable() && leg.seconds() > 0) {
                     options.add(new Option(mode, leg.seconds(), leg.meters(),
                             leg.polyline(), leg.fare()));
@@ -274,7 +292,9 @@ public class RouteService {
 
         Coordinates at = Coordinates.of(lat, lng);
         Place here = Place.builder().name("여기").lat(at.lat()).lng(at.lng()).build();
-        return ask(here, to, mode).withEnds("me", to.getId());
+        /* "지금 여기서" 는 정말 지금입니다. 그래서 시각을 안 넘깁니다 —
+           구글이 현재로 잡는 것이 여기서는 맞습니다. */
+        return ask(here, to, mode, null).withEnds("me", to.getId());
     }
 
     /**
@@ -297,7 +317,9 @@ public class RouteService {
             return null;
         }
         try {
-            String line = leg(from, to, mode).polyline();
+            /* 길 모양만 씁니다. 걷기로 묻고 있고(WALK) 시각표가 없으므로
+               언제인지가 상관없습니다. */
+            String line = leg(from, to, mode, null).polyline();
             return line == null || line.isBlank() ? null : line;
         } catch (RuntimeException e) {
             /* 길을 못 구한 것으로 찾는 일까지 막지 않습니다. */
@@ -305,14 +327,70 @@ public class RouteService {
         }
     }
 
-    private Leg leg(Place from, Place to, Mode mode) {
-        String id = cacheKey(from, to, mode);
+    /**
+     * 그 날 그 시각.
+     *
+     * <p>대중교통은 <b>언제 타는지가 곧 답을 가릅니다.</b> 안 보내면 구글이
+     * 지금으로 잡아서, 11월 일정을 새벽에 짜면 그때 안 다니는 노선이 전부
+     * "그런 길 없음" 으로 옵니다.
+     *
+     * <h3>시각대는 경도로 어림합니다</h3>
+     *
+     * <p>구글에게는 절대 시각을 줘야 하는데, 우리는 그 나라의 시간대를
+     * 모릅니다. 좌표로 시간대를 사 오는 길(Time Zone API)이 있지만 그건
+     * 바깥문을 하나 더 여는 일입니다.
+     *
+     * <p>그래서 <b>경도를 15로 나눠 어림합니다.</b> 오사카(135도)는 +9로
+     * 정확히 맞고, 유럽은 한두 시간 틀립니다. <b>틀려도 됩니다</b> — 여기서
+     * 고치려는 것은 "낮에 다니는 것을 밤으로 물어서 아무것도 안 나오는 것"
+     * 이지 분 단위 정확도가 아닙니다.
+     *
+     * <h3>구글이 받는 창이 있습니다</h3>
+     *
+     * <p>지금으로부터 7일 전 ~ 100일 뒤까지만 받습니다. 그 밖이면 <b>안
+     * 보냅니다</b> — 보내면 요청 자체가 거절돼서 지금보다 나빠집니다. 아주
+     * 먼 여행은 지금처럼 현재 시각으로 계산되고, 그건 원래 하던 대로입니다.
+     *
+     * @return 못 정하면 {@code null}
+     */
+    static Instant departureFor(Day day, Place from) {
+        LocalDate date = day == null ? null : day.getIso();
+        if (date == null) {
+            return null;
+        }
+
+        /* 적어 둔 시각을 씁니다. "점심때쯤" 처럼 자유롭게 적은 것은 못 읽으니
+           낮으로 둡니다 — 집 규칙이 자유 글자를 숫자로 읽지 말라고 합니다. */
+        LocalTime at = DEFAULT_DEPARTURE;
+        String written = from == null ? null : from.getTime();
+        if (written != null && CLOCK.matcher(written.trim()).matches()) {
+            at = LocalTime.parse(written.trim());
+        }
+
+        /* 경도 15도가 한 시간입니다. 날짜변경선 근처가 ±14까지 갑니다. */
+        int offset = Math.max(-12, Math.min(14,
+                (int) Math.round((from == null ? 0 : from.getLng()) / 15.0)));
+        Instant when = LocalDateTime.of(date, at).toInstant(ZoneOffset.ofHours(offset));
+
+        Instant now = Instant.now();
+        if (when.isBefore(now.minus(WINDOW_PAST)) || when.isAfter(now.plus(WINDOW_AHEAD))) {
+            return null;
+        }
+        return when;
+    }
+
+    /**
+     * @param when 그 날 그 시각에 다니는 것으로 물어봅니다. 비어 있으면
+     *             구글이 <b>지금</b>으로 잡습니다 — {@link #departureFor}
+     */
+    private Leg leg(Place from, Place to, Mode mode, Instant when) {
+        String id = cacheKey(from, to, mode, when);
         Cached hit = cache.get(id);
         if (hit != null && hit.until().isAfter(Instant.now())) {
             return hit.leg().withEnds(from.getId(), to.getId());
         }
 
-        Leg fresh = ask(from, to, mode);
+        Leg fresh = ask(from, to, mode, when);
         Duration keep = mode == Mode.TRANSIT ? KEEP_TRANSIT : KEEP_STATIC;
         cache.put(id, new Cached(fresh, Instant.now().plus(keep)));
         return fresh;
@@ -322,12 +400,15 @@ public class RouteService {
      * 같은 자리를 다시 묻지 않도록 좌표를 다섯 자리까지만 봅니다. 그 아래는 한
      * 걸음 남짓이라 경로가 달라지지 않습니다.
      */
-    private String cacheKey(Place from, Place to, Mode mode) {
-        return String.format(Locale.ROOT, "%s|%.5f,%.5f|%.5f,%.5f",
-                mode, from.getLat(), from.getLng(), to.getLat(), to.getLng());
+    private String cacheKey(Place from, Place to, Mode mode, Instant when) {
+        /* 시각이 열쇠에 들어가야 합니다. 안 넣으면 11월 1일 아침과 11월 3일
+           밤이 같은 칸을 쓰고, 먼저 물은 쪽의 답이 다른 날에도 나옵니다. */
+        return String.format(Locale.ROOT, "%s|%.5f,%.5f|%.5f,%.5f|%s",
+                mode, from.getLat(), from.getLng(), to.getLat(), to.getLng(),
+                when == null ? "now" : when.toString());
     }
 
-    private Leg ask(Place from, Place to, Mode mode) {
+    private Leg ask(Place from, Place to, Mode mode, Instant when) {
         /* 여기가 실제로 나가는 자리입니다. 캐시에 맞은 구간은 여기까지 안
            오므로 세지 않습니다. leg() 와 fromHere() 둘 다 이 앞을 지나므로
            한 곳만 적어 두면 빠뜨릴 자리가 없습니다. */
@@ -343,6 +424,20 @@ public class RouteService {
            요청 자체가 거절당합니다. */
         if (mode == Mode.DRIVE) {
             body.put("routingPreference", "TRAFFIC_AWARE");
+        }
+        /*
+          언제 타는지.
+
+          안 보내면 구글이 <b>지금</b>으로 잡습니다. 그래서 11월 일정을 새벽에
+          짜면 그 시각에 안 다니는 노선이 전부 "그런 길 없음" 으로 왔습니다.
+          걷기와 차는 시각표가 없어 멀쩡히 나오니, 대중교통만 빠진 것처럼
+          보였습니다.
+
+          걷기·차에는 안 붙입니다. 차에 붙이면 그 시각의 교통량으로 계산이
+          바뀌는데, 그건 이 결함과 상관없는 다른 변화입니다.
+         */
+        if (mode == Mode.TRANSIT && when != null) {
+            body.put("departureTime", DateTimeFormatter.ISO_INSTANT.format(when));
         }
 
         try {
