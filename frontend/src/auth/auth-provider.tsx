@@ -86,18 +86,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
          효과가 두 번 실행될 때 같은 리프레시 토큰이 두 번 나가고, 서버가
          그것을 탈취로 보고 로그인을 끊어 버립니다. */
       const revived = await refreshSession();
-      if (revived) {
-        if (alive) {
-          accept(revived as unknown as TokenResponse);
-        }
-        return;
+      if (revived && alive) {
+        accept(revived as unknown as TokenResponse);
       }
 
+      /*
+        로그인이 됐든 안 됐든 부릅니다.
+
+        전에는 세션이 되살아나면 여기서 그냥 빠져나갔습니다. 그래서
+        googleClientId 가 빈 채로 남았고, <b>이미 로그인한 사람의 설정
+        화면에서 "구글 잇기" 칸이 영영 안 떴습니다</b> — 구글 로그인에서
+        "이미 가입된 주소입니다" 를 받은 사람이 가야 할 바로 그 자리입니다.
+
+        setupNeeded 는 로그인 전에만 뜻이 있습니다. 되살아난 사람에게 다시
+        켜면 멀쩡히 쓰던 사람에게 설치 화면이 뜹니다.
+      */
       try {
         const state = await request<AuthState>('/api/auth/state', { anonymous: true });
         if (alive) {
-          setSetupNeeded(state.setupNeeded);
           setGoogleClientId(state.googleClientId ?? '');
+          if (!revived) {
+            setSetupNeeded(state.setupNeeded);
+          }
         }
       } catch {
         /* 서버가 아직 안 떴을 수 있습니다. 로그인 화면에서 다시 시도하게 둡니다. */
