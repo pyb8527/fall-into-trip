@@ -1,0 +1,585 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FIT — fall into trip</title>
+<meta name="description" content="여행 일정을 함께 짜고, 길 위에서 도장을 찍고, 돌아와 정산하는 곳.">
+<style>
+  /* ------------------------------------------------------------------ 토큰
+     값을 새로 고르지 않았습니다. frontend/src/constants/theme.ts 의 것을
+     그대로 옮겼습니다 — 홍보물이 제품과 다른 색을 쓰면 제품을 안 닮습니다. */
+  :root {
+    --paper:   #FFFFFF;
+    --fill:    #F7F7F7;
+    --line:    #E4E4E4;
+    --ink:     #0E0E0E;
+    --ink-2:   #5A5A5A;
+    --ink-3:   #8A8A8A;
+    --stamp:   #0E0E0E;
+
+    /* 날짜를 가르는 여섯. 이 앱이 색을 쓰는 유일한 자리이고, 뜻이 있는
+       색이 아니라 이름표입니다. 여기서도 날짜 말고는 안 씁니다. */
+    --d1: #2563EB;
+    --d2: #F97316;
+    --d3: #059669;
+    --d4: #9333EA;
+    --d5: #E11D48;
+    --d6: #0891B2;
+
+    --sans: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Pretendard',
+            'Malgun Gothic', 'Noto Sans KR', 'Segoe UI', Roboto, sans-serif;
+    --mono: ui-monospace, 'SFMono-Regular', 'Cascadia Mono', Consolas,
+            'D2Coding', 'Noto Sans Mono CJK KR', monospace;
+
+    --col: 40rem;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #0E0E0E;
+      --fill:  #171717;
+      --line:  #2C2C2C;
+      --ink:   #F0F0F0;
+      --ink-2: #A8A8A8;
+      --ink-3: #7E7E7E;
+      --stamp: #F0F0F0;
+      --d1: #6098FF; --d2: #FFA34D; --d3: #34C48C;
+      --d4: #B478F0; --d5: #FF6B8A; --d6: #38B6D6;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #0E0E0E;
+    --fill:  #171717;
+    --line:  #2C2C2C;
+    --ink:   #F0F0F0;
+    --ink-2: #A8A8A8;
+    --ink-3: #7E7E7E;
+    --stamp: #F0F0F0;
+    --d1: #6098FF; --d2: #FFA34D; --d3: #34C48C;
+    --d4: #B478F0; --d5: #FF6B8A; --d6: #38B6D6;
+  }
+
+  /* ------------------------------------------------------------------- 바탕 */
+  *, *::before, *::after { box-sizing: border-box; }
+
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 1rem;
+    line-height: 1.75;
+    letter-spacing: -0.011em;
+    word-break: keep-all;      /* 한국어는 낱말 단위로 끊어야 읽힙니다 */
+    overflow-wrap: anywhere;
+  }
+
+  main {
+    max-width: var(--col);
+    margin: 0 auto;
+    padding: 0 1.5rem 6rem;
+  }
+
+  /* 모서리를 둥글리지 않습니다. 이 앱이 71곳에서 걷어낸 것입니다.
+     그림자도 없습니다 — 층은 선 한 가닥이 나눕니다. */
+  section { padding: 3.5rem 0; border-top: 1px solid var(--line); }
+  section:first-of-type { border-top: 0; }
+
+  h1, h2, h3 { text-wrap: balance; margin: 0; }
+
+  h1 {
+    font-size: clamp(2.4rem, 8vw, 3.6rem);
+    line-height: 1.06;
+    letter-spacing: -0.045em;
+    font-weight: 800;
+  }
+
+  h2 {
+    font-size: clamp(1.5rem, 4.5vw, 1.9rem);
+    line-height: 1.25;
+    letter-spacing: -0.033em;
+    font-weight: 800;
+  }
+
+  h3 {
+    font-size: 1.0625rem;
+    line-height: 1.5;
+    letter-spacing: -0.02em;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+  }
+
+  p { margin: 0; }
+  strong { font-weight: 700; }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin-bottom: 1rem;
+  }
+
+  .lede { font-size: 1.125rem; color: var(--ink-2); }
+  .muted { color: var(--ink-2); }
+  .small { font-size: 0.9375rem; }
+
+  .stack   { display: flex; flex-direction: column; gap: 1.25rem; }
+  .stack-s { display: flex; flex-direction: column; gap: 0.5rem; }
+  .stack-l { display: flex; flex-direction: column; gap: 2.25rem; }
+
+  /* ------------------------------------------------------------------ 머리 */
+  .hero { padding: 5.5rem 0 4rem; }
+
+  .wordmark {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+
+  .hero h1 { margin: 1.75rem 0 1.5rem; }
+
+  .hero-line { font-size: 1.1875rem; color: var(--ink-2); max-width: 32rem; }
+
+  /*
+    도장 하나.
+
+    이 제품에서 가장 자기다운 물건입니다. 갔다 온 자리에 찍는 것이고, 앱이
+    적어 둔 대로 "반듯하면 아이콘이 되고, 조금 비뚤어야 손으로 찍은 것"
+    입니다. 그래서 여기서도 비뚤게 둡니다.
+  */
+  .stamp-wrap { margin-top: 3rem; }
+
+  .stamp {
+    width: 8.5rem; height: 8.5rem;
+    border: 3px solid var(--stamp);
+    color: var(--stamp);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 0.15rem;
+    transform: rotate(-5.5deg);
+    font-family: var(--mono);
+    animation: press 620ms cubic-bezier(0.2, 0.9, 0.3, 1.3) both;
+  }
+  .stamp .mark { font-size: 1.9rem; font-weight: 700; letter-spacing: 0.06em; }
+  .stamp .when { font-size: 0.8125rem; letter-spacing: 0.1em; }
+
+  @keyframes press {
+    from { opacity: 0; transform: rotate(-5.5deg) scale(1.5); }
+    to   { opacity: 1; transform: rotate(-5.5deg) scale(1); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .stamp { animation: none; }
+  }
+
+  /* ------------------------------------------------------------ 종이 블록
+     화면에 실제로 뜨는 것을 그대로 옮겨 놓는 자리입니다. 설명하는 것보다
+     보여 주는 편이 빠릅니다. */
+  .paper {
+    background: var(--fill);
+    border: 1px solid var(--line);
+    padding: 1.25rem;
+    font-family: var(--mono);
+    font-size: 0.875rem;
+    line-height: 1.85;
+    font-variant-numeric: tabular-nums;
+    overflow-x: auto;
+  }
+  .paper .row { display: flex; gap: 0.9rem; white-space: nowrap; }
+  .paper .at { color: var(--ink-3); min-width: 3.4rem; }
+  .paper .grow { flex: 1; }
+  .paper .num { color: var(--ink-2); }
+  .paper .note { color: var(--ink-3); }
+  .paper .rule { border-top: 1px dashed var(--line); margin: 0.6rem 0; }
+
+  .daytag {
+    display: inline-flex; align-items: center; gap: 0.45rem;
+    font-family: var(--mono); font-size: 0.75rem;
+    letter-spacing: 0.08em; color: var(--ink-3);
+    margin-bottom: 0.75rem;
+  }
+  .dot { width: 0.6rem; height: 0.6rem; }
+
+  /* 색을 쓰는 유일한 자리. 뜻이 있는 색이 아니라 날짜 이름표입니다. */
+  .days {
+    display: flex; align-items: center; gap: 0.4rem;
+    margin-top: 0.75rem; flex-wrap: wrap;
+  }
+  .days .dot { width: 0.85rem; height: 0.85rem; }
+  .days-note {
+    font-family: var(--mono); font-size: 0.6875rem;
+    letter-spacing: 0.04em; color: var(--ink-3); margin-left: 0.35rem;
+  }
+
+  .cap {
+    font-size: 0.8125rem; color: var(--ink-3); margin-top: 0.6rem;
+  }
+
+  /* ------------------------------------------------------------------ 항목 */
+  .items { display: flex; flex-direction: column; gap: 1.75rem; }
+
+  /* 지키는 것 — 목록이 아니라 약속이라 왼쪽에 굵은 선을 둡니다. */
+  .vow { border-left: 3px solid var(--ink); padding-left: 1.1rem; }
+
+  .facts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+  }
+  .fact { background: var(--paper); padding: 1.1rem; }
+  .fact dt {
+    font-family: var(--mono); font-size: 0.6875rem;
+    letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3);
+  }
+  .fact dd {
+    margin: 0.3rem 0 0; font-size: 1.0625rem; font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  footer {
+    border-top: 1px solid var(--line);
+    padding: 2.5rem 0 0;
+    color: var(--ink-3);
+    font-size: 0.875rem;
+  }
+
+  a { color: var(--ink); text-underline-offset: 3px; }
+  a:focus-visible, .stamp:focus-visible {
+    outline: 2px solid var(--ink); outline-offset: 3px;
+  }
+</style>
+</head>
+<body>
+<main>
+
+  <header class="hero">
+    <div class="wordmark">fall into trip</div>
+    <h1>같이 짜고, 같이 걷고,<br>돌아와서 나눕니다.</h1>
+    <p class="hero-line">
+      여행 하나를 여럿이 만듭니다. 일정도, 갈 곳을 정하는 일도, 쓴 돈도.
+      그리고 길 위에서는 <strong>짜는 도구 대신 걷는 도구</strong>가 됩니다.
+    </p>
+    <div class="stamp-wrap">
+      <div class="stamp" aria-label="도장 — 11월 2일에 다녀온 자리">
+        <span class="mark">FIT</span>
+        <span class="when">11.02</span>
+      </div>
+    </div>
+  </header>
+
+  <section>
+    <p class="lede">
+      여행 앱은 대개 <strong>떠나기 전</strong>에만 쓸모가 있습니다. 짜는 동안은
+      부지런히 열어 보다가, 정작 길 위에 서면 화면이 너무 복잡해서 안 엽니다.
+      돌아와서는 누가 얼마 냈는지 카톡을 거슬러 올라갑니다.
+    </p>
+    <p class="lede" style="margin-top:1.25rem">
+      FIT 은 그 세 순간을 각각 다르게 다룹니다.
+    </p>
+  </section>
+
+  <!-- 여행의 네 순간은 실제 차례가 있습니다. 그래서 순서가 뜻을 담습니다. -->
+  <section>
+    <div class="eyebrow">하나 — 짜는 동안</div>
+    <h2>넣기만 하면 알아서 섭니다</h2>
+
+    <div class="stack" style="margin-top:1.75rem">
+      <p class="muted">
+        갈 곳을 생각나는 대로 넣습니다. <strong>시간을 적으면 시간순으로
+        자리를 잡습니다.</strong> 안 적어도 됩니다 — "점심때쯤" 은 실제로
+        쓰이는 말이니까요.
+      </p>
+
+      <div>
+        <div class="daytag"><span class="dot" style="background:var(--d1)"></span>둘째 날 · 11.02 (월)</div>
+        <div class="paper">
+          <div class="row"><span class="at">09:30</span><span class="grow">구로몬 시장</span><span class="num">도보 8분</span></div>
+          <div class="row"><span class="at">12:30</span><span class="grow">이치란 도톤보리</span><span class="num">전철 14분</span></div>
+          <div class="row"><span class="at">15:00</span><span class="grow">우메다 공중정원</span><span class="num">도보 6분</span></div>
+          <div class="rule"></div>
+          <div class="row"><span class="at"></span><span class="grow note">15:00 까지 3분 모자랍니다 · 전철이면 닿습니다</span></div>
+        </div>
+        <p class="cap">시간이 빠듯한 자리는 그 자리에서 말해 줍니다. 대신 갈 수 있는 방법도 함께.</p>
+      </div>
+
+      <div class="items">
+        <div>
+          <h3>갈지자 동선을 다시 세워 줍니다</h3>
+          <p class="muted small">
+            북쪽 절 → 남쪽 시장 → 다시 북쪽 카페. 넣을 때는 어쩔 수 없이 그렇게
+            됩니다. 한 번 눌러 정리하되 <strong>12:30 예약은 12:30 에 그대로
+            둡니다.</strong> 그리고 바뀌기 전에 먼저 보여 주고 물어봅니다.
+          </p>
+        </div>
+        <div>
+          <h3>이름을 몰라도 찾습니다</h3>
+          <p class="muted small">
+            "비 올 때 갈 만한 실내" 라고 적으면 됩니다. 가게 이름을 알아내려고
+            블로그를 뒤진 다음에 돌아올 필요가 없습니다.
+          </p>
+        </div>
+        <div>
+          <h3>예약 확인서를 붙여 넣으면 칸이 찹니다</h3>
+          <p class="muted small">
+            메일을 통째로 붙여 넣으면 숙소 이름과 날짜, 타는 편을 뽑아 줍니다.
+            <strong>그 글은 기기 밖으로 나가지 않습니다.</strong> 예약번호와
+            카드 뒷자리가 들어 있는 글이니까요.
+          </p>
+        </div>
+        <div>
+          <h3>눈에 띈 곳은 보석함에</h3>
+          <p class="muted small">
+            아직 어느 날에 넣을지 모르는 곳은 담아 두었다가, 정해지면 아무 날에나
+            꺼내 넣습니다.
+          </p>
+        </div>
+        <div>
+          <h3>지도에서 날짜가 갈립니다</h3>
+          <p class="muted small">
+            날마다 색이 하나씩 붙고, 지도의 핀과 목록의 날짜가 <strong>같은
+            색</strong>을 씁니다. 나흘치를 한 지도에 펼쳐 놓아도 어느 날이
+            어느 동네인지 보입니다.
+          </p>
+          <div class="days" aria-hidden="true">
+            <span class="dot" style="background:var(--d1)"></span>
+            <span class="dot" style="background:var(--d2)"></span>
+            <span class="dot" style="background:var(--d3)"></span>
+            <span class="dot" style="background:var(--d4)"></span>
+            <span class="dot" style="background:var(--d5)"></span>
+            <span class="dot" style="background:var(--d6)"></span>
+            <span class="days-note">첫날부터 여섯째 날까지, 그 뒤로는 돌려 씁니다</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">둘 — 같이 가는 사람과</div>
+    <h2>"야 투표해" 를 따로 보내지 않게</h2>
+
+    <div class="stack" style="margin-top:1.75rem">
+      <div class="items">
+        <div>
+          <h3>초대는 링크 하나</h3>
+          <p class="muted small">
+            상대 이메일을 몰라도 됩니다. 링크를 받은 사람이 들어오면 그때부터
+            같이 고칩니다.
+          </p>
+        </div>
+        <div>
+          <h3>정하기 전에는 투표장에</h3>
+          <p class="muted small">
+            일정에 바로 넣으면 아직 정하지도 않은 것이 확정처럼 보이고, 나중에
+            빼자고 말하기 어려워집니다. 후보로 올려 두고 각자 누른 뒤
+            <strong>다 좋다고 한 것만</strong> 일정으로 옮깁니다. 한 명이라도
+            아직 안 눌렀으면 정해지지 않은 것으로 봅니다.
+          </p>
+        </div>
+        <div>
+          <h3>어댑터가 셋이거나 없거나</h3>
+          <p class="muted small">
+            챙길 것에 <strong>누가 챙길지</strong>를 함께 적습니다. 그게 없으면
+            목록이 "각자 알아서" 가 되고, 결국 둘 중 하나가 됩니다.
+          </p>
+        </div>
+        <div>
+          <h3>내가 없는 동안 뭐가 바뀌었는지</h3>
+          <p class="muted small">
+            앱을 열면 한자리에 모여 있습니다. 들어가서 일정 전체를 다시 훑을
+            필요가 없습니다.
+          </p>
+        </div>
+      </div>
+
+      <div>
+        <div class="paper" role="img" aria-label="소식함에 쌓인 줄 넷">
+          <div class="row"><span class="grow">지영 님이 11.02 (월)에 「이치란」 를 넣었습니다.</span><span class="note">2시간 전</span></div>
+          <div class="row"><span class="grow">민수 님이 「우메다 공중정원」 에 좋다고 했습니다.</span><span class="note">어제</span></div>
+          <div class="row"><span class="grow">「오사카 3박 4일」 를 13명이 추천했습니다.</span><span class="note">어제</span></div>
+          <div class="rule"></div>
+          <div class="row"><span class="grow note">남긴 한 줄 4개가 7번 쓰였습니다.</span></div>
+        </div>
+        <p class="cap">내가 한 일은 안 실립니다. 목록이 내 발자국으로 차면 볼 이유가 없어지니까요.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">셋 — 길 위에서</div>
+    <h2>여행이 시작되면 앱이 달라집니다</h2>
+
+    <div class="stack" style="margin-top:1.75rem">
+      <p class="muted">
+        길 위에서는 지도도 날짜도 카드도 전부 방해입니다. 그래서 여행이 시작되면
+        <strong>지금 갈 곳 하나만 크게</strong> 놓고, 길찾기와 다녀옴만 남깁니다.
+      </p>
+      <p class="muted">
+        들른 자리에는 <strong>도장을 찍습니다.</strong> 체크 표시로 뒀더니 할 일
+        목록처럼 읽혔습니다. 여행에서 한 곳을 들르는 것은 처리한 일이 아니라
+        갔다 온 자리입니다.
+      </p>
+
+      <div class="items">
+        <div>
+          <h3>안 터져도 일정은 보입니다</h3>
+          <p class="muted small">
+            지하철, 산속, 로밍이 끊긴 골목. 정작 일정이 가장 필요한 자리가 그런
+            데입니다. 마지막으로 본 일정이 기기에 남아 있습니다.
+          </p>
+        </div>
+        <div>
+          <h3>자유시간에 서로 어디 있는지</h3>
+          <p class="muted small">
+            켠 사람만, 그 여행에서만, 동행자에게만 보입니다. 몇 시간 뒤에는
+            <strong>스스로 꺼집니다.</strong>
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">넷 — 돌아와서</div>
+    <h2>카톡을 거슬러 올라가지 않게</h2>
+
+    <div class="stack" style="margin-top:1.75rem">
+      <p class="muted">
+        여행에서 동행자끼리 실제로 껄끄러워지는 자리는 돈입니다. 쓴 김에 적어
+        두면 돌아와서 한 번에 나뉩니다. <strong>적는 것과 나누는 것을 갈라
+        두었습니다</strong> — 길에서 적을 때마다 정산표가 눈에 들어올 필요는
+        없으니까요.
+      </p>
+
+      <div>
+        <div class="paper" role="img" aria-label="정산 결과">
+          <div class="row"><span class="grow">지영 → 민수</span><span class="num">¥ 8,400</span></div>
+          <div class="row"><span class="grow">나 → 민수</span><span class="num">¥ 3,200</span></div>
+          <div class="row"><span class="grow">지영 → 나</span><span class="num">₩ 42,000</span></div>
+        </div>
+        <p class="cap">엔과 원을 한 줄로 합치지 않습니다. 환율을 어디 것으로 잡느냐에 따라 답이 달라지고, 그 답을 우리가 정해서 적으면 틀린 수가 됩니다.</p>
+      </div>
+
+      <div class="items">
+        <div>
+          <h3>다녀온 여행을 한 장으로</h3>
+          <p class="muted small">
+            날마다 몇 곳을 들렀고 얼마를 썼는지 영수증처럼 늘어놓습니다. 동선이
+            지도 위에 순서대로 다시 그려지는 것도 볼 수 있습니다.
+          </p>
+        </div>
+        <div>
+          <h3>일정을 내놓고, 남의 것을 가져오고</h3>
+          <p class="muted small">
+            잘 짠 일정을 올려 두면 남이 <strong>통째로 가져가</strong> 자기
+            날짜에 맞춰 고쳐 씁니다. 링크를 카톡이나 슬랙에 붙이면 카드로
+            펼쳐집니다.
+          </p>
+        </div>
+        <div>
+          <h3>남긴 한 줄이 쓰인 것</h3>
+          <p class="muted small">
+            "2번 출구로 나와야 함" 같은 한 줄을 장소에 남기면 다음 사람이
+            씁니다. 그게 몇 번 쓰였는지 남긴 사람에게 돌려줍니다.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">지키는 것</div>
+    <h2>안 하기로 정한 것들</h2>
+    <p class="muted" style="margin-top:1rem">
+      기능을 늘리는 것보다 <strong>안 하기로 정한 것</strong>이 이 앱을 더 잘
+      설명합니다.
+    </p>
+
+    <div class="stack-l" style="margin-top:2rem">
+      <div class="vow">
+        <h3>다닌 길을 쌓지 않습니다</h3>
+        <p class="muted small">
+          지금 어디 있는지는 한 사람당 한 줄을 덮어씁니다. 줄을 쌓으면 그것은
+          다닌 길이 되고, 그건 들고 있을 값이 아닙니다.
+        </p>
+      </div>
+      <div class="vow">
+        <h3>사람이 수락해야 바뀝니다</h3>
+        <p class="muted small">
+          앱이 혼자 일정을 고치지 않습니다. 동선을 정리할 때도 먼저 보여 주고,
+          마음에 안 들면 되돌립니다.
+        </p>
+      </div>
+      <div class="vow">
+        <h3>통화를 합치지 않습니다</h3>
+        <p class="muted small">
+          엔과 원을 더해 한 숫자로 만들지 않습니다. 어느 환율로 잡느냐에 따라
+          답이 달라지는데, 그 판단을 대신하면 틀린 수를 드리는 것입니다.
+        </p>
+      </div>
+      <div class="vow">
+        <h3>아는 것만 말합니다</h3>
+        <p class="muted small">
+          그날 문을 여는지 모르면 "영업 중" 이라고 적지 않고 비워 둡니다.
+          모르는 것을 아는 척하면 나머지도 못 믿게 됩니다.
+        </p>
+      </div>
+      <div class="vow">
+        <h3>사진을 올리지 않습니다</h3>
+        <p class="muted small">
+          다녀온 여행은 사진 없이도 한 장이 됩니다. 들른 곳과 쓴 돈, 그리고
+          지도 위의 동선으로.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">어디서 쓰나</div>
+    <h2>브라우저에서 바로 열립니다</h2>
+
+    <dl class="facts" style="margin-top:1.75rem">
+      <div class="fact">
+        <dt>여는 법</dt>
+        <dd>설치 없이</dd>
+      </div>
+      <div class="fact">
+        <dt>폰</dt>
+        <dd>홈 화면에 담아서</dd>
+      </div>
+      <div class="fact">
+        <dt>구경</dt>
+        <dd>로그인 없이</dd>
+      </div>
+      <div class="fact">
+        <dt>값</dt>
+        <dd>무료</dd>
+      </div>
+    </dl>
+
+    <p class="muted small" style="margin-top:1.5rem">
+      주소만 있으면 됩니다. 폰에서는 홈 화면에 담아 두면 앱처럼 열리고, 담아 둔
+      일정은 안 터지는 곳에서도 보입니다.
+    </p>
+    <p class="muted small" style="margin-top:0.75rem">
+      남이 올린 일정은 계정 없이도 볼 수 있습니다. 가져가거나 추천을 누를 때만
+      로그인을 부릅니다.
+    </p>
+  </section>
+
+  <footer>
+    <p>FIT — fall into trip</p>
+    <p style="margin-top:0.35rem">여행 일정을 짜고, 동선을 지도에서 보고, 가계부를 함께 쓰는 곳.</p>
+  </footer>
+
+</main>
+</body>
+</html>
