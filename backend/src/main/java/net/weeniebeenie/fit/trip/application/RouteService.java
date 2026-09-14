@@ -70,6 +70,15 @@ public class RouteService {
     private static final Duration KEEP_STATIC = Duration.ofHours(6);
     private static final Duration KEEP_TRANSIT = Duration.ofMinutes(20);
 
+    /**
+     * <b>못 물어본</b> 구간을 들고 있는 시간.
+     *
+     * <p>답이 아니라 사고입니다. 답만큼 오래 들고 있으면 한 번의 사고가 여섯
+     * 시간짜리 거짓말이 됩니다. 그렇다고 아예 안 들고 있으면 구글이 잠깐
+     * 맛이 갔을 때 날짜를 열 때마다 서른여섯 번씩 다시 나갑니다.
+     */
+    private static final Duration KEEP_FAILED = Duration.ofMinutes(1);
+
     /** 들고 있을 답의 개수. 넘으면 오래 안 쓴 것부터 버립니다. */
     private static final int CACHE_MAX = 2000;
 
@@ -294,7 +303,11 @@ public class RouteService {
         Place here = Place.builder().name("여기").lat(at.lat()).lng(at.lng()).build();
         /* "지금 여기서" 는 정말 지금입니다. 그래서 시각을 안 넘깁니다 —
            구글이 현재로 잡는 것이 여기서는 맞습니다. */
-        return ask(here, to, mode, null).withEnds("me", to.getId());
+        Leg got = ask(here, to, mode, null);
+        /* 못 물어봤으면 "그 길이 없다" 로 내려보냅니다. 이 자리는 캐시를
+           안 쓰므로 들고 있을 것이 없습니다. */
+        return (got == null ? Leg.unreachable("me", to.getId()) : got)
+                .withEnds("me", to.getId());
     }
 
     /**
@@ -391,6 +404,25 @@ public class RouteService {
         }
 
         Leg fresh = ask(from, to, mode, when);
+
+        /*
+          못 물어본 것을 오래 들고 있지 않습니다.
+
+          전에는 성공·실패를 안 가리고 넣었습니다. 그래서 <b>한 번 실패하면
+          걷기·자동차는 여섯 시간 동안 그 수단이 화면에서 사라졌습니다.</b>
+          새로고침해도 캐시에서 같은 실패가 나왔습니다.
+
+          그렇다고 아예 안 넣을 수도 없습니다. 구글이 잠깐 맛이 갔을 때
+          날짜를 열 때마다 서른여섯 번씩 다시 나가고, 그 실패도 문턱을
+          깎습니다(spend 는 나가기 전에 셉니다). 그래서 <b>잠깐만</b>
+          들고 있습니다 — 사람이 다시 열어 볼 때쯤이면 풀려 있습니다.
+         */
+        if (fresh == null) {
+            cache.put(id, new Cached(Leg.unreachable(from.getId(), to.getId()),
+                    Instant.now().plus(KEEP_FAILED)));
+            return Leg.unreachable(from.getId(), to.getId());
+        }
+
         Duration keep = mode == Mode.TRANSIT ? KEEP_TRANSIT : KEEP_STATIC;
         cache.put(id, new Cached(fresh, Instant.now().plus(keep)));
         return fresh;
@@ -494,10 +526,16 @@ public class RouteService {
                     true,
                     fare);
         } catch (Exception e) {
-            /* 한 구간이 안 됐다고 하루 전체를 못 보여 줄 이유는 없습니다.
-               그 구간만 비워 두고 나머지를 그립니다. */
+            /*
+              한 구간이 안 됐다고 하루 전체를 못 보여 줄 이유는 없습니다. 그
+              구간만 비워 두고 나머지를 그립니다.
+
+              <b>여기서는 null 입니다.</b> "그 길이 없다"(위)와 달리 이것은
+              "못 물어봤다" 입니다. 둘을 같은 값으로 돌려주면 부르는 쪽이
+              가릴 수 없고, 그러면 실패한 답이 캐시에 여섯 시간 눌러앉습니다.
+             */
             log.warn("경로를 받지 못했습니다: mode={} {}", mode, e.getMessage());
-            return Leg.unreachable(from.getId(), to.getId());
+            return null;
         }
     }
 
