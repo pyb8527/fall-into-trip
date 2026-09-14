@@ -79,6 +79,17 @@ public class RouteService {
      */
     private static final Duration KEEP_FAILED = Duration.ofMinutes(1);
 
+    /**
+     * 여기까지는 걷는 것이 선택입니다.
+     *
+     * <p>5분이면 갈 길을 30분 걷는 사람이 있습니다. 돈을 아끼려고도 하고 그냥
+     * 걷고 싶어서도 합니다. 그 아래는 손대지 않습니다.
+     */
+    private static final Duration WALK_SANE = Duration.ofMinutes(90);
+
+    /** 그 위로, 다른 수단이 이만큼 빠르면 걷기는 고를 것이 아닙니다. */
+    private static final int WALK_TOO_MUCH = 3;
+
     /** 들고 있을 답의 개수. 넘으면 오래 안 쓴 것부터 버립니다. */
     private static final int CACHE_MAX = 2000;
 
@@ -215,10 +226,47 @@ public class RouteService {
                             leg.polyline(), leg.fare()));
                 }
             }
+            dropSillyWalk(options);
             out.add(new Gap(from.getId(), to.getId(), options,
                     pick(options, true), pick(options, false)));
         }
         return out;
+    }
+
+    /**
+     * 말이 안 되는 걷기를 뺍니다.
+     *
+     * <p>나리타 공항에서 닛포리까지 <b>걸어서 14시간</b>이 나왔습니다. 구글이
+     * 대중교통을 안 줬고, 남은 것이 걷기와 차였고, 걷기는 요금이 없어서
+     * <b>"싼 쪽" 추천으로까지 올라갔습니다.</b> 돈을 아끼자고 13시간을 더
+     * 쓰는 사람은 없습니다.
+     *
+     * <h3>길이만 보고 자르지 않습니다</h3>
+     *
+     * <p>두 시간 걷는 것이 답인 자리가 있습니다 — 산길이나 둘레길처럼 <b>걷는
+     * 것이 곧 목적</b>인 곳입니다. 그래서 시간만으로 자르면 멀쩡한 답을
+     * 지웁니다.
+     *
+     * <p>대신 <b>훨씬 나은 대안이 있을 때만</b> 뺍니다. 차로 한 시간인데
+     * 걸어서 열네 시간이면 그것은 고를 것이 아닙니다. 반대로 걷는 것 말고
+     * 길이 없으면 몇 시간이 걸려도 그대로 둡니다 — 그때는 그것이 유일한
+     * 답입니다.
+     */
+    static void dropSillyWalk(List<Option> options) {
+        Option walk = options.stream().filter(o -> o.mode() == Mode.WALK).findFirst().orElse(null);
+        if (walk == null || options.size() < 2) {
+            return;
+        }
+        /* 짧은 걷기는 건드리지 않습니다. 5분 차를 30분 걷는 것은 사람이
+           실제로 고르는 선택입니다. */
+        if (walk.seconds() <= WALK_SANE.toSeconds()) {
+            return;
+        }
+        int best = options.stream().filter(o -> o.mode() != Mode.WALK)
+                .mapToInt(Option::seconds).min().orElse(Integer.MAX_VALUE);
+        if (walk.seconds() > best * WALK_TOO_MUCH) {
+            options.remove(walk);
+        }
     }
 
     /**
@@ -231,6 +279,15 @@ public class RouteService {
      * 숫자만으로 견주면 엉뚱한 답이 나옵니다. 한 구간 안에서는 통화가 같으므로
      * 실제로 문제가 되지는 않지만, 그래도 확인하고 넘어갑니다.
      */
+    /** 시험이 부르는 이름. 안에서는 {@link #pick} 하나로 씁니다. */
+    static Mode fastestOf(List<Option> options) {
+        return pick(options, true);
+    }
+
+    static Mode cheapestOf(List<Option> options) {
+        return pick(options, false);
+    }
+
     private static Mode pick(List<Option> options, boolean fastest) {
         Option best = null;
         for (Option o : options) {
