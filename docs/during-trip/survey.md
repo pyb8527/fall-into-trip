@@ -257,7 +257,7 @@ routes.polyline.encodedPolyline, routes.travelAdvisory.transitFare
 | 푸시 | 불필요 |
 | 외부 API | **새로 하나** (구글이 아닙니다) |
 | 서버 저장 | 0 (캐시는 짧게) |
-| 구글 호출 | 0 — `callsOf` 와 무관한 새 바깥문입니다 |
+| 구글 호출 | 0 — 문턱과 무관한 새 바깥문입니다 |
 
 **출처**
 - <https://open-meteo.com/en/pricing> · <https://open-meteo.com/en/terms> (2026-09-11 확인)

@@ -164,7 +164,7 @@ Apple Intelligence 쪽은 애초에 못 씁니다. **iOS 전용**이고, 이 저
 
 ### 구글 호출
 
-**`GoogleQuotaFilter.callsOf` 를 안 고칩니다.** 이 기능은 구글을 부르지
+**문턱을 안 건드립니다.** 이 기능은 구글을 부르지
 않습니다. 사람이 이어서 `PlaceSearch` 로 좌표를 잡으면 그때 기존
 `/api/places/search` 가 1 을 씁니다 — 이미 세고 있는 자리입니다.
 

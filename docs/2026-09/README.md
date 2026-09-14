@@ -1,23 +1,33 @@
 # 2026년 9월 조사 — 어디까지 왔나
 
-> 조사 → 판단 → 계획까지 끝났고, **구현이 절반쯤 갔습니다** (2026-09-11).
+> 조사 셋 중 **첫째**입니다. 앞뒤와 폴더 사이의 일은
+> [`docs/README.md`](../README.md) 를 보세요.
+
+> 조사 → 판단 → 계획까지 끝났고, **여섯이 끝났습니다** (2026-09-14).
 >
 > | 상태 | 계획 |
 > |---|---|
-> | **끝남** — [`docs/done/`](../done/) 으로 옮겼습니다 | 홈의 D-day, 장소 비용, 영수증의 쓴 돈, 구글 문턱 |
+> | **끝남** — [`docs/done/`](../done/) 으로 옮겼습니다 | 홈의 D-day · 장소 비용 · 영수증의 쓴 돈 · 구글 문턱 · [소식함](../done/plan-news.md)(`V21`) · [남긴 한 줄이 쓰인 것](../done/plan-tip-used.md)(`V22`) |
 > | **끝남** — 계획 문서가 없던 것 | `verdict.md` §11.1 (커밋 `5e2126b`) |
-> | **끝남** — `V21` | [`../done/plan-news.md`](../done/plan-news.md) (커밋 `39e2f14`, 접기는 `a8fe6bd`) |
-> | **반쯤** | [`plan-places-fields.md`](plan-places-fields.md) · [`plan-booking-paste.md`](plan-booking-paste.md) |
-> | **아직 안 함** | [`../done/plan-tip-used.md`](../done/plan-tip-used.md) · [`plan-search-along-route.md`](plan-search-along-route.md) · [`plan-app-offline.md`](plan-app-offline.md) · [`plan-widget.md`](plan-widget.md) |
+> | **반쯤 — 구글 키에 막힘** | [`plan-places-fields.md`](plan-places-fields.md) · [`plan-search-along-route.md`](plan-search-along-route.md) |
+> | **반쯤 — 관문 못 넘음** | [`plan-booking-paste.md`](plan-booking-paste.md) |
+> | **대기 — 앱 작업 때 한 번에** | [`plan-app-offline.md`](plan-app-offline.md) · [`plan-widget.md`](plan-widget.md) |
 >
-> **마이그레이션 번호가 당겨졌습니다.** `V20` 을 장소 비용이,
-> `V21` 을 소식함이 썼습니다. `../done/plan-tip-used.md` 는 **`V22`** 로 갑니다 —
-> 그 문서는 아직 옛 번호로 적혀 있습니다.
+> **남은 다섯이 전부 무언가에 막혀 있습니다.** 셋은 구글 키나 모델 실측
+> 같은 **관문**이고, 둘은 EAS 재빌드를 묶어 굽기로 한 **대기**입니다.
+> 지금 이 폴더에서 바로 손댈 수 있는 것이 없습니다 —
+> [`docs/replan/`](../replan/) 이 그다음입니다.
 >
-> **계획에 없던 일이 둘 나왔습니다.** `plan-quota.md` 는 조사에서 나온 것이
-> 아니라 실제로 막혀서 재 본 것이고, 장소 비용 작업 중에 원래 있던 결함
-> 둘(`Expense.placeId` 미검증, `Versioned.check` 인자 뒤집힘)이 나왔습니다.
-> 계획서가 예고한 일보다 **코드를 만지다 나온 일**이 적지 않습니다.
+> **마이그레이션은 `V22` 까지 썼습니다.** `V20` 장소 비용, `V21` 소식함,
+> `V22` 팁 조회.
+>
+> **계획에 없던 일이 여럿 나왔습니다.** `plan-quota.md` 는 조사에서 나온 것이
+> 아니라 실제로 막혀서 재 본 것이고, 장소 비용 작업에서 원래 있던 결함
+> 둘(`Expense.placeId` 미검증, `Versioned.check` 인자 뒤집힘)이, 필드마스크
+> 작업에서 `CLOSED_TEMPORARILY` 가 나왔습니다. 계획서가 예고한 일보다
+> **코드를 만지다 나온 일**이 적지 않습니다.
+>
+> **그 문턱 작업이 문서들을 낡게 만들었습니다** — 아래 "낡은 참조".
 
 ## 문서
 
@@ -43,22 +53,22 @@
 |---|---|
 | [`verdict-ideas.md`](verdict-ideas.md) | `docs/ideas.md` 의 셋 + 장소 비용 이야기의 판정 |
 | [`plan-dday.md`](../done/plan-dday.md) | 홈에서도 며칠 남았는지 (`ideas.md` 2번) — **끝나서 `docs/done/` 으로 옮겼습니다** |
-| [`../done/plan-news.md`](../done/plan-news.md) | 소식함 — 내가 없는 동안 무엇이 바뀌었나 (`ideas.md` 1번) |
-| [`../done/plan-tip-used.md`](../done/plan-tip-used.md) | 내가 남긴 한 줄이 쓰였다는 것 (`ideas.md` 3번) |
+| [`plan-news.md`](../done/plan-news.md) | 소식함 — 내가 없는 동안 무엇이 바뀌었나 (`ideas.md` 1번) |
+| [`plan-tip-used.md`](../done/plan-tip-used.md) | 내가 남긴 한 줄이 쓰였다는 것 (`ideas.md` 3번) |
 | [`../done/plan-place-cost.md`](../done/plan-place-cost.md) | 장소의 비용과 가계부를 잇는다 |
 
 ### 두 갈래가 만나는 곳
 
-**`verdict.md` §11.1 과 `../done/plan-news.md` 가 같은 것을 다룹니다.** 순서가 정해져
-있습니다 — `../done/plan-news.md` 머리가 적어 두었습니다:
+**`verdict.md` §11.1 과 `plan-news.md` 가 같은 것을 다룹니다.** 순서가 정해져
+있습니다 — `plan-news.md` 머리가 적어 두었습니다:
 
 > `verdict.md` §11.1 이 이보다 한 단계 앞입니다. 새 엔드포인트 없이 일정
 > 화면에서 `updatedBy`·`updatedAt` 을 바로 쓰는 쪽이고 서버를 안 건드립니다.
 > 그것을 먼저 하고, 소식이 여러 여행에 걸쳐 모여야 할 때 이 문서로 넘어옵니다.
 
-**`verdict.md` 5번(입구 좌표)과 `../done/plan-tip-used.md` 도 이어집니다.** 5번을
+**`verdict.md` 5번(입구 좌표)과 `plan-tip-used.md` 도 이어집니다.** 5번을
 반대한 근거가 "구글에서 입구를 사 오면 `PlaceTip` 을 적을 이유가 줄어든다"
-였고, `../done/plan-tip-used.md` 가 바로 그 `PlaceTip` 을 세우는 계획입니다.
+였고, `plan-tip-used.md` 가 바로 그 `PlaceTip` 을 세우는 계획입니다.
 
 계획을 파일 하나씩 따로 쓰는 것이 규칙입니다. `plan-places-fields.md` 만
 넷을 묶었고, 그 이유를 문서 §0 에 적었습니다.
@@ -107,6 +117,29 @@
 
 `recommend.md` 를 고치는 것이 **0차**였고, 끝났습니다. 문서는
 [`docs/done/recommend.md`](../done/recommend.md) 에 있습니다.
+
+## 낡은 참조 — `callsOf` 는 이제 없습니다
+
+문턱을 고치면서(`../done/plan-quota.md`) `GoogleQuotaFilter.callsOf` 를
+걷어냈습니다. 지금은 이렇습니다.
+
+| 전 | 후 |
+|---|---|
+| 필터가 경로를 보고 **부를 것 같은 횟수**를 미리 뺌 | 필터는 `touchesGoogle` 로 **바닥난 사람만 돌려보냄** |
+| 한 곳에서 셈 | **구글을 실제로 부르는 네 자리**가 나갈 때 1씩 씀 |
+| 캐시에 맞아도 빠짐 | 캐시에 맞으면 그 자리를 안 지나가 **아무것도 안 씀** |
+
+**그 메서드를 가리키던 계획 문서가 여럿이었습니다.** 커밋 `30740e6` 이
+`plan-search-along-route.md` 를 고쳤고(§10.2), 2026-09-14 에 나머지를
+훑었습니다.
+
+| 어디 | 무엇이 틀렸나 | 어떻게 했나 |
+|---|---|---|
+| `docs/during-trip/verdict.md` 0.2 | 없어진 메서드 본문을 **인용**해 논지를 세웠습니다 | 정정 상자를 얹었습니다. **논지는 그대로** — 세는 자리가 넷으로 못박혀서 날씨·항공·환율은 오히려 더 분명히 안 세어집니다 |
+| `docs/during-trip/verdict.md` 4번 (ㄷ) | "`callsOf` 에 반영합니다" — **틀린 지시가 됐습니다** | 취소선. 세는 자리가 `RouteService.ask()` 안이라 **할 일이 없습니다** |
+| 나머지 열 곳 | "`callsOf` 를 안 고칩니다" — 방향은 맞고 이름만 죽었습니다 | "문턱을 안 건드립니다" 로 |
+
+`docs/done/` 안의 문서는 **안 고쳤습니다.** 그때의 기록이라 그대로 둡니다.
 
 ## 커밋할 때 빼야 하는 것
 
@@ -195,8 +228,8 @@ PC 의 디스크가 모자라 모델을 못 받았습니다. 앱 쪽은 EAS 빌�
 | | 계획 | 갈래 | 상태 |
 |---|---|---|---|
 | 5 | [`plan-places-fields.md`](plan-places-fields.md) | A | **반쯤** — 9.1 은 `7a01fbd`. 나머지 셋은 **구글 키가 있어야** 재 볼 수 있어 멈췄습니다 |
-| ~~6~~ | [`../done/plan-news.md`](../done/plan-news.md) | B | **끝남** — 앞단(§11.1)은 `5e2126b`, 본체는 `39e2f14`(`V21`). 올린 당일 추천·댓글·표를 한 줄로 접었습니다(`a8fe6bd`) — §11 |
-| 7 | [`../done/plan-tip-used.md`](../done/plan-tip-used.md) | B | 아직. `../done/plan-news.md` 와 같은 화면의 아래층. 마이그레이션은 **`V22`** |
+| ~~6~~ | [`plan-news.md`](../done/plan-news.md) | B | **끝남** — 앞단(§11.1)은 `5e2126b`, 본체는 `39e2f14`(`V21`). 올린 당일 추천·댓글·표를 한 줄로 접었습니다(`a8fe6bd`) — §11 |
+| 7 | [`plan-tip-used.md`](../done/plan-tip-used.md) | B | 아직. `plan-news.md` 와 같은 화면의 아래층. 마이그레이션은 **`V22`** |
 | 8 | [`plan-search-along-route.md`](plan-search-along-route.md) | A | **만들었습니다** — 커밋은 아래. 다만 §9 의 게이트(구글이 실제로 다르게 답하는가)는 **운영에서 사람이 재야** 합니다 |
 
 5번에서 **계획서가 짚은 것보다 한 줄이 더 나왔습니다.** `FUTURE_OPENING` 만
@@ -206,8 +239,8 @@ PC 의 디스크가 모자라 모델을 못 받았습니다. 앱 쪽은 EAS 빌�
 `../done/plan-place-cost.md` 가 여기 있었는데 1차로 올라갔다가 끝났습니다.
 
 갈래 B 의 순서는 `verdict-ideas.md` 가 정한 것이고, 여기서는 갈래 A 와
-섞어 놓기만 했습니다. 둘의 상대 순서는 `../done/plan-news.md` 가 적어 둔 의존
-(1차 2번 → `../done/plan-news.md` → `../done/plan-tip-used.md`) 만 지켰습니다.
+섞어 놓기만 했습니다. 둘의 상대 순서는 `plan-news.md` 가 적어 둔 의존
+(1차 2번 → `plan-news.md` → `plan-tip-used.md`) 만 지켰습니다.
 
 ## 하지 않기로 한 것
 
