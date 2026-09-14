@@ -601,14 +601,36 @@ public class RouteService {
     }
 
     /** 구글은 "165s" 처럼 초 뒤에 s 를 붙여 보냅니다. */
-    private static int seconds(String text) {
+    /**
+     * 구글이 준 소요시간을 초로.
+     *
+     * <p><b>소수점이 붙어 옵니다.</b> 구글의 {@code Duration} 은 프로토버프
+     * JSON 규칙을 따르고, 그 규칙은 "0·3·6·9 자리의 소수" 뒤에 {@code s} 를
+     * 붙인다고 적혀 있습니다. 그래서 {@code "2345s"} 도 오고
+     * {@code "2345.500s"} 도 옵니다.
+     *
+     * <p>전에는 {@link Integer#parseInt} 하나로 읽었습니다. 소수점이 붙은
+     * 것은 거기서 터지고 <b>0초</b>가 됐습니다. 그리고 {@code compare} 가
+     * {@code seconds() > 0} 으로 거르므로 <b>그 수단이 조용히 사라졌습니다.</b>
+     *
+     * <p>로그도 안 남았습니다 — 경로는 멀쩡히 왔고, 우리가 못 읽은 것뿐입니다.
+     * 그래서 "구글맵에는 나오는데 우리 앱에는 대중교통이 없다" 가 됐습니다.
+     *
+     * <p>0 은 <b>못 읽었다</b>는 뜻으로만 씁니다. 실제로 0초 걸리는 구간은
+     * 없습니다.
+     */
+    static int seconds(String text) {
         if (text == null || text.isBlank()) {
             return 0;
         }
         String digits = text.endsWith("s") ? text.substring(0, text.length() - 1) : text;
         try {
-            return Integer.parseInt(digits);
+            /* 소수를 그대로 받아 반올림합니다. 초 아래는 이동 시간에서 뜻이
+               없습니다. */
+            double parsed = Double.parseDouble(digits.trim());
+            return parsed <= 0 ? 0 : (int) Math.round(parsed);
         } catch (NumberFormatException e) {
+            log.warn("소요시간을 못 읽었습니다: {}", text);
             return 0;
         }
     }
