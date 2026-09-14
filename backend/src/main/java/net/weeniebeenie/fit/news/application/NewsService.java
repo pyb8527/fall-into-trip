@@ -45,6 +45,12 @@ import java.util.stream.Collectors;
  * 붙이고, 여럿이면 몇 사람인지만 적습니다 — 누구누구인지는 들어가서 볼
  * 일입니다.
  *
+ * <h3>아래에 요약 한 줄</h3>
+ *
+ * <p>내가 남긴 팁이 얼마나 쓰였는지는 <b>목록에 섞지 않습니다.</b> 소식은
+ * 읽으면 지나가는 것이고 이것은 사라지지 않고 쌓이는 것이라, 같은 자리에
+ * 두면 매번 읽은 것을 또 읽게 됩니다.
+ *
  * <h3>내가 한 일은 안 담습니다</h3>
  *
  * <p>다섯 질의가 전부 "나 말고" 로 좁힙니다. 내가 방금 넣은 장소가 소식으로
@@ -84,7 +90,24 @@ public class NewsService {
                        String postId, String postTitle,
                        String text, String url, boolean fresh) {}
 
-    public record View(List<Item> items, long unseen, Instant seenAt) {}
+    /**
+     * 소식함 한 장.
+     *
+     * <p>{@code mine} 은 <b>한 줄도 안 남긴 사람에게는 없습니다.</b> 0 을
+     * 보여 주면 "너는 아무것도 안 했다" 가 되고, 그건 돌아올 이유가 아니라
+     * 안 돌아올 이유입니다.
+     */
+    public record View(List<Item> items, long unseen, Instant seenAt, Mine mine) {}
+
+    /**
+     * 내가 남긴 한 줄들이 얼마나 쓰였는지.
+     *
+     * <p>위 목록과 성격이 다릅니다. 소식은 읽으면 지나가지만 이것은
+     * 사라지지 않고 쌓입니다.
+     *
+     * @param views 쓰인 <b>횟수</b>입니다. 사람 수가 아닙니다
+     */
+    public record Mine(long tipCount, long viewCount) {}
 
     @Transactional(readOnly = true)
     public View of(AuthPrincipal me) {
@@ -139,9 +162,14 @@ public class NewsService {
 
         /* 본 시각보다 나중 것이 새것입니다. 한 번도 안 열었으면 전부입니다. */
         long unseen = items.stream().filter(i -> isFresh(i, seenAt)).count();
+
+        /* 남긴 한 줄이 없으면 아예 안 싣습니다 — View 의 주석. */
+        MineRow row = feed.mine(me.id());
+        Mine mine = row.tips() == 0 ? null : new Mine(row.tips(), row.views());
+
         return new View(
                 items.stream().map(i -> isFresh(i, seenAt) ? withFresh(i) : i).toList(),
-                unseen, seenAt);
+                unseen, seenAt, mine);
     }
 
     /**

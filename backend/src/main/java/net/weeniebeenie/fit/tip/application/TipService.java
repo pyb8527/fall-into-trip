@@ -9,6 +9,8 @@ import net.weeniebeenie.fit.shared.error.ApiException;
 import net.weeniebeenie.fit.support.audit.AuditService;
 import net.weeniebeenie.fit.tip.domain.PlaceTip;
 import net.weeniebeenie.fit.tip.domain.PlaceTipRepository;
+import net.weeniebeenie.fit.tip.domain.PlaceTipView;
+import net.weeniebeenie.fit.tip.domain.PlaceTipViewRepository;
 import net.weeniebeenie.fit.tip.domain.TipReport;
 import net.weeniebeenie.fit.tip.domain.TipReportRepository;
 import org.springframework.data.domain.Page;
@@ -18,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -53,6 +56,7 @@ public class TipService {
     private static final int MAX_LENGTH = 200;
 
     private final PlaceTipRepository tips;
+    private final PlaceTipViewRepository views;
     private final TipReportRepository reports;
     private final UserRepository users;
     private final AuditService audit;
@@ -65,6 +69,45 @@ public class TipService {
             out.add(cardOf(tip, meId));
         }
         return out;
+    }
+
+    /**
+     * 남의 한 줄을 읽었다고 표시합니다. 하루에 한 번만 셉니다.
+     *
+     * <p>남긴 사람에게 <b>자기 것이 쓰였다</b>고 말해 주려고 셉니다. 그것
+     * 말고 쓰는 데가 없습니다 — 팁마다 조회수를 띄우지 않습니다. 띄우면
+     * 수가 적은 팁이 덜 맞는 말처럼 보이는데, 늦게 올라온 것일 뿐입니다.
+     *
+     * <p>안 세는 자리가 셋입니다.
+     * <ul>
+     *   <li><b>손님</b> — 사람 번호가 없어 "하루 한 번" 을 셀 수 없습니다.
+     *       아이피로 세면 자취를 쌓는 일이 됩니다</li>
+     *   <li><b>내 팁</b> — 장소를 열 때마다 내 수가 오릅니다</li>
+     *   <li><b>내려간 팁</b> — 신고가 쌓여 내려간 것이 쓰였다고 말하면
+     *       안 됩니다. 목록이 이미 거르므로 여기 오지 않지만, 부르는 쪽이
+     *       바뀌어도 안 새도록 여기서 한 번 더 봅니다</li>
+     * </ul>
+     *
+     * <p>읽는 것과 나눠 둡니다. {@link #listOf} 는 읽기 전용이고, 세는 일은
+     * 쓰기입니다. 한 메서드로 묶으면 손님이 목록을 볼 때마다 쓰기 거래가
+     * 열립니다.
+     */
+    @Transactional
+    public void countViews(String placeId, String meId) {
+        if (meId == null) {
+            return;
+        }
+        LocalDate today = LocalDate.now();
+        for (PlaceTip tip : tips.findAllByPlaceIdAndHiddenFalseAndCreatedAtAfterOrderByCreatedAtDesc(
+                placeId, Instant.now().minus(FRESH))) {
+            if (tip.isHidden() || meId.equals(tip.getUserId())) {
+                continue;
+            }
+            if (views.existsByTipIdAndUserIdAndOnDate(tip.getId(), meId, today)) {
+                continue;
+            }
+            views.save(new PlaceTipView(tip.getId(), meId, today));
+        }
     }
 
     /** 장소마다 최근 팁이 몇 개인지. 목록에서 "팁 3" 을 띄우는 데 씁니다. */

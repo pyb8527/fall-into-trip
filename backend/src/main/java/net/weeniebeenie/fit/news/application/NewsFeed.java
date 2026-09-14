@@ -188,4 +188,28 @@ public class NewsFeed {
                 .setMaxResults(limit)
                 .getResultList();
     }
+
+    /**
+     * 내가 남긴 한 줄이 얼마나 쓰였는지.
+     *
+     * <p>{@code LEFT JOIN} 입니다. 아직 아무도 안 읽은 팁도 <b>내가 남긴
+     * 수</b>에는 들어가야 합니다 — 안 그러면 "남긴 한 줄 4개" 가 읽힌 것만
+     * 세어 2개가 됩니다.
+     *
+     * <p>내려간 팁은 양쪽에서 다 뺍니다. 신고가 쌓여 내려간 것이 쓰였다고
+     * 말하면 안 되고, 남긴 수에도 세면 안 됩니다.
+     *
+     * <p>{@code count(v.tipId)} 는 읽힌 줄만 셉니다 — 아무도 안 읽은 팁의
+     * 빈 짝은 {@code null} 이라 안 셉니다.
+     */
+    public MineRow mine(String me) {
+        return em.createQuery("""
+                       SELECT new %sMineRow(count(DISTINCT t.id), count(v.tipId))
+                       FROM PlaceTip t
+                       LEFT JOIN PlaceTipView v ON v.tipId = t.id
+                       WHERE t.userId = :me AND t.hidden = false
+                       """.formatted(ROW), MineRow.class)
+                .setParameter("me", me)
+                .getSingleResult();
+    }
 }

@@ -26,7 +26,21 @@ public class TipController {
 
     @GetMapping("/api/places/{placeId}/tips")
     public Map<String, Object> list(@CurrentUser AuthPrincipal me, @PathVariable String placeId) {
-        return Map.of("tips", tips.listOf(placeId, me == null ? null : me.id()));
+        String meId = me == null ? null : me.id();
+        List<TipService.Card> cards = tips.listOf(placeId, meId);
+
+        /* 읽었다고 표시합니다. 남긴 사람에게 "쓰였다" 고 말해 주려는 것이고,
+           이 목록에는 아무 영향이 없습니다.
+
+           실패해도 목록은 그대로 돌려줍니다. 세는 일 때문에 읽는 일이
+           막히면 앞뒤가 바뀝니다 — PlaceService.announce 가 같은 자리에서
+           같은 판단을 합니다. */
+        try {
+            tips.countViews(placeId, meId);
+        } catch (RuntimeException ignored) {
+            /* 세기만 못 했습니다. 볼 것은 이미 손에 있습니다. */
+        }
+        return Map.of("tips", cards);
     }
 
     /** 여러 장소의 팁 수를 한 번에. 목록에서 "팁 3" 을 띄우는 데 씁니다. */

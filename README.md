@@ -276,7 +276,7 @@ node backend/src/test/http/admin.test.mjs      # 운영자 계정 관리·감사
 node backend/src/test/http/guest.test.mjs      # 계정 없이 어디까지 되는지
 node backend/src/test/http/community.test.mjs  # 글 올리기·복제·링크 미리보기
 node backend/src/test/http/comment.test.mjs    # 댓글과 신고
-node backend/src/test/http/tip.test.mjs        # 장소 팁과 신고
+node backend/src/test/http/tip.test.mjs        # 장소 팁·신고·남긴 한 줄이 쓰인 횟수
 node backend/src/test/http/expense.test.mjs    # 가계부와 정산
 node backend/src/test/http/candidate.test.mjs  # 후보와 투표
 node backend/src/test/http/saved.test.mjs      # 보석함

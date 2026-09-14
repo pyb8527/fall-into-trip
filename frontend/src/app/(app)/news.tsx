@@ -69,25 +69,57 @@ export default function NewsScreen() {
   }
 
   const items = data?.items ?? [];
-  if (items.length === 0) {
-    return (
-      <Screen scroll={false}>
-        <Empty message="아직 온 소식이 없습니다. 동행자가 일정을 고치면 여기에 쌓입니다." />
-      </Screen>
-    );
-  }
 
   return (
     <Screen>
-      <View style={styles.list}>
-        {items.map((item, index) => (
-          <NewsRow key={`${item.kind}-${item.at}-${index}`} item={item} />
-        ))}
-      </View>
-      {/* 30일이라고 미리 말해 둡니다. 어제 것이 안 보이는 날에 고장인지
-          지난 것인지 알 수 있어야 합니다. */}
-      <Caption>지난 30일치입니다.</Caption>
+      {items.length === 0 ? (
+        <Empty message="아직 온 소식이 없습니다. 동행자가 일정을 고치면 여기에 쌓입니다." />
+      ) : (
+        <>
+          <View style={styles.list}>
+            {items.map((item, index) => (
+              <NewsRow key={`${item.kind}-${item.at}-${index}`} item={item} />
+            ))}
+          </View>
+          {/* 30일이라고 미리 말해 둡니다. 어제 것이 안 보이는 날에 고장인지
+              지난 것인지 알 수 있어야 합니다. */}
+          <Caption>지난 30일치입니다.</Caption>
+        </>
+      )}
+      {/* 소식이 하나도 없어도 이 줄은 섭니다. 위 목록과 성격이 달라서입니다 —
+          소식은 읽으면 지나가지만 이것은 사라지지 않고 쌓입니다. */}
+      {data?.mine ? <MineNote tipCount={data.mine.tipCount} viewCount={data.mine.viewCount} /> : null}
     </Screen>
+  );
+}
+
+/**
+ * 내가 남긴 한 줄이 얼마나 쓰였는지.
+ *
+ * <p>한 줄 팁은 이 앱에서 <b>남에게 남기는</b> 거의 유일한 것인데, 남기고
+ * 나면 아무것도 돌아오지 않았습니다. 남긴 사람에게 이 앱은 "한 번 글자를
+ * 넣은 곳" 으로 끝났습니다.
+ *
+ * <p><b>"명" 이 아니라 "번" 입니다.</b> 같은 사람이 다음 주에 그 가게를 다시
+ * 찾아보며 또 읽었다면 그것도 한 번 쓰인 것입니다. 사람 수를 세지 않으면서
+ * "명" 이라고 적으면 아는 것과 다른 말을 하는 것이 됩니다.
+ *
+ * <p>뱃지도 등급도 없습니다. 수를 점수로 바꾸는 순간 수를 올리려는 행동이
+ * 생기고, 그러면 팁 칸이 쓰레기로 찹니다.
+ */
+function MineNote({ tipCount, viewCount }: { tipCount: number; viewCount: number }) {
+  return (
+    <View style={styles.mine}>
+      <Body>
+        {viewCount > 0
+          ? `남긴 한 줄 ${tipCount}개가 ${viewCount}번 쓰였습니다.`
+          : `남긴 한 줄 ${tipCount}개. 아직 읽은 사람이 없습니다.`}
+      </Body>
+      {/* 부풀리지 않습니다. 손님이 읽은 것은 셀 수가 없고(사람 번호가 없어
+          "하루 한 번" 이 성립하지 않습니다), 그것을 안 밝히면 이 수 하나
+          때문에 나머지 화면까지 못 믿게 됩니다. */}
+      <Caption>로그인하고 본 것만 셉니다. 실제로는 더 쓰였을 수 있습니다.</Caption>
+    </View>
   );
 }
 
@@ -177,5 +209,14 @@ const styles = StyleSheet.create({
     height: 7,
     borderRadius: 4,
     backgroundColor: Colors.accent,
+  },
+  /* 목록과 다른 것이라고 눈에 보여야 합니다. 선 한 가닥으로 나눕니다 —
+     이 화면에서 층을 나누는 것은 그림자가 아니라 선입니다. */
+  mine: {
+    gap: 2,
+    marginTop: Spacing.lg,
+    paddingTop: Spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.border,
   },
 });
