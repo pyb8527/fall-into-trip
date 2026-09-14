@@ -36,8 +36,15 @@ public class User {
     @Column(length = 24)
     private String mark;
 
-    /** scrypt 해시. 평문은 어디에도 남기지 않습니다. */
-    @Column(name = "password_hash", nullable = false)
+    /**
+     * scrypt 해시. 평문은 어디에도 남기지 않습니다.
+     *
+     * <p><b>없을 수 있습니다.</b> 구글로만 들어온 사람은 비밀번호를 만든 적이
+     * 없습니다. 그때는 비밀번호로 로그인하는 길이 <b>막혀</b> 있어야 합니다 —
+     * 빈 해시에 빈 비밀번호가 맞아떨어지는 일이 없도록 {@link #hasPassword} 를
+     * 먼저 봅니다.
+     */
+    @Column(name = "password_hash")
     private String passwordHash;
 
     @Enumerated(EnumType.STRING)
@@ -77,5 +84,16 @@ public class User {
 
     public boolean isAdmin() {
         return role == Role.ADMIN;
+    }
+
+    /**
+     * 비밀번호로 들어올 수 있는 계정인가.
+     *
+     * <p>해시를 직접 견주는 자리마다 이것을 먼저 봅니다. 안 보면 해시가
+     * 비어 있을 때 무슨 일이 일어나는지가 암호 라이브러리 사정에 달리게
+     * 됩니다.
+     */
+    public boolean hasPassword() {
+        return passwordHash != null && !passwordHash.isBlank();
     }
 }

@@ -269,6 +269,7 @@ HTTP 로 실제 서버를 두드리는 방식입니다. 서버를 먼저 띄워 
 
 ```bash
 node backend/src/test/http/auth.test.mjs       # 인증·토큰 회전·재사용 감지
+node backend/src/test/http/social.test.mjs     # 구글 로그인 — 울타리
 node backend/src/test/http/invite.test.mjs     # 가입·초대 링크·공동 편집
 node backend/src/test/http/trip.test.mjs       # 여행·날짜·장소·동선 그림
 node backend/src/test/http/copy.test.mjs       # 여행 복제·동선 정리·알림

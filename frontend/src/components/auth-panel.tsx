@@ -5,7 +5,8 @@ import { StyleSheet, View } from 'react-native';
 import { ApiError, UNEXPECTED } from '@/api/client';
 import { useAuth } from '@/auth/auth-provider';
 import { Spacing } from '@/constants/theme';
-import { Body, Button, ErrorNote, Field, Screen, SegmentedTabs, Title } from '@/ui';
+import { GoogleButton } from '@/components/google-button';
+import { Body, Button, Caption, ErrorNote, Field, Screen, SegmentedTabs, Title } from '@/ui';
 import { LogoLockup } from '@/ui/logo';
 
 /** 서버의 AuthService.PASSWORD_MIN 과 같아야 합니다. */
@@ -32,7 +33,7 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
   /* 초대 링크에서 넘어왔다면 로그인 뒤 그리로 돌아가야 합니다.
      띠를 눌러 가입 쪽으로 갈아탈 때도 잃어버리면 안 됩니다. */
   const { next: back } = useLocalSearchParams<{ next?: string }>();
-  const { login, register } = useAuth();
+  const { login, register, signInWithGoogle } = useAuth();
 
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
@@ -51,6 +52,28 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
        뒤로 가야 하면 답답합니다. */
     const to = next === 'login' ? '/(auth)/login' : '/(auth)/register';
     router.replace(back ? `${to}?next=${encodeURIComponent(back)}` : to);
+  }
+
+  /**
+   * 구글이 준 토큰으로 들어옵니다.
+   *
+   * <p>여기서 막히는 가장 흔한 경우가 <b>이미 그 주소로 비밀번호 계정이
+   * 있는 것</b>입니다(409). 서버가 그때 무엇을 해야 하는지까지 적어서
+   * 보내므로 그 문구를 그대로 띄웁니다.
+   */
+  async function withGoogle(credential: string) {
+    if (busy) {
+      return;
+    }
+    setError(null);
+    setBusy(true);
+    try {
+      await signInWithGoogle(credential);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : UNEXPECTED);
+    } finally {
+      setBusy(false);
+    }
   }
 
   /* 비었다고 버튼을 잠그지 않습니다. 브라우저가 자동완성으로 칸을 채울 때
@@ -164,12 +187,48 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
           onPress={submit}
           busy={busy}
         />
+
+        {/*
+          구글로 들어오기.
+
+          비밀번호 칸 아래에 둡니다. 위에 두면 이미 비밀번호로 쓰던 사람이
+          매번 지나쳐야 합니다.
+
+          클라이언트 ID 가 없거나 앱이면 아무것도 안 그려집니다. 그래서
+          여기 "또는" 줄도 단추가 있을 때만 뜨게 묶어 둡니다 — 아래가 비면
+          "또는" 이 아무것도 안 가리킵니다.
+        */}
+        <GoogleBlock onDone={withGoogle} />
       </View>
     </Screen>
   );
 }
 
+/**
+ * 구글 단추와 그 위의 가름 줄.
+ *
+ * <p>단추가 안 그려지는 자리(앱, 또는 서버가 구글을 안 켠 경우)에서는
+ * <b>가름 줄도 안 뜹니다.</b> 아래가 빈 채로 "또는" 만 남으면 무엇이 빠진
+ * 것처럼 보입니다.
+ */
+function GoogleBlock({ onDone }: { onDone: (credential: string) => void }) {
+  const { googleClientId } = useAuth();
+  if (!googleClientId) {
+    return null;
+  }
+  return (
+    <View style={styles.social}>
+      <Caption tone="muted">또는</Caption>
+      <GoogleButton onCredential={onDone} />
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  social: {
+    gap: Spacing.md,
+    alignItems: 'center',
+  },
   brand: {
     alignItems: 'flex-start',
     paddingTop: Spacing.xxl,

@@ -68,6 +68,11 @@ public class SecurityConfig {
                                 "/api/auth/setup",
                                 "/api/auth/register",
                                 "/api/auth/login",
+                                /* 구글 토큰을 들고 옵니다. 로그인 전이라
+                                   열어 두고, 진짜인지는 SocialTokens 가
+                                   서명으로 봅니다. 잇기·끊기는 로그인한
+                                   사람만이라 여기 없습니다. */
+                                "/api/auth/google",
                                 "/api/auth/refresh",
                                 "/api/auth/logout").permitAll()
                         /* 링크를 받은 사람이 가입 전에도 어떤 여행인지 볼 수 있게 합니다.

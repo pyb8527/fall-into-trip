@@ -64,6 +64,7 @@ services:
 
       # 장소 검색을 서버가 대신 합니다. 키가 앱·브라우저로 나가지 않습니다.
       GOOGLE_MAPS_KEY: ${GOOGLE_MAPS_KEY:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
 
       # 서버가 보는 "지금" 과 "오늘".
       #

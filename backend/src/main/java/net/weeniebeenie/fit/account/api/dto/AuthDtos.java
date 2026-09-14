@@ -77,6 +77,27 @@ public final class AuthDtos {
     }
 
     /** 로그인 전에 화면이 무엇을 띄울지 정할 때 씁니다. */
-    public record AuthStateResponse(boolean setupNeeded) {
+    /**
+     * 화면이 뜰 때 서버에 묻는 것.
+     *
+     * @param googleClientId 구글 로그인이 켜져 있으면 그 클라이언트 ID.
+     *                       꺼져 있으면 비어 있고, 그때는 단추를 안 냅니다.
+     *                       <b>빌드에 박지 않고 여기로 내려보냅니다</b> —
+     *                       박아 두면 값을 바꿀 때마다 웹을 다시 구워야
+     *                       하고, 그러면 .env 와 번들이 서로 어긋난 채로
+     *                       도는 날이 옵니다. 비밀이 아니라 브라우저에
+     *                       나가도 되는 값입니다.
+     */
+    public record AuthStateResponse(boolean setupNeeded, String googleClientId) {
+    }
+
+    /**
+     * 남이 준 로그인 토큰.
+     *
+     * <p>{@code @Valid} 를 안 겁니다. 비어 있을 때의 문구를 여기서 만들면
+     * "무엇이 비었는지" 를 알려 주게 되는데, 토큰이 틀린 까닭은 뭉뚱그리는
+     * 것이 이 자리의 규칙입니다({@code SocialTokens}).
+     */
+    public record SocialRequest(String credential) {
     }
 }

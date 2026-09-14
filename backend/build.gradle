@@ -31,6 +31,11 @@ dependencies {
     implementation 'org.flywaydb:flyway-database-postgresql'
     runtimeOnly 'org.postgresql:postgresql'
 
+    /* 남이 발급한 토큰(구글 ID 토큰)을 검증하는 데만 씁니다. JWKS 를 받아
+       캐시하고 키 교체를 따라가는 일을 손으로 짜지 않으려고 답니다 —
+       손으로 짤 것이 암호 검증이면 라이브러리가 맞습니다. */
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
+
     /* JWT — api 만 컴파일 시점에 보이게 두고 구현체는 런타임에 붙인다 */
     implementation "io.jsonwebtoken:jjwt-api:${jjwtVersion}"
     runtimeOnly "io.jsonwebtoken:jjwt-impl:${jjwtVersion}"

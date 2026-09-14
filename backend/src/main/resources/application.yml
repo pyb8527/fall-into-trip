@@ -49,6 +49,18 @@ fit:
     # 비워 두면 검색이 꺼지고 좌표를 직접 넣는 길만 남습니다.
     maps-key: ${GOOGLE_MAPS_KEY:}
 
+  social:
+    google:
+      # 구글로 로그인하기. 브라우저가 받아 온 토큰이 "우리에게 준 것" 인지를
+      # 이 값으로 봅니다 — 안 보면 남의 앱에 발급된 토큰으로 들어옵니다.
+      #
+      # 장소 검색 키와 다른 것입니다. 이쪽은 Google Cloud 콘솔의
+      # "OAuth 2.0 클라이언트 ID"(웹 애플리케이션)이고, 비밀이 아니라
+      # 브라우저에도 나갑니다.
+      #
+      # 비워 두면 구글 로그인이 꺼지고 단추도 안 뜹니다.
+      client-id: ${GOOGLE_CLIENT_ID:}
+
 logging:
   level:
     net.weeniebeenie.fit: INFO

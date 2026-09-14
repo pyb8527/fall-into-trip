@@ -12,6 +12,7 @@ import net.weeniebeenie.fit.account.infrastructure.security.CurrentUser;
 import net.weeniebeenie.fit.account.infrastructure.security.JwtProperties;
 import net.weeniebeenie.fit.account.infrastructure.security.JwtProvider;
 import net.weeniebeenie.fit.account.application.AuthService;
+import net.weeniebeenie.fit.account.application.SocialAuthService;
 import net.weeniebeenie.fit.account.application.RefreshTokenService;
 import net.weeniebeenie.fit.account.api.dto.AuthDtos;
 import net.weeniebeenie.fit.account.api.dto.AuthDtos.*;
@@ -43,6 +44,7 @@ public class AuthController {
     private static final String COOKIE_PATH = "/api/auth";
 
     private final AuthService auth;
+    private final SocialAuthService social;
     private final RefreshTokenService refreshTokens;
     private final UserRepository users;
     private final JwtProvider jwt;
@@ -50,14 +52,25 @@ public class AuthController {
 
     @GetMapping("/state")
     public AuthStateResponse state() {
-        return new AuthStateResponse(auth.setupNeeded());
+        return new AuthStateResponse(auth.setupNeeded(), social.clientId());
     }
 
+    /**
+     * 나.
+     *
+     * <p>{@code hasPassword} 와 {@code providers} 를 함께 내려보냅니다. 설정
+     * 화면이 <b>"비밀번호 바꾸기"</b> 를 띄울지 <b>"비밀번호 만들기"</b> 를
+     * 띄울지 정해야 하고, 구글로만 들어온 사람에게 현재 비밀번호를 물으면
+     * 답할 수가 없습니다.
+     */
     @GetMapping("/me")
     public Map<String, Object> me(@CurrentUser AuthPrincipal me) {
         User user = users.findById(me.id())
                 .orElseThrow(() -> ApiException.unauthorized("로그인이 필요합니다."));
-        return Map.of("user", UserView.of(user));
+        return Map.of(
+                "user", UserView.of(user),
+                "hasPassword", user.hasPassword(),
+                "providers", social.providersOf(user.getId()));
     }
 
     /** 누구나 가입합니다. 가입하면 바로 로그인된 상태가 됩니다. */
@@ -73,6 +86,39 @@ public class AuthController {
                                                HttpServletRequest http) {
         User admin = auth.setup(req.email(), req.name(), req.password(), req.token());
         return withNewSession(admin, http);
+    }
+
+    /**
+     * 구글로 들어옵니다.
+     *
+     * <p>브라우저가 구글에게 받은 ID 토큰을 그대로 보냅니다. 서버가 그것을
+     * 검증하고, <b>지금 로그인과 똑같은 모양</b>으로 세션을 내줍니다 —
+     * 세션을 내주는 자리가 하나라 소셜이 붙어도 규칙이 안 갈라집니다.
+     *
+     * <p>이미 그 주소로 비밀번호 계정이 있으면 409 입니다. 자동으로 잇지
+     * 않습니다 — 그 까닭은 {@link SocialAuthService} 에 적었습니다.
+     */
+    @PostMapping("/google")
+    public ResponseEntity<TokenResponse> google(@RequestBody SocialRequest req,
+                                                HttpServletRequest http) {
+        User user = social.signIn(req == null ? null : req.credential());
+        return withNewSession(user, http);
+    }
+
+    /** 로그인한 사람이 자기 계정에 구글을 잇습니다. */
+    @PostMapping("/link/google")
+    public Map<String, Object> link(@CurrentUser AuthPrincipal me,
+                                    @RequestBody SocialRequest req) {
+        social.link(me.id(), req == null ? null : req.credential());
+        return Map.of("providers", social.providersOf(me.id()));
+    }
+
+    /** 끊습니다. 끊고 나서 들어올 길이 없으면 거절합니다. */
+    @DeleteMapping("/link/{provider}")
+    public Map<String, Object> unlink(@CurrentUser AuthPrincipal me,
+                                      @PathVariable String provider) {
+        social.unlink(me.id(), provider);
+        return Map.of("providers", social.providersOf(me.id()));
     }
 
     @PostMapping("/login")

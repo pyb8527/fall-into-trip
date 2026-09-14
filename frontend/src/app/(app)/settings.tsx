@@ -1,8 +1,9 @@
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { api, ApiError, UNEXPECTED } from '@/api/client';
+import { GoogleButton } from '@/components/google-button';
 import { canNotify, notifyState, turnOff, turnOn } from '@/lib/notify';
 import { useAuth } from '@/auth/auth-provider';
 import { USER_MARKS, markOf } from '@/constants/user-marks';
@@ -69,6 +70,7 @@ export default function Settings() {
 
       <MarkCard />
 
+      <LinkedCard />
       <PasswordCard />
 
       <Card>
@@ -240,6 +242,98 @@ function MarkCard() {
       </Row>
 
       {error ? <ErrorNote message={error} /> : null}
+    </Card>
+  );
+}
+
+/**
+ * 무엇으로 들어오는가.
+ *
+ * <p>비밀번호로 가입해 둔 사람이 <b>구글을 잇는 자리</b>입니다. 구글 로그인
+ * 화면에서 "이미 가입된 주소입니다" 를 받은 사람이 올 곳이 여기라, 없으면
+ * 그 사람은 갈 데가 없습니다.
+ *
+ * <p>끊기는 서버가 막습니다 — 비밀번호가 없고 이어 둔 것이 이것 하나뿐이면
+ * 끊는 순간 자기 계정에서 잠깁니다.
+ */
+function LinkedCard() {
+  const { googleClientId, refreshUser } = useAuth();
+  const [providers, setProviders] = useState<string[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const got = await api.get<{ providers?: string[] }>('/api/auth/me');
+      setProviders(got.providers ?? []);
+    } catch {
+      /* 못 받아 왔으면 이 칸만 안 그립니다. 설정의 나머지는 멀쩡합니다. */
+    }
+  }, []);
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const linked = (providers ?? []).includes('google');
+
+  async function connect(credential: string) {
+    if (busy) {
+      return;
+    }
+    setError(null);
+    setBusy(true);
+    try {
+      const got = await api.post<{ providers: string[] }>('/api/auth/link/google', { credential });
+      setProviders(got.providers);
+      await refreshUser();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : UNEXPECTED);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function disconnect() {
+    if (busy) {
+      return;
+    }
+    setError(null);
+    setBusy(true);
+    try {
+      const got = await api.delete<{ providers: string[] }>('/api/auth/link/google');
+      setProviders(got.providers);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : UNEXPECTED);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /* 서버가 구글을 안 켰으면 이 칸 자체가 뜻이 없습니다. */
+  if (!googleClientId || providers === null) {
+    return null;
+  }
+
+  return (
+    <Card>
+      <Subtitle>구글로 로그인하기</Subtitle>
+      {linked ? (
+        <>
+          <Body small tone="secondary">
+            이어 두었습니다. 다음부터 구글 단추 하나로 들어옵니다.
+          </Body>
+          {error ? <ErrorNote message={error} /> : null}
+          <Button label="끊기" variant="secondary" onPress={disconnect} busy={busy} />
+        </>
+      ) : (
+        <>
+          <Body small tone="secondary">
+            이어 두면 비밀번호를 안 적고 들어옵니다. 비밀번호는 그대로 남습니다.
+          </Body>
+          {error ? <ErrorNote message={error} /> : null}
+          <GoogleButton onCredential={connect} />
+        </>
+      )}
     </Card>
   );
 }

@@ -16,10 +16,19 @@ type AuthContextValue = {
   user: User | null;
   /** 운영자가 아직 없어 최초 설치 화면을 띄워야 하는지. */
   setupNeeded: boolean;
+  /**
+   * 구글 로그인이 켜져 있으면 그 클라이언트 ID.
+   *
+   * <p>빌드에 안 박고 서버가 내려보냅니다 — 박아 두면 값을 바꿀 때마다 웹을
+   * 다시 구워야 하고, 그러면 .env 와 번들이 어긋난 채로 도는 날이 옵니다.
+   * 비어 있으면 단추를 안 냅니다.
+   */
+  googleClientId: string;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, name: string, password: string) => Promise<void>;
   setup: (email: string, name: string, password: string, token: string) => Promise<void>;
   changePassword: (current: string, next: string) => Promise<void>;
+  signInWithGoogle: (credential: string) => Promise<void>;
   logout: () => Promise<void>;
   logoutAll: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -39,6 +48,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [setupNeeded, setSetupNeeded] = useState(false);
+  const [googleClientId, setGoogleClientId] = useState('');
 
   const accept = useCallback((res: TokenResponse) => {
     setAccessToken(res.accessToken);
@@ -87,6 +97,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const state = await request<AuthState>('/api/auth/state', { anonymous: true });
         if (alive) {
           setSetupNeeded(state.setupNeeded);
+          setGoogleClientId(state.googleClientId ?? '');
         }
       } catch {
         /* 서버가 아직 안 떴을 수 있습니다. 로그인 화면에서 다시 시도하게 둡니다. */
@@ -105,6 +116,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(
     async (email: string, password: string) => {
       accept(await api.anon<TokenResponse>('/api/auth/login', { email, password }));
+    },
+    [accept],
+  );
+
+  /**
+   * 구글이 준 토큰으로 들어옵니다.
+   *
+   * <p>받는 자리가 비밀번호 로그인과 같습니다 — 서버가 세션을 똑같은 모양으로
+   * 내주므로 화면은 무엇으로 들어왔는지 몰라도 됩니다.
+   */
+  const signInWithGoogle = useCallback(
+    async (credential: string) => {
+      accept(await api.anon<TokenResponse>('/api/auth/google', { credential }));
     },
     [accept],
   );
@@ -158,6 +182,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       ready,
       user,
       setupNeeded,
+      googleClientId,
+      signInWithGoogle,
       login,
       register,
       setup,
@@ -166,7 +192,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       logoutAll,
       refreshUser,
     }),
-    [ready, user, setupNeeded, login, register, setup, changePassword, logout, logoutAll, refreshUser],
+    [ready, user, setupNeeded, googleClientId, login, register, setup, changePassword, logout,
+     logoutAll, refreshUser, signInWithGoogle],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

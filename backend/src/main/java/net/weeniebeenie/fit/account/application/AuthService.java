@@ -134,8 +134,15 @@ public class AuthService {
         }
 
         User user = users.findByEmail(normalized).orElse(null);
+        /* 비밀번호를 만든 적이 없는 사람(구글로만 들어온 사람)은 여기서
+           막습니다. 해시가 비어 있을 때 무슨 일이 일어나는지를 암호
+           라이브러리 사정에 맡기지 않습니다.
+
+           문구는 그대로 둡니다. "구글로 로그인해 주세요" 라고 알려 주면
+           어느 주소가 소셜 계정인지 확인하는 통로가 됩니다. */
         boolean ok = user != null
                 && !user.isDisabled()
+                && user.hasPassword()
                 && encoder.matches(password == null ? "" : password, user.getPasswordHash());
         if (!ok) {
             attempts.recordFailure(key);
@@ -151,14 +158,17 @@ public class AuthService {
     public void changePassword(String userId, String current, String next) {
         User user = users.findById(userId)
                 .orElseThrow(() -> ApiException.unauthorized("로그인이 필요합니다."));
-        if (!encoder.matches(current == null ? "" : current, user.getPasswordHash())) {
+        boolean had = user.hasPassword();
+        /* 비밀번호를 아직 만든 적이 없으면 지금 만드는 것입니다. 현재 것을
+           물어보면 답할 수가 없습니다 — 구글로만 들어온 사람입니다. */
+        if (user.hasPassword() && !encoder.matches(current == null ? "" : current, user.getPasswordHash())) {
             throw ApiException.badRequest("현재 비밀번호가 올바르지 않습니다.");
         }
         validatePassword(next);
         user.setPasswordHash(encoder.encode(next));
         /* 다른 기기는 모두 내보냅니다. 지금 기기는 호출한 쪽에서 새 토큰을 받습니다. */
         refreshTokens.revokeAllOf(userId);
-        audit.log(userId, "password.change", userId);
+        audit.log(userId, had ? "password.change" : "password.create", userId);
     }
 
     public String issueAccessToken(User user) {
