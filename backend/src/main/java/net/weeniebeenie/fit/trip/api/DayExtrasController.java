@@ -46,7 +46,12 @@ public class DayExtrasController {
     @GetMapping("/route/compare")
     public Map<String, Object> compare(@CurrentUser AuthPrincipal me,
                                        @PathVariable String dayId) {
-        return Map.of("gaps", routes.compare(me, dayId));
+        RouteService.Compared got = routes.compare(me, dayId);
+        Map<String, Object> out = new java.util.HashMap<>();
+        out.put("gaps", got.gaps());
+        /* 대중교통이 하나도 없으면 왜인지 한 줄. 없으면 안 실립니다. */
+        out.put("note", got.note());
+        return out;
     }
 
     /**

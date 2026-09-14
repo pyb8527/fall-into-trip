@@ -197,7 +197,7 @@ public class RouteService {
      * <p>세 수단이 모두 안 되는 구간도 있습니다(몇 백 미터 거리에는 구글이
      * 대중교통을 안 태웁니다). 그런 것은 빼고 되는 것만 내놓습니다.
      */
-    public List<Gap> compare(AuthPrincipal me, String dayId) {
+    public Compared compare(AuthPrincipal me, String dayId) {
         Day day = days.findById(dayId)
                 .orElseThrow(() -> ApiException.notFound("날짜를 찾을 수 없습니다."));
         access.requireCanRead(day.getTripId(), me.id());
@@ -208,11 +208,14 @@ public class RouteService {
 
         List<Place> list = places.findAllByDayIdOrderBySortAsc(dayId);
         if (list.size() < 2) {
-            return List.of();
+            return new Compared(List.of(), null);
         }
 
         int pairs = Math.min(list.size() - 1, MAX_LEGS);
         List<Gap> out = new ArrayList<>(pairs);
+        /* 이 지역에 대중교통 안내가 아예 없는지 보려고 셉니다 — 아래 noteFor. */
+        int longEnough = 0;
+        int transitFound = 0;
 
         for (int i = 0; i < pairs; i++) {
             Place from = list.get(i);
@@ -224,13 +227,71 @@ public class RouteService {
                 if (leg.reachable() && leg.seconds() > 0) {
                     options.add(new Option(mode, leg.seconds(), leg.meters(),
                             leg.polyline(), leg.fare()));
+                    if (mode == Mode.TRANSIT) {
+                        transitFound++;
+                    }
                 }
+            }
+            if (farApart(from, to)) {
+                longEnough++;
             }
             dropSillyWalk(options);
             out.add(new Gap(from.getId(), to.getId(), options,
                     pick(options, true), pick(options, false)));
         }
-        return out;
+        return new Compared(out, noteFor(longEnough, transitFound));
+    }
+
+    /**
+     * 대중교통이 왜 하나도 없는지.
+     *
+     * <h3>왜 말해 줘야 하나</h3>
+     *
+     * <p><b>구글은 일본에 대중교통 길찾기를 API 로 주지 않습니다.</b> 걷기·
+     * 자전거·차는 주고 대중교통만 안 줍니다. 구글 지도 앱에 나오는 것은
+     * 라이선스가 다릅니다. 그래서 오류가 아니라 <b>빈 답</b>이 옵니다.
+     *
+     * <p>그동안 우리는 그것을 조용히 지웠습니다. 그래서 쓰는 사람은 <b>앱이
+     * 고장 난 줄</b> 알았습니다 — 구글 지도에는 나오는 스카이라이너가 여기는
+     * 없으니까요.
+     *
+     * <p>모르는 것을 아는 척하지 않는 것만큼, <b>아는 것을 말하지 않는 것도
+     * 틀린 일</b>입니다.
+     *
+     * <h3>어떻게 가리는가</h3>
+     *
+     * <p>구간 하나가 비는 것은 흔합니다 — 몇백 미터에 전철이 없는 것은 맞는
+     * 답입니다. 그래서 <b>전철을 탈 만한 구간이 있는데 그중 하나도 안
+     * 나왔을 때</b>만 말합니다.
+     *
+     * @param longEnough  전철을 탈 만큼 떨어진 구간의 수
+     * @param transitFound 실제로 대중교통이 나온 구간의 수
+     */
+    static String noteFor(int longEnough, int transitFound) {
+        if (longEnough == 0 || transitFound > 0) {
+            return null;
+        }
+        return "이 지역은 구글이 대중교통 길찾기를 내주지 않습니다. "
+                + "구글 지도 앱에서는 보이지만 다른 앱으로는 가져올 수 없는 자리입니다.";
+    }
+
+    /**
+     * 전철을 탈 만큼 떨어져 있는가.
+     *
+     * <p>몇백 미터 사이에 대중교통이 없는 것은 <b>맞는 답</b>입니다. 그런
+     * 구간까지 세면 짧은 구간만 있는 하루가 "이 지역은 대중교통이 없다" 로
+     * 잘못 읽힙니다.
+     */
+    static boolean farApart(Place from, Place to) {
+        return new Coordinates(from.getLat(), from.getLng())
+                .metersTo(new Coordinates(to.getLat(), to.getLng())) >= TRANSIT_WORTH_ASKING;
+    }
+
+    /** 이만큼 떨어져 있으면 대중교통이 있을 만합니다. */
+    private static final int TRANSIT_WORTH_ASKING = 2000;
+
+    /** 사이사이와, 왜 대중교통이 없는지 한 줄. */
+    public record Compared(List<Gap> gaps, String note) {
     }
 
     /**

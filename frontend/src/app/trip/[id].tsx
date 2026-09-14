@@ -557,16 +557,28 @@ export default function TripScreen() {
     구글에 묻게 되어 요금이 감당이 안 됩니다. 한 날을 펼쳤을 때만입니다.
   */
   const {
-    data: gaps,
+    data: compared,
     loading: gapping,
     error: gapError,
-  } = useAsync<Gap[]>(
+  } = useAsync<{ gaps: Gap[]; note?: string | null }>(
     (signal) =>
       dayId
-        ? api.get<{ gaps: Gap[] }>(`/api/days/${dayId}/route/compare`, signal).then((r) => r.gaps)
-        : Promise.resolve([]),
+        ? api.get<{ gaps: Gap[]; note?: string | null }>(
+            `/api/days/${dayId}/route/compare`,
+            signal,
+          )
+        : Promise.resolve({ gaps: [], note: null }),
     [dayId, daySeq],
   );
+  const gaps = compared?.gaps ?? null;
+  /*
+    대중교통이 하나도 안 나온 까닭.
+
+    구글은 일본에 대중교통 길찾기를 API 로 주지 않습니다. 그래서 조용히
+    비워 두면 쓰는 사람은 앱이 고장 난 줄 압니다 — 구글 지도에는 나오는
+    전철이 여기만 없으니까요. 서버가 판단해서 한 줄로 보냅니다.
+  */
+  const gapNote = compared?.note ?? null;
 
   /**
    * 구간마다 어느 수단으로 볼지.
@@ -1229,6 +1241,7 @@ export default function TripScreen() {
               onChanged={refresh}
               onRemove={remove}
               gapAfter={gapAfter}
+              gapNote={gapNote}
               chosenOf={chosenOf}
               onPick={(fromId, mode) => setPicked((p) => ({ ...p, [fromId]: mode }))}
               infoOf={infoOf}
@@ -1518,6 +1531,7 @@ function DayCard({
   onChanged,
   onRemove,
   gapAfter,
+  gapNote,
   chosenOf,
   onPick,
   infoOf,
@@ -1542,6 +1556,8 @@ function DayCard({
   onRemove: (placeId: string) => void;
   /** 이 장소를 떠나 다음 장소로 가는 구간. "전체" 를 볼 때는 비어 있습니다. */
   gapAfter: Map<string, Gap>;
+  /** 대중교통이 하나도 안 나온 까닭. 없으면 비어 있습니다. */
+  gapNote: string | null;
   chosenOf: (gap: Gap) => GapOption | null;
   onPick: (fromId: string, mode: TravelMode) => void;
   /** 장소별 영업시간 등. 좌표만 직접 넣은 곳에는 없습니다. */
@@ -1950,6 +1966,19 @@ function DayCard({
               ))}
             </View>
           )}
+
+          {/*
+            대중교통이 하나도 안 나왔을 때 왜인지.
+
+            조용히 비워 두면 쓰는 사람은 앱이 고장 난 줄 압니다 — 구글 지도
+            에는 나오는 전철이 여기만 없으니까요. 모르는 것을 아는 척하지
+            않는 것만큼, 아는 것을 말하지 않는 것도 틀린 일입니다.
+
+            판단은 서버가 합니다. 짧은 구간만 있는 하루를 "이 지역은 대중교통이
+            없다" 로 읽으면 안 되는데, 그 셈은 구간을 다 가진 쪽이 해야
+            맞습니다.
+          */}
+          {gapNote ? <Caption tone="secondary">{gapNote}</Caption> : null}
 
           {/* 영업시간과 평점은 구글에서 온 것이라 어디서 왔는지 밝혀야 합니다.
               약관 의무라 지우면 안 됩니다. */}
