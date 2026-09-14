@@ -3,12 +3,12 @@ import { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { api } from '@/api/client';
-import type { News, TripSummary } from '@/api/types';
+import type { News, Place, TripDetail, TripSummary } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
 import { Spacing } from '@/constants/theme';
 import type { Countdown } from '@/lib/countdown';
-import { countdownIsNear, countdownLabel, countdownOf } from '@/lib/countdown';
+import { countdownIsNear, countdownLabel, countdownOf, todayIso } from '@/lib/countdown';
 import {
   Badge,
   Button,
@@ -62,6 +62,7 @@ export default function Home() {
   */
   const { data: news } = useAsync<News>((signal) => api.get('/api/news', signal), []);
 
+
   /*
     가장 가까운 여행 하나.
 
@@ -82,6 +83,49 @@ export default function Home() {
     rows.sort((a, b) => (a.trip.startIso ?? '').localeCompare(b.trip.startIso ?? ''));
     return rows[0] ?? null;
   }, [mine]);
+
+  /*
+    길 위에 있으면 오늘이 어떻게 돼 가는지.
+
+    <p>여행 중일 때만 한 번 더 부릅니다. 목록(`/api/trips`)에는 장소가 없고,
+    여행 중인 사람은 하루에 여러 번 여는데 그때 알고 싶은 것이 정확히
+    "다음 어디" 입니다. 여행 중이 아니면 한 번도 안 부릅니다.
+
+    <p>실패해도 조용히 넘어갑니다. 이것 때문에 홈이 멈추면 여행 안 가는
+    사람까지 느려집니다.
+  */
+  const goingId = next?.at.kind === 'going' ? next.trip.id : null;
+  const { data: today } = useAsync<TripDetail | null>(
+    (signal) =>
+      goingId
+        ? api.get(`/api/trip?trip=${encodeURIComponent(goingId)}`, signal)
+        : Promise.resolve(null),
+    [goingId],
+  );
+
+  /*
+    오늘 남은 것.
+
+    <p>여기서 세는 것은 <b>오늘 하루</b>입니다. 여행 전체의 진행률이 아닙니다 —
+    길 위에서 궁금한 것은 "앞으로 며칠 남았나" 가 아니라 "이따 어디 가나"
+    입니다.
+
+    <p>오늘 날짜에 해당하는 날이 없으면(여행 사이에 빈 날) 비웁니다. 그때는
+    카드가 지금까지처럼 제목만 말합니다.
+  */
+  const road = useMemo(() => {
+    if (!today) {
+      return null;
+    }
+    const iso = todayIso();
+    const day = today.days.find((d) => d.iso === iso) ?? null;
+    if (!day || day.places.length === 0) {
+      return null;
+    }
+    const stamped = new Set(today.visited);
+    const left = day.places.filter((p) => !stamped.has(p.id));
+    return { next: left[0] ?? null, left: left.length, total: day.places.length };
+  }, [today]);
 
   return (
     <Screen safeTop>
@@ -186,40 +230,77 @@ export default function Home() {
         덤으로 여행을 다 지운 사람에게도 맞는 안내가 됩니다.
       */}
       {mine && mine.trips.length === 0 ? <FirstSteps /> : null}
-      {next ? <NextTrip trip={next.trip} at={next.at} /> : null}
+      {next ? <NextTrip trip={next.trip} at={next.at} road={road} /> : null}
     </Screen>
   );
 }
 
 /**
- * 다음 여행까지 며칠.
+ * 다음 여행까지 며칠 — 그리고 길 위에 있으면, 지금 어떻게 돼 가는지.
  *
  * <p>세는 일은 <code>lib/countdown</code> 이 합니다. 여행 목록의 뱃지와
  * 같은 답을 써야 해서입니다 — 두 화면이 다른 날짜를 말하면 어느 쪽이
  * 맞는지 알 수 없습니다.
  *
- * <p>누르면 그 여행의 일정으로 갑니다. 여행 중이면 일정 화면이 알아서
- * 오늘 날짜를 펼쳐 줍니다(<code>trip/[id].tsx</code>).
+ * <h3>여행이 시작되면 가는 곳이 달라집니다</h3>
+ *
+ * <p>전에는 이 줄이 "지금 그 길 위" 라고 <b>적어 놓고</b> 일정을 짜는
+ * 화면을 열었습니다. 앱이 길 위인 것을 알면서 짜는 도구를 내민 셈입니다.
+ *
+ * <p>길 위에서 보라고 만든 화면이 이미 있습니다 —
+ * <code>travel/[id].tsx</code>, 스탬프첩입니다. 지금 갈 곳 하나만 크게
+ * 놓고 길찾기와 다녀옴만 남깁니다. 여행 중에는 그쪽을 엽니다.
+ *
+ * <p><b>짜는 화면을 막지는 않습니다.</b> 길 위에서도 일정은 고칩니다 — 비가
+ * 와서 하나 빼는 일이 실제로 벌어집니다. 스탬프첩 오른쪽 위에 "일정 전체"
+ * 가 늘 있습니다. 바뀌는 것은 <b>무엇이 먼저 열리는가</b>뿐입니다.
+ *
+ * @param road 오늘 남은 것. 여행 중이 아니거나 오늘에 해당하는 날이 없으면
+ *             비어 있고, 그때는 지금까지처럼 제목만 말합니다
  */
-function NextTrip({ trip, at }: { trip: TripSummary; at: Countdown }) {
+function NextTrip({
+  trip,
+  at,
+  road,
+}: {
+  trip: TripSummary;
+  at: Countdown;
+  road: { next: Place | null; left: number; total: number } | null;
+}) {
   const router = useRouter();
+  const going = at.kind === 'going';
+
+  /* 길 위에서 궁금한 것은 "이따 어디 가나" 한 줄입니다. 다 찍었으면 그것도
+     말해 줍니다 — 남은 것이 없다는 것도 답입니다. */
+  const line = !road
+    ? null
+    : road.next
+      ? `다음 · ${road.next.name}`
+      : `오늘 ${road.total}곳 다 찍었습니다`;
 
   return (
     <Rise order={5}>
       <Press
-        onPress={() => router.push(`/trip/${trip.id}`)}
-        accessibilityLabel={`${trip.title} — ${countdownLabel(at)}`}>
+        onPress={() =>
+          going
+            ? router.push({ pathname: '/travel/[id]', params: { id: trip.id } })
+            : router.push(`/trip/${trip.id}`)
+        }
+        accessibilityLabel={`${trip.title} — ${countdownLabel(at)}${line ? `, ${line}` : ''}`}>
         <Card>
           <Row style={styles.nextRow}>
             <View style={styles.grow}>
               {/* 무엇에 대한 줄인지 먼저 말합니다. 제목만 있으면 이것이
                   다음 여행인지 방금 본 여행인지 알 수 없습니다. */}
-              <Caption tone="secondary">{at.kind === 'going' ? '지금 그 길 위' : '다음 여행'}</Caption>
+              <Caption tone="secondary">{going ? '지금 그 길 위' : '다음 여행'}</Caption>
               <Subtitle>{trip.title}</Subtitle>
+              {/* 아직 안 받아 왔으면 아무 줄도 안 둡니다. 자리만 잡아 두면
+                  카드가 한 번 흔들립니다. */}
+              {line ? <Caption>{line}</Caption> : null}
             </View>
             <Badge
-              label={countdownLabel(at)}
-              tone={at.kind === 'going' ? 'success' : countdownIsNear(at) ? 'accent' : 'muted'}
+              label={going && road ? `${road.left}곳 남음` : countdownLabel(at)}
+              tone={going ? 'success' : countdownIsNear(at) ? 'accent' : 'muted'}
             />
           </Row>
         </Card>

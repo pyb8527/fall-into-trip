@@ -40,7 +40,7 @@ import { PlaceDetailSheet, type Looked } from '@/components/place-detail-sheet';
 import { PlaceSearch } from '@/components/place-search';
 import { RecommendSheet } from '@/components/recommend-sheet';
 import { openDirections } from '@/lib/directions';
-import { ago } from '@/lib/countdown';
+import { ago, todayIso } from '@/lib/countdown';
 import type { Booking } from '@/lib/intent-types';
 import { canParseBookingHere, intentState, parseBooking } from '@/lib/intent';
 import { canKeep, keepTrip, keepTripMap, keptAgo, keptTrip, keptTripMap } from '@/lib/keep';
@@ -409,6 +409,18 @@ export default function TripScreen() {
   /* 매 렌더마다 새 배열이 되면 이것을 보는 useMemo·useEffect 가 전부 매번 다시
      돕니다. 서버를 부르는 것이 끼어 있으면 요청이 끝없이 나갑니다. */
   const days = useMemo(() => data?.days ?? [], [data]);
+
+  /**
+   * 지금 이 여행 위에 있는가.
+   *
+   * <p>오늘이 이 여행의 날 중 하나이면 그렇습니다. <b>날짜로만 봅니다</b> —
+   * 어디에 서 있는지로 판단하면 자취를 쌓는 일이 되고, 그건 이 앱이 안
+   * 하기로 한 것입니다.
+   *
+   * <p>이 값으로 "길 위에서" 단추를 앞으로 당깁니다. 화면을 잠그거나 무엇을
+   * 막지는 않습니다.
+   */
+  const onTrip = useMemo(() => days.some((d) => d.iso === todayIso()), [days]);
 
   /**
    * 여행 중이면 오늘을 펼쳐 놓고 시작합니다.
@@ -1137,19 +1149,43 @@ export default function TripScreen() {
           줄도 모르고 지나갔습니다. 판을 열면 바로 보이는 자리로 올립니다.
         */}
         <Row gap={Spacing.xs} style={styles.shortcuts}>
+          {/*
+            길 위에서는 짜는 화면이 방해입니다. 지금 갈 곳만 크게 보는 쪽으로
+            넘어갑니다.
+
+            오늘이 이 여행의 날 중 하나면 맨 앞에 둡니다. 그날 이 화면에서
+            가장 먼저 누를 것이 그것입니다. 아니면 하던 자리(검색 다음)에
+            그대로 둡니다 — 짜는 동안에는 자주 쓸 것이 아닙니다.
+
+            이름이 "스탬프 찍기" 였습니다. 나머지가 전부 자리나 물건인데
+            (투표장·챙길 것·가계부·추억) 이것만 손짓이라, 어디로 가는
+            단추인지 안 읽혔습니다. 앱이 이미 쓰는 말로 바꿉니다 — 홈이
+            "지금 그 길 위" 라고 적고 있습니다.
+
+            그림도 바꿉니다. 체크 표시는 "챙길 것" 이 쓰고 있어서 둘이
+            같았고, 그 화면이 일부러 피한 것이 바로 그 읽힘입니다 —
+            "들르는 것은 처리한 일이 아니라 갔다 온 자리".
+          */}
+          {onTrip ? (
+            <Shortcut
+              icon="flag"
+              label="길 위에서"
+              onPress={() => router.push({ pathname: '/travel/[id]', params: { id } })}
+            />
+          ) : null}
           {/* 갈 곳의 이름을 알아야만 넣을 수 있었습니다. "비 올 때 갈 만한
               실내" 는 적을 데가 없어서, 블로그를 뒤져 이름을 알아낸 다음에야
               여기로 돌아와야 했습니다. */}
           {canEdit ? (
             <Shortcut icon="search" label="어디 갈까" onPress={() => setAsking(true)} />
           ) : null}
-          {/* 길 위에서는 짜는 화면이 방해입니다. 지금 갈 곳만 크게 보는 쪽으로
-              넘어갑니다. */}
-          <Shortcut
-            icon="check"
-            label="스탬프 찍기"
-            onPress={() => router.push({ pathname: '/travel/[id]', params: { id } })}
-          />
+          {onTrip ? null : (
+            <Shortcut
+              icon="flag"
+              label="길 위에서"
+              onPress={() => router.push({ pathname: '/travel/[id]', params: { id } })}
+            />
+          )}
           {/* 아직 정하지 않은 곳은 일정이 아니라 여기에 모입니다. */}
           <Shortcut
             icon="star"
@@ -2531,13 +2567,6 @@ function fareText(fare: Money | null) {
     VND: '₫',
   };
   return `${sign[fare.currency] ?? ''}${fare.amount.toLocaleString()}`;
-}
-
-/** 오늘 날짜를 여행의 iso 와 같은 모양으로. */
-function todayIso() {
-  const now = new Date();
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }
 
 /** "1시간 12분" 처럼. 초는 버립니다 — 이동 시간에서 초는 뜻이 없습니다. */

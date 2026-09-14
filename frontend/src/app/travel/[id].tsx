@@ -15,6 +15,7 @@ import type { Day, DayRoute, Place, PlaceInfo, RouteLeg, TripDetail } from '@/ap
 import { useAsync } from '@/api/use-async';
 import { iconOf } from '@/constants/place-icons';
 import { Colors, dayColor, Gutter, Motion, Radius, Spacing } from '@/constants/theme';
+import { todayIso } from '@/lib/countdown';
 import { openDirections } from '@/lib/directions';
 import {
   Body,
@@ -558,12 +559,6 @@ function stampDate(iso: string) {
  */
 function withInk(color: string) {
   return `${color}14`;
-}
-
-function todayIso() {
-  const now = new Date();
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }
 
 const STAMP = 132;
