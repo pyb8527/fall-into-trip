@@ -559,9 +559,21 @@ public class RouteService {
                   왜 비었는지 뒤에서 알아볼 수 있게 남깁니다. 조용히 넘기면
                   키 문제인지 거리 문제인지 구별할 방법이 없습니다.
                 */
-                log.info("경로가 비었습니다: mode={} {},{} -> {},{} 응답={}",
+                /*
+                  <b>무엇을 물었는지도 함께 남깁니다.</b>
+
+                  <p>전에는 응답만 남겼습니다. 그래서 빈 답이 왔을 때 "구글이
+                  없다고 한 것" 까지는 알아도 <b>우리가 뭘 물었는지</b>를 알
+                  방법이 없었습니다. 도쿄 한복판 4km 에 전철이 없다고 나올
+                  때 의심해야 하는 것은 답이 아니라 질문입니다.
+
+                  <p>키는 안 남깁니다 — 몸통에 없습니다. 좌표는 이미 위에
+                  찍히고 있고, 그 좌표는 사람이 일정에 스스로 넣은 자리라
+                  자취가 아닙니다.
+                 */
+                log.info("경로가 비었습니다: mode={} {},{} -> {},{} | 물은 것={} | 받은 것={}",
                         mode, from.getLat(), from.getLng(), to.getLat(), to.getLng(),
-                        res == null ? "null" : res.toString());
+                        body, res == null ? "null" : res.toString());
                 return Leg.unreachable(from.getId(), to.getId());
             }
 
