@@ -12,17 +12,20 @@ import { Spacing } from '@/constants/theme';
 import type { Comeback } from '@/lib/comeback';
 import {
   Body,
+  BottomSheet,
   Button,
   Caption,
   Card,
   Chip,
+  Divider,
   Empty,
   ErrorNote,
-  Field,
+  FilterChip,
   Loading,
   Pager,
   Row,
   Screen,
+  SearchField,
   SegmentedTabs,
   Split,
   Subtitle,
@@ -88,8 +91,30 @@ export default function Community() {
     [],
   );
 
+  /** 조건 고르는 판을 열어 두었는지. */
+  const [sifting, setSifting] = useState(false);
+
+  /**
+   * 지금 걸려 있는 것들.
+   *
+   * <p>밖에 내놓을 것과 개수를 여기서 한 번에 셉니다. 화면 여기저기서
+   * {@code region !== null} 을 따로 세면 한 군데를 빠뜨렸을 때 개수와
+   * 실제가 어긋납니다.
+   */
+  const picked: { key: string; label: string; clear: () => void }[] = [
+    q !== '' ? { key: 'q', label: `"${q}"`, clear: () => { setTyped(''); setQ(''); } } : null,
+    region !== null ? { key: 'region', label: region, clear: () => setRegion(null) } : null,
+    days !== null
+      ? {
+          key: 'days',
+          label: DAYS.find((d) => d.value === days)?.label ?? '기간',
+          clear: () => setDays(null),
+        }
+      : null,
+  ].filter(Boolean) as { key: string; label: string; clear: () => void }[];
+
   /** 무엇으로든 거르고 있는지. 아무것도 안 걸렸을 때만 안내를 띄웁니다. */
-  const filtered = q !== '' || region !== null || days !== null;
+  const filtered = picked.length > 0;
 
   const { data, error, loading, reload, setData } = useAsync<PostPage>(
     (signal) =>
@@ -148,76 +173,103 @@ export default function Community() {
         }}
       />
 
-      {/* 내 글에는 거르기를 두지 않습니다. 몇 개 안 되는 것을 또 거를 이유가
-          없고, 서버도 내 글에는 조건을 받지 않습니다. */}
+      {/*
+        조건은 판 안에 둡니다.
+
+        전에는 지역 아홉 개와 기간 넷이 늘 펼쳐져 있었습니다. 칩 열셋이면
+        좁은 폰에서 석 줄이고, 그 위에 찾기 칸과 띠까지 있으니 <b>정작 보러
+        온 목록이 늘 화면 밖에서 시작했습니다.</b>
+
+        고를 수 있는 것은 판 안으로 넣고, 밖에는 <b>지금 걸려 있는 것</b>만
+        남깁니다. 대개 하나나 둘이고, 아무것도 안 걸렸으면 한 줄도 안 먹습니다.
+      */}
       {PRIVATE.includes(view) ? null : (
         <View style={styles.filters}>
-          {/* 돋보기는 칸 안 오른쪽 끝에 붙입니다. 아래에 따로 두면 둘이 한
-              벌로 안 읽히고 세로로만 길어집니다. */}
-          <Field
+          <SearchField
             label="찾기"
             value={typed}
             onChangeText={setTyped}
             placeholder="도쿄, 온천, 아이와 함께"
-            returnKeyType="search"
-            onSubmitEditing={() => refilter(() => setQ(typed.trim()))}
-            action={{
-              icon: 'search',
-              label: '찾기',
-              onPress: () => refilter(() => setQ(typed.trim())),
-            }}
+            onSearch={() => refilter(() => setQ(typed.trim()))}
           />
-          {q ? (
-            <Row gap={Spacing.sm}>
+
+          <Split>
+            <Row gap={Spacing.xs} style={styles.applied}>
               <Button
-                label={`"${q}" 지우기`}
-                variant="ghost"
+                label={picked.length > 0 ? `조건 ${picked.length}` : '조건'}
+                variant="secondary"
                 compact
-                onPress={() =>
-                  refilter(() => {
-                    setTyped('');
-                    setQ('');
-                  })
-                }
+                onPress={() => setSifting(true)}
               />
+              {picked.map((p) => (
+                <FilterChip key={p.key} label={p.label} onRemove={() => refilter(p.clear)} />
+              ))}
             </Row>
-          ) : null}
-
-          <Row gap={Spacing.xs}>
-            <Chip
-              label="어디든"
-              selected={region === null}
-              onPress={() => refilter(() => setRegion(null))}
-            />
-            {regionList?.regions.map((r) => (
-              <Chip
-                key={r}
-                label={r}
-                selected={region === r}
-                onPress={() => refilter(() => setRegion(region === r ? null : r))}
-              />
-            ))}
-          </Row>
-
-          <Row gap={Spacing.xs}>
-            <Chip
-              label="며칠이든"
-              selected={days === null}
-              onPress={() => refilter(() => setDays(null))}
-            />
-            {DAYS.map((d) => (
-              <Chip
-                key={d.value}
-                label={d.label}
-                selected={days === d.value}
-                onPress={() => refilter(() => setDays(days === d.value ? null : d.value))}
-              />
-            ))}
-          </Row>
-
-          {data ? <Caption tone="secondary">{data.total.toLocaleString()}개</Caption> : null}
+            {data ? <Caption tone="secondary">{data.total.toLocaleString()}개</Caption> : null}
+          </Split>
         </View>
       )}
+
+      <BottomSheet
+        visible={sifting}
+        title="조건"
+        onClose={() => setSifting(false)}
+        footer={
+          picked.length > 0 ? (
+            <Button
+              label="조건 모두 지우기"
+              variant="secondary"
+              onPress={() =>
+                refilter(() => {
+                  setRegion(null);
+                  setDays(null);
+                  setTyped('');
+                  setQ('');
+                })
+              }
+            />
+          ) : undefined
+        }>
+        <Body small strong>
+          어디
+        </Body>
+        <Row gap={Spacing.xs} style={styles.applied}>
+          <Chip
+            label="어디든"
+            selected={region === null}
+            onPress={() => refilter(() => setRegion(null))}
+          />
+          {regionList?.regions.map((r) => (
+            <Chip
+              key={r}
+              label={r}
+              selected={region === r}
+              onPress={() => refilter(() => setRegion(region === r ? null : r))}
+            />
+          ))}
+        </Row>
+
+        <Divider />
+
+        <Body small strong>
+          며칠
+        </Body>
+        <Row gap={Spacing.xs} style={styles.applied}>
+          <Chip
+            label="며칠이든"
+            selected={days === null}
+            onPress={() => refilter(() => setDays(null))}
+          />
+          {DAYS.map((d) => (
+            <Chip
+              key={d.value}
+              label={d.label}
+              selected={days === d.value}
+              onPress={() => refilter(() => setDays(days === d.value ? null : d.value))}
+            />
+          ))}
+        </Row>
+      </BottomSheet>
 
       {loading && !data ? <Loading /> : null}
       {error ? <ErrorNote message={error} onRetry={reload} /> : null}
@@ -303,7 +355,10 @@ function PostRow({
 
 const styles = StyleSheet.create({
   filters: {
-    gap: Spacing.sm,
+    gap: Spacing.md,
+  },
+  applied: {
+    flexWrap: 'wrap',
   },
   tap: {
     gap: Spacing.xs,

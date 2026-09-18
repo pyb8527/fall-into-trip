@@ -974,6 +974,40 @@ export function ChoiceTile({
   );
 }
 
+/**
+ * 지금 걸려 있는 조건 하나. 누르면 풀립니다.
+ *
+ * <h3>왜 칩과 다른가</h3>
+ *
+ * <p>{@link Chip} 은 <b>고를 수 있는 것</b>을 늘어놓습니다 — 아홉 개가 있으면
+ * 아홉 개가 다 서 있어야 무엇을 고를 수 있는지 알 수 있습니다.
+ *
+ * <p>이것은 <b>이미 고른 것</b>입니다. 고른 것만 서 있으면 되고, 대개 하나나
+ * 둘입니다. 그래서 고르는 자리는 판 안으로 들어가고 밖에는 이것만 남습니다.
+ * 아홉 개가 늘 펼쳐져 있으면, 정작 보러 온 목록이 늘 화면 밖에서 시작합니다.
+ *
+ * <p>누르면 풀립니다. 조건 하나를 빼려고 판을 다시 열게 하지 않습니다.
+ */
+export function FilterChip({
+  label,
+  onRemove,
+}: {
+  label: string;
+  onRemove: () => void;
+}) {
+  return (
+    <Press
+      onPress={onRemove}
+      accessibilityLabel={`${label} 조건 빼기`}
+      hitSlop={Tap.compactSlop}
+      scale={0.93}
+      style={styles.filterChip}>
+      <Text style={styles.filterChipLabel}>{label}</Text>
+      <Icon name="x" size={13} tone="brand" />
+    </Press>
+  );
+}
+
 /** 상태를 한눈에 보여 주는 작은 표식. 누르는 것이 아닙니다. */
 export function Badge({ label, tone = 'muted' }: { label: string; tone?: Tone }) {
   return (
@@ -2168,6 +2202,22 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     shadowOffset: { width: 0, height: 1 },
     elevation: 2,
+  },
+  filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    height: Tap.compact,
+    paddingHorizontal: Spacing.md,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.accentSoft,
+    borderWidth: 1,
+    borderColor: Colors.accent,
+  },
+  filterChipLabel: {
+    ...Type.caption,
+    fontWeight: Weight.bold,
+    color: Colors.accentInk,
   },
   /* 고른 것은 굵기로도 말합니다. 옅은 물만으로는 한 단이 모자랍니다. */
   chipLabelOn: {
