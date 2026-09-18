@@ -23,6 +23,7 @@ import {
   IconButton,
   ListRow,
   Loading,
+  Mark,
   Row,
   Screen,
   SearchField,
@@ -114,7 +115,8 @@ export default function Vote() {
         <Card key={candidate.id}>
           <Split align="start" gap={Spacing.md}>
             <View style={styles.grow}>
-              <Subtitle>{`${iconOf(candidate.icon)} ${candidate.name}`.trim()}</Subtitle>
+              <Mark emoji={iconOf(candidate.icon)} fallback="★" />
+              <Subtitle>{candidate.name}</Subtitle>
               {candidate.note || candidate.cat ? (
                 <Caption tone="secondary">{candidate.note ?? candidate.cat}</Caption>
               ) : null}
@@ -275,7 +277,8 @@ function AddSheet({
             .map((place) => (
             <ListRow
               key={place.id}
-              title={`${iconOf(place.icon)} ${place.name}`.trim()}
+              title={place.name}
+              left={<Mark emoji={iconOf(place.icon)} fallback="★" />}
               subtitle={place.note ?? place.cat ?? '메모 없음'}
               onPress={() => add({ savedId: place.id })}
             />

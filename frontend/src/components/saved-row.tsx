@@ -4,7 +4,13 @@ import type { SavedPlace } from '@/api/types';
 import { iconOf, labelOf } from '@/constants/place-icons';
 import { Colors, Radius, Spacing, Tap } from '@/constants/theme';
 import { savedAgo } from '@/lib/saved';
-import { Body, Caption, Checkbox, Press } from '@/ui';
+import {
+  Body,
+  Caption,
+  Checkbox,
+  Mark,
+  Press,
+} from '@/ui';
 
 /** 그림을 아직 안 고른 곳. 지도에서도 별로 찍힙니다. */
 const STAR = '⭐';
@@ -84,9 +90,7 @@ export function SavedRow({
         }
         accessibilityState={picking ? { selected: on } : undefined}
         style={styles.body}>
-        <View style={styles.mark}>
-          <Body style={styles.emoji}>{iconOf(place.icon) || STAR}</Body>
-        </View>
+        <Mark emoji={iconOf(place.icon)} fallback={STAR} active={on} />
         <View style={styles.text}>
           <Body strong numberOfLines={1}>
             {place.name}
@@ -135,18 +139,6 @@ const styles = StyleSheet.create({
     minHeight: Tap.min,
     paddingVertical: Spacing.sm,
     paddingLeft: Spacing.md,
-  },
-  mark: {
-    width: 36,
-    height: 36,
-    borderRadius: Radius.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.fill,
-  },
-  emoji: {
-    /* 이모지는 글꼴이 제 높이를 갖고 있어, 줄 높이를 두면 아래로 처집니다. */
-    lineHeight: undefined,
   },
   text: {
     flex: 1,

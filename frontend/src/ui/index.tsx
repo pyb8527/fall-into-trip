@@ -319,16 +319,20 @@ export function Card({ children, style, ...rest }: ViewProps) {
 export function ListRow({
   title,
   subtitle,
+  left,
   right,
   onPress,
 }: {
   title: React.ReactNode;
   subtitle?: React.ReactNode;
+  /** 제목 앞에 서는 것. 갈래를 나타내는 {@link Mark} 가 대개 옵니다. */
+  left?: React.ReactNode;
   right?: React.ReactNode;
   onPress: () => void;
 }) {
   return (
     <Press onPress={onPress} scale={0.985} style={styles.listRow}>
+      {left}
       <View style={styles.listRowText}>
         <Text style={styles.listRowTitle} numberOfLines={1}>
           {title}
@@ -971,6 +975,49 @@ export function ChoiceTile({
         </Text>
       ) : null}
     </Press>
+  );
+}
+
+/**
+ * 갈래를 나타내는 그림 한 칸.
+ *
+ * <h3>아이콘 체계가 둘입니다</h3>
+ *
+ * <p>화면에는 선으로 그린 UI 아이콘(Feather)과 이모지가 같이 삽니다. 섞여
+ * 있으면 어설퍼 보이는데, 그렇다고 이모지를 걷을 수도 없습니다 — Feather
+ * 287개를 뒤져도 온천·초밥·라멘·신사는 없습니다. 그쪽은 도구를 그리는
+ * 세트이지 갈래를 그리는 세트가 아닙니다.
+ *
+ * <p>그래서 걷는 대신 <b>가릅니다.</b> 선 아이콘은 <b>누르는 것</b>이고
+ * 이모지는 <b>그 곳이 무엇인가</b>입니다. 뜻이 다르니 사는 자리도 다릅니다 —
+ * 선 아이콘은 맨몸으로 서고, 이모지는 늘 이 칸 안에 들어갑니다.
+ *
+ * <p>칸에 담기 전에는 이모지가 글자 사이에 그냥 박혀 있었습니다
+ * ({@code `${iconOf(icon)} ${name}`}). 그러면 기기마다 다른 높이로 그려져
+ * 글줄이 들쭉날쭉하고, 이모지가 없는 곳만 줄이 어긋납니다.
+ */
+export function Mark({
+  emoji,
+  fallback,
+  active,
+}: {
+  /** 이모지 한 글자. 없으면 fallback 을 그립니다. */
+  emoji?: string | null;
+  /** 그림이 없을 때 대신 적을 것. 순서 번호나 별. */
+  fallback?: React.ReactNode;
+  /** 지금 켜져 있는 것. 바탕이 옅게 물듭니다. */
+  active?: boolean;
+}) {
+  return (
+    <View style={[styles.mark, active ? styles.markOn : null]}>
+      {emoji ? (
+        <Text style={styles.markEmoji}>{emoji}</Text>
+      ) : typeof fallback === 'string' || typeof fallback === 'number' ? (
+        <Text style={styles.markFallback}>{fallback}</Text>
+      ) : (
+        fallback
+      )}
+    </View>
   );
 }
 
@@ -1922,6 +1969,7 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
   },
   listRowText: {
+    flex: 1,
     flexShrink: 1,
     gap: Spacing.xs,
   },
@@ -2202,6 +2250,27 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     shadowOffset: { width: 0, height: 1 },
     elevation: 2,
+  },
+  mark: {
+    width: 34,
+    height: 34,
+    borderRadius: Radius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.fill,
+  },
+  markOn: {
+    backgroundColor: Colors.accentSoft,
+  },
+  markEmoji: {
+    ...Type.bodySmall,
+    /* 이모지는 글꼴이 제 높이를 갖고 있어, 줄 높이를 두면 아래로 처집니다. */
+    lineHeight: undefined,
+  },
+  markFallback: {
+    ...Type.caption,
+    fontWeight: Weight.bold,
+    color: Colors.textSecondary,
   },
   filterChip: {
     flexDirection: 'row',

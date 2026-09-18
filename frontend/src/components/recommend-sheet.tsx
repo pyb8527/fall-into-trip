@@ -453,7 +453,7 @@ export function RecommendSheet({
             accessibilityLabel={`${card.name} 자세히 보기`}>
           <Row gap={Spacing.sm} style={styles.head}>
             <Body strong numberOfLines={2}>
-              {`${iconOf(card.icon)} ${card.name}`.trim()}
+{card.name}
             </Body>
             {/* 이미 어딘가에 있는 곳이면 먼저 말해 줍니다. 모르면 같은 곳을
                 또 담게 됩니다. */}

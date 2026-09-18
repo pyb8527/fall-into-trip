@@ -1729,7 +1729,7 @@ function DayCard({
   const color = day.color || dayColor(index);
 
   return (
-    <Card>
+    <Card style={[styles.dayBand, { borderLeftColor: color }]}>
       <Split align="start" gap={Spacing.md}>
         <Pressable
           onPress={() => setFolded((v) => !v)}
@@ -1737,7 +1737,6 @@ function DayCard({
           accessibilityLabel={`${day.date || day.label} ${folded ? '펴기' : '접기'}`}
           style={styles.dayTap}>
           <Row gap={Spacing.md} style={styles.dayTitle}>
-            <View style={[styles.dayDot, { backgroundColor: color }]} />
             <Subtitle>{day.date || day.label}</Subtitle>
             <Icon name={folded ? 'chevron-down' : 'chevron-up'} size={16} tone="muted" />
           </Row>
@@ -3286,10 +3285,19 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     alignItems: 'center',
   },
-  dayDot: {
-    width: 10,
-    height: 10,
-    borderRadius: Radius.full,
+  /*
+    날짜 색은 카드 왼쪽 띠로 답니다.
+
+    전에는 제목 앞에 지름 10 짜리 점 하나였습니다. 지도의 핀과 동선은 그
+    색으로 굵게 그려지는데 목록 쪽은 점 하나뿐이라, 같은 색이 두 자리를
+    잇고 있다는 것이 눈에 안 걸렸습니다.
+
+    띠는 카드 높이만큼 섭니다. 하루가 길수록 띠도 길어지므로, 훑어 내려가는
+    동안 어느 날의 어디쯤인지가 계속 보입니다.
+  */
+  dayBand: {
+    borderLeftWidth: 4,
+    paddingLeft: Spacing.lg - 4,
   },
 
   places: {

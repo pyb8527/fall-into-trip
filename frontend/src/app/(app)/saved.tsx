@@ -28,6 +28,8 @@ import {
   Empty,
   ErrorNote,
   Field,
+  FilterChip,
+  Grow,
   Loading,
   Row,
   Screen,
@@ -85,6 +87,8 @@ export default function Saved() {
   const [keeping, setKeeping] = useState(false);
   /** 지도에서 켜 둔 곳. 목록의 그 줄도 함께 켜집니다. */
   const [activeId, setActiveId] = useState<string | null>(null);
+  /** 조건 고르는 판을 열어 두었는지. */
+  const [sifting, setSifting] = useState(false);
 
   /*
     열어 둔 판들은 곳 자체가 아니라 그 번호만 들고 있습니다.
@@ -104,6 +108,19 @@ export default function Saved() {
   const all = useMemo(() => data?.places ?? [], [data]);
   const kinds = useMemo(() => kindsIn(all), [all]);
   const shown = useMemo(() => siftSaved(all, { q, kind, by }), [all, q, kind, by]);
+
+  /**
+   * 지금 걸려 있는 것들. 밖에 내놓을 것과 개수를 여기서 한 번에 셉니다.
+   *
+   * <p>찾는 말은 안 넣습니다 — 칸이 밖에 그대로 서 있어서 거기 적힌 것이
+   * 곧 조건입니다. 칩으로 한 번 더 적으면 같은 말이 두 군데 있습니다.
+   */
+  const applied: { key: string; label: string; clear: () => void }[] = [
+    kind !== null
+      ? { key: 'kind', label: labelOf(kind) || '갈래', clear: () => setKind(null) }
+      : null,
+    by !== 'given' ? { key: 'by', label: '이름순', clear: () => setBy('given') } : null,
+  ].filter(Boolean) as { key: string; label: string; clear: () => void }[];
 
   const looking = all.find((p) => p.id === lookingId) ?? null;
   const tagging = all.find((p) => p.id === taggingId) ?? null;
@@ -230,19 +247,37 @@ export default function Saved() {
         ) : undefined
       }>
       {/*
-        머리 한 줄.
+        지도가 먼저입니다.
 
-        위 막대가 이미 화면 이름을 적고 있으므로 여기서는 그것을 되풀이하지
-        않습니다. 왼쪽은 지금 몇 곳이 들어 있는지, 오른쪽은 더 담는 자리.
+        전에는 설명 한 줄과 단추가 맨 위에 서고 지도는 그 아래 회색 네모로
+        끼여 있었습니다. 그런데 보석함을 열고 가장 먼저 하는 일은 <b>어디에
+        뭘 담아 뒀는지</b> 보는 것입니다 — "오사카에서 담은 게 뭐였지" 는
+        목록을 훑어서는 안 나오고 지도를 봐야 나옵니다.
+
+        사진을 안 올리는 앱이라 화면의 무게를 질 것이 지도밖에 없기도 합니다.
+        문토나 무신사가 사진으로 하는 일을 여기서는 지도가 합니다.
       */}
+      {pins.length > 0 ? (
+        <TripMap
+          places={pins}
+          activeId={activeId}
+          onSelect={setActiveId}
+          link={false}
+          /* 전부 같은 동그라미에 별 하나. 담아 둔 곳에는 순서가 없고, 갈래는
+             아래 거르기가 이미 말해 줍니다. */
+          shape="star"
+          height={300}
+        />
+      ) : null}
+
       <Split>
-        <View style={styles.grow}>
+        <Grow>
           <Body tone="secondary">
             {all.length > 0
               ? `주워 둔 ${all.length}곳. 골라서 일정 아무 날에나 얹습니다.`
               : '눈에 띄는 곳을 담아 두었다가 일정에 꺼내 씁니다.'}
           </Body>
-        </View>
+        </Grow>
         <Button label="담기" compact onPress={() => setKeeping(true)} />
       </Split>
 
@@ -252,20 +287,6 @@ export default function Saved() {
 
       {data && all.length === 0 ? (
         <Empty message="아직 주워 둔 보석이 없습니다. 여행 둘러보기나 장소 찾기에서 별을 누르면 여기 쌓입니다. 위 「담기」 로 바로 찾아 담을 수도 있습니다." />
-      ) : null}
-
-      {/* 어디에 무엇이 모여 있는지. 목록보다 이쪽이 먼저 답이 됩니다. */}
-      {pins.length > 0 ? (
-        <TripMap
-          places={pins}
-          activeId={activeId}
-          onSelect={setActiveId}
-          link={false}
-          /* 전부 같은 동그라미에 별 하나. 담아 둔 곳에는 순서가 없고, 갈래는
-             아래 목록과 거르기가 이미 말해 줍니다. */
-          shape="star"
-          height={240}
-        />
       ) : null}
 
       {/* 몇 개 안 될 때는 찾을 것이 없습니다. 칸만 자리를 차지합니다. */}
@@ -278,42 +299,68 @@ export default function Saved() {
         />
       ) : null}
 
-      {/* 갈래로 거릅니다. 갈래가 둘 이상일 때만 — 하나뿐이면 누를 것이 없습니다. */}
-      {kinds.length > 1 ? (
-        <Row gap={Spacing.xs} style={styles.chips}>
-          <Chip label="전체" selected={kind === null} onPress={() => setKind(null)} />
-          {kinds.map((k) => (
-            <Chip
-              key={k.key}
-              label={`${k.emoji} ${k.label}`}
-              selected={kind === k.key}
-              onPress={() => setKind(kind === k.key ? null : k.key)}
-            />
-          ))}
-        </Row>
-      ) : null}
-
       {/*
-        정렬은 오른쪽 끝에 붙입니다.
+        갈래와 정렬도 판 안으로.
 
-        거르기와 정렬이 둘 다 같은 모양 칩이라, 왼쪽에 나란히 흘려 두면
-        어디까지가 거르기이고 어디부터가 정렬인지 경계가 없습니다. 사이에
-        가는 금을 그어 봤지만 흰 바탕에 1px 는 아무도 못 봅니다. <b>자리</b>
-        로 가릅니다 — 거르는 것은 왼쪽에서 흘러가고, 세우는 것은 오른쪽 끝에
-        붙어 있습니다.
-
-        담아 둔 곳에는 평점이 없습니다. 번호만 저장하고 내용은 저장하지
-        않으니까요 — 이름순만 냅니다.
+        갈래 칩이 여덟이면 좁은 폰에서 두 줄이고, 그 아래 정렬이 또 한 줄
+        입니다. 담아 둔 것을 보러 왔는데 그것이 늘 화면 밖에서 시작했습니다.
+        둘러보기와 같은 방식으로 섭니다 — 고를 수 있는 것은 판 안에, 밖에는
+        고른 것만.
       */}
-      {all.length > 2 ? (
-        <Row style={styles.sort}>
-          <SortBar
-            options={[{ ...SORT_GIVEN, label: '담은 순' }, SORT_NAME]}
-            value={by}
-            onChange={setBy}
-          />
-        </Row>
+      {kinds.length > 1 || all.length > 2 ? (
+        <Split>
+          <Row gap={Spacing.xs} style={styles.applied}>
+            <Button
+              label={applied.length > 0 ? `조건 ${applied.length}` : '조건'}
+              variant="secondary"
+              compact
+              onPress={() => setSifting(true)}
+            />
+            {applied.map((a) => (
+              <FilterChip key={a.key} label={a.label} onRemove={a.clear} />
+            ))}
+          </Row>
+          <Caption tone="secondary">{shown.length}곳</Caption>
+        </Split>
       ) : null}
+
+      <BottomSheet visible={sifting} title="조건" onClose={() => setSifting(false)}>
+        {kinds.length > 1 ? (
+          <>
+            <Body small strong>
+              갈래
+            </Body>
+            <Row gap={Spacing.xs} style={styles.applied}>
+              <Chip label="전체" selected={kind === null} onPress={() => setKind(null)} />
+              {kinds.map((k) => (
+                <Chip
+                  key={k.key}
+                  label={`${k.emoji} ${k.label}`}
+                  selected={kind === k.key}
+                  onPress={() => setKind(kind === k.key ? null : k.key)}
+                />
+              ))}
+            </Row>
+          </>
+        ) : null}
+
+        {kinds.length > 1 && all.length > 2 ? <Divider /> : null}
+
+        {/* 담아 둔 곳에는 평점이 없습니다. 번호만 저장하고 내용은 저장하지
+            않으니까요 — 이름순만 냅니다. */}
+        {all.length > 2 ? (
+          <>
+            <Body small strong>
+              세우는 법
+            </Body>
+            <SortBar
+              options={[{ ...SORT_GIVEN, label: '담은 순' }, SORT_NAME]}
+              value={by}
+              onChange={setBy}
+            />
+          </>
+        ) : null}
+      </BottomSheet>
 
       {data && all.length > 0 && shown.length === 0 ? (
         <Empty
@@ -546,11 +593,8 @@ const styles = StyleSheet.create({
   grow: {
     flex: 1,
   },
-  chips: {
+  applied: {
     flexWrap: 'wrap',
-  },
-  sort: {
-    justifyContent: 'flex-end',
   },
   list: {
     gap: Spacing.xs,
