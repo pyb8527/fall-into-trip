@@ -692,6 +692,7 @@ type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost';
 export function Button({
   label,
   onPress,
+  onMap,
   variant = 'primary',
   disabled,
   busy,
@@ -700,6 +701,18 @@ export function Button({
   label: string;
   onPress: () => void;
   variant?: ButtonVariant;
+  /**
+   * 지도 위에 얹히는 단추인지.
+   *
+   * <p>지도 위에서는 네모난 단추가 건물·구획과 섞여 어디까지가 단추인지
+   * 안 보입니다. 알약으로 둥글리고 흰 바탕에 그림자를 두어 떠 있게 합니다.
+   *
+   * <p>그림만 있는 동그란 단추({@link IconButton} 의 {@code onMap})와 달리
+   * 여기에는 글자가 남아 있습니다. 무슨 일이 일어나는지 눌러 보기 전에
+   * 알아야 하는 것 — 내가 어디 있는지가 남에게 가는 일 같은 것 — 은 그림
+   * 하나로 둘 수 없습니다.
+   */
+  onMap?: boolean;
   disabled?: boolean;
   busy?: boolean;
   /** 줄 안에 들어가는 작은 버튼. 보이는 높이만 줄이고 누르는 넓이는 그대로입니다. */
@@ -744,6 +757,7 @@ export function Button({
       style={[
         styles.button,
         compact ? styles.buttonCompact : styles.buttonFull,
+        onMap ? styles.buttonOnMap : null,
         { backgroundColor: off ? offBg : c.bg },
         /* 테두리가 세기를 나눕니다. 위험한 것만 굵게 두릅니다. */
         variant === 'danger' ? styles.buttonEdge : null,
@@ -2181,6 +2195,16 @@ const styles = StyleSheet.create({
     height: Tap.compact,
     borderRadius: Radius.sm,
     paddingHorizontal: Spacing.lg,
+  },
+  /* 지도 위에 떠 있는 것. 알약으로 둥글리고 그림자를 둡니다 — 지도의 길과
+     건물 위에서는 실선만으로 가장자리가 안 보입니다. */
+  buttonOnMap: {
+    borderRadius: Radius.full,
+    shadowColor: '#000000',
+    shadowOpacity: 0.16,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
   },
   /* 주 동작은 뜨지 않습니다. 검정 채움 자체가 화면에서 가장 강한 것이라
      그림자를 더 얹을 이유가 없습니다. */

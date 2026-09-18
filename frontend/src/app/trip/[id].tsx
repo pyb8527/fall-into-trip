@@ -1,6 +1,7 @@
 import { Stack, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Animated,
   Image,
   PanResponder,
@@ -1040,6 +1041,34 @@ export default function TripScreen() {
           안 일어나면서 자리 알림만 켜지는 것이 가장 나쁩니다. */}
       {me.supported && !keptMap ? (
         <View style={[styles.floatRight, { bottom: covered + Spacing.md }]}>
+          {/*
+            위치를 켜 둔 동안에만 나오는 둘.
+
+            판 안에 있었습니다. 그런데 이 둘을 쓰는 때는 <b>길 위에 서서
+            지도를 보고 있을 때</b>입니다 — 그때 판은 아래로 내려가 있고,
+            올려서 찾아야 하는 단추는 없는 것과 같습니다. 지도 위로 올립니다.
+
+            그림만 있는 동그라미로는 안 됩니다. 내가 어디 있는지가 남에게
+            가는 일을 그림 하나로 둘 수 없습니다. 글자를 단 알약으로 둡니다.
+          */}
+          {me.watching ? (
+            <>
+              <Button
+                label={sharing ? '위치 공유 중 · 끄기' : '위치 공유'}
+                variant={sharing ? 'primary' : 'secondary'}
+                compact
+                onMap
+                onPress={toggleSharing}
+              />
+              <Button
+                label="여기에 깃발"
+                variant="secondary"
+                compact
+                onMap
+                onPress={dropPin}
+              />
+            </>
+          ) : null}
           <IconButton
             name="crosshair"
             label={me.watching ? '내 위치로' : '내 위치 보기'}
@@ -1102,32 +1131,15 @@ export default function TripScreen() {
         {me.error ? <Caption tone="danger">{me.error}</Caption> : null}
 
         {/*
-          내 위치로 하는 일들.
+          위치를 켜 둔 동안 무슨 일이 일어나는지.
 
-          지도 위에 동그란 단추로 두었더니 무엇인지 알 수 없었습니다. 특히
-          "동행자에게 알리기" 는 내가 어디 있는지가 남에게 가는 일이라, 그림
-          하나로 둘 것이 아닙니다. 켜 두었을 때만 글자로 펼칩니다.
+          단추는 지도 위로 올라갔습니다 — 길 위에서 쓰는 것이라 판을 올려
+          찾게 할 수 없습니다. 다만 "네 시간 뒤 저절로 꺼진다", "지나온
+          자리는 안 남는다" 같은 것은 지도에 얹을 길이가 아닙니다. 설명은
+          여기 남습니다.
         */}
         {me.supported && me.watching ? (
           <View style={styles.live}>
-            <Row gap={Spacing.xs}>
-              {/* 켜져 있을 때만 색이 찹니다. 반대로 두었더니 켜지도 않았는데
-                  이미 공유 중인 것처럼 보였습니다. */}
-              <Button
-                label={sharing ? '내 위치 공유 중 · 끄기' : '내 위치 공유'}
-                variant={sharing ? 'primary' : 'secondary'}
-                compact
-                onPress={toggleSharing}
-              />
-              {/* 지금 서 있는 자리에 꽂아 두는 깃발. 동행자에게 "나 여기"
-                  라고 알리는 표시입니다. */}
-              <IconButton
-                name="flag"
-                label="여기 있다고 깃발 꽂기"
-                tone="accent"
-                onPress={dropPin}
-              />
-            </Row>
             {planted ? (
               <Caption tone="hot" strong>
                 {plantedWith
@@ -1242,6 +1254,7 @@ export default function TripScreen() {
               onChanged={refresh}
               onRemove={remove}
               gapAfter={gapAfter}
+              gapping={gapping}
               gapNote={gapNote}
               chosenOf={chosenOf}
               onPick={(fromId, mode) => setPicked((p) => ({ ...p, [fromId]: mode }))}
@@ -1512,7 +1525,12 @@ function SheetHead({
       ) : null}
 
       {gapping ? (
-        <Caption tone="secondary">이동 시간을 알아보는 중…</Caption>
+        /* 글자만 두었더니 멈춰 있는 것과 구별이 안 됐습니다. 도는 것이
+           하나 있어야 "오는 중" 으로 읽힙니다. */
+        <Row gap={Spacing.xs}>
+          <ActivityIndicator size="small" color={Colors.textMuted} />
+          <Caption tone="secondary">이동 시간을 알아보는 중…</Caption>
+        </Row>
       ) : moving > 0 ? (
         <Caption tone="secondary">오늘 이동에 {asDuration(moving)}</Caption>
       ) : null}
@@ -1532,6 +1550,7 @@ function DayCard({
   onChanged,
   onRemove,
   gapAfter,
+  gapping,
   gapNote,
   chosenOf,
   onPick,
@@ -1557,6 +1576,8 @@ function DayCard({
   onRemove: (placeId: string) => void;
   /** 이 장소를 떠나 다음 장소로 가는 구간. "전체" 를 볼 때는 비어 있습니다. */
   gapAfter: Map<string, Gap>;
+  /** 구간을 다시 묻고 있는 중인지. 날짜를 바꾸면 한두 박자 걸립니다. */
+  gapping: boolean;
   /** 대중교통이 하나도 안 나온 까닭. 없으면 비어 있습니다. */
   gapNote: string | null;
   chosenOf: (gap: Gap) => GapOption | null;
@@ -1974,6 +1995,8 @@ function DayCard({
                       }
                     }}
                     gap={gapAfter.get(place.id)}
+                    /* 마지막 장소 뒤에는 갈 데가 없습니다. */
+                    gapping={gapping && i < order.length - 1}
                     arriveBy={order[i + 1]?.time ?? null}
                     spent={spentAt.get(place.id) ?? null}
                     touched={touchedOf(place)}
@@ -2112,6 +2135,7 @@ function PlaceRow({
   onEdit,
   onRemove,
   gap,
+  gapping,
   arriveBy,
   spent,
   touched,
@@ -2144,6 +2168,8 @@ function PlaceRow({
   onRemove: () => void;
   /** 다음 장소까지의 이동. 마지막 장소 뒤에는 없습니다. */
   gap?: Gap;
+  /** 구간을 다시 묻고 있는 중인지. 마지막 장소 뒤에는 안 붙습니다. */
+  gapping: boolean;
   /** 다음 장소에 적어 둔 시각. 안 적었으면 비어 있습니다. */
   arriveBy: string | null;
   /** 여기서 실제로 쓴 돈. 통화마다 하나씩. 안 적었으면 비어 있습니다. */
@@ -2367,6 +2393,19 @@ function PlaceRow({
           arriveBy={arriveBy}
           onPick={onPick}
         />
+      ) : gapping ? (
+        /*
+          날짜를 바꾸면 구간을 다시 묻습니다. 그동안 gaps 가 비어서 <b>구간
+          줄이 통째로 사라졌다가</b> 한두 박자 뒤에 다시 나타났습니다. 아무
+          말도 없으니 없어진 것인지 오는 중인지 알 수가 없습니다.
+
+          자리를 비워 두지 않고 알아보는 중이라고 적어 둡니다. 줄 높이도
+          그대로라 목록이 덜컥거리지 않습니다.
+        */
+        <Row gap={Spacing.xs} style={styles.gap}>
+          <ActivityIndicator size="small" color={Colors.textMuted} />
+          <Caption tone="muted">이동 시간을 알아보는 중…</Caption>
+        </Row>
       ) : null}
     </View>
   );

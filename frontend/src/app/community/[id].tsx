@@ -13,6 +13,7 @@ import {
   useComments,
 } from '@/components/comment-list';
 import type { MapPlace } from '@/components/map-types';
+import { PlaceDetailSheet } from '@/components/place-detail-sheet';
 import { PostMap } from '@/components/post-map';
 import { SignUpGate } from '@/components/signup-gate';
 import { TripMap } from '@/components/trip-map';
@@ -82,6 +83,8 @@ export default function Post() {
 
   /** 지도에서 켜 둔 곳. */
   const [activeId, setActiveId] = useState<string | null>(null);
+  /** 들여다보는 중인 곳. 판이 지도를 덮으므로 지도는 안 움직입니다. */
+  const [looking, setLooking] = useState<ItineraryPlace | null>(null);
 
   /** 사본의 장소를 지도에 얹을 모양으로. 자리(몇째 날 몇 번째)가 곧 이름표입니다. */
   const pins = useMemo<MapPlace[]>(
@@ -312,6 +315,7 @@ export default function Post() {
           onComment={(placeIndex) => setAt({ dayIndex: i, placeIndex })}
           activeId={activeId}
           onFocus={(placeIndex) => setActiveId(`${i}:${placeIndex}`)}
+          onLook={setLooking}
         />
       ))}
 
@@ -403,6 +407,36 @@ export default function Post() {
         }}
       />
 
+      {/*
+        들여다보는 판.
+
+        지도·평점·영업시간은 구글에서 옵니다. 담는 단추를 여기도 둡니다 —
+        사정을 보고 나서 담는 것이 순서이고, 판을 닫고 목록에서 다시 별을
+        찾게 하면 방금 본 것을 잊습니다.
+      */}
+      <PlaceDetailSheet
+        place={looking}
+        onClose={() => setLooking(null)}
+        actions={
+          looking ? (
+            <Button
+              label={savedNames.has(looking.name) ? '보석함에 담김' : '보석함에 담기'}
+              compact
+              disabled={savedNames.has(looking.name)}
+              onPress={() => {
+                const target = looking;
+                setLooking(null);
+                if (user) {
+                  save(target);
+                } else {
+                  needLogin('save', target.name);
+                }
+              }}
+            />
+          ) : null
+        }
+      />
+
       <SignUpGate intent={gate} onClose={() => setGate(null)} />
 
       <ConfirmDialog
@@ -435,6 +469,7 @@ function DayBlock({
   onComment,
   activeId,
   onFocus,
+  onLook,
 }: {
   day: ItineraryDay;
   index: number;
@@ -453,6 +488,8 @@ function DayBlock({
   /** 지도에서 켜 둔 곳. 목록의 그 줄도 함께 켜집니다. */
   activeId: string | null;
   onFocus: (placeIndex: number) => void;
+  /** 이 곳을 들여다보는 판을 엽니다. */
+  onLook: (place: ItineraryPlace) => void;
 }) {
   const color = day.color || dayColor(index);
 
@@ -557,6 +594,16 @@ function DayBlock({
               ) : null}
             </Row>
           ) : null}
+          {/*
+            남의 일정에서 한 곳을 보고 가져올지 정하려면 이름과 메모만으로는
+            모자랍니다. 평점이 몇인지 그날 문을 여는지가 있어야 고르는 일이
+            됩니다. 장소 찾기에서 쓰는 것과 같은 판을 엽니다.
+          */}
+          <IconButton
+            name="info"
+            label={`${place.name} 들여다보기`}
+            onPress={() => onLook(place)}
+          />
           {/* 일정을 통째로 가져오지 않고 이 집만 담을 수 있어야 합니다. */}
           <IconButton
             name="star"

@@ -381,7 +381,10 @@ export default function Saved() {
               setActiveId(place.id);
               toggle(place.id);
             }}
-            onOpen={() => {
+            /* 줄은 지도로 보냅니다. 들여다보는 판은 지도를 덮으므로 둘을
+               한꺼번에 하면 움직인 지도를 볼 수가 없습니다. */
+            onPress={() => setActiveId(place.id)}
+            onLook={() => {
               setActiveId(place.id);
               setLookingId(place.id);
             }}

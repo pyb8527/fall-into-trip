@@ -8,6 +8,7 @@ import {
   Body,
   Caption,
   Checkbox,
+  IconButton,
   Mark,
   Press,
 } from '@/ui';
@@ -41,15 +42,25 @@ const STAR = '⭐';
  * 웹에서는 큰 것 안의 작은 것이 함께 눌려, 그림을 바꾸려다 고르기까지
  * 됐습니다.
  *
- * <p>이제 줄을 누르면 그 곳을 <b>들여다보고</b>, 오른쪽 네모를 누르면
- * <b>고릅니다</b>. 길찾기·빼기·그림 바꾸기는 들여다보는 판 안으로
- * 들어갔습니다 — 거기서는 무엇을 하는 것인지 이름이 붙어 있습니다.
+ * <p>이제 자리가 셋입니다. 줄을 누르면 <b>지도가 그리로 가고</b>, 동그라미를
+ * 누르면 <b>들여다보고</b>, 네모를 누르면 <b>고릅니다</b>. 길찾기·빼기·그림
+ * 바꾸기는 들여다보는 판 안으로 들어갔습니다 — 거기서는 무엇을 하는 것인지
+ * 이름이 붙어 있습니다.
+ *
+ * <h3>지도로 보내기와 들여다보기를 갈랐습니다</h3>
+ *
+ * <p>한동안은 줄을 누르면 둘이 한꺼번에 일어났습니다. 지도가 그 자리로
+ * 움직이고 동시에 들여다보는 판이 올라왔는데, <b>그 판이 지도를 덮어</b>
+ * 움직인 것을 볼 수가 없었습니다. 둘 다 한 셈인데 하나는 헛일이었습니다.
+ *
+ * <p>가릅니다. 줄은 지도로 보내고, 들여다보는 것은 따로 누릅니다.
  */
 export function SavedRow({
   place,
   selected,
   onToggle,
-  onOpen,
+  onPress,
+  onLook,
   lit,
 }: {
   place: SavedPlace;
@@ -57,10 +68,14 @@ export function SavedRow({
   selected?: boolean | null;
   onToggle?: () => void;
   /**
-   * 들여다보기. 없으면 줄을 눌러도 고르기만 합니다 — 꺼내 넣는 판처럼
-   * 이미 무엇을 넣을지 아는 자리에서는 들여다볼 일이 없습니다.
+   * 줄을 눌렀을 때. 대개 지도를 그 자리로 보냅니다.
+   *
+   * <p>없으면 줄을 눌러도 고르기만 합니다 — 꺼내 넣는 판처럼 지도가 없는
+   * 자리에서는 보낼 데가 없습니다.
    */
-  onOpen?: () => void;
+  onPress?: () => void;
+  /** 들여다보기. 주면 동그라미 하나가 붙습니다. */
+  onLook?: () => void;
   /** 지도에서 켜 둔 것. 목록의 그 줄도 함께 켜집니다. */
   lit?: boolean;
 }) {
@@ -83,10 +98,10 @@ export function SavedRow({
   return (
     <View style={[styles.row, on ? styles.rowOn : lit ? styles.rowLit : null]}>
       <Press
-        onPress={onOpen ?? onToggle}
+        onPress={onPress ?? onToggle}
         scale={0.99}
         accessibilityLabel={
-          onOpen ? `${place.name} 들여다보기` : `${place.name} ${on ? '고르기 취소' : '고르기'}`
+          onPress ? `${place.name} 지도에서 보기` : `${place.name} ${on ? '고르기 취소' : '고르기'}`
         }
         accessibilityState={picking ? { selected: on } : undefined}
         style={styles.body}>
@@ -100,6 +115,10 @@ export function SavedRow({
           </Caption>
         </View>
       </Press>
+
+      {onLook ? (
+        <IconButton name="info" label={`${place.name} 들여다보기`} onPress={onLook} />
+      ) : null}
 
       {picking ? (
         <Checkbox
