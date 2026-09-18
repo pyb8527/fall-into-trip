@@ -3295,7 +3295,9 @@ const styles = StyleSheet.create({
     gap: Spacing.xs,
     paddingVertical: Spacing.md,
     borderRadius: Radius.sm,
-    backgroundColor: Colors.fill,
+    /* 바닥이 회색이 되면서 이 칸도 회색이면 사라집니다. 흰 카드로 올려야
+       누를 수 있는 것으로 읽힙니다. */
+    backgroundColor: Colors.surface,
   },
   live: {
     gap: Spacing.sm,
@@ -3308,7 +3310,7 @@ const styles = StyleSheet.create({
   track: {
     height: 5,
     borderRadius: Radius.full,
-    backgroundColor: Colors.fill,
+    backgroundColor: Colors.border,
     overflow: 'hidden',
   },
   fill: {

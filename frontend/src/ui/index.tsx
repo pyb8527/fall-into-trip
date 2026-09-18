@@ -723,20 +723,28 @@ export function Button({
   /* 못 누르는 버튼은 흐리게 만드는 대신 아예 다른 색으로 둡니다. 투명도만
      낮추면 그 아래 배경이 비쳐 글자가 읽기 어려워집니다. */
   /*
-    색이 없으니 단추의 세기는 채움과 테두리가 나눕니다.
+    단추의 세기.
 
-      주 동작   검정으로 꽉 채운 것 — 화면에 하나
-      보조      흰 바탕에 가는 선
+      주 동작   옅은 코랄 바탕에 코랄 글씨 — 화면에 하나
+      보조      흰 바탕에 검은 글씨
       위험      흰 바탕에 굵은 선 — 되돌릴 수 없다는 표시
       곁다리    아무것도 없는 글자
 
-    위험을 굵은 선으로 두는 것은, 빨강을 뺀 자리에 무언가는 있어야 하기
-    때문입니다. 그리고 그 앞에는 늘 확인 판이 한 번 더 섭니다.
+    <h3>색으로 꽉 채우지 않습니다</h3>
+
+    한동안 주 단추를 코랄로 채우고 흰 글씨를 얹었습니다. 그러려면 색이
+    충분히 어두워야 하는데, 어두운 코랄은 이미 코랄이 아니라 팥색입니다.
+    밝게 두면 글씨가 안 읽히고 어둡게 두면 색이 죽습니다.
+
+    옅은 바탕에 진한 글씨로 뒤집으면 그 자리가 없어집니다. 대비는 5:1 이
+    넘고, 회색 바닥 위 흰 단추들 사이에서 색 있는 것은 이것 하나라 충분히
+    눈에 걸립니다.
+
+    위험을 굵은 선으로 두는 것은, 색을 안 쓰기로 한 자리에 무언가는 있어야
+    하기 때문입니다. 그리고 그 앞에는 늘 확인 판이 한 번 더 섭니다.
   */
   const palette: Record<ButtonVariant, { bg: string; pressed: string; fg: string }> = {
-    /* 흰 글씨를 얹는 자리라 진한 쪽을 씁니다. 밝은 코랄에 흰 글씨는
-       대비가 3.9:1 로 WCAG AA 에 못 미칩니다. */
-    primary: { bg: Colors.accentStrong, pressed: Colors.accentPressed, fg: Colors.accentText },
+    primary: { bg: Colors.accentSoft, pressed: Colors.accentSoftPressed, fg: Colors.accentInk },
     secondary: { bg: Colors.surface, pressed: Colors.fill, fg: Colors.text },
     danger: { bg: Colors.surface, pressed: Colors.fill, fg: Colors.text },
     ghost: { bg: 'transparent', pressed: Colors.fill, fg: Colors.textMuted },
