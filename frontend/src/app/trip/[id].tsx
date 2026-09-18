@@ -29,6 +29,7 @@ import { useAuth } from '@/auth/auth-provider';
 import { CompanionsSheet } from '@/components/companions-sheet';
 import type { RouteLine } from '@/components/map-types';
 import { PlaceForm } from '@/components/place-form';
+import { SavedPicker } from '@/components/saved-picker';
 import { PublishForm } from '@/components/publish-form';
 import { TipSheet } from '@/components/tip-sheet';
 import { TripMap, type MapPlace } from '@/components/trip-map';
@@ -1581,6 +1582,14 @@ function DayCard({
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<Place | null>(null);
   const [folded, setFolded] = useState(false);
+  /*
+    보석함에서 꺼내 넣는 판.
+
+    "여기 뭐 넣지" 는 이 화면에서 생깁니다. 그런데 이미 적어 둔 답(보석함)
+    으로 가려면 탭을 옮기고, 고르고, 여행과 날짜를 되짚어 골라 돌아와야
+    했습니다 — 되짚는 세 걸음이 전부 방금 떠나온 자리를 다시 말하는 일입니다.
+  */
+  const [digging, setDigging] = useState(false);
 
   /*
     끌어서 옮기기.
@@ -1749,6 +1758,16 @@ function DayCard({
               onPress={() => {
                 setFolded(false);
                 askTidy();
+              }}
+            />
+          ) : null}
+          {canEdit ? (
+            <IconButton
+              name="star"
+              label={`${day.date || day.label}에 보석함에서 꺼내 넣기`}
+              onPress={() => {
+                setFolded(false);
+                setDigging(true);
               }}
             />
           ) : null}
@@ -1998,6 +2017,16 @@ function DayCard({
           onChanged();
         }}
         onCancel={() => setAdding(false)}
+      />
+      <SavedPicker
+        visible={digging}
+        dayId={day.id}
+        dayLabel={day.date || day.label}
+        onDone={() => {
+          setDigging(false);
+          onChanged();
+        }}
+        onCancel={() => setDigging(false)}
       />
       {editing ? (
         <PlaceForm
