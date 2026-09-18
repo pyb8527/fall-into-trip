@@ -41,6 +41,7 @@ import {
   Title,
 } from '@/ui';
 import { LogoMark } from '@/ui/logo';
+import { AppTabs } from '@/ui/tab-bar';
 
 /**
  * 첫 화면.
@@ -166,13 +167,25 @@ export default function Home() {
     입니다 — 같은 제목에 같은 배지가 한 화면에 두 번 있으면 둘 중 무엇이
     진짜인지 잠깐 헷갈리고, 무엇보다 자리가 아깝습니다.
   */
+  /*
+    맨 위 카드에 이미 나온 여행은 뺍니다. 같은 여행이 한 화면에 두 번
+    나오면 둘 중 무엇이 진짜인지 잠깐 헷갈리고, 무엇보다 자리가 아깝습니다.
+
+    <p>가장 최근에 만든 것부터 다섯. 서버는 만든 차례대로 주므로 뒤에서
+    자릅니다 — 마흔 개를 가진 사람에게 삼 년 전 여행부터 보여 줄 이유가
+    없습니다.
+  */
   const shortlist = useMemo(
-    () => (mine?.trips ?? []).filter((t) => t.id !== next?.trip.id).slice(0, 3),
+    () =>
+      (mine?.trips ?? [])
+        .filter((t) => t.id !== next?.trip.id)
+        .slice(-5)
+        .reverse(),
     [mine, next],
   );
 
   return (
-    <Screen safeTop>
+    <Screen safeTop tabs={<AppTabs />}>
       <View style={styles.head}>
         <Split>
           <LogoMark size={26} />
@@ -231,74 +244,16 @@ export default function Home() {
       ) : null}
 
       {/*
-        넷을 한 장에 담습니다.
+        내 여행 — 이 화면의 첫머리.
 
-        <p>회색 바닥 위에 흰 카드 넷이 저마다 떠 있었습니다. 카드 하나하나는
-        흰데 사이가 전부 회색이라, 넷이 <b>한 묶음</b>이라는 것이 안 읽히고
-        따로 놓인 네 개로 보였습니다. 묶음이면 한 장에 담아야 묶음입니다.
+        <h3>메뉴판이던 자리</h3>
 
-        <p>안의 카드들은 제 바탕과 테두리를 걷습니다 — 판이 이미 바탕입니다.
-        흰 판에 흰 카드를 얹으면 층이 둘인데 눈에는 하나로 보여, 테두리만
-        공연히 늘어납니다.
+        <p>맨 위를 메뉴 카드 넷이 차지하고 있었습니다. 그래서 홈을 열면
+        <b>어디로 갈 수 있는지</b>가 먼저 보이고, 정작 내 여행은 그 아래로
+        밀려 한 번 굴려야 나왔습니다.
 
-        <p>카드가 한 번에 툭 나타나면 화면이 갈아 끼워진 것처럼 보입니다.
-        위에서부터 조금씩 늦게 떠오르면 눈이 따라 내려갑니다.
-      */}
-      <Panel>
-        <Row gap={Spacing.sm} style={styles.grid}>
-          <Rise order={0} style={styles.half}>
-            <MenuCard
-              title="내 여행"
-              caption="짜고, 부르고, 같이 고치기"
-              onPress={() => router.push('/(app)/trips')}
-            />
-          </Rise>
-          <Rise order={1} style={styles.half}>
-            <MenuCard
-              title="보석함"
-              caption="주워 둔 곳들"
-              onPress={() => router.push('/(app)/saved')}
-            />
-          </Rise>
-          <Rise order={2} style={styles.half}>
-            <MenuCard
-              title="여행 둘러보기"
-              caption="남이 다녀온 길 구경하기"
-              onPress={() => router.push('/community')}
-            />
-          </Rise>
-          {/* 가계부는 여행 하나에 딸립니다. 먼저 어느 여행인지를 고르고,
-              고르면 곧장 그 여행의 가계부로 갑니다 — 일정 화면을 거치지
-              않습니다. */}
-          <Rise order={3} style={styles.half}>
-            <MenuCard
-              title="가계부"
-              caption="누가 얼마 냈는지"
-              onPress={() => router.push('/(app)/trips?for=money')}
-            />
-          </Rise>
-        </Row>
-      </Panel>
-
-      {/*
-        갓 가입한 사람의 홈은 텅 비어 있습니다. 메뉴 넷이 있지만 무엇부터
-        눌러야 하는지는 말해 주지 않습니다.
-
-        아래에 둡니다. 위에 두면 목록을 받아 온 순간 메뉴가 아래로 밀려
-        내려가, 이미 손이 가 있던 카드가 달아납니다.
-
-        여행 수를 서버에 따로 표시해 두지 않습니다. 개수가 0인지로 그냥
-        알 수 있고, 표시를 만들면 그때부터 그 값이 진짜와 어긋납니다.
-        덤으로 여행을 다 지운 사람에게도 맞는 안내가 됩니다.
-      */}
-      {mine && mine.trips.length === 0 ? <FirstSteps /> : null}
-      {/* 길 위에 있는 것은 이미 맨 위에 올라가 있습니다. */}
-      {next && next.at.kind !== 'going' ? (
-        <NextTrip trip={next.trip} at={next.at} road={road} />
-      ) : null}
-
-      {/*
-        내 여행 — 카드 하나에 목록으로.
+        <p>갈 곳은 이제 아래 띠가 말합니다. 홈은 메뉴판 노릇을 그만두고
+        내용부터 답니다 — 홈에 오는 사람이 찾는 것은 대개 자기 여행입니다.
 
         <h3>왜 줄마다 카드가 아닌가</h3>
 
@@ -313,9 +268,12 @@ export default function Home() {
 
         <h3>몇십 개여도 됩니다</h3>
 
-        <p>여기서 내는 것은 늘 <b>셋</b>입니다. 여행이 마흔 개여도 카드
-        높이는 그대로이고, 나머지는 "40개 전체보기" 한 줄이 맡습니다.
-        홈이 목록이 되면 홈이 아닙니다.
+        <p>여기서 내는 것은 늘 <b>다섯</b>입니다. 여행이 마흔 개여도 카드
+        높이는 그대로이고, 나머지는 "전체보기" 한 줄이 맡습니다. 홈이
+        목록이 되면 홈이 아닙니다.
+
+        <p>맨 위로 올라오면서 셋에서 다섯으로 늘렸습니다. 첫머리에 셋만
+        있으면 그 아래가 곧바로 남의 여행이라, 내 것이 곁다리처럼 보입니다.
       */}
       {mine && mine.trips.length > 0 ? (
         <View style={styles.section}>
@@ -379,6 +337,20 @@ export default function Home() {
             ))}
           </Card>
         </View>
+      ) : null}
+
+      {/*
+        갓 가입한 사람의 홈은 텅 비어 있습니다. 아래 갈래 띠가 어디로 갈
+        수 있는지는 말해 주지만, 무엇부터 해야 하는지는 말해 주지 않습니다.
+
+        여행 수를 서버에 따로 표시해 두지 않습니다. 개수가 0인지로 그냥
+        알 수 있고, 표시를 만들면 그때부터 그 값이 진짜와 어긋납니다.
+        덤으로 여행을 다 지운 사람에게도 맞는 안내가 됩니다.
+      */}
+      {mine && mine.trips.length === 0 ? <FirstSteps /> : null}
+      {/* 길 위에 있는 것은 이미 맨 위에 올라가 있습니다. */}
+      {next && next.at.kind !== 'going' ? (
+        <NextTrip trip={next.trip} at={next.at} road={road} />
       ) : null}
 
       {/*
@@ -676,18 +648,6 @@ const styles = StyleSheet.create({
   },
   head: {
     gap: Spacing.md,
-  },
-  grid: {
-    alignItems: 'stretch',
-  },
-  /* 감싸는 층이 하나 늘었으므로 넓이를 여기서 잡습니다. 안쪽 카드는 이
-     자리를 꽉 채웁니다. */
-  half: {
-    flexGrow: 1,
-    flexBasis: '46%',
-  },
-  wide: {
-    width: '100%',
   },
   steps: {
     flexWrap: 'nowrap',

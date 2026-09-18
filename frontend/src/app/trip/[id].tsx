@@ -1,4 +1,5 @@
 import { Stack, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -82,6 +83,7 @@ import {
   type UndoNote,
   useUndo,
 } from '@/ui';
+import { TabBar } from '@/ui/tab-bar';
 
 /** 전체를 보는 상태. 특정 날짜가 아니라는 뜻입니다. */
 const ALL = -1;
@@ -348,6 +350,14 @@ export default function TripScreen() {
   /* 판이 지금 몇 픽셀을 덮고 있는지. 지도가 이것을 알아야 고른 핀을 판에
      가리지 않는 자리에 놓습니다. */
   const [covered, setCovered] = useState(0);
+  /*
+    아래 띠가 먹는 높이.
+
+    <p>띠는 화면 맨 아래에 떠 있고 판은 그 위에 서야 합니다. 안전영역까지
+    띠가 스스로 챙기므로 여기서는 띠 몸통만 셉니다.
+  */
+  const insets = useSafeAreaInsets();
+  const dock = Math.max(insets.bottom, Spacing.sm) + 60;
   /** 단추 줄이 실제로 몇 픽셀인지. 판을 내렸을 때 여기까지 보입니다. */
   const [railTall, setRailTall] = useState(0);
   const { undo, show: showUndo, hide: hideUndo } = useUndo();
@@ -1023,7 +1033,9 @@ export default function TripScreen() {
         /* 길을 다시 묻는 동안에는 지도가 아무 길도 안 그리고 그렇다고 말합니다.
            안 그러면 어제 길과 오늘 점선이 한 지도에 겹칩니다. */
         routesPending={gapping}
-        bottomInset={covered}
+        /* 판과 띠가 함께 아래를 덮습니다. 둘을 다 세야 고른 장소가
+           보이는 곳의 가운데에 옵니다. */
+        bottomInset={covered + dock}
         goHereAt={goHereAt}
         panTo={lookAt}
       />
@@ -1091,7 +1103,7 @@ export default function TripScreen() {
           내 자리로 옮기는 것인데 그림은 움직이지 않습니다. 눌러도 아무 일이
           안 일어나면서 자리 알림만 켜지는 것이 가장 나쁩니다. */}
       {me.supported && !keptMap ? (
-        <View style={[styles.floatRight, { bottom: covered + Spacing.md }]}>
+        <View style={[styles.floatRight, { bottom: covered + dock + Spacing.md }]}>
           {/*
             십자를 누르면 나오는 둘.
 
@@ -1163,7 +1175,7 @@ export default function TripScreen() {
         만한 것이 아닙니다. 단추 하나로 접어 두고 눌렀을 때만 펼칩니다.
       */}
       {pins.length > 0 ? (
-        <View style={[styles.floatLeft, { bottom: covered + Spacing.md }]}>
+        <View style={[styles.floatLeft, { bottom: covered + dock + Spacing.md }]}>
           <IconButton
             name="flag"
             label={`꽂아 둔 깃발 ${pins.length}개 보기`}
@@ -1184,14 +1196,70 @@ export default function TripScreen() {
       */}
       <View
         pointerEvents="box-none"
-        style={[styles.floatTop, { bottom: covered + Spacing.md }]}>
+        style={[styles.floatTop, { bottom: covered + dock + Spacing.md }]}>
         <View style={styles.snackRail}>
           <Snack undo={undo} onHide={hideUndo} />
         </View>
       </View>
 
+      {/*
+        이 여행에서 갈 수 있는 곳들.
+
+        <p>앱 전체의 갈래 대신 <b>이 여행의 갈래</b>가 섭니다. 여행 하나에
+        들어오면 그 안에서 오가는 것이 대부분이라, 바깥 갈래를 그대로 두면
+        정작 자주 쓰는 것들이 다시 화면 어딘가로 흩어집니다.
+
+        <p>왼쪽에 나가는 길을 답니다. 갈래가 통째로 바뀌었으므로 어디서
+        빠져나가는지가 보여야 합니다.
+      */}
+      <TabBar
+        onBack={() => (navigation.canGoBack() ? navigation.goBack() : router.push('/(app)/home'))}
+        items={[
+          {
+            key: 'plan',
+            label: '일정',
+            icon: 'calendar',
+            /* 지금 이 화면입니다. 눌러도 아무 일이 없는 것이 맞습니다 —
+               같은 곳을 다시 쌓으면 뒤로가기가 한 번 헛돕니다. */
+            active: true,
+            onPress: () => {},
+          },
+          {
+            key: 'travel',
+            label: '여행 중',
+            icon: 'flag',
+            /* 오늘이 이 여행의 날 중 하나면 점을 찍습니다. 그날 이 화면에서
+               가장 먼저 누를 것이 그것입니다. */
+            dot: onTrip,
+            onPress: () => router.push({ pathname: '/travel/[id]', params: { id } }),
+          },
+          {
+            key: 'vote',
+            label: '가고 싶은 곳',
+            icon: 'thumbs-up',
+            onPress: () => router.push({ pathname: '/vote/[id]', params: { id } }),
+          },
+          {
+            key: 'money',
+            label: '가계부',
+            icon: 'credit-card',
+            onPress: () => router.push({ pathname: '/money/[id]', params: { id } }),
+          },
+          {
+            key: 'card',
+            label: '요약',
+            icon: 'book-open',
+            onPress: () => router.push({ pathname: '/card/[id]', params: { id } }),
+          },
+        ]}
+      />
+
       <DragSheet
         ref={sheet}
+        /* 아래 띠만큼 띄웁니다. 안 띄우면 판이 띠 뒤로 들어가 판의 마지막
+           줄과 띠가 겹칩니다. 띠도 판도 화면 바닥을 기준으로 서므로 여기서
+           한 번만 어긋내 주면 됩니다. */
+        lift={dock}
         /*
           내렸을 때 단추 줄까지는 보여야 합니다.
 
@@ -1267,24 +1335,18 @@ export default function TripScreen() {
 
 
         {/*
-          가끔 쓰는 것들.
+          이 화면에서 하는 일들.
 
-          <h3>일곱 개가 일정을 밀어냈습니다</h3>
+          <h3>갈 곳과 할 일을 갈랐습니다</h3>
 
-          <p>이 화면의 주인공은 일정입니다. 그런데 칸 다섯에 다음 줄 둘이
-          얹혀 판을 열자마자 보이는 것의 절반을 먹었고, 둘째 줄에 두 개만
-          남은 모양도 어색했습니다.
+          <p>일곱이 한 줄에 있었습니다. 그런데 그중 넷은 <b>다른 화면으로
+          가는 것</b>(여행 중·가고 싶은 곳·가계부·요약)이고 셋은 <b>여기서
+          하는 것</b>(어디 갈까·챙길 것·글 올리기)이라, 같은 모양으로 나란히
+          두면 어느 것이 화면을 갈아 끼우는지 눌러 봐야 알았습니다.
 
-          <p>한 줄로 흘립니다. 앞의 넷이 온전히 보이고 다음 것이 반쯤 걸쳐
-          있어, 더 있다는 것이 눈으로 읽힙니다 — 접어 숨기면 있는 줄도
-          모르고 지나가는데 그건 이 화면이 이미 겪은 일입니다.
-
-          <h3>이름은 기능이 드러나게</h3>
-
-          <p>"내놓기"·"추억" 은 눌러 보기 전에는 무엇인지 몰랐습니다. 재치
-          있는 말은 화면 안 제목과 설명에 두고, <b>단추 이름은 무슨 일이
-          일어나는지</b>를 적습니다. 카피가 사라지는 것이 아니라 제자리를
-          찾아가는 것입니다.
+          <p>가는 것은 아래 띠로 내렸습니다. 어느 화면에 있든 같은 자리에
+          있고, 지금 어디인지도 거기서 말합니다. 여기 남는 것은 이 화면에서
+          하는 일뿐이라 셋이고, 한 줄에 다 들어갑니다.
         */}
         <ScrollView
           horizontal
@@ -1292,55 +1354,14 @@ export default function TripScreen() {
           /* 판을 내렸을 때 여기까지 보이게 하려고 높이를 재 둡니다. */
           onLayout={(e) => setRailTall(e.nativeEvent.layout.height)}>
           <Row gap={Spacing.xs} style={styles.shortcuts}>
-            {/*
-              길 위에서는 짜는 화면이 방해입니다. 지금 갈 곳만 크게 보는
-              쪽으로 넘어갑니다.
-
-              오늘이 이 여행의 날 중 하나면 맨 앞에 둡니다. 그날 이 화면에서
-              가장 먼저 누를 것이 그것입니다.
-            */}
-            {onTrip ? (
-              <Shortcut
-                icon="flag"
-                label="여행 중"
-                onPress={() => router.push({ pathname: '/travel/[id]', params: { id } })}
-              />
-            ) : null}
             {/* 갈 곳의 이름을 알아야만 넣을 수 있었습니다. "비 올 때 갈 만한
                 실내" 는 적을 데가 없어서, 블로그를 뒤져 이름을 알아낸 다음에야
                 여기로 돌아와야 했습니다. */}
             {canEdit ? (
               <Shortcut icon="search" label="어디 갈까" onPress={() => setAsking(true)} />
             ) : null}
-            {/* 아직 정하지 않은 곳은 일정이 아니라 여기에 모입니다. */}
-            <Shortcut
-              icon="thumbs-up"
-              label="가고 싶은 곳"
-              onPress={() => router.push({ pathname: '/vote/[id]', params: { id } })}
-            />
             {/* 떠나기 전에 서로 "그거 챙겼어?" 를 몇 번씩 묻게 됩니다. */}
             <Shortcut icon="check" label="챙길 것" onPress={() => setPacking(true)} />
-            {/* 여행에서 서로 껄끄러워지는 자리는 돈입니다. 쓴 김에 적어 두면
-                돌아와서 카톡을 거슬러 올라갈 일이 없습니다. */}
-            <Shortcut
-              icon="credit-card"
-              label="가계부"
-              onPress={() => router.push({ pathname: '/money/[id]', params: { id } })}
-            />
-            {/* "추억" 이었습니다. 실제로 여는 것은 영수증과 동선 다시보기라,
-                이름이 그 둘 중 어느 것도 가리키지 않았습니다. */}
-            <Shortcut
-              icon="book-open"
-              label="여행 요약"
-              onPress={() => router.push({ pathname: '/card/[id]', params: { id } })}
-            />
-            {onTrip ? null : (
-              <Shortcut
-                icon="flag"
-                label="여행 중"
-                onPress={() => router.push({ pathname: '/travel/[id]', params: { id } })}
-              />
-            )}
             {/* "내놓기" 였습니다. 무엇을 어디에 내놓는지가 안 읽혔습니다.
                 올리는 것은 주인만 할 수 있습니다 — 서버도 그렇게 막습니다. */}
             {mine ? (

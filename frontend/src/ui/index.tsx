@@ -212,6 +212,21 @@ type ScreenProps = {
    * 헷갈립니다. 목록 위에 띄웁니다.
    */
   snack?: React.ReactNode;
+  /**
+   * 아래에 붙는 갈래 띠. {@code <AppTabs />} 를 둡니다.
+   *
+   * <p>갈래 안에 있는 화면만 켭니다. 여행 하나에 들어간 뒤에는 그 여행의
+   * 띠가 대신 서므로 여기서는 안 켭니다 — 띠가 둘이면 어느 것이 지금
+   * 어디인지를 말하는지 알 수 없습니다.
+   *
+   * <p>여기서 만들지 않고 <b>받습니다.</b> 만들려면 이 파일이 띠를 부르고
+   * 띠가 이 파일의 Icon·Press 를 부르는 고리가 생깁니다. 머리 아픈 고리를
+   * 두느니 header·footer 와 같은 방식으로 받는 편이 낫습니다.
+   *
+   * <p>켜면 굴러가는 내용 아래를 그만큼 비웁니다. 안 그러면 마지막 줄이
+   * 띠 뒤로 들어가 영영 안 보입니다.
+   */
+  tabs?: React.ReactNode;
   scroll?: boolean;
   /** 위에 막대(헤더)가 없는 화면이면 켭니다. 노치를 피해 여백을 넣습니다. */
   safeTop?: boolean;
@@ -240,7 +255,7 @@ function useKeyboardUp() {
 }
 
 export const Screen = forwardRef<ScreenHandle, ScreenProps>(function Screen(
-  { children, header, footer, snack, scroll = true, safeTop = false },
+  { children, header, footer, snack, tabs, scroll = true, safeTop = false },
   ref,
 ) {
   const insets = useSafeAreaInsets();
@@ -279,8 +294,11 @@ export const Screen = forwardRef<ScreenHandle, ScreenProps>(function Screen(
             styles.scrollBody,
             {
               paddingTop: header ? Spacing.lg : (safeTop ? insets.top : 0) + Spacing.xxl,
-              /* 아래 버튼이 있으면 그 높이만큼, 없으면 홈 인디케이터만큼 띄웁니다. */
-              paddingBottom: footer ? Spacing.xl : insets.bottom + Spacing.huge,
+              /* 아래 버튼이 있으면 그 높이만큼, 없으면 홈 인디케이터만큼 띄웁니다.
+                 갈래 띠까지 있으면 그만큼 더 비웁니다 — 마지막 줄이 띠 뒤로
+                 들어가면 아무리 굴려도 안 보입니다. */
+              paddingBottom:
+                (footer ? Spacing.xl : insets.bottom + Spacing.huge) + (tabs ? TAB_DOCK : 0),
             },
           ]}
           keyboardShouldPersistTaps="handled"
@@ -311,11 +329,18 @@ export const Screen = forwardRef<ScreenHandle, ScreenProps>(function Screen(
         </View>
       ) : null}
 
+      {/* 갈래 띠. 자판이 올라와 있으면 걷습니다 — 글을 치는 동안 띠가
+          자판 위에 얹혀 있으면 그것대로 자리를 먹습니다. */}
+      {tabs && !keyboardUp ? tabs : null}
+
       {footer ? (
         <View
           style={[
             styles.footer,
-            { paddingBottom: (keyboardUp ? 0 : insets.bottom) + Spacing.md },
+            {
+              paddingBottom:
+                (keyboardUp ? 0 : insets.bottom) + Spacing.md + (tabs && !keyboardUp ? TAB_DOCK : 0),
+            },
           ]}>
           <View style={styles.footerInner}>
             <OnFloor.Provider value>{footer}</OnFloor.Provider>
@@ -517,6 +542,15 @@ const toneSoft: Record<Tone, string> = {
  * 단추가 그것을 읽습니다.
  */
 const OnFloor = createContext(false);
+
+/**
+ * 갈래 띠가 먹는 높이.
+ *
+ * <p>띠를 재서 쓰는 편이 정확하지만, 그러려면 처음 한 번은 띠 없이 그렸다가
+ * 잰 뒤 다시 그려야 해서 화면이 한 번 덜컥합니다. 띠 높이는 내용에 따라
+ * 변하지 않으므로(그림 하나와 작은 글자 하나) 값으로 둡니다.
+ */
+const TAB_DOCK = 68;
 
 /** 화면의 제목. 한 화면에 하나만. */
 export function Title({ children, tone }: { children: React.ReactNode; tone?: Tone }) {
@@ -1661,6 +1695,7 @@ export const DragSheet = forwardRef<DragSheetHandle, DragSheetProps>(function Dr
   /** 판 맨 위에 늘 보이는 줄. 손잡이 옆에 붙습니다. */
   peek,
   revealAtLow,
+  lift = 0,
   onHeightChange,
 }, ref) {
   const { height } = useWindowDimensions();
@@ -1810,7 +1845,7 @@ export const DragSheet = forwardRef<DragSheetHandle, DragSheetProps>(function Dr
   const top = at >= stops.length - 1;
 
   return (
-    <Animated.View style={[styles.dragSheet, { height: tall }]}>
+    <Animated.View style={[styles.dragSheet, { height: tall }, lift ? { bottom: lift } : null]}>
       {/* 손잡이와 그 옆 줄까지가 끄는 자리입니다. 손잡이만 잡게 하면
           손가락으로는 잘 안 맞습니다. */}
       <View
@@ -1876,6 +1911,13 @@ type DragSheetProps = {
    * <p>안 주면 지금까지처럼 {@code snaps[0]} 대로 화면 비율을 씁니다.
    */
   revealAtLow?: number;
+  /**
+   * 화면 바닥에서 몇 픽셀 띄울지.
+   *
+   * <p>아래에 갈래 띠가 떠 있는 화면에서 씁니다. 안 띄우면 판이 띠 뒤로
+   * 들어가, 판의 마지막 줄과 띠가 겹칩니다.
+   */
+  lift?: number;
   /**
    * 판이 지금 몇 픽셀을 덮고 있는지.
    *

@@ -36,6 +36,7 @@ import {
   SearchField,
   Split,
 } from '@/ui';
+import { AppTabs } from '@/ui/tab-bar';
 
 /**
  * 보석함.
@@ -241,6 +242,7 @@ export default function Saved() {
 
   return (
     <Screen
+      tabs={<AppTabs />}
       footer={
         picked.size > 0 ? (
           <Button label={`${picked.size}곳 일정에 넣기`} onPress={() => setPouring(true)} />

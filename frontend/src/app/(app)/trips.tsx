@@ -31,6 +31,7 @@ import {
   Split,
   Subtitle,
 } from '@/ui';
+import { AppTabs } from '@/ui/tab-bar';
 
 /**
  * 내 여행.
@@ -118,6 +119,7 @@ export default function Trips() {
   return (
     <Screen
       safeTop
+      tabs={<AppTabs />}
       /* 주 동작은 아래에 붙입니다. 한 손으로 쥐었을 때 엄지가 닿는 자리입니다. */
       footer={<Button label="새 여행 만들기" onPress={() => setCreating(true)} />}>
       {/* 무엇 때문에 고르는 중인지. 여느 때는 말할 것이 없습니다. */}

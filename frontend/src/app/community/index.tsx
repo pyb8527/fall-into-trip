@@ -31,6 +31,7 @@ import {
   Split,
   Subtitle,
 } from '@/ui';
+import { AppTabs } from '@/ui/tab-bar';
 
 /**
  * 남들이 올린 일정.
@@ -177,7 +178,7 @@ export default function Community() {
   }
 
   return (
-    <Screen>
+    <Screen tabs={<AppTabs />}>
       <SegmentedTabs
         items={user ? TABS : TABS.filter((t) => !PRIVATE.includes(t.value))}
         value={view}

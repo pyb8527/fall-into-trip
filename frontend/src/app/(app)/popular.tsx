@@ -25,6 +25,7 @@ import {
   Split,
   Subtitle,
 } from '@/ui';
+import { AppTabs } from '@/ui/tab-bar';
 
 type Tab = 'places' | 'regions';
 
@@ -87,7 +88,7 @@ export default function Popular() {
   );
 
   return (
-    <Screen>
+    <Screen tabs={<AppTabs />}>
       <SegmentedTabs items={TABS} value={tab} onChange={setTab} />
 
       {tab === 'places' ? (
