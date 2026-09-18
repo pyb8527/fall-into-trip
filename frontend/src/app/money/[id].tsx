@@ -5,7 +5,7 @@ import { StyleSheet, View } from 'react-native';
 import { api, ApiError, UNEXPECTED } from '@/api/client';
 import type { Books, Companion, Spend, TripDetail } from '@/api/types';
 import { useAsync } from '@/api/use-async';
-import { Colors, Spacing } from '@/constants/theme';
+import { Colors, Spacing, dayColor } from '@/constants/theme';
 import { decimalsOf, money, unitsOf } from '@/lib/money';
 import {
   Badge,
@@ -152,7 +152,12 @@ export default function Money() {
           {/* 날짜별로 묶습니다. 여행의 돈은 하루 단위로 기억됩니다 —
               "둘째 날에 많이 썼지" 처럼. */}
           {byDay(list, days).map((group) => (
-            <View key={group.key} style={styles.group}>
+            <View
+              key={group.key}
+              style={[
+                styles.group,
+                group.color ? { borderLeftColor: group.color } : styles.groupPlain,
+              ]}>
               <Split align="baseline">
                 <Subtitle>{group.label}</Subtitle>
                 <Caption tone="secondary">
@@ -505,6 +510,14 @@ function AddSheet({
 function byDay(list: Spend[], days: TripDetail['days']) {
   const order = ['', ...days.map((d) => d.id)];
   const labels = new Map(days.map((d) => [d.id, d.date || d.label]));
+  /*
+    날짜 색도 함께 꺼냅니다.
+
+    지도의 핀과 동선, 일정 화면의 날짜 카드가 이미 이 색을 씁니다. 가계부만
+    무채색으로 남아 있어서, 같은 "둘째 날" 이 두 화면에서 다른 것처럼
+    보였습니다. 색이 날짜를 뜻한다면 그 말을 앱 어디서나 해야 합니다.
+  */
+  const colors = new Map(days.map((d, i) => [d.id, d.color || dayColor(i)]));
 
   const box = new Map<string, Spend[]>();
   list.forEach((e) => {
@@ -524,6 +537,8 @@ function byDay(list: Spend[], days: TripDetail['days']) {
       return {
         key,
         label: key === '' ? '날짜 없음' : (labels.get(key) ?? '날짜 없음'),
+        /* 어느 날인지 모르는 것에는 색이 없습니다. */
+        color: colors.get(key) ?? null,
         items,
         totals: [...sums.entries()],
       };
@@ -531,8 +546,16 @@ function byDay(list: Spend[], days: TripDetail['days']) {
 }
 
 const styles = StyleSheet.create({
+  /* 일정 화면의 날짜 카드가 쓰는 것과 같은 띠입니다. 같은 날이 두 화면에서
+     같은 색으로 읽혀야 색이 날짜를 뜻하는 말이 됩니다. */
   group: {
     gap: Spacing.xs,
+    borderLeftWidth: 4,
+    paddingLeft: Spacing.md,
+  },
+  /* 어느 날인지 모르는 묶음. 띠 자리는 남겨 두어야 다른 묶음과 줄이 맞습니다. */
+  groupPlain: {
+    borderLeftColor: Colors.border,
   },
   row: {
     alignItems: 'center',

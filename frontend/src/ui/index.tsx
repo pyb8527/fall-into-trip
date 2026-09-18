@@ -1104,10 +1104,21 @@ export function FilterChip({
   );
 }
 
-/** 상태를 한눈에 보여 주는 작은 표식. 누르는 것이 아닙니다. */
+/**
+ * 상태를 한눈에 보여 주는 작은 표식. 누르는 것이 아닙니다.
+ *
+ * <h3>테두리 대신 옅은 바탕</h3>
+ *
+ * <p>글자색과 같은 색으로 테두리를 둘렀습니다. 그래서 <code>success</code> 나
+ * <code>default</code> 처럼 진한 톤에서는 <b>검은 실선 한 칸</b>이 되어,
+ * 둥근 카드들 사이에서 그것만 날카로웠습니다.
+ *
+ * <p>선을 걷고 옅은 바탕을 깝니다. 배지는 상태를 알리는 것이지 경계를
+ * 긋는 것이 아닙니다.
+ */
 export function Badge({ label, tone = 'muted' }: { label: string; tone?: Tone }) {
   return (
-    <View style={[styles.badge, { borderColor: toneColor[tone] }]}>
+    <View style={[styles.badge, { backgroundColor: toneSoft[tone] }]}>
       <Text style={[styles.badgeLabel, { color: toneColor[tone] }]}>{label}</Text>
     </View>
   );
@@ -2283,9 +2294,19 @@ const styles = StyleSheet.create({
      그림자를 더 얹을 이유가 없습니다. */
   buttonGlow: {},
   /* 되돌릴 수 없는 단추만 두른 테두리. 색을 못 쓰니 굵기로 가릅니다. */
+  /*
+    되돌릴 수 없는 것.
+
+    <p>검정 1.5px 를 둘렀습니다. 색을 안 쓰기로 했던 때, 빨강을 뺀 자리에
+    무언가는 있어야 해서였습니다. 그런데 이제 회색 바닥에 흰 카드가 놓이고
+    모서리가 둥근 화면에서 그 선만 날카로워, 서류 양식 한 칸처럼 보입니다.
+
+    <p>선을 가늘게 하고 글씨를 진하게 둡니다. 어차피 이 단추 앞에는 늘
+    한 번 더 묻는 판이 섭니다 — 무게는 거기서 집니다.
+  */
   buttonEdge: {
-    borderWidth: 1.5,
-    borderColor: Colors.text,
+    borderWidth: 1,
+    borderColor: Colors.borderStrong,
   },
   buttonHair: {
     borderWidth: StyleSheet.hairlineWidth,
@@ -2570,9 +2591,8 @@ const styles = StyleSheet.create({
 
   badge: {
     borderRadius: Radius.full,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingVertical: 2,
-    paddingHorizontal: Spacing.sm - 1,
+    paddingVertical: 3,
+    paddingHorizontal: Spacing.sm + 1,
   },
   badgeLabel: {
     ...Type.label,
