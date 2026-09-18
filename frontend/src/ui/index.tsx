@@ -348,6 +348,65 @@ export function Row({ children, style, gap = Spacing.sm, ...rest }: ViewProps & 
   );
 }
 
+/**
+ * 왼쪽에 말하는 것, 오른쪽에 하는 것.
+ *
+ * <h3>왜 따로 두는가</h3>
+ *
+ * <p>화면마다 손으로 만들고 있었습니다 — {@code head}, {@code sheetHead},
+ * {@code headTop}, {@code cardHead}, {@code sectionHead}, {@code groupHead},
+ * {@code dayHeader}, {@code metaRow}, {@code totalRow}… 이름이 열셋인데 속은
+ * 전부 같은 것이었고, 스물두 자리에 흩어져 있었습니다.
+ *
+ * <p>이름이 열셋이면 무엇을 하나 고칠 때 열세 군데를 찾아야 합니다. 제목과
+ * 단추 사이를 한 눈금 넓히는 것 같은 일도 그렇습니다.
+ *
+ * <h3>맞춤은 세로만 고릅니다</h3>
+ *
+ * <p>가로로 양끝에 붙이는 것은 늘 같습니다. 세로는 자리마다 다릅니다 —
+ * 글자끼리 나란히 놓을 때는 밑줄(baseline), 단추가 끼면 가운데(center),
+ * 오른쪽이 여러 줄이면 위(start). 이 셋뿐입니다.
+ */
+export function Split({
+  children,
+  align = 'center',
+  gap = Spacing.sm,
+  style,
+  ...rest
+}: ViewProps & {
+  /** 세로로 무엇에 맞출지. 글자끼리면 baseline, 단추가 끼면 center. */
+  align?: 'center' | 'baseline' | 'start';
+  gap?: number;
+}) {
+  return (
+    <View
+      style={[
+        styles.split,
+        { gap, alignItems: align === 'start' ? 'flex-start' : align },
+        style,
+      ]}
+      {...rest}>
+      {children}
+    </View>
+  );
+}
+
+/**
+ * 남는 자리를 다 먹는 칸.
+ *
+ * <p>{@link Split} 의 왼쪽에 대개 이것이 옵니다. 이름을 길게 적어 두고
+ * 오른쪽 단추는 제 크기만 쓰게 하려면 왼쪽이 늘어나야 합니다. 이것도
+ * {@code grow}·{@code half}·{@code name}·{@code who}·{@code identity} 처럼
+ * 화면마다 다른 이름으로 같은 것을 적고 있었습니다.
+ */
+export function Grow({ children, style, gap, ...rest }: ViewProps & { gap?: number }) {
+  return (
+    <View style={[styles.grow, gap === undefined ? null : { gap }, style]} {...rest}>
+      {children}
+    </View>
+  );
+}
+
 /** 카드 안에서 내용을 가르는 얇은 선. */
 export function Divider() {
   return <View style={styles.divider} />;
@@ -475,6 +534,7 @@ export function Field({
   onFocus,
   onBlur,
   action,
+  mark,
   ...rest
 }: TextInputProps & {
   label: string;
@@ -487,6 +547,17 @@ export function Field({
    * 칸과 단추 사이가 벌어져 둘이 한 벌로 안 읽히고, 그만큼 세로로 길어집니다.
    */
   action?: { icon: IconName; label: string; onPress: () => void; disabled?: boolean };
+  /**
+   * 같은 자리에 놓되 <b>누르는 것이 아닌</b> 표식.
+   *
+   * <p>치는 대로 걸러지는 칸에는 누를 것이 없습니다. 그런 자리에도 돋보기를
+   * 단추로 달아 두었더니, 눌러도 아무 일이 안 일어나는 단추가 다섯 곳에
+   * 생겼습니다. 눌리는 모양인데 안 눌리면 고장으로 읽힙니다.
+   *
+   * <p>그렇다고 떼어 버리면 이 칸이 찾는 칸인지 적는 칸인지가 안 보입니다.
+   * 그려는 두되 누르는 것이 아니게 둡니다.
+   */
+  mark?: IconName;
 }) {
   /* 지금 쓰고 있는 칸이 어디인지 보이게 합니다. 회색 칸이 여럿 붙어 있으면
      커서만으로는 눈에 잘 띄지 않습니다. */
@@ -512,8 +583,8 @@ export function Field({
             multiline && styles.inputMultiline,
             focused && styles.inputFocused,
             error ? styles.inputError : null,
-            /* 단추가 붙으면 글자가 그 밑으로 들어가지 않게 오른쪽을 비웁니다. */
-            action ? styles.inputWithAction : null,
+            /* 단추나 표식이 붙으면 글자가 그 밑으로 들어가지 않게 오른쪽을 비웁니다. */
+            action || mark ? styles.inputWithAction : null,
             style,
           ]}
           {...rest}
@@ -529,6 +600,10 @@ export function Field({
               onPress={action.onPress}
             />
           </View>
+        ) : mark ? (
+          <View style={styles.fieldMark} pointerEvents="none">
+            <Icon name={mark} tone="muted" />
+          </View>
         ) : null}
       </View>
       {error ? (
@@ -537,6 +612,60 @@ export function Field({
         <Text style={styles.hint}>{hint}</Text>
       ) : null}
     </View>
+  );
+}
+
+/**
+ * 찾는 칸.
+ *
+ * <h3>두 가지가 섞여 있었습니다</h3>
+ *
+ * <p>여덟 자리에서 같은 묶음을 손으로 적고 있었는데, 속을 보니 둘이 섞여
+ * 있었습니다. <b>치는 대로 걸러지는 것</b>(보석함, 여행 목록)과 <b>눌러야
+ * 물어보는 것</b>(장소 찾기, 추천, 둘러보기)입니다.
+ *
+ * <p>앞쪽 다섯 자리에도 돋보기가 단추로 달려 있었고, 누르면
+ * {@code () => {}} 였습니다. 눌리는 모양인데 아무 일도 안 일어납니다.
+ *
+ * <p>여기서 가릅니다. {@code onSearch} 를 주면 눌러서 묻는 칸이 되고, 안
+ * 주면 돋보기는 표식으로만 남습니다 — 치는 대로 이미 걸러지고 있으니
+ * 누를 것이 없습니다.
+ */
+export function SearchField({
+  label,
+  value,
+  onChangeText,
+  placeholder,
+  hint,
+  onSearch,
+  busy,
+}: {
+  label: string;
+  value: string;
+  onChangeText: (next: string) => void;
+  placeholder?: string;
+  hint?: string;
+  /** 눌러야 묻는 칸이면 줍니다. 안 주면 치는 대로 걸러지는 칸입니다. */
+  onSearch?: () => void;
+  busy?: boolean;
+}) {
+  return (
+    <Field
+      label={label}
+      value={value}
+      onChangeText={onChangeText}
+      placeholder={placeholder}
+      hint={hint}
+      autoCorrect={false}
+      returnKeyType="search"
+      onSubmitEditing={onSearch}
+      mark={onSearch ? undefined : 'search'}
+      action={
+        onSearch
+          ? { icon: 'search', label, disabled: !value.trim() || busy, onPress: onSearch }
+          : undefined
+      }
+    />
   );
 }
 
@@ -716,6 +845,102 @@ export function Switch({
         />
       </View>
     </Pressable>
+  );
+}
+
+/**
+ * 고른 것에 찍는 네모.
+ *
+ * <h3>왜 칩이 아닌가</h3>
+ *
+ * <p>칩은 <b>무엇을 볼지</b> 고르는 것입니다 — 갈래, 정렬, 통화. 누르면
+ * 화면에 보이는 것이 바뀝니다.
+ *
+ * <p>체크는 <b>무엇을 가지고 갈지</b> 고르는 것입니다. 여러 개를 골라 두고
+ * 마지막에 한 번에 처리합니다. 둘은 다른 일인데 지금까지 칩 하나로 둘 다
+ * 하고 있었고, 그래서 화면에 칩이 늘어서 있으면 그중 무엇이 거르는 것이고
+ * 무엇이 담는 것인지 눌러 보기 전에는 몰랐습니다.
+ *
+ * <h3>색으로만 말하지 않습니다</h3>
+ *
+ * <p>고른 줄은 바탕이 옅게 깔리지만, 무채색 화면에서 그것 하나로는
+ * "눌렀나?" 가 남습니다. 네모가 채워지는 것이 눈에 훨씬 잘 걸립니다.
+ */
+export function Checkbox({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: () => void;
+  /** 무엇을 고르는 것인지. 눈에는 안 보이고 읽어 주는 기기만 씁니다. */
+  label: string;
+}) {
+  return (
+    <Press
+      onPress={onChange}
+      scale={0.88}
+      hitSlop={Spacing.sm}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ selected: checked }}
+      style={styles.checkTap}>
+      <View style={[styles.check, checked ? styles.checkOn : null]}>
+        {checked ? <Icon name="check" size={15} tone="inverse" /> : null}
+      </View>
+    </Press>
+  );
+}
+
+/**
+ * 그림과 이름이 함께 있는, 눌러서 고르는 칸.
+ *
+ * <h3>무엇을 대신하는가</h3>
+ *
+ * <p>핀 그림 고르기({@code icon-picker})와 동행자 얼굴 고르기({@code
+ * settings})가 이것을 각각 따로 만들고 있었습니다. 이모지가 줄 높이 때문에
+ * 아래로 처지는 것을 막는 {@code lineHeight: undefined} 한 줄까지 주석째
+ * 복사돼 있었습니다.
+ *
+ * <h3>이름을 함께 답니다</h3>
+ *
+ * <p>그림만 늘어놓으면 뜻을 짐작해야 합니다. 이모지는 기기마다 다르게 생겨,
+ * 어떤 폰에서는 라멘과 우동이 거의 같아 보입니다. 다만 얼굴 고르기처럼
+ * 이름을 붙일 것이 없는 자리도 있어, 없으면 그림만 그립니다.
+ */
+export function ChoiceTile({
+  mark,
+  label,
+  selected,
+  onPress,
+  accessibilityLabel,
+}: {
+  /** 칸에 그릴 것. 이모지 한 글자거나, 그림이 없으면 비웁니다. */
+  mark?: string;
+  /** 그림 아래 적는 말. 없으면 그림만. 그림이 없으면 이것이 대신 들어갑니다. */
+  label?: string;
+  selected: boolean;
+  onPress: () => void;
+  accessibilityLabel: string;
+}) {
+  return (
+    <Press
+      onPress={onPress}
+      scale={0.9}
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ selected }}
+      style={[styles.tile, label ? null : styles.tileBare, selected ? styles.tileOn : null]}>
+      {mark ? <Text style={styles.tileMark}>{mark}</Text> : null}
+      {label ? (
+        <Text
+          style={[
+            mark ? styles.tileLabel : styles.tileLabelAlone,
+            { color: selected ? Colors.accentInk : mark ? Colors.textMuted : Colors.textSecondary },
+          ]}>
+          {label}
+        </Text>
+      ) : null}
+    </Press>
   );
 }
 
@@ -1425,6 +1650,60 @@ export function Stepper({
 
 /* ------------------------------------------------------------------ 상태 */
 
+/**
+ * 이전 / 지금 몇 쪽 / 다음.
+ *
+ * <h3>넷이 똑같이 있었습니다</h3>
+ *
+ * <p>{@code admin/users}, {@code admin/posts}, {@code admin/audit},
+ * {@code community/index} 에 열여덟 줄짜리 같은 것이 네 벌 있었습니다.
+ * 셋은 글자까지 한 글자도 안 다르고, 하나만 "전체 N" 이 더 붙어 있었습니다.
+ *
+ * <h3>한 쪽뿐이면 안 냅니다</h3>
+ *
+ * <p>넘길 데가 없는데 단추가 둘 서 있으면 눌러 보게 됩니다. 부르는 쪽마다
+ * {@code totalPages > 1} 을 손으로 재고 있었는데, 그 판단은 여기 것입니다.
+ */
+export function Pager({
+  page,
+  totalPages,
+  total,
+  onPage,
+}: {
+  /** 지금 몇 쪽인지. 0부터 셉니다 — 서버가 그렇게 줍니다. */
+  page: number;
+  totalPages: number;
+  /** 전부 몇 건인지. 있으면 쪽수 옆에 적습니다. */
+  total?: number;
+  onPage: (next: number) => void;
+}) {
+  if (totalPages <= 1) {
+    return null;
+  }
+  return (
+    <Split>
+      <Button
+        label="이전"
+        variant="secondary"
+        compact
+        disabled={page <= 0}
+        onPress={() => onPage(Math.max(0, page - 1))}
+      />
+      <Caption>
+        {page + 1} / {totalPages}
+        {total === undefined ? '' : ` · 전체 ${total.toLocaleString()}`}
+      </Caption>
+      <Button
+        label="다음"
+        variant="secondary"
+        compact
+        disabled={page >= totalPages - 1}
+        onPress={() => onPage(page + 1)}
+      />
+    </Split>
+  );
+}
+
 export function Loading({ label = '가져오는 중' }: { label?: string }) {
   return (
     <View style={styles.center}>
@@ -1601,6 +1880,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexWrap: 'wrap',
   },
+  /* 양끝에 붙이는 줄은 안 흘립니다. 흘러 내려가면 오른쪽 것이 제 줄을
+     잃고 왼쪽 아래로 붙어, 양끝에 둔 뜻이 사라집니다. */
+  split: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  grow: {
+    flex: 1,
+  },
 
   /* --------------------------------------------------- 지도 위의 판 */
   dragSheet: {
@@ -1734,6 +2022,14 @@ const styles = StyleSheet.create({
   fieldAction: {
     position: 'absolute',
     right: 0,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+  },
+  /* 단추와 같은 자리에 서되 누르는 넓이를 안 가집니다. */
+  fieldMark: {
+    position: 'absolute',
+    right: Spacing.md,
     top: 0,
     bottom: 0,
     justifyContent: 'center',
@@ -1943,6 +2239,65 @@ const styles = StyleSheet.create({
 
   /* 옅은 채움으로 구분하던 것을 가는 테두리로 바꿉니다. 무채색에서는
      옅은 채움끼리 밝기가 같아 아무 표시도 아닌 것이 됩니다. */
+  checkTap: {
+    width: Tap.min,
+    height: Tap.min,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  check: {
+    width: 22,
+    height: 22,
+    borderRadius: Radius.none,
+    borderWidth: 1.5,
+    borderColor: Colors.borderStrong,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkOn: {
+    backgroundColor: Colors.accent,
+    borderColor: Colors.accent,
+  },
+
+  tile: {
+    minWidth: 56,
+    minHeight: Tap.min,
+    /* 이름이 붙는 칸은 글자가 들어갈 만큼 넓어야 합니다. */
+    borderRadius: Radius.none,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.border,
+    backgroundColor: Colors.fill,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+  },
+  /* 그림만 있는 칸. 넓힐 이유가 없습니다 — 넓히면 같은 개수가 줄을 더
+     먹고, 고르는 화면이 그만큼 아래로 밀립니다. */
+  tileBare: {
+    minWidth: Tap.min,
+    width: Tap.min,
+  },
+  tileOn: {
+    borderColor: Colors.accent,
+    backgroundColor: Colors.accentSoft,
+  },
+  tileMark: {
+    ...Type.bodySmall,
+    /* 이모지는 글꼴이 제 높이를 갖고 있어, 줄 높이를 두면 아래로 처집니다. */
+    lineHeight: undefined,
+  },
+  tileLabel: {
+    ...Type.caption,
+  },
+  /* 그림 없이 글자만 들어가는 칸. 그림 아래 붙는 이름보다 한 단 큽니다 —
+     혼자 있으면 그것이 곧 그 칸의 얼굴입니다. */
+  tileLabelAlone: {
+    ...Type.bodySmall,
+    fontWeight: Weight.semibold,
+  },
+
   badge: {
     borderRadius: Radius.none,
     borderWidth: StyleSheet.hairlineWidth,

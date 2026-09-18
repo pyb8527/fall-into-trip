@@ -20,9 +20,11 @@ import {
   ErrorNote,
   Field,
   Loading,
+  Pager,
   Row,
   Screen,
   SegmentedTabs,
+  Split,
   Subtitle,
 } from '@/ui';
 
@@ -243,27 +245,11 @@ export default function Community() {
         />
       ))}
 
-      {data && data.totalPages > 1 ? (
-        <Row style={styles.pager}>
-          <Button
-            label="이전"
-            variant="secondary"
-            compact
-            disabled={page === 0}
-            onPress={() => setPage((p) => Math.max(0, p - 1))}
-          />
-          <Caption>
-            {data.page + 1} / {data.totalPages}
-          </Caption>
-          <Button
-            label="다음"
-            variant="secondary"
-            compact
-            disabled={page >= data.totalPages - 1}
-            onPress={() => setPage((p) => p + 1)}
-          />
-        </Row>
-      ) : null}
+      <Pager
+        page={data?.page ?? 0}
+        totalPages={data?.totalPages ?? 0}
+        onPage={setPage}
+      />
 
       <SignUpGate intent={gate} onClose={() => setGate(null)} />
     </Screen>
@@ -299,7 +285,7 @@ function PostRow({
         </Caption>
       </Pressable>
 
-      <Row style={styles.meta}>
+      <Split gap={Spacing.sm}>
         <Caption tone="secondary">조회 {post.viewCount.toLocaleString()}</Caption>
         {/* 하트는 목록에서 바로 누릅니다. 글을 열어야만 누를 수 있으면
             구경하다 마음에 든 것을 지나치게 됩니다. */}
@@ -309,7 +295,7 @@ function PostRow({
           compact
           onPress={onLike}
         />
-      </Row>
+      </Split>
     </Card>
   );
 }
@@ -321,14 +307,5 @@ const styles = StyleSheet.create({
   },
   tap: {
     gap: Spacing.xs,
-  },
-  meta: {
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  pager: {
-    justifyContent: 'space-between',
-    alignItems: 'center',
   },
 });

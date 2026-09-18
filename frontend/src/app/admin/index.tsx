@@ -16,6 +16,7 @@ import {
   Loading,
   Row,
   Screen,
+  Split,
   Subtitle,
   Title,
 } from '@/ui';
@@ -67,10 +68,10 @@ export default function AdminHome() {
               <>
                 <Divider />
                 {Object.entries(data.topActions).map(([action, count]) => (
-                  <Row key={action} style={styles.actionRow}>
+                  <Split key={action}>
                     <Caption tone="secondary">{action}</Caption>
                     <Caption strong>{count.toLocaleString()}</Caption>
-                  </Row>
+                  </Split>
                 ))}
               </>
             )}
@@ -136,8 +137,5 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.lg,
     gap: Spacing.xs,
-  },
-  actionRow: {
-    justifyContent: 'space-between',
   },
 });

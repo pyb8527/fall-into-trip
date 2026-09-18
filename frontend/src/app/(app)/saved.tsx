@@ -10,6 +10,7 @@ import type { MapPlace } from '@/components/map-types';
 import { PlaceDetailSheet } from '@/components/place-detail-sheet';
 import { PlaceSearch } from '@/components/place-search';
 import { RecommendSheet } from '@/components/recommend-sheet';
+import { DayPicker } from '@/components/day-picker';
 import { SavedRow } from '@/components/saved-row';
 import { SORT_GIVEN, SORT_NAME, SortBar, type SortBy } from '@/components/sort-bar';
 import { TripMap } from '@/components/trip-map';
@@ -25,13 +26,13 @@ import {
   ConfirmButton,
   Divider,
   Empty,
-  Field,
   ErrorNote,
+  Field,
   Loading,
-  ListRow,
   Row,
   Screen,
-  Subtitle,
+  SearchField,
+  Split,
 } from '@/ui';
 
 /**
@@ -234,7 +235,7 @@ export default function Saved() {
         위 막대가 이미 화면 이름을 적고 있으므로 여기서는 그것을 되풀이하지
         않습니다. 왼쪽은 지금 몇 곳이 들어 있는지, 오른쪽은 더 담는 자리.
       */}
-      <Row style={styles.head}>
+      <Split>
         <View style={styles.grow}>
           <Body tone="secondary">
             {all.length > 0
@@ -243,7 +244,7 @@ export default function Saved() {
           </Body>
         </View>
         <Button label="담기" compact onPress={() => setKeeping(true)} />
-      </Row>
+      </Split>
 
       {loading && !data ? <Loading /> : null}
       {error ? <ErrorNote message={error} onRetry={reload} /> : null}
@@ -269,13 +270,11 @@ export default function Saved() {
 
       {/* 몇 개 안 될 때는 찾을 것이 없습니다. 칸만 자리를 차지합니다. */}
       {all.length > 4 ? (
-        <Field
+        <SearchField
           label="보석함에서 찾기"
           value={q}
           onChangeText={setQ}
           placeholder="국밥, 온천, 도톤보리"
-          returnKeyType="search"
-          action={{ icon: 'search', label: '보석함에서 찾기', onPress: () => {} }}
         />
       ) : null}
 
@@ -457,16 +456,20 @@ export default function Saved() {
         here={null}
       />
 
-      <PourSheet
+      <DayPicker
         visible={pouring}
-        count={picked.size}
+        note={`고른 ${picked.size}곳이 그 날 맨 뒤에 붙습니다. 순서는 넣은 뒤 바꿀 수 있습니다.`}
+        onPour={(dayId) =>
+          api.post(`/api/days/${dayId}/places/from-saved`, { savedIds: [...picked] })
+        }
         onCancel={() => setPouring(false)}
         onDone={(tripId) => {
           setPouring(false);
           setPicked(new Set());
-          router.push({ pathname: '/trip/[id]', params: { id: tripId } });
+          if (tripId) {
+            router.push({ pathname: '/trip/[id]', params: { id: tripId } });
+          }
         }}
-        savedIds={[...picked]}
       />
     </Screen>
   );
@@ -539,120 +542,7 @@ function Why({
   );
 }
 
-/**
- * 어느 날에 넣을지 고릅니다.
- *
- * <p>여행을 고르면 그 안의 날짜를 부릅니다. 날짜까지 한 번에 늘어놓으면 여행이
- * 여럿일 때 목록이 감당이 안 됩니다.
- */
-function PourSheet({
-  visible,
-  count,
-  savedIds,
-  onDone,
-  onCancel,
-}: {
-  visible: boolean;
-  count: number;
-  savedIds: string[];
-  onDone: (tripId: string) => void;
-  onCancel: () => void;
-}) {
-  const [trip, setTrip] = useState<TripSummary | null>(null);
-  /** 여행 고르는 칸에서 이름으로 거르기. */
-  const [pick, setPick] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [failed, setFailed] = useState<string | null>(null);
-
-  const { data: trips } = useAsync<{ trips: TripSummary[] }>(
-    (signal) => (visible ? api.get('/api/trips', signal) : Promise.resolve({ trips: [] })),
-    [visible],
-  );
-  const { data: detail } = useAsync<TripDetail | null>(
-    (signal) =>
-      trip
-        ? api.get(`/api/trip?trip=${encodeURIComponent(trip.id)}`, signal)
-        : Promise.resolve(null),
-    [trip],
-  );
-
-  async function pour(dayId: string) {
-    setFailed(null);
-    setBusy(true);
-    try {
-      await api.post(`/api/days/${dayId}/places/from-saved`, { savedIds });
-      onDone(trip!.id);
-    } catch (e) {
-      setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <BottomSheet
-      visible={visible}
-      title={trip ? '어느 날에 넣을까요?' : '어느 여행에 넣을까요?'}
-      onClose={() => {
-        setTrip(null);
-        onCancel();
-      }}>
-      <Caption tone="secondary">
-        고른 {count}곳이 그 날 맨 뒤에 붙습니다. 순서는 넣은 뒤 바꿀 수 있습니다.
-      </Caption>
-
-      {failed ? <ErrorNote message={failed} /> : null}
-
-      {/* 여행이 여럿이면 여기서도 훑어 내려가야 합니다. 다섯을 넘을 때만 냅니다. */}
-      {trip === null && (trips?.trips.length ?? 0) > 5 ? (
-        <Field
-          label="여행 찾기"
-          value={pick}
-          onChangeText={setPick}
-          placeholder="오사카, 제주"
-          returnKeyType="search"
-          action={{ icon: 'search', label: '여행 찾기', onPress: () => {} }}
-        />
-      ) : null}
-
-      {trip === null
-        ? (trips?.trips ?? [])
-            .filter((t) => t.title.toLowerCase().includes(pick.trim().toLowerCase()))
-            .map((t) => (
-              <ListRow
-                key={t.id}
-                title={t.title}
-                subtitle={`${t.dayCount}일 · 장소 ${t.placeCount}곳`}
-                onPress={() => setTrip(t)}
-              />
-            ))
-        : null}
-
-      {trip !== null ? (
-        <>
-          <Row style={styles.back}>
-            <Subtitle>{trip.title}</Subtitle>
-            <Button label="다른 여행" variant="ghost" compact onPress={() => setTrip(null)} />
-          </Row>
-          {detail?.days.map((day) => (
-            <ListRow
-              key={day.id}
-              title={day.date || day.label}
-              subtitle={`장소 ${day.places.length}곳`}
-              onPress={() => (busy ? undefined : pour(day.id))}
-            />
-          ))}
-        </>
-      ) : null}
-    </BottomSheet>
-  );
-}
-
 const styles = StyleSheet.create({
-  head: {
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
   grow: {
     flex: 1,
   },
@@ -673,10 +563,6 @@ const styles = StyleSheet.create({
   },
   actions: {
     flexWrap: 'wrap',
-    alignItems: 'center',
-  },
-  back: {
-    justifyContent: 'space-between',
     alignItems: 'center',
   },
 });

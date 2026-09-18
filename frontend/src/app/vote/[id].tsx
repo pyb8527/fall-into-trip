@@ -5,6 +5,7 @@ import { StyleSheet, View } from 'react-native';
 import { api, ApiError, UNEXPECTED } from '@/api/client';
 import type { Candidate, SavedPlace, TripDetail } from '@/api/types';
 import { useAsync } from '@/api/use-async';
+import { DayPicker } from '@/components/day-picker';
 import { PlaceSearch } from '@/components/place-search';
 import { iconOf } from '@/constants/place-icons';
 import { Spacing } from '@/constants/theme';
@@ -17,7 +18,6 @@ import {
   Card,
   ConfirmDialog,
   Divider,
-  Field,
   Empty,
   ErrorNote,
   IconButton,
@@ -25,6 +25,8 @@ import {
   Loading,
   Row,
   Screen,
+  SearchField,
+  Split,
   Subtitle,
   Title,
 } from '@/ui';
@@ -110,7 +112,7 @@ export default function Vote() {
 
       {data?.candidates.map((candidate) => (
         <Card key={candidate.id}>
-          <Row style={styles.cardHead}>
+          <Split align="start" gap={Spacing.md}>
             <View style={styles.grow}>
               <Subtitle>{`${iconOf(candidate.icon)} ${candidate.name}`.trim()}</Subtitle>
               {candidate.note || candidate.cat ? (
@@ -118,7 +120,7 @@ export default function Vote() {
               ) : null}
             </View>
             {candidate.agreed ? <Badge label="정해짐" tone="success" /> : null}
-          </Row>
+          </Split>
 
           <Row gap={Spacing.md}>
             <Caption tone="secondary">
@@ -187,14 +189,19 @@ export default function Vote() {
         }}
       />
 
-      <PourSheet
+      <DayPicker
         visible={pouring}
+        note={`정해진 ${agreed.length}곳이 그 날 맨 뒤에 붙고, 여기 목록에서는 사라집니다.`}
         days={trip?.days ?? []}
-        candidateIds={agreed.map((c) => c.id)}
+        onPour={(dayId) =>
+          api.post(`/api/days/${dayId}/places/from-candidates`, {
+            candidateIds: agreed.map((c) => c.id),
+          })
+        }
         onCancel={() => setPouring(false)}
         onDone={() => {
           setPouring(false);
-          router.replace({ pathname: '/trip/[id]', params: { id } });
+          reload();
         }}
       />
     </Screen>
@@ -252,13 +259,11 @@ function AddSheet({
           <Caption tone="secondary">보석함에서</Caption>
           {/* 담아 둔 것이 여럿이면 여기서도 훑어 내려가야 합니다. */}
           {saved.places.length > 5 ? (
-            <Field
+            <SearchField
               label="보석함에서 찾기"
               value={pick}
               onChangeText={setPick}
               placeholder="국밥, 온천"
-              returnKeyType="search"
-              action={{ icon: 'search', label: '보석함에서 찾기', onPress: () => {} }}
             />
           ) : null}
           {saved.places
@@ -281,62 +286,9 @@ function AddSheet({
   );
 }
 
-/** 정해진 것을 어느 날에 넣을지. */
-function PourSheet({
-  visible,
-  days,
-  candidateIds,
-  onDone,
-  onCancel,
-}: {
-  visible: boolean;
-  days: TripDetail['days'];
-  candidateIds: string[];
-  onDone: () => void;
-  onCancel: () => void;
-}) {
-  const [busy, setBusy] = useState(false);
-  const [failed, setFailed] = useState<string | null>(null);
-
-  async function pour(dayId: string) {
-    setFailed(null);
-    setBusy(true);
-    try {
-      await api.post(`/api/days/${dayId}/places/from-candidates`, { candidateIds });
-      onDone();
-    } catch (e) {
-      setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <BottomSheet visible={visible} title="어느 날에 넣을까요?" onClose={onCancel}>
-      <Caption tone="secondary">
-        정해진 {candidateIds.length}곳이 그 날 맨 뒤에 붙고, 여기 목록에서는 사라집니다.
-      </Caption>
-      {failed ? <ErrorNote message={failed} /> : null}
-      {days.map((day) => (
-        <ListRow
-          key={day.id}
-          title={day.date || day.label}
-          subtitle={`장소 ${day.places.length}곳`}
-          onPress={() => (busy ? undefined : pour(day.id))}
-        />
-      ))}
-    </BottomSheet>
-  );
-}
-
 const styles = StyleSheet.create({
   head: {
     gap: Spacing.xs,
-  },
-  cardHead: {
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: Spacing.md,
   },
   grow: {
     flex: 1,

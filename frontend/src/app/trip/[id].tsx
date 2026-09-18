@@ -35,7 +35,7 @@ import { TipSheet } from '@/components/tip-sheet';
 import { TripMap, type MapPlace } from '@/components/trip-map';
 import { iconOf } from '@/constants/place-icons';
 import { faceOf } from '@/constants/user-marks';
-import { metersBetween, SAME_SPOT } from '@/lib/geo';
+import { SAME_SPOT, metersBetween, readableMeters } from '@/lib/geo';
 import type { Found } from '@/components/map-types';
 import { PlaceDetailSheet, type Looked } from '@/components/place-detail-sheet';
 import { PlaceSearch } from '@/components/place-search';
@@ -52,7 +52,6 @@ import { decodePolyline } from '@/lib/polyline';
 import { DateField } from '@/ui/date-field';
 import { Colors, dayColor, Gutter, Radius, Spacing, Tap } from '@/constants/theme';
 import {
-  Badge,
   Body,
   BottomSheet,
   Button,
@@ -74,6 +73,7 @@ import {
   Press,
   Row,
   Screen,
+  Split,
   Subtitle,
   Switch,
 } from '@/ui';
@@ -1490,12 +1490,12 @@ function SheetHead({
 
   return (
     <View style={styles.head}>
-      <Row style={styles.headTop}>
+      <Split align="baseline">
         <Subtitle>{title}</Subtitle>
         <Caption tone={total > 0 && done === total ? 'success' : 'secondary'} strong>
           {done} / {total} 다녀옴
         </Caption>
-      </Row>
+      </Split>
 
       {total > 0 ? (
         <View style={styles.track}>
@@ -1730,7 +1730,7 @@ function DayCard({
 
   return (
     <Card>
-      <Row style={styles.dayHeader}>
+      <Split align="start" gap={Spacing.md}>
         <Pressable
           onPress={() => setFolded((v) => !v)}
           accessibilityRole="button"
@@ -1782,7 +1782,7 @@ function DayCard({
             />
           ) : null}
         </Row>
-      </Row>
+      </Split>
 
       {folded ? null : (
         <>
@@ -1846,10 +1846,10 @@ function DayCard({
               {tidy.worthIt ? (
                 <>
                   <Body small strong>
-                    이렇게 돌면 {km(tidy.beforeMeters - tidy.afterMeters)} 덜 걷습니다.
+                    이렇게 돌면 {readableMeters(tidy.beforeMeters - tidy.afterMeters)} 덜 걷습니다.
                   </Body>
                   <Caption tone="secondary">
-                    {km(tidy.beforeMeters)} → {km(tidy.afterMeters)} · 시간을 적어 둔 곳은
+                    {readableMeters(tidy.beforeMeters)} → {readableMeters(tidy.afterMeters)} · 시간을 적어 둔 곳은
                     그대로 둡니다.
                   </Caption>
                   <Row gap={Spacing.sm}>
@@ -3101,16 +3101,6 @@ type Tidy = {
 };
 
 /**
- * 거리를 사람이 읽는 말로.
- *
- * <p>1km 아래는 미터로, 그 위는 소수 한 자리까지. "3247m" 는 읽으라고 쓴
- * 글자가 아닙니다.
- */
-function km(meters: number) {
-  return meters < 1000 ? `${Math.round(meters)}m` : `${(meters / 1000).toFixed(1)}km`;
-}
-
-/**
  * 이 일정으로 새 여행 하나.
  *
  * <p>날짜는 반드시 새로 받습니다. 지난 날짜를 그대로 물려받으면 만들자마자
@@ -3277,10 +3267,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: Spacing.sm,
   },
-  headTop: {
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-  },
   track: {
     height: 5,
     borderRadius: Radius.none,
@@ -3295,11 +3281,6 @@ const styles = StyleSheet.create({
   dayTap: {
     flexShrink: 1,
     paddingVertical: Spacing.xs,
-  },
-  dayHeader: {
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: Spacing.md,
   },
   dayTitle: {
     flexShrink: 1,

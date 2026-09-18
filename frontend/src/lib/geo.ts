@@ -38,3 +38,29 @@ export function metersBetween(a: At, b: At): number {
  * 괜찮다는데 서버가 거절하는 일이 생깁니다.
  */
 export const SAME_SPOT = 30;
+
+/**
+ * 거리를 사람이 읽는 말로.
+ *
+ * <h3>세 군데서 따로 적고 있었습니다</h3>
+ *
+ * <p>일정 화면과 추천 판이 {@code km()} 라는 같은 함수를 한 글자도 안 틀리고
+ * 각각 갖고 있었고, 장소를 들여다보는 판은 {@code away()} 라는 이름으로 앞에
+ * "여기서" 만 붙인 것을 또 갖고 있었습니다.
+ *
+ * <p>세 벌이면 1km 를 넘는 자리를 "1.2km" 로 쓸지 "1,200m" 로 쓸지 같은 것을
+ * 바꿀 때 세 군데를 고쳐야 하고, 대개 한 군데를 빠뜨립니다.
+ *
+ * <h3>1km 아래는 미터로</h3>
+ *
+ * <p>"0.3km" 는 읽는 사람이 한 번 더 셈을 해야 합니다. 걸어갈 만한 거리는
+ * 미터로 적어야 몸으로 짐작이 됩니다.
+ */
+export function readableMeters(meters: number): string {
+  return meters < 1000 ? `${Math.round(meters)}m` : `${(meters / 1000).toFixed(1)}km`;
+}
+
+/** 여기서 저기까지. 기준이 있을 때 씁니다. */
+export function awayFrom(from: At, to: At): string {
+  return `여기서 ${readableMeters(metersBetween(from, to))}`;
+}

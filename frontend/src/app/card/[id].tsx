@@ -20,6 +20,7 @@ import {
   Row,
   Screen,
   SegmentedTabs,
+  Split,
   Subtitle,
   Title,
 } from '@/ui';
@@ -152,24 +153,24 @@ function Receipt({
       <Divider />
 
       {trip.days.map((day, i) => (
-        <Row key={day.id} style={styles.line}>
+        <Split key={day.id}>
           <Body small>{day.date || day.label}</Body>
           <Body small>{day.places.length}곳</Body>
-        </Row>
+        </Split>
       ))}
 
       <Divider />
 
-      <Row style={styles.line}>
+      <Split>
         <Caption>들른 곳</Caption>
         <Caption>{places.length}곳</Caption>
-      </Row>
-      <Row style={styles.line}>
+      </Split>
+      <Split>
         <Caption>다녀옴</Caption>
         <Caption>
           {done} / {places.length}
         </Caption>
-      </Row>
+      </Split>
       {/*
         쓴 돈.
 
@@ -186,16 +187,16 @@ function Receipt({
         혼자일 때 빠지는 것과 같습니다.
       */}
       {books.map((book, i) => (
-        <Row key={book.currency} style={styles.line}>
+        <Split key={book.currency}>
           <Caption>{i === 0 ? '쓴 돈' : ''}</Caption>
           <Caption>{money(book.total, book.currency, book.decimals)}</Caption>
-        </Row>
+        </Split>
       ))}
       {mates.length > 1 ? (
-        <Row style={styles.line}>
+        <Split>
           <Caption>함께한 사람</Caption>
           <Caption>{mates.length}명</Caption>
-        </Row>
+        </Split>
       ) : null}
 
       <Divider />
@@ -344,9 +345,6 @@ const styles = StyleSheet.create({
   center: {
     alignItems: 'center',
     gap: 2,
-  },
-  line: {
-    justifyContent: 'space-between',
   },
   replay: {
     gap: Spacing.md,

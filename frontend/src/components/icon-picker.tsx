@@ -1,8 +1,8 @@
 import { StyleSheet, View } from 'react-native';
 
 import { PLACE_ICONS } from '@/constants/place-icons';
-import { Colors, Radius, Spacing } from '@/constants/theme';
-import { Body, Caption, Press, Row } from '@/ui';
+import { Spacing } from '@/constants/theme';
+import { ChoiceTile, Row } from '@/ui';
 
 /**
  * 핀에 찍을 그림 고르기.
@@ -27,33 +27,22 @@ export function IconPicker({
   return (
     <View style={styles.picker}>
       <Row gap={Spacing.xs}>
-        <Press
+        <ChoiceTile
+          label={noneLabel}
+          selected={value === null}
           onPress={() => onChange(null)}
-          scale={0.9}
           accessibilityLabel={`그림 없이 ${noneLabel}`}
-          accessibilityState={{ selected: value === null }}
-          style={[styles.kind, value === null ? styles.kindOn : null]}>
-          <Body small strong tone={value === null ? 'accent' : 'secondary'}>
-            {noneLabel}
-          </Body>
-        </Press>
-        {PLACE_ICONS.map((kind) => {
-          const on = value === kind.key;
-          return (
-            <Press
-              key={kind.key}
-              onPress={() => onChange(kind.key)}
-              scale={0.9}
-              accessibilityLabel={kind.label}
-              accessibilityState={{ selected: on }}
-              style={[styles.kind, on ? styles.kindOn : null]}>
-              <Body small style={styles.emoji}>
-                {kind.emoji}
-              </Body>
-              <Caption tone={on ? 'accent' : 'muted'}>{kind.label}</Caption>
-            </Press>
-          );
-        })}
+        />
+        {PLACE_ICONS.map((kind) => (
+          <ChoiceTile
+            key={kind.key}
+            mark={kind.emoji}
+            label={kind.label}
+            selected={value === kind.key}
+            onPress={() => onChange(kind.key)}
+            accessibilityLabel={kind.label}
+          />
+        ))}
       </Row>
     </View>
   );
@@ -62,25 +51,5 @@ export function IconPicker({
 const styles = StyleSheet.create({
   picker: {
     gap: Spacing.sm,
-  },
-  kind: {
-    minWidth: 56,
-    borderRadius: Radius.none,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: Colors.border,
-    backgroundColor: Colors.fill,
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 2,
-  },
-  kindOn: {
-    borderColor: Colors.accent,
-    backgroundColor: Colors.accentSoft,
-  },
-  emoji: {
-    /* 이모지는 글꼴이 제 높이를 갖고 있어, 줄 높이를 두면 아래로 처집니다. */
-    lineHeight: undefined,
   },
 });

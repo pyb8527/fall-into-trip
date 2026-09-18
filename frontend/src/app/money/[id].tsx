@@ -24,6 +24,7 @@ import {
   Row,
   Screen,
   SegmentedTabs,
+  Split,
   Subtitle,
 } from '@/ui';
 
@@ -136,10 +137,10 @@ export default function Money() {
             <Card>
               <Caption tone="secondary">지금까지</Caption>
               {totals.map(([currency, t]) => (
-                <Row key={currency} style={styles.totalRow}>
+                <Split key={currency}>
                   <Subtitle>{money(t.sum, currency, t.decimals)}</Subtitle>
                   <Caption tone="muted">{list.filter((e) => e.currency === currency).length}건</Caption>
-                </Row>
+                </Split>
               ))}
             </Card>
           ) : null}
@@ -152,12 +153,12 @@ export default function Money() {
               "둘째 날에 많이 썼지" 처럼. */}
           {byDay(list, days).map((group) => (
             <View key={group.key} style={styles.group}>
-              <Row style={styles.groupHead}>
+              <Split align="baseline">
                 <Subtitle>{group.label}</Subtitle>
                 <Caption tone="secondary">
                   {group.totals.map(([c, t]) => money(t.sum, c, t.decimals)).join(' · ')}
                 </Caption>
-              </Row>
+              </Split>
               {group.items.map((e) => (
                 <SpendRow
                   key={e.id}
@@ -253,12 +254,12 @@ function Settle({ books, loading }: { books: Books[]; loading: boolean }) {
     <>
       {books.map((book) => (
         <Card key={book.currency}>
-          <Row style={styles.totalRow}>
+          <Split>
             <Subtitle>{book.currency}</Subtitle>
             <Caption tone="secondary">
               모두 {money(book.total, book.currency, book.decimals)}
             </Caption>
-          </Row>
+          </Split>
 
           <Divider />
 
@@ -267,13 +268,13 @@ function Settle({ books, loading }: { books: Books[]; loading: boolean }) {
           {book.balances
             .filter((b) => b.balance !== 0)
             .map((b) => (
-              <Row key={b.userId} style={styles.totalRow}>
+              <Split key={b.userId}>
                 <Body>{b.name}</Body>
                 <Body strong tone={b.balance > 0 ? 'success' : 'danger'}>
                   {b.balance > 0 ? '받을 ' : '낼 '}
                   {money(Math.abs(b.balance), book.currency, book.decimals)}
                 </Body>
-              </Row>
+              </Split>
             ))}
 
           {book.transfers.length > 0 ? (
@@ -281,14 +282,14 @@ function Settle({ books, loading }: { books: Books[]; loading: boolean }) {
               <Divider />
               <Caption tone="secondary">이렇게 주고받으면 끝납니다</Caption>
               {book.transfers.map((t, i) => (
-                <Row key={i} style={styles.totalRow}>
+                <Split key={i}>
                   <Body>
                     {t.fromName} → {t.toName}
                   </Body>
                   <Body strong tone="accent">
                     {money(t.amount, book.currency, book.decimals)}
                   </Body>
-                </Row>
+                </Split>
               ))}
             </>
           ) : (
@@ -530,16 +531,8 @@ function byDay(list: Spend[], days: TripDetail['days']) {
 }
 
 const styles = StyleSheet.create({
-  totalRow: {
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
   group: {
     gap: Spacing.xs,
-  },
-  groupHead: {
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
   },
   row: {
     alignItems: 'center',

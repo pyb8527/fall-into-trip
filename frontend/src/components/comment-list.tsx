@@ -18,7 +18,7 @@ import {
   Field,
   IconButton,
   Loading,
-  Row,
+  Split,
   Subtitle,
 } from '@/ui';
 
@@ -154,10 +154,10 @@ export function CommentList({
   return (
     <View style={styles.wrap}>
       {bare ? null : (
-        <Row style={styles.head}>
+        <Split align="baseline">
           <Subtitle>댓글</Subtitle>
           {comments ? <Caption tone="secondary">{comments.length}</Caption> : null}
-        </Row>
+        </Split>
       )}
 
       {failed ? <ErrorNote message={failed} /> : null}
@@ -181,7 +181,7 @@ export function CommentList({
           <View key={comment.id} style={styles.item}>
             {where ? <Badge label={where} tone="muted" /> : null}
             <Body>{comment.text}</Body>
-            <Row style={styles.meta}>
+            <Split>
               <Caption tone="secondary">
                 {comment.authorName} · {comment.createdAt.slice(0, 10)}
               </Caption>
@@ -196,7 +196,7 @@ export function CommentList({
               ) : user ? (
                 <Button label="신고" variant="ghost" compact onPress={() => setReporting(comment)} />
               ) : null}
-            </Row>
+            </Split>
           </View>
         );
       })}
@@ -282,15 +282,7 @@ const styles = StyleSheet.create({
   wrap: {
     gap: Spacing.md,
   },
-  head: {
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-  },
   item: {
     gap: Spacing.xs,
-  },
-  meta: {
-    justifyContent: 'space-between',
-    alignItems: 'center',
   },
 });

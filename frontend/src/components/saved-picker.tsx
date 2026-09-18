@@ -15,9 +15,9 @@ import {
   Chip,
   Empty,
   ErrorNote,
-  Field,
   Loading,
   Row,
+  SearchField,
 } from '@/ui';
 
 /** 한 번에 넣을 수 있는 개수. 서버가 재는 것과 같은 값입니다. */
@@ -145,13 +145,11 @@ export function SavedPicker({
 
       {/* 몇 개 안 될 때는 찾을 것이 없습니다. 칸만 자리를 차지합니다. */}
       {all.length > 4 ? (
-        <Field
+        <SearchField
           label="보석함에서 찾기"
           value={q}
           onChangeText={setQ}
           placeholder="국밥, 온천, 도톤보리"
-          returnKeyType="search"
-          action={{ icon: 'search', label: '보석함에서 찾기', onPress: () => {} }}
         />
       ) : null}
 

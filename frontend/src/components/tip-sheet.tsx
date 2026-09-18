@@ -17,7 +17,7 @@ import {
   Field,
   IconButton,
   Loading,
-  Row,
+  Split,
 } from '@/ui';
 
 /**
@@ -110,7 +110,7 @@ export function TipSheet({
       {tips?.map((tip) => (
         <View key={tip.id} style={styles.tip}>
           <Body>{tip.text}</Body>
-          <Row style={styles.meta}>
+          <Split>
             <Caption tone="secondary">
               {tip.authorName} · {sinceOf(tip.createdAt)}
             </Caption>
@@ -130,7 +130,7 @@ export function TipSheet({
                 onPress={() => setReporting(tip)}
               />
             ) : null}
-          </Row>
+          </Split>
         </View>
       ))}
 
@@ -202,9 +202,5 @@ function sinceOf(iso: string) {
 const styles = StyleSheet.create({
   tip: {
     gap: Spacing.xs,
-  },
-  meta: {
-    justifyContent: 'space-between',
-    alignItems: 'center',
   },
 });

@@ -18,7 +18,6 @@ import {
   Caption,
   Empty,
   ErrorNote,
-  Field,
   Icon,
   IconButton,
   ListRow,
@@ -26,7 +25,9 @@ import {
   Press,
   Row,
   Screen,
+  SearchField,
   SegmentedTabs,
+  Split,
   Subtitle,
 } from '@/ui';
 
@@ -125,13 +126,11 @@ export default function Trips() {
 
       {/* 몇 개 안 될 때는 찾을 것이 없습니다. 칸만 자리를 차지합니다. */}
       {all.length > 4 ? (
-        <Field
+        <SearchField
           label="여행 찾기"
           value={q}
           onChangeText={setQ}
           placeholder="오사카, 제주"
-          returnKeyType="search"
-          action={{ icon: 'search', label: '여행 찾기', onPress: () => {} }}
         />
       ) : null}
 
@@ -184,10 +183,10 @@ export default function Trips() {
 
           {loose.length > 0 ? (
             <View style={styles.section}>
-              <Row style={styles.sectionHead}>
+              <Split align="baseline">
                 <Subtitle>폴더 없음</Subtitle>
                 <Caption tone="secondary">{loose.length}</Caption>
-              </Row>
+              </Split>
               {loose.map((trip) => (
                 <TripRow
                   key={trip.id}
@@ -204,10 +203,10 @@ export default function Trips() {
 
       {sections.map((section) => (
         <View key={section.title} style={styles.section}>
-          <Row style={styles.sectionHead}>
+          <Split align="baseline">
             <Subtitle>{section.title}</Subtitle>
             <Caption tone="secondary">{section.trips.length}</Caption>
-          </Row>
+          </Split>
 
           {section.trips.map((trip) => (
             <TripRow
@@ -409,10 +408,6 @@ const styles = StyleSheet.create({
   },
   section: {
     gap: Spacing.sm,
-  },
-  sectionHead: {
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
   },
   row: {
     alignItems: 'center',

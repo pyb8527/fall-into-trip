@@ -14,13 +14,14 @@ import {
   Button,
   Caption,
   Card,
+  ChoiceTile,
   ConfirmButton,
   Divider,
   ErrorNote,
   Field,
-  Press,
   Row,
   Screen,
+  Split,
   Subtitle,
 } from '@/ui';
 import { LogoMark } from '@/ui/logo';
@@ -52,14 +53,14 @@ export default function Settings() {
           </View>
         </Row>
         <Divider />
-        <Row style={styles.metaRow}>
+        <Split>
           <Caption>가입</Caption>
           <Caption tone="secondary">{formatDate(user?.createdAt)}</Caption>
-        </Row>
-        <Row style={styles.metaRow}>
+        </Split>
+        <Split>
           <Caption>마지막 로그인</Caption>
           <Caption tone="secondary">{formatDate(user?.lastLoginAt)}</Caption>
-        </Row>
+        </Split>
       </Card>
 
       {user?.role === 'ADMIN' ? (
@@ -215,30 +216,21 @@ function MarkCard() {
       </Body>
 
       <Row gap={Spacing.xs}>
-        <Press
+        <ChoiceTile
+          label={user?.name?.slice(0, 1) ?? '나'}
+          selected={!user?.mark}
           onPress={() => pick(null)}
-          scale={0.9}
           accessibilityLabel="그림 없이 이름 첫 글자"
-          accessibilityState={{ selected: !user?.mark }}
-          style={[styles.mark, !user?.mark ? styles.markOn : null]}>
-          <Body small strong tone={!user?.mark ? 'accent' : 'secondary'}>
-            {user?.name?.slice(0, 1) ?? '나'}
-          </Body>
-        </Press>
-        {USER_MARKS.map((m) => {
-          const on = user?.mark === m.key;
-          return (
-            <Press
-              key={m.key}
-              onPress={() => pick(m.key)}
-              scale={0.9}
-              accessibilityLabel={m.label}
-              accessibilityState={{ selected: on }}
-              style={[styles.mark, on ? styles.markOn : null]}>
-              <Body style={styles.markEmoji}>{m.emoji}</Body>
-            </Press>
-          );
-        })}
+        />
+        {USER_MARKS.map((m) => (
+          <ChoiceTile
+            key={m.key}
+            mark={m.emoji}
+            selected={user?.mark === m.key}
+            onPress={() => pick(m.key)}
+            accessibilityLabel={m.label}
+          />
+        ))}
       </Row>
 
       {error ? <ErrorNote message={error} /> : null}
@@ -411,20 +403,6 @@ function formatDate(iso?: string | null) {
 }
 
 const styles = StyleSheet.create({
-  mark: {
-    width: 44,
-    height: 44,
-    borderRadius: Radius.none,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: Colors.border,
-    backgroundColor: Colors.fill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  markOn: {
-    borderColor: Colors.accent,
-    backgroundColor: Colors.accentSoft,
-  },
   markEmoji: {
     /* 이모지는 글꼴이 제 높이를 갖고 있어, 줄 높이를 두면 아래로 처집니다. */
     lineHeight: undefined,
@@ -432,9 +410,6 @@ const styles = StyleSheet.create({
   identity: {
     flexShrink: 1,
     gap: Spacing.xs,
-  },
-  metaRow: {
-    justifyContent: 'space-between',
   },
   dangerRow: {
     justifyContent: 'flex-start',

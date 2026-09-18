@@ -4,7 +4,7 @@ import type { SavedPlace } from '@/api/types';
 import { iconOf, labelOf } from '@/constants/place-icons';
 import { Colors, Radius, Spacing, Tap } from '@/constants/theme';
 import { savedAgo } from '@/lib/saved';
-import { Body, Caption, Icon, Press } from '@/ui';
+import { Body, Caption, Checkbox, Press } from '@/ui';
 
 /** 그림을 아직 안 고른 곳. 지도에서도 별로 찍힙니다. */
 const STAR = '⭐';
@@ -97,26 +97,12 @@ export function SavedRow({
         </View>
       </Press>
 
-      {/*
-        고르는 자리.
-
-        색으로만 말하지 않습니다. 고른 줄은 바탕이 옅게 깔리지만, 무채색
-        화면에서 그것 하나로는 "눌렀나?" 가 남습니다. 네모가 채워지는 것이
-        눈에 훨씬 잘 걸립니다.
-      */}
       {picking ? (
-        <Press
-          onPress={onToggle}
-          scale={0.88}
-          hitSlop={Spacing.sm}
-          accessibilityRole="button"
-          accessibilityLabel={`${place.name} ${on ? '고르기 취소' : '고르기'}`}
-          accessibilityState={{ selected: on }}
-          style={styles.checkTap}>
-          <View style={[styles.check, on ? styles.checkOn : null]}>
-            {on ? <Icon name="check" size={15} tone="inverse" /> : null}
-          </View>
-        </Press>
+        <Checkbox
+          checked={on}
+          onChange={onToggle ?? (() => {})}
+          label={`${place.name} ${on ? '고르기 취소' : '고르기'}`}
+        />
       ) : null}
     </View>
   );
@@ -165,24 +151,5 @@ const styles = StyleSheet.create({
   text: {
     flex: 1,
     gap: 2,
-  },
-  checkTap: {
-    width: Tap.min,
-    height: Tap.min,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  check: {
-    width: 22,
-    height: 22,
-    borderRadius: Radius.none,
-    borderWidth: 1.5,
-    borderColor: Colors.borderStrong,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkOn: {
-    backgroundColor: Colors.accent,
-    borderColor: Colors.accent,
   },
 });

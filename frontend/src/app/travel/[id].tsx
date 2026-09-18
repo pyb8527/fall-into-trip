@@ -28,6 +28,7 @@ import {
   Loading,
   Row,
   Screen,
+  Split,
   Subtitle,
   Title,
 } from '@/ui';
@@ -175,14 +176,14 @@ export default function Travel() {
       />
 
       <View style={styles.head}>
-        <Row style={styles.headRow}>
+        <Split align="baseline">
           <Title>{day ? day.date || day.label : '날짜 없음'}</Title>
           {places.length > 0 ? (
             <Caption tone={done === places.length ? 'success' : 'muted'} strong>
               {done === places.length ? '이 날 다 찍었습니다' : `${done}/${places.length} 찍음`}
             </Caption>
           ) : null}
-        </Row>
+        </Split>
 
         {days.length > 1 ? (
           <Row gap={Spacing.xs}>
@@ -326,7 +327,7 @@ function PlaceCard({
 }) {
   return (
     <Card>
-      <Row style={styles.cardHead}>
+      <Split>
         {place.time ? (
           <Body strong tone="accent">
             {place.time}
@@ -335,7 +336,7 @@ function PlaceCard({
           <Caption tone="muted">{order}번째</Caption>
         )}
         {place.cat ? <Caption tone="secondary">{place.cat}</Caption> : null}
-      </Row>
+      </Split>
 
       <Subtitle>{place.name}</Subtitle>
       {place.ja || place.en ? <Caption>{place.ja ?? place.en}</Caption> : null}
@@ -568,10 +569,6 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     paddingBottom: Spacing.md,
   },
-  headRow: {
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-  },
   book: {
     flexWrap: 'wrap',
   },
@@ -592,10 +589,6 @@ const styles = StyleSheet.create({
   },
   slotInner: {
     paddingBottom: Spacing.lg,
-  },
-  cardHead: {
-    justifyContent: 'space-between',
-    alignItems: 'center',
   },
 
   /* ------------------------------------------------------------- 도장 */

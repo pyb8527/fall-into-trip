@@ -22,6 +22,7 @@ import {
   IconButton,
   Loading,
   Row,
+  Split,
   Stepper,
   Subtitle,
 } from '@/ui';
@@ -109,7 +110,7 @@ function Inner({
       {actionError ? <ErrorNote message={actionError} /> : null}
 
       {data?.members.map((m) => (
-        <Row key={m.id} style={styles.person}>
+        <Split key={m.id} gap={Spacing.md}>
           <View style={styles.who}>
             <Row gap={Spacing.xs}>
               {/* 지도에 찍히는 그림을 여기에도 답니다. 지도에서 곰을 보고
@@ -138,7 +139,7 @@ function Inner({
               />
             ) : null}
           </Row>
-        </Row>
+        </Split>
       ))}
 
       {data && data.members.length <= 1 ? (
@@ -371,7 +372,7 @@ function InviteRowView({ invite, onChanged }: { invite: InviteRow; onChanged: ()
 
   return (
     <View style={styles.invite}>
-      <Row style={styles.person}>
+      <Split gap={Spacing.md}>
         <View style={styles.who}>
           <Caption strong>{invite.role === 'EDITOR' ? '같이 짜기' : '보기만'}</Caption>
           <Caption tone="secondary">
@@ -394,7 +395,7 @@ function InviteRowView({ invite, onChanged }: { invite: InviteRow; onChanged: ()
             />
           )}
         </Row>
-      </Row>
+      </Split>
 
       {failed ? <ErrorNote message={failed} /> : null}
 
@@ -416,11 +417,6 @@ function InviteRowView({ invite, onChanged }: { invite: InviteRow; onChanged: ()
 }
 
 const styles = StyleSheet.create({
-  person: {
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: Spacing.md,
-  },
   who: {
     flexShrink: 1,
     gap: 2,

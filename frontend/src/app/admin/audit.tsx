@@ -15,8 +15,10 @@ import {
   ErrorNote,
   Field,
   Loading,
+  Pager,
   Row,
   Screen,
+  Split,
   Title,
 } from '@/ui';
 
@@ -114,27 +116,12 @@ export default function AdminAudit() {
         <EntryCard key={entry.id} entry={entry} />
       ))}
 
-      {data && data.totalPages > 1 ? (
-        <Row style={styles.pager}>
-          <Button
-            label="이전"
-            variant="secondary"
-            compact
-            disabled={page === 0}
-            onPress={() => setPage((p) => Math.max(0, p - 1))}
-          />
-          <Caption>
-            {data.page + 1} / {data.totalPages} · 전체 {data.total.toLocaleString()}
-          </Caption>
-          <Button
-            label="다음"
-            variant="secondary"
-            compact
-            disabled={page >= data.totalPages - 1}
-            onPress={() => setPage((p) => p + 1)}
-          />
-        </Row>
-      ) : null}
+      <Pager
+        page={data?.page ?? 0}
+        totalPages={data?.totalPages ?? 0}
+        total={data?.total}
+        onPage={setPage}
+      />
     </Screen>
   );
 }
@@ -142,10 +129,10 @@ export default function AdminAudit() {
 function EntryCard({ entry }: { entry: AuditEntry }) {
   return (
     <Card>
-      <Row style={styles.head}>
+      <Split align="start">
         <Body>{entry.action}</Body>
         <Caption>{formatAt(entry.at)}</Caption>
-      </Row>
+      </Split>
       <Caption tone="secondary">
         {entry.userName ?? (entry.userId ? '(지워진 계정)' : '(시스템)')}
         {entry.userId ? ` · ${entry.userId}` : ''}
@@ -173,15 +160,8 @@ function summarize(detail: Record<string, unknown>) {
 }
 
 const styles = StyleSheet.create({
-  head: {
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
   half: {
     flexGrow: 1,
     flexBasis: 120,
-  },
-  pager: {
-    justifyContent: 'space-between',
   },
 });

@@ -9,7 +9,7 @@ import { TripMap } from '@/components/trip-map';
 import { iconOf, labelOf } from '@/constants/place-icons';
 import { Colors, Spacing } from '@/constants/theme';
 import { openDirections, openPlace } from '@/lib/directions';
-import { metersBetween } from '@/lib/geo';
+import { awayFrom } from '@/lib/geo';
 import {
   Badge,
   Body,
@@ -144,7 +144,7 @@ export function PlaceDetailSheet({
           </Body>
         ) : null}
         {place.icon ? <Badge label={labelOf(place.icon)} tone="muted" /> : null}
-        {here ? <Caption tone="secondary">{away(here, place)}</Caption> : null}
+        {here ? <Caption tone="secondary">{awayFrom(here, place)}</Caption> : null}
       </Row>
 
       {loading && place.placeId ? <Loading label="사정을 보는 중" /> : null}
@@ -269,12 +269,6 @@ export type Looked = {
   placeId?: string | null;
   icon?: string | null;
 };
-
-/** 여기서 저기까지. 1km 아래는 미터로 적습니다. */
-function away(from: { lat: number; lng: number }, to: { lat: number; lng: number }) {
-  const m = metersBetween(from, to);
-  return m < 1000 ? `여기서 ${Math.round(m)}m` : `여기서 ${(m / 1000).toFixed(1)}km`;
-}
 
 const styles = StyleSheet.create({
   facts: {

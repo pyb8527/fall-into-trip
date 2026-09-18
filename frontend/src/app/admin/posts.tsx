@@ -14,9 +14,11 @@ import {
   Empty,
   ErrorNote,
   Loading,
+  Pager,
   Row,
   Screen,
   SegmentedTabs,
+  Split,
   Subtitle,
   Title,
 } from '@/ui';
@@ -91,27 +93,11 @@ export default function AdminPosts() {
         <ReportedRow key={item.id} kind={kind} item={item} onChanged={reload} />
       ))}
 
-      {data && data.totalPages > 1 ? (
-        <Row style={styles.pager}>
-          <Button
-            label="이전"
-            variant="secondary"
-            compact
-            disabled={page === 0}
-            onPress={() => setPage((p) => Math.max(0, p - 1))}
-          />
-          <Caption>
-            {data.page + 1} / {data.totalPages}
-          </Caption>
-          <Button
-            label="다음"
-            variant="secondary"
-            compact
-            disabled={page >= data.totalPages - 1}
-            onPress={() => setPage((p) => p + 1)}
-          />
-        </Row>
-      ) : null}
+      <Pager
+        page={data?.page ?? 0}
+        totalPages={data?.totalPages ?? 0}
+        onPage={setPage}
+      />
     </Screen>
   );
 }
@@ -146,7 +132,7 @@ function ReportedRow({
 
   return (
     <Card>
-      <Row style={styles.head}>
+      <Split align="start" gap={Spacing.md}>
         <View style={styles.title}>
           <Subtitle>{title}</Subtitle>
           <Caption tone="secondary">
@@ -157,7 +143,7 @@ function ReportedRow({
           <Badge label={`신고 ${item.reportCount}`} tone="danger" />
           {item.hidden ? <Badge label="감춰짐" tone="muted" /> : null}
         </Row>
-      </Row>
+      </Split>
 
       {'likeCount' in item ? (
         <Row gap={Spacing.md}>
@@ -186,17 +172,8 @@ function ReportedRow({
 }
 
 const styles = StyleSheet.create({
-  head: {
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: Spacing.md,
-  },
   title: {
     flexShrink: 1,
     gap: 2,
-  },
-  pager: {
-    justifyContent: 'space-between',
-    alignItems: 'center',
   },
 });

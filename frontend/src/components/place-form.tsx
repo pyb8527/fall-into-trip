@@ -16,7 +16,6 @@ import {
   ErrorNote,
   Field,
   Icon,
-  Press,
   Row,
 } from '@/ui';
 

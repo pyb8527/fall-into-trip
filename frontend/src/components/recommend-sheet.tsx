@@ -14,6 +14,7 @@ import {
 import { iconOf } from '@/constants/place-icons';
 import type { IntentState } from '@/lib/intent-types';
 import { canParseHere, fetchModel, intentState, modelNote, parseIntent } from '@/lib/intent';
+import { readableMeters } from '@/lib/geo';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import {
   Badge,
@@ -471,7 +472,7 @@ export function RecommendSheet({
               </Caption>
             ) : null}
             {card.distanceM != null ? (
-              <Caption tone="secondary">{km(card.distanceM)}</Caption>
+              <Caption tone="secondary">{readableMeters(card.distanceM)}</Caption>
             ) : null}
             {/* 그날 쉬는 곳은 눈에 띄게. 추천받아서 갔더니 휴무는 추천을
                 안 하느니만 못합니다. */}
@@ -577,11 +578,6 @@ type Card = {
 };
 
 type Recommended = { places: Card[]; note: string | null };
-
-/** 1km 아래는 미터로. "3247m" 는 읽으라고 쓴 글자가 아닙니다. */
-function km(meters: number) {
-  return meters < 1000 ? `${Math.round(meters)}m` : `${(meters / 1000).toFixed(1)}km`;
-}
 
 const styles = StyleSheet.create({
   card: {

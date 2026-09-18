@@ -20,6 +20,7 @@ import {
   Rise,
   Row,
   Screen,
+  Split,
   Subtitle,
   Title,
 } from '@/ui';
@@ -130,7 +131,7 @@ export default function Home() {
   return (
     <Screen safeTop>
       <View style={styles.head}>
-        <Row style={styles.headTop}>
+        <Split>
           <LogoMark size={26} />
           {/* 오른쪽 위에 둘입니다.
 
@@ -154,7 +155,7 @@ export default function Home() {
               onPress={() => router.push('/(app)/settings')}
             />
           </Row>
-        </Row>
+        </Split>
         {/* 이름을 강조색으로 떼어 놓습니다. 한 덩어리로 두면 인사말이 그냥
             문장 하나로 흘러갑니다.
 
@@ -288,7 +289,7 @@ function NextTrip({
         }
         accessibilityLabel={`${trip.title} — ${countdownLabel(at)}${line ? `, ${line}` : ''}`}>
         <Card>
-          <Row style={styles.nextRow}>
+          <Split>
             <View style={styles.grow}>
               {/* 무엇에 대한 줄인지 먼저 말합니다. 제목만 있으면 이것이
                   다음 여행인지 방금 본 여행인지 알 수 없습니다. */}
@@ -302,7 +303,7 @@ function NextTrip({
               label={going && road ? `${road.left}곳 남음` : countdownLabel(at)}
               tone={going ? 'success' : countdownIsNear(at) ? 'accent' : 'muted'}
             />
-          </Row>
+          </Split>
         </Card>
       </Press>
     </Rise>
@@ -342,10 +343,6 @@ const styles = StyleSheet.create({
   head: {
     gap: Spacing.md,
   },
-  headTop: {
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
   grid: {
     alignItems: 'stretch',
   },
@@ -360,10 +357,6 @@ const styles = StyleSheet.create({
   },
   steps: {
     flexWrap: 'nowrap',
-  },
-  nextRow: {
-    justifyContent: 'space-between',
-    alignItems: 'center',
   },
   grow: {
     flex: 1,

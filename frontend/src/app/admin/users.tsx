@@ -18,8 +18,10 @@ import {
   ErrorNote,
   Field,
   Loading,
+  Pager,
   Row,
   Screen,
+  Split,
   Subtitle,
   Title,
 } from '@/ui';
@@ -88,27 +90,12 @@ export default function AdminUsers() {
         <UserCard key={u.id} user={u} onChanged={reload} />
       ))}
 
-      {data && data.totalPages > 1 ? (
-        <Row style={styles.pager}>
-          <Button
-            label="이전"
-            variant="secondary"
-            compact
-            disabled={page === 0}
-            onPress={() => setPage((p) => Math.max(0, p - 1))}
-          />
-          <Caption>
-            {data.page + 1} / {data.totalPages} · 전체 {data.total.toLocaleString()}
-          </Caption>
-          <Button
-            label="다음"
-            variant="secondary"
-            compact
-            disabled={page >= data.totalPages - 1}
-            onPress={() => setPage((p) => p + 1)}
-          />
-        </Row>
-      ) : null}
+      <Pager
+        page={data?.page ?? 0}
+        totalPages={data?.totalPages ?? 0}
+        total={data?.total}
+        onPage={setPage}
+      />
     </Screen>
   );
 }
@@ -142,7 +129,7 @@ function UserCard({ user, onChanged }: { user: AdminUser; onChanged: () => void 
 
   return (
     <Card>
-      <Row style={styles.head}>
+      <Split align="start">
         <View style={styles.name}>
           <Subtitle>{user.name}</Subtitle>
           <Caption tone="secondary">{user.email}</Caption>
@@ -152,7 +139,7 @@ function UserCard({ user, onChanged }: { user: AdminUser; onChanged: () => void 
           {user.role === 'ADMIN' ? <Badge label="운영자" tone="accent" /> : null}
           {user.disabled ? <Badge label="잠김" tone="danger" /> : null}
         </Row>
-      </Row>
+      </Split>
 
       <Row gap={Spacing.md}>
         <Caption>가입 {user.createdAt.slice(0, 10)}</Caption>
@@ -278,15 +265,8 @@ function UserCard({ user, onChanged }: { user: AdminUser; onChanged: () => void 
 }
 
 const styles = StyleSheet.create({
-  head: {
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
   name: {
     flexShrink: 1,
     gap: 2,
-  },
-  pager: {
-    justifyContent: 'space-between',
   },
 });
