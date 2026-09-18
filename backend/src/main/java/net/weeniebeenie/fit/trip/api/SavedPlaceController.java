@@ -35,22 +35,26 @@ public class SavedPlaceController {
     }
 
     /**
-     * 담아 둔 곳의 그림을 바꿉니다.
+     * 담아 둔 곳의 그림과 메모를 고칩니다.
      *
-     * <p>담을 때는 구글 갈래로 짐작해 찍어 둡니다. 대개 맞지만 틀릴 때가
-     * 있고, 무엇보다 "이건 나한테 온천이 아니라 사진 찍을 곳" 처럼 쓰는 사람이
-     * 달리 보고 싶을 수 있습니다. 지우고 다시 담게 하지 않습니다.
+     * <p>그림은 담을 때 구글 갈래로 짐작해 찍어 둡니다. 대개 맞지만 틀릴
+     * 때가 있고, 무엇보다 "이건 나한테 온천이 아니라 사진 찍을 곳" 처럼
+     * 쓰는 사람이 달리 보고 싶을 수 있습니다. 지우고 다시 담게 하지 않습니다.
+     *
+     * <p>메모는 왜 담았는지입니다. 한 달 뒤 보석함을 열면 이름만 남아 그게
+     * 왜 거기 있는지 모릅니다.
      */
     @PatchMapping("/api/saved/{savedId}")
-    public Map<String, Object> retag(@CurrentUser AuthPrincipal me,
-                                     @PathVariable String savedId,
-                                     @RequestBody IconRequest req) {
-        return Map.of("place",
-                View.of(saved.retag(me, savedId, req == null ? null : req.icon())));
+    public Map<String, Object> edit(@CurrentUser AuthPrincipal me,
+                                    @PathVariable String savedId,
+                                    @RequestBody EditRequest req) {
+        return Map.of("place", View.of(saved.edit(me, savedId,
+                req == null ? null : req.icon(),
+                req == null ? null : req.note())));
     }
 
-    /** 빈 문자열은 "그림 빼기" 입니다. */
-    public record IconRequest(String icon) {
+    /** null 은 "손대지 마라", 빈 문자열은 "비워라" 입니다. */
+    public record EditRequest(String icon, String note) {
     }
 
     @DeleteMapping("/api/saved/{savedId}")

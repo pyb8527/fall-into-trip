@@ -45,6 +45,13 @@ import {
  * <p>부르는 자리마다 갈 곳이 다릅니다 — 보석함에서 열면 "담기" 하나, 추천
  * 에서 열면 일정·투표장·보석함 셋. 이 판은 그것을 정하지 않고 받아서
  * 늘어놓기만 합니다.
+ *
+ * <h3>우리가 아는 것도 밖에서 받습니다</h3>
+ *
+ * <p>구글이 아는 것(평점·영업시간·전화) 말고, <b>우리 쪽에만 있는 것</b>이
+ * 있습니다 — 보석함이라면 왜 담았는지와 언제 담았는지, 추천이라면 왜
+ * 골라 왔는지. 그것은 부르는 자리만 알고 이 판은 모릅니다. 자리만
+ * 내어 주고 무엇을 적을지는 안 정합니다.
  */
 export function PlaceDetailSheet({
   place,
@@ -52,12 +59,21 @@ export function PlaceDetailSheet({
   onIso,
   /** 지금 서 있는 자리. 있으면 얼마나 먼지 적습니다. */
   here,
+  about,
   actions,
   onClose,
 }: {
   place: Looked | null;
   onIso?: string | null;
   here?: { lat: number; lng: number } | null;
+  /**
+   * 부르는 자리만 아는 것. 구글에 물어서 나오는 것 위에 얹힙니다.
+   *
+   * <p>보석함이라면 왜 담았는지와 언제 담았는지가 여기 옵니다. 평점보다
+   * 먼저 적습니다 — 별 넷이라는 사실보다 "그때 줄 서서 먹었던 집" 이
+   * 이 곳을 고르는 데 더 큰 몫을 합니다.
+   */
+  about?: React.ReactNode;
   /** 이 곳을 어디에 담을지. 부르는 자리가 정합니다. */
   actions?: React.ReactNode;
   onClose: () => void;
@@ -115,6 +131,8 @@ export function PlaceDetailSheet({
       <TripMap places={[pin]} activeId="looked" onSelect={() => {}} link={false} height={200} />
 
       {place.address ? <Caption tone="secondary">{place.address}</Caption> : null}
+
+      {about}
 
       <Row gap={Spacing.sm} style={styles.facts}>
         {info?.rating ? (

@@ -72,7 +72,18 @@ T("아무것도 안 고르면 거절", r.status === 400, r.data);
 r = await call("POST", `/api/days/${dayId}/places/from-saved`, { token: other, body: { savedIds: [savedA] } });
 T("남의 여행에는 못 넣음", r.status === 403 || r.status === 404, r.data);
 
-console.log("\n[5] 지우기");
+console.log("\n[5] 왜 담았는지 적어 두기");
+/* 한 달 뒤 보석함을 열면 이름만 남아 그게 왜 거기 있는지 모릅니다. */
+r = await call("PATCH", "/api/saved/" + savedA, { token: me, body: { note: "규슈에서 줄 서던 그 집" } });
+T("메모 적힘", r.data.place.note === "규슈에서 줄 서던 그 집", r.data.place);
+r = await call("PATCH", "/api/saved/" + savedA, { token: me, body: { icon: "ramen" } });
+T("그림만 고쳐도 메모는 남음", r.data.place.note === "규슈에서 줄 서던 그 집" && r.data.place.icon === "ramen", r.data.place);
+r = await call("PATCH", "/api/saved/" + savedA, { token: me, body: { note: "" } });
+T("빈 글자는 메모 비우기", r.data.place.note == null && r.data.place.icon === "ramen", r.data.place);
+r = await call("PATCH", "/api/saved/" + savedA, { token: other, body: { note: "남의 것" } });
+T("남의 것은 못 고침", r.status === 404, r.data);
+
+console.log("\n[6] 지우기");
 r = await call("DELETE", "/api/saved/" + savedB, { token: me });
 T("지움", r.status === 200, r.data);
 r = await call("GET", "/api/saved", { token: me });

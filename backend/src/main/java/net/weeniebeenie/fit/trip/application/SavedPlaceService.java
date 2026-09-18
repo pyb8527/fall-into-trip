@@ -42,6 +42,14 @@ public class SavedPlaceService {
     /** 한 번에 일정으로 옮길 수 있는 개수. */
     private static final int MAX_AT_ONCE = 20;
 
+    /**
+     * 메모 길이.
+     *
+     * <p>보석함의 메모는 "왜 담았는지" 한 줄입니다. 긴 글은 일정에 넣은 뒤
+     * 그 장소의 메모에 적으면 됩니다 — 거기는 길이를 재지 않습니다.
+     */
+    private static final int MAX_NOTE = 300;
+
     private final SavedPlaceRepository saved;
     private final PlaceRepository places;
     private final DayRepository days;
@@ -95,19 +103,34 @@ public class SavedPlaceService {
     }
 
     /**
-     * 담아 둔 곳의 그림만 바꿉니다.
+     * 담아 둔 곳의 그림과 메모를 고칩니다.
      *
-     * <p>모르는 이름이면 비웁니다. 화면에서 넘어온 값을 그대로 믿지 않습니다.
+     * <p>그림은 모르는 이름이면 비웁니다. 화면에서 넘어온 값을 그대로 믿지
+     * 않습니다.
+     *
+     * <p>메모는 <b>왜 담았는지</b>를 적는 자리입니다. 담을 때는 대개 아무
+     * 말도 안 적히는데 — 남의 글에서 담으면 그 글의 한 줄이 따라오고, 검색
+     * 에서 담으면 비어 있습니다 — 한 달 뒤 보석함을 열면 이름만 남아 그게
+     * 왜 거기 있는지 모릅니다. "규슈 갔을 때 줄 서던 그 국밥집" 한 줄이면
+     * 됩니다.
+     *
+     * <p>둘 다 {@code null} 은 "손대지 마라", 빈 글자는 "비워라" 입니다.
+     * 한쪽만 고치려고 부를 때 다른 쪽이 딸려 지워지면 안 됩니다.
      */
     @Transactional
-    public SavedPlace retag(AuthPrincipal me, String savedId, String icon) {
+    public SavedPlace edit(AuthPrincipal me, String savedId, String icon, String note) {
         SavedPlace item = saved.findById(savedId)
                 .orElseThrow(() -> ApiException.notFound("담아 둔 장소를 찾을 수 없습니다."));
         if (!item.getUserId().equals(me.id())) {
             /* 남의 보석함이 있다는 것 자체를 알릴 이유가 없습니다. */
             throw ApiException.notFound("담아 둔 장소를 찾을 수 없습니다.");
         }
-        item.setIcon(PlaceKind.clean(icon));
+        if (icon != null) {
+            item.setIcon(PlaceKind.clean(icon));
+        }
+        if (note != null) {
+            item.setNote(trimmedOrNull(note, MAX_NOTE));
+        }
         return item;
     }
 
@@ -171,6 +194,15 @@ public class SavedPlaceService {
 
     private static String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    /** 다듬어 넣되 너무 길면 자릅니다. 길다고 거절하면 적던 것을 통째로 잃습니다. */
+    private static String trimmedOrNull(String value, int max) {
+        String trimmed = blankToNull(value);
+        if (trimmed == null) {
+            return null;
+        }
+        return trimmed.length() <= max ? trimmed : trimmed.substring(0, max);
     }
 
     /**
