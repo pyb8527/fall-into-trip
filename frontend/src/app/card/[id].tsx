@@ -1,6 +1,6 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { api, API_BASE } from '@/api/client';
 import type { Books, Companion, TripDetail } from '@/api/types';
@@ -14,6 +14,7 @@ import {
   Body,
   Button,
   Caption,
+  Chip,
   Divider,
   ErrorNote,
   Loading,
@@ -223,15 +224,73 @@ function Receipt({
  * <p>이제 아무것도 받아 오지 않습니다. 넣어 둔 곳과 그 순서만으로 됩니다.
  * 구글에 묻지 않으니 요금도 들지 않습니다.
  */
+/** 한 자리에 머무는 동안. 내려앉고, 잠깐 서고, 다시 뜹니다. */
+const STAY_MS = 620;
+/** 한 구간을 나는 동안. */
+const FLY_MS = 1250;
+/** 몇 번에 나눠 그릴지. 50 이면 1초에 스무 번입니다. */
+const TICK_MS = 50;
+
+/**
+ * 두 자리 사이 어느 쪽을 보고 나는지.
+ *
+ * <p>정확한 대권 항로를 셀 것까지는 없습니다. 도시 몇 개 사이라 평면으로
+ * 봐도 눈에는 같고, 무엇보다 <b>코끝이 가는 쪽을 향하는가</b>만 보입니다.
+ * 다만 경도는 위도가 높을수록 촘촘해지므로 그만큼 줄여 줍니다 — 안 그러면
+ * 북쪽 도시에서 코가 옆으로 틀어집니다.
+ */
+function headingOf(from: { lat: number; lng: number }, to: { lat: number; lng: number }) {
+  const mid = ((from.lat + to.lat) / 2) * (Math.PI / 180);
+  const dx = (to.lng - from.lng) * Math.cos(mid);
+  const dy = to.lat - from.lat;
+  if (dx === 0 && dy === 0) {
+    return 0;
+  }
+  return (Math.atan2(dx, dy) * 180) / Math.PI;
+}
+
+/**
+ * 뜨고, 날고, 내린다.
+ *
+ * <p>같은 속도로 가면 <b>끌려가는 점</b>입니다. 뜰 때 밀어내고 내릴 때
+ * 늦추면 그제야 오가는 것으로 보입니다. 가운데가 가장 빠른 곡선입니다.
+ */
+function ease(t: number) {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+/**
+ * 다녀온 길을 처음부터 다시.
+ *
+ * <h3>점이 튀는 것이 아니라 오가는 것으로</h3>
+ *
+ * <p>1.1초마다 다음 곳으로 <b>건너뛰었습니다.</b> 지도가 따라 옮겨 가기는
+ * 했지만 그 사이가 비어 있어서, 무엇이 어디로 가는지가 아니라 화면이
+ * 갈아 끼워지는 것으로 보였습니다.
+ *
+ * <p>사이를 채웁니다. 자리에 내려앉아 잠깐 섰다가, 다음 곳을 향해 돌아서서,
+ * 뜨고, 날고, 내립니다. 셈은 여기서 하고 지도는 받은 자리에 그리기만
+ * 합니다 — 지도가 웹과 앱 두 벌이라, 셈까지 두 벌이면 언젠가 둘이 다르게
+ * 납니다.
+ *
+ * <h3>날짜별로 볼 수 있습니다</h3>
+ *
+ * <p>여행 전체를 한 번에 돌리면 닷새치 스무 곳이 이어져, 어느 날 무엇을
+ * 했는지가 아니라 <b>지도가 한참 움직였다</b>만 남습니다. 날짜를 고르면
+ * 그 하루만 돕니다.
+ */
 function Replay({ trip }: { trip: TripDetail }) {
-  /** 지금 몇 번째를 보고 있는지. 곳의 수와 같아지면 다 본 것입니다. */
+  /** 어느 날만 볼지. null 이면 처음부터 끝까지. */
+  const [dayPick, setDayPick] = useState<number | null>(null);
+  /** 지금 몇 번째 자리에서 출발했는지. 곳의 수와 같아지면 다 본 것입니다. */
   const [step, setStep] = useState(0);
+  /** 그 자리에서 다음 자리까지 얼마나 왔는지. 0 은 아직 서 있는 것. */
+  const [gone, setGone] = useState(0);
   const [playing, setPlaying] = useState(true);
   /** 뒤로 물러나 전부 보여 달라는 신호. 값이 바뀌면 지도가 맞춥니다. */
   const [fitAt, setFitAt] = useState(0);
-  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const places = useMemo(
+  const all = useMemo(
     () =>
       trip.days.flatMap((day, dayIndex) =>
         day.places
@@ -261,11 +320,53 @@ function Replay({ trip }: { trip: TripDetail }) {
     [trip],
   );
 
+  const places = useMemo(
+    () => (dayPick === null ? all : all.filter((p) => p.dayIndex === dayPick)),
+    [all, dayPick],
+  );
+
+  /** 찍을 곳이 있는 날만 냅니다. 빈 날을 고르면 아무 일도 안 일어납니다. */
+  const days = useMemo(() => {
+    const seen = new Map<number, string>();
+    all.forEach((p) => {
+      if (!seen.has(p.dayIndex)) {
+        seen.set(p.dayIndex, p.detail.dayLabel);
+      }
+    });
+    return [...seen.entries()];
+  }, [all]);
+
+  /* 날짜를 바꾸면 처음부터. 열두 번째에서 멈춘 채로 세 곳짜리 하루로
+     옮겨 가면 시작하자마자 끝나 있습니다. */
+  useEffect(() => {
+    setStep(0);
+    setGone(0);
+    setPlaying(true);
+  }, [dayPick]);
+
   useEffect(() => {
     if (!playing || places.length === 0) {
       return;
     }
-    timer.current = setInterval(() => {
+    /*
+      한 자리에 머무는 동안(STAY_MS)과 나는 동안(FLY_MS)을 이어 붙여 한
+      묶음으로 셉니다. 머무는 동안에는 자리가 안 바뀌고 크기만 낮아졌다
+      오르므로, 내려앉아 섰다가 다시 뜨는 것으로 보입니다.
+    */
+    const span = STAY_MS + FLY_MS;
+    let spent = 0;
+    const timer = setInterval(() => {
+      spent += TICK_MS;
+      if (spent < STAY_MS) {
+        setGone(0);
+        return;
+      }
+      if (spent < span) {
+        setGone((spent - STAY_MS) / FLY_MS);
+        return;
+      }
+      spent = 0;
+      setGone(0);
       setStep((at) => {
         if (at >= places.length - 1) {
           /* 마지막 곳까지 갔으면 멈추고 뒤로 물러납니다. 한 곳에 붙어 끝나면
@@ -276,28 +377,70 @@ function Replay({ trip }: { trip: TripDetail }) {
         }
         return at + 1;
       });
-    }, 1100);
-    return () => {
-      if (timer.current) {
-        clearInterval(timer.current);
-      }
-    };
+    }, TICK_MS);
+    return () => clearInterval(timer);
   }, [playing, places.length]);
 
   const done = step >= places.length;
   const now = done ? null : places[step];
+  const next = done ? null : (places[step + 1] ?? null);
+
+  /*
+    지금 어디쯤 떠 있는지.
+
+    <p>마지막 자리에는 갈 곳이 없으므로 그 위에 내려앉은 채로 둡니다.
+    다 본 뒤에는 아예 안 그립니다 — 전부를 한눈에 보는 자리에 비행기 하나가
+    남아 있으면 아직 도는 중인 줄 압니다.
+  */
+  const traveler = useMemo(() => {
+    if (done || !now) {
+      return null;
+    }
+    if (!next) {
+      return { lat: now.lat, lng: now.lng, heading: 0, lift: 0, color: now.color };
+    }
+    const held = Math.min(1, Math.max(0, gone));
+    const t = ease(held);
+    return {
+      lat: now.lat + (next.lat - now.lat) * t,
+      lng: now.lng + (next.lng - now.lng) * t,
+      heading: headingOf(now, next),
+      /* 가운데에서 가장 높이. 뜨고 내리는 양 끝에서 0 으로 내려앉습니다. */
+      lift: Math.sin(held * Math.PI),
+      color: now.color,
+    };
+  }, [done, now, next, gone]);
 
   return (
     <View style={styles.replay}>
+      {/* 날짜가 둘 이상일 때만. 하루짜리 여행에 "전체/1일차" 를 두면 고를
+          것이 없는 띠가 한 줄 자리만 먹습니다. */}
+      {days.length > 1 ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <Row gap={Spacing.xs} style={styles.dayRail}>
+            <Chip label="전체" selected={dayPick === null} onPress={() => setDayPick(null)} />
+            {days.map(([index, label]) => (
+              <Chip
+                key={index}
+                label={label}
+                selected={dayPick === index}
+                onPress={() => setDayPick(dayPick === index ? null : index)}
+              />
+            ))}
+          </Row>
+        </ScrollView>
+      ) : null}
+
       <TripMap
         places={places}
-        /* 지금 보고 있는 곳으로 지도가 따라갑니다. 다 보고 나면 아무것도
-           고르지 않아, 전부가 같은 크기로 남습니다. */
+        /* 지금 떠난 자리로 지도가 따라갑니다. follow 가 앞뒤 곳까지 한 화면에
+           넣으므로, 나는 동안 떠난 곳과 닿을 곳이 함께 보입니다. */
         activeId={now?.id ?? null}
         onSelect={() => {}}
-        /* 따라가되 당기지 않습니다. 1.1초마다 넘어가는 자리라 바짝 당기면
-           먼 다음 곳이 늘 화면 밖이고, 옮겨 가는 도중에 다음 옮김이 시작돼
-           앞엣것이 잘립니다 — 그것이 "멀리 있으면 끊긴다" 의 정체였습니다. */
+        traveler={traveler}
+        /* 따라가되 당기지 않습니다. 바짝 당기면 먼 다음 곳이 늘 화면 밖이고,
+           옮겨 가는 도중에 다음 옮김이 시작돼 앞엣것이 잘립니다 — 그것이
+           "멀리 있으면 끊긴다" 의 정체였습니다. */
         follow
         fitAt={fitAt}
         height={320}
@@ -311,6 +454,7 @@ function Replay({ trip }: { trip: TripDetail }) {
           onPress={() => {
             if (done) {
               setStep(0);
+              setGone(0);
             }
             setPlaying((v) => !v);
           }}
@@ -326,7 +470,11 @@ function Replay({ trip }: { trip: TripDetail }) {
             {now.emoji ? `${now.emoji} ` : ''}
             {now.name}
           </Body>
-          <Caption tone="secondary">{now.detail.dayLabel}</Caption>
+          {/* 전체를 돌 때는 날짜가 넘어가는 것이 이야기의 일부입니다. 하루만
+              보고 있으면 띠에 이미 적혀 있어 두 번 말하는 셈입니다. */}
+          {dayPick === null ? (
+            <Caption tone="secondary">{now.detail.dayLabel}</Caption>
+          ) : null}
         </Row>
       ) : null}
 
@@ -352,5 +500,10 @@ const styles = StyleSheet.create({
   },
   replay: {
     gap: Spacing.md,
+  },
+  /* 끝을 띄워 둬야 마지막 날짜가 잘린 것처럼 안 보입니다. */
+  dayRail: {
+    flexWrap: 'nowrap',
+    paddingRight: Spacing.lg,
   },
 });

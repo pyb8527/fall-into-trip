@@ -1,12 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, StyleSheet, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import MapView, { Circle, Marker, PROVIDER_GOOGLE, Polyline } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { MapPlace, TripMapProps } from '@/components/map-types';
 import { QUIET_MAP } from '@/lib/map-style';
 import { Colors, Radius, Spacing, Tap } from '@/constants/theme';
-import { Badge, Body, Caption, Icon, IconButton, Row, Subtitle } from '@/ui';
+import { Badge, Body, Caption, Chip, Icon, IconButton, Row, Subtitle } from '@/ui';
 
 /**
  * 지도 (앱).
@@ -84,11 +92,13 @@ export type { MapPlace } from '@/components/map-types';
    것이라 다음 빌드 때 열립니다(docs/design.md). 그때 showsUserLocation 을
    켜면 됩니다. */
 export function TripMap({
-  places,
+  places: all,
   activeId,
   onSelect,
   routes,
   routesPending = false,
+  traveler,
+  dayFilter = false,
   height = 300,
   chrome = true,
   bleed = false,
@@ -98,6 +108,29 @@ export function TripMap({
   panTo,
   follow,
 }: TripMapProps) {
+  /*
+    어느 날만 볼지.
+
+    <p>지도 안에 둡니다. 밖에서 걸러 넘기면 작은 지도만 걸러지고 전체화면으로
+    펴는 순간 다시 전부가 됩니다 — 정작 날짜별로 보고 싶은 때는 크게 펼쳤을
+    때입니다.
+  */
+  const [dayPick, setDayPick] = useState<number | null>(null);
+  const shown = useMemo(
+    () => (dayPick === null ? all : all.filter((p) => p.dayIndex === dayPick)),
+    [all, dayPick],
+  );
+  /** 찍을 곳이 있는 날만. 빈 날을 고르면 아무 일도 안 일어납니다. */
+  const dayList = useMemo(() => {
+    const seen = new Map<number, string>();
+    all.forEach((p) => {
+      if (!seen.has(p.dayIndex)) {
+        seen.set(p.dayIndex, p.detail?.dayLabel || `${p.dayIndex + 1}일차`);
+      }
+    });
+    return [...seen.entries()];
+  }, [all]);
+
   const map = useRef<MapView | null>(null);
   const [full, setFull] = useState(false);
   /* 전체화면에서 핀을 눌렀을 때 아래에 뜨는 카드. 목록의 선택과 따로 둡니다. */
@@ -118,8 +151,8 @@ export function TripMap({
    * 좁쌀만 해집니다.
    */
   const region = useMemo(() => {
-    const core = places.filter((p) => p.fit);
-    const target = core.length >= 2 ? core : places;
+    const core = shown.filter((p) => p.fit);
+    const target = core.length >= 2 ? core : shown;
     if (target.length === 0) {
       return { latitude: 37.5665, longitude: 126.978, latitudeDelta: 0.2, longitudeDelta: 0.2 };
     }
@@ -135,7 +168,7 @@ export function TripMap({
       latitudeDelta: Math.max((maxLat - minLat) * PAD, FOCUS_SPAN),
       longitudeDelta: Math.max((maxLng - minLng) * PAD, FOCUS_SPAN),
     };
-  }, [places]);
+  }, [shown]);
 
   /** 일정에 없는 자리로 옮깁니다. 꽂아 둔 깃발처럼 고를 id 가 없는 것들. */
   useEffect(() => {
@@ -156,11 +189,11 @@ export function TripMap({
 
   /** 넣어 둔 곳을 모두 한 화면에. 바깥에서 값을 바꿔 부릅니다. */
   useEffect(() => {
-    if (!fitAt || !map.current || places.length === 0) {
+    if (!fitAt || !map.current || shown.length === 0) {
       return;
     }
     map.current.fitToCoordinates(
-      places.map((p) => ({ latitude: p.lat, longitude: p.lng })),
+      shown.map((p) => ({ latitude: p.lat, longitude: p.lng })),
       { edgePadding: { top: 60, right: 50, bottom: 60, left: 50 }, animated: true },
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -187,7 +220,7 @@ export function TripMap({
     /* 실제 경로가 덮은 구간. id 는 "떠나는곳-닿는곳" 입니다. */
     const covered = new Set(drawn.map((r) => r.id));
     const byDay = new Map<number, MapPlace[]>();
-    places.forEach((p) => {
+    shown.forEach((p) => {
       const list = byDay.get(p.dayIndex) ?? [];
       list.push(p);
       byDay.set(p.dayIndex, list);
@@ -203,7 +236,7 @@ export function TripMap({
       }
     });
     return out;
-  }, [places, drawn]);
+  }, [shown, drawn]);
 
   /*
     장소 묶음이 실제로 바뀌었을 때만 화면을 다시 맞춥니다. 핀을 고르거나
@@ -211,25 +244,25 @@ export function TripMap({
   */
   const fitted = useRef('');
   useEffect(() => {
-    const key = places.map((p) => `${p.id}@${p.lat},${p.lng}`).join('|');
+    const key = shown.map((p) => `${p.id}@${p.lat},${p.lng}`).join('|');
     if (key === fitted.current || !map.current) {
       return;
     }
     fitted.current = key;
     map.current.animateToRegion(region, 350);
-  }, [places, region]);
+  }, [shown, region]);
 
   /* 고른 장소로 옮기면서 들여다볼 만큼 당깁니다. */
   useEffect(() => {
-    const chosen = places.find((p) => p.id === activeId);
+    const chosen = shown.find((p) => p.id === activeId);
     if (!chosen || !map.current) {
       return;
     }
     if (follow) {
       /* 따라가되 당기지 않습니다. 앞뒤 곳까지 한 화면에 넣으면 동선이
          남은 채로 눈길만 옮겨 가고, 먼 구간에서는 저절로 물러납니다. */
-      const at = places.indexOf(chosen);
-      const near = [places[at - 1], chosen, places[at + 1]].filter(Boolean);
+      const at = shown.indexOf(chosen);
+      const near = [shown[at - 1], chosen, shown[at + 1]].filter(Boolean);
       const lats = near.map((p) => p.lat);
       const lngs = near.map((p) => p.lng);
       map.current.animateToRegion(
@@ -252,7 +285,7 @@ export function TripMap({
       },
       350,
     );
-  }, [activeId, places, follow]);
+  }, [activeId, shown, follow]);
 
   /*
     가까이 몰린 별을 하나로 묶습니다.
@@ -265,7 +298,7 @@ export function TripMap({
     주는 것이라 묶으면 그 순서가 사라집니다.
   */
   const { loners, clumps } = useMemo(() => {
-    const none = { loners: places, clumps: [] as Clump[] };
+    const none = { loners: shown, clumps: [] as Clump[] };
     if (shape !== 'star' || !view || size.w === 0 || size.h === 0) {
       return none;
     }
@@ -279,7 +312,7 @@ export function TripMap({
     }
 
     const bins = new Map<string, MapPlace[]>();
-    places.forEach((p) => {
+    shown.forEach((p) => {
       /* 고른 것은 묶지 않습니다. 눌러서 고른 별이 숫자 뒤로 사라지면 어디를
          골랐는지 알 수 없습니다. */
       if (p.id === activeId) {
@@ -291,7 +324,7 @@ export function TripMap({
       bins.set(key, bin);
     });
 
-    const loners: MapPlace[] = places.filter((p) => p.id === activeId);
+    const loners: MapPlace[] = shown.filter((p) => p.id === activeId);
     const clumps: Clump[] = [];
     bins.forEach((bin, key) => {
       if (bin.length < 2) {
@@ -307,7 +340,7 @@ export function TripMap({
       });
     });
     return { loners, clumps };
-  }, [places, activeId, shape, view, size]);
+  }, [shown, activeId, shape, view, size]);
 
   /** 묶음을 누르면 그 안이 다 보일 만큼 당깁니다. */
   const spread = useCallback((group: Clump) => {
@@ -392,7 +425,30 @@ export function TripMap({
           ))
         : null}
 
-      {places.map((p) =>
+      {/*
+        길 위를 지나가는 것.
+
+        <p>이모지를 씁니다 — 앱 쪽 마커는 화면 요소를 그대로 얹을 수 있어서
+        돌리는 것도 크기를 바꾸는 것도 됩니다. 웹은 마커 글자를 못 돌려
+        선으로 그리는데, 같은 자리에 같은 뜻이면 생김새가 조금 달라도
+        됩니다.
+
+        <p>✈️ 는 오른쪽(동쪽)을 보고 있습니다. 북쪽이 0 인 heading 으로
+        맞추려면 90 도를 빼야 합니다.
+      */}
+      {traveler ? (
+        <Marker
+          coordinate={{ latitude: traveler.lat, longitude: traveler.lng }}
+          anchor={{ x: 0.5, y: 0.5 }}
+          rotation={traveler.heading - 90}
+          flat
+          tracksViewChanges={false}
+          zIndex={900}>
+          <Text style={{ fontSize: 20 + traveler.lift * 8 }}>✈️</Text>
+        </Marker>
+      ) : null}
+
+      {shown.map((p) =>
         p.radius ? (
           <Circle
             key={`circle-${p.id}`}
@@ -428,7 +484,34 @@ export function TripMap({
     </MapView>
   );
 
-  const chosen = full && sheetId ? (places.find((p) => p.id === sheetId) ?? null) : null;
+  const chosen = full && sheetId ? (shown.find((p) => p.id === sheetId) ?? null) : null;
+
+  /*
+    날짜 띠.
+
+    <p>작은 지도와 전체화면 양쪽에 같은 것을 답니다. 전체화면에서는 위쪽
+    안전영역만큼 내려 앉힙니다.
+  */
+  const dayRail =
+    dayFilter && dayList.length > 1 ? (
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.dayRail}
+        contentContainerStyle={styles.dayRailInner}>
+        <Row gap={Spacing.xs} style={styles.dayRailRow}>
+          <Chip label="전체" selected={dayPick === null} onPress={() => setDayPick(null)} />
+          {dayList.map(([index, label]) => (
+            <Chip
+              key={index}
+              label={label}
+              selected={dayPick === index}
+              onPress={() => setDayPick(dayPick === index ? null : index)}
+            />
+          ))}
+        </Row>
+      </ScrollView>
+    ) : null;
 
   return (
     <>
@@ -442,6 +525,7 @@ export function TripMap({
             <Caption tone="secondary">길 찾는 중</Caption>
           </View>
         ) : null}
+        {full ? null : dayRail}
         {full || !chrome ? null : (
           <View style={styles.overlay}>
             <IconButton name="maximize" label="전체화면으로 보기" onPress={() => setFull(true)} />
@@ -452,6 +536,9 @@ export function TripMap({
       <Modal visible={full} animationType="slide" onRequestClose={() => setFull(false)}>
         <View style={styles.fullWrap}>
           {full ? body : null}
+          {dayRail ? (
+            <View style={[styles.fullRail, { top: insets.top + Spacing.md }]}>{dayRail}</View>
+          ) : null}
           <View style={[styles.overlay, { top: insets.top + Spacing.md }]}>
             <IconButton
               name="minimize"
@@ -741,6 +828,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     borderRadius: Radius.full,
     backgroundColor: Colors.surface,
+  },
+  /* 지도 왼쪽 위. 오른쪽 위에는 전체화면 단추가 섭니다. */
+  dayRail: {
+    position: 'absolute',
+    top: Spacing.md,
+    left: 0,
+    right: 0,
+    flexGrow: 0,
+  },
+  dayRailInner: {
+    paddingHorizontal: Spacing.md,
+    /* 오른쪽 단추와 안 겹치게 그만큼 비웁니다. */
+    paddingRight: Tap.min * 2 + Spacing.xl,
+  },
+  dayRailRow: {
+    flexWrap: 'nowrap',
+  },
+  /* 전체화면에서는 안전영역만큼 내려 앉힙니다. 안에 든 띠는 이미 제
+     자리를 잡고 있으므로 이 껍데기가 기준만 옮겨 줍니다. */
+  fullRail: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: Tap.min,
   },
   overlay: {
     position: 'absolute',

@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import type { MapPlace, TripMapProps } from '@/components/map-types';
 import { gmaps, hasMaps, loadMaps } from '@/lib/gmaps.web';
 import { QUIET_MAP } from '@/lib/map-style';
 import { Colors, Radius, Spacing, Tap } from '@/constants/theme';
-import { Badge, Body, Caption, IconButton, Row, Subtitle } from '@/ui';
+import { Badge, Body, Caption, Chip, IconButton, Row, Subtitle } from '@/ui';
 
 /**
  * 지도 (웹).
@@ -240,6 +240,33 @@ function personIcon(color: string) {
   };
 }
 
+/**
+ * 길 위를 지나가는 것.
+ *
+ * <p>이모지(✈️)를 안 씁니다. 구글 지도에서 이모지는 마커의 <b>글자</b>로만
+ * 얹히는데, 글자는 돌릴 수가 없습니다. 어느 쪽으로 가는지가 안 보이면
+ * 지나가는 느낌이 아니라 점이 튀는 것으로 보입니다.
+ *
+ * <p>선으로 직접 그리면 돌아가고, 날짜 색을 그대로 입을 수 있습니다.
+ * 코 끝이 위(북쪽)를 보게 그려 두고 heading 만큼 돌립니다.
+ *
+ * @param lift 얼마나 떠 있는지. 뜨고 내릴 때 작아집니다 — 멀어지는 것이
+ *             아니라 <b>내려앉는</b> 것으로 읽히도록 그림자 대신 크기로
+ *             말합니다
+ */
+function flierIcon(g: any, heading: number, lift: number, color: string) {
+  return {
+    path: 'M 0,-10 L 3,-2 L 11,3 L 11,5 L 3,3 L 2,8 L 6,11 L 6,12 L 0,10 L -6,12 L -6,11 L -2,8 L -3,3 L -11,5 L -11,3 L -3,-2 Z',
+    fillColor: color,
+    fillOpacity: 1,
+    strokeColor: '#FFFFFF',
+    strokeWeight: 1.6,
+    rotation: heading,
+    scale: 0.85 + lift * 0.45,
+    anchor: new g.Point(0, 0),
+  };
+}
+
 function markerIcon(
   g: ReturnType<typeof gmaps>,
   place: MapPlace,
@@ -281,11 +308,13 @@ function markerIcon(
 }
 
 export function TripMap({
-  places,
+  places: all,
   activeId,
   onSelect,
   routes,
   routesPending = false,
+  traveler,
+  dayFilter = false,
   here,
   mates,
   notes,
@@ -301,6 +330,29 @@ export function TripMap({
   myFace,
   follow,
 }: TripMapProps) {
+  /*
+    어느 날만 볼지.
+
+    <p>지도 안에 둡니다. 밖에서 걸러 넘기면 작은 지도만 걸러지고 전체화면으로
+    펴는 순간 다시 전부가 됩니다 — 정작 날짜별로 보고 싶은 때는 크게 펼쳤을
+    때입니다.
+  */
+  const [dayPick, setDayPick] = useState<number | null>(null);
+  const shown = useMemo(
+    () => (dayPick === null ? all : all.filter((p) => p.dayIndex === dayPick)),
+    [all, dayPick],
+  );
+  /** 찍을 곳이 있는 날만. 빈 날을 고르면 아무 일도 안 일어납니다. */
+  const dayList = useMemo(() => {
+    const seen = new Map<number, string>();
+    all.forEach((p) => {
+      if (!seen.has(p.dayIndex)) {
+        seen.set(p.dayIndex, p.detail?.dayLabel || `${p.dayIndex + 1}일차`);
+      }
+    });
+    return [...seen.entries()];
+  }, [all]);
+
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
   const [full, setFull] = useState(false);
@@ -316,6 +368,8 @@ export function TripMap({
   const lines = useRef<any[]>([]);
   /** 가까운 것들을 대신 가리키는 별. 당기면 흩어지므로 배율마다 다시 만듭니다. */
   const clusters = useRef<any[]>([]);
+  /** 길 위를 지나가는 것. 자리만 갈아 끼우고 다시 만들지 않습니다. */
+  const flier = useRef<any>(null);
 
   /**
    * 마지막으로 화면을 맞춘 장소 묶음.
@@ -486,6 +540,42 @@ export function TripMap({
     });
   }, [ready, here]);
 
+  /*
+    길 위를 지나가는 것.
+
+    <p>따로 그립니다. 장소 핀을 다시 그리는 자리에 끼우면 1초에 스무 번씩
+    핀 전부를 지웠다 새로 만들게 됩니다.
+  */
+  useEffect(() => {
+    if (!ready || !map.current) {
+      return;
+    }
+    const g = gmaps();
+    if (!traveler) {
+      if (flier.current) {
+        flier.current.setMap(null);
+        flier.current = null;
+      }
+      return;
+    }
+    const at = { lat: traveler.lat, lng: traveler.lng };
+    const icon = flierIcon(g, traveler.heading, traveler.lift, traveler.color);
+    if (flier.current) {
+      /* 만들어 둔 것의 자리만 갈아 끼웁니다. 프레임마다 새로 만들면 지도가
+         마커를 지웠다 붙이느라 깜빡입니다. */
+      flier.current.setPosition(at);
+      flier.current.setIcon(icon);
+      return;
+    }
+    flier.current = new g.Marker({
+      position: at,
+      map: map.current,
+      icon,
+      clickable: false,
+      zIndex: 900,
+    });
+  }, [ready, traveler]);
+
   useEffect(() => {
     if (!ready || !map.current) {
       return;
@@ -499,7 +589,7 @@ export function TripMap({
     lines.current.forEach((l) => l.setMap(null));
     lines.current = [];
 
-    places.forEach((p) => {
+    shown.forEach((p) => {
       const marker = new g.Marker({
         position: { lat: p.lat, lng: p.lng },
         title: p.name,
@@ -569,7 +659,7 @@ export function TripMap({
       /* 실제 경로가 덮은 구간. id 는 "떠나는곳-닿는곳" 입니다. */
       const covered = new Set(drawn.map((r) => r.id));
       const byDay = new Map<number, MapPlace[]>();
-      places.forEach((p) => {
+      shown.forEach((p) => {
         const list = byDay.get(p.dayIndex) ?? [];
         list.push(p);
         byDay.set(p.dayIndex, list);
@@ -616,14 +706,14 @@ export function TripMap({
       켜는 것만으로 다시 맞추면, 들여다보던 자리가 매번 축소되어 튕겨
       나갑니다. 공항처럼 멀리 떨어진 곳은 빼야 나머지가 좁쌀만 해지지 않습니다.
     */
-    const key = places.map((p) => `${p.id}@${p.lat},${p.lng}`).join('|');
+    const key = shown.map((p) => `${p.id}@${p.lat},${p.lng}`).join('|');
     if (key === fitted.current) {
       return;
     }
     fitted.current = key;
 
-    const core = places.filter((p) => p.fit);
-    const target = core.length >= 2 ? core : places;
+    const core = shown.filter((p) => p.fit);
+    const target = core.length >= 2 ? core : shown;
     if (target.length === 1) {
       map.current.setCenter({ lat: target[0].lat, lng: target[0].lng });
       map.current.setZoom(15);
@@ -640,7 +730,7 @@ export function TripMap({
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, places, routes, link, routesPending]);
+  }, [ready, shown, routes, link, routesPending]);
 
   /*
     동행자와 임시 핀.
@@ -753,7 +843,7 @@ export function TripMap({
     const cell = 46;
 
     const bins = new Map<string, MapPlace[]>();
-    places.forEach((p) => {
+    shown.forEach((p) => {
       /* 고른 것은 묶지 않습니다. 눌러서 고른 별이 숫자 뒤로 사라지면
          어디를 골랐는지 알 수 없습니다. */
       if (p.id === activeId) {
@@ -803,7 +893,7 @@ export function TripMap({
       });
       clusters.current.push(marker);
     });
-  }, [places, activeId, shape]);
+  }, [shown, activeId, shape]);
 
   useEffect(() => {
     if (!ready || !map.current || shape !== 'star') {
@@ -830,7 +920,7 @@ export function TripMap({
       return;
     }
     const g = gmaps();
-    places.forEach((p) => {
+    shown.forEach((p) => {
       const marker = markers.current.get(p.id);
       if (!marker) {
         return;
@@ -840,14 +930,14 @@ export function TripMap({
       marker.setLabel(pinLabel(p, p.detail.visited, active, shape));
       marker.setZIndex(active ? 999 : 100 + p.order);
     });
-    const chosen = places.find((p) => p.id === activeId);
+    const chosen = shown.find((p) => p.id === activeId);
     if (chosen && map.current && follow) {
       /*
         따라가되 당기지 않습니다. 앞뒤 곳까지 한 화면에 넣으면 동선이 남은
         채로 눈길만 옮겨 가고, 먼 구간에서는 저절로 물러납니다.
       */
-      const at = places.indexOf(chosen);
-      const near = [places[at - 1], chosen, places[at + 1]].filter(Boolean);
+      const at = shown.indexOf(chosen);
+      const near = [shown[at - 1], chosen, shown[at + 1]].filter(Boolean);
       const bounds = new g.LatLngBounds();
       near.forEach((p) => bounds.extend({ lat: p.lat, lng: p.lng }));
       map.current.fitBounds(bounds, {
@@ -875,7 +965,7 @@ export function TripMap({
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, activeId, places]);
+  }, [ready, activeId, shown]);
 
   /*
     키가 없거나 스크립트를 못 받아 왔을 때.
@@ -932,12 +1022,12 @@ export function TripMap({
 
   /** 넣어 둔 곳을 모두 한 화면에. 바깥에서 부릅니다. */
   useEffect(() => {
-    if (!fitAt || !ready || !map.current || places.length === 0) {
+    if (!fitAt || !ready || !map.current || shown.length === 0) {
       return;
     }
     const g = gmaps();
     const bounds = new g.LatLngBounds();
-    places.forEach((p) => bounds.extend({ lat: p.lat, lng: p.lng }));
+    shown.forEach((p) => bounds.extend({ lat: p.lat, lng: p.lng }));
     map.current.fitBounds(bounds, {
       top: 48,
       right: 40,
@@ -949,7 +1039,7 @@ export function TripMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fitAt]);
 
-  const chosen = full && sheetId ? (places.find((p) => p.id === sheetId) ?? null) : null;
+  const chosen = full && sheetId ? (shown.find((p) => p.id === sheetId) ?? null) : null;
 
   return (
     <div
@@ -963,6 +1053,32 @@ export function TripMap({
         backgroundColor: Colors.abyss,
       }}>
       <div ref={host} style={{ width: '100%', height: '100%' }} />
+
+      {/*
+        날짜 띠.
+
+        <p>날이 둘 이상일 때만 냅니다. 하루짜리 일정에 "전체/1일차" 를 두면
+        고를 것이 없는 띠가 지도 위를 가립니다.
+      */}
+      {dayFilter && dayList.length > 1 ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.dayRail}
+          contentContainerStyle={styles.dayRailInner}>
+          <Row gap={Spacing.xs} style={styles.dayRailRow}>
+            <Chip label="전체" selected={dayPick === null} onPress={() => setDayPick(null)} />
+            {dayList.map(([index, label]) => (
+              <Chip
+                key={index}
+                label={label}
+                selected={dayPick === index}
+                onPress={() => setDayPick(dayPick === index ? null : index)}
+              />
+            ))}
+          </Row>
+        </ScrollView>
+      ) : null}
 
       {/* 글자 대신 모양으로 둡니다. 앱 쪽과 같아야 같은 화면으로 읽힙니다. */}
       {chrome ? (
@@ -1075,6 +1191,23 @@ const styles = StyleSheet.create({
     borderRadius: Radius.full,
     backgroundColor: Colors.surface,
     zIndex: 2,
+  },
+  /* 지도 왼쪽 위. 오른쪽 위에는 전체화면·내 위치 단추가 섭니다. */
+  dayRail: {
+    position: 'absolute',
+    top: Spacing.md,
+    left: 0,
+    right: 0,
+    flexGrow: 0,
+    zIndex: 2,
+  },
+  dayRailInner: {
+    paddingHorizontal: Spacing.md,
+    /* 오른쪽 단추와 안 겹치게 그만큼 비웁니다. */
+    paddingRight: Tap.min * 2 + Spacing.xl,
+  },
+  dayRailRow: {
+    flexWrap: 'nowrap',
   },
   chip: {
     minHeight: Tap.min,

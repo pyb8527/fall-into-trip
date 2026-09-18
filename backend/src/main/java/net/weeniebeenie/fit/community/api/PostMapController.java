@@ -36,16 +36,21 @@ public class PostMapController {
     public ResponseEntity<byte[]> map(@PathVariable String postId) {
         JsonNode snapshot = posts.snapshotOf(posts.read(postId));
 
-        List<Point> points = new ArrayList<>();
+        /* 날짜를 묶어 둔 채로 넘깁니다. 한 줄로 이어 붙이면 닷새치가 한 색
+           실뭉치가 되어, 목록에서 어느 것이 짧은 여행이고 어느 것이 긴
+           여행인지도 안 보입니다. */
+        List<List<Point>> byDay = new ArrayList<>();
         for (JsonNode day : snapshot.path("days")) {
+            List<Point> one = new ArrayList<>();
             for (JsonNode place : day.path("places")) {
                 if (place.hasNonNull("lat") && place.hasNonNull("lng")) {
-                    points.add(new Point(place.path("lat").asDouble(), place.path("lng").asDouble()));
+                    one.add(new Point(place.path("lat").asDouble(), place.path("lng").asDouble()));
                 }
             }
+            byDay.add(one);
         }
 
-        byte[] png = maps.render(points, 600, 320);
+        byte[] png = maps.renderDays(byDay, 600, 320);
         return ResponseEntity.ok()
                 /* 글의 일정은 사본이라 바뀌지 않습니다. 브라우저가 오래 들고
                    있어도 틀린 그림을 보여 줄 일이 없습니다. */

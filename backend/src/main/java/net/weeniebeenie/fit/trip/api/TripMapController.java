@@ -67,15 +67,20 @@ public class TripMapController {
                 .collect(Collectors.groupingBy(Place::getDayId));
 
         /* 날짜 순서로, 그 안에서는 적어 둔 순서로. 여행 전체를 한 번에 묶어
-           부르는 길이 있지만 그쪽은 날짜를 가로질러 섞이므로 쓰지 않습니다. */
-        List<Point> points = new ArrayList<>();
+           부르는 길이 있지만 그쪽은 날짜를 가로질러 섞이므로 쓰지 않습니다.
+
+           날짜를 묶어 둔 채로 넘깁니다. 한 줄로 이어 붙이면 닷새치가 한 색
+           실뭉치가 되어, 어디가 첫날인지 알 수 없습니다. */
+        List<List<Point>> byDayPoints = new ArrayList<>();
         for (Day day : ordered) {
+            List<Point> one = new ArrayList<>();
             byDay.getOrDefault(day.getId(), List.of()).stream()
                     .sorted(Comparator.comparingInt(Place::getSort))
-                    .forEach(p -> points.add(new Point(p.getLat(), p.getLng())));
+                    .forEach(p -> one.add(new Point(p.getLat(), p.getLng())));
+            byDayPoints.add(one);
         }
 
-        byte[] png = maps.render(points, 600, 320);
+        byte[] png = maps.renderDays(byDayPoints, 600, 320);
         return ResponseEntity.ok()
                 /*
                   남의 캐시에 얹히면 안 되는 그림입니다. 여행은 부른 사람들만

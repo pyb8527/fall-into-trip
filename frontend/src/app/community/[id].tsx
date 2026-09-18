@@ -250,7 +250,16 @@ export default function Post() {
       */
       header={
         pins.length > 0 ? (
-          <TripMap places={pins} activeId={activeId} onSelect={setActiveId} height={220} />
+          <TripMap
+            places={pins}
+            activeId={activeId}
+            onSelect={setActiveId}
+            /* 닷새치 스무 곳이 한 지도에 얹히면 어느 것이 몇째 날인지는
+               색으로만 남습니다. 날짜를 고르면 그 하루만 봅니다 — 전체화면도
+               같이 걸립니다. */
+            dayFilter
+            height={220}
+          />
         ) : (
           <PostMap postId={id} title={data.title} height={160} />
         )
