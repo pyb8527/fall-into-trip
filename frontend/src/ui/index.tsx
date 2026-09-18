@@ -1,7 +1,9 @@
 import Feather from '@expo/vector-icons/Feather';
 import {
+  createContext,
   forwardRef,
   useCallback,
+  useContext,
   useEffect,
   useImperativeHandle,
   useRef,
@@ -11,6 +13,7 @@ import {
   ActivityIndicator,
   Animated,
   Easing,
+  Image,
   Keyboard,
   KeyboardAvoidingView,
   Modal,
@@ -23,6 +26,7 @@ import {
   TextInput,
   useWindowDimensions,
   View,
+  type ImageSourcePropType,
   type StyleProp,
   type TextInputProps,
   type TextStyle,
@@ -294,7 +298,9 @@ export const Screen = forwardRef<ScreenHandle, ScreenProps>(function Screen(
             styles.footer,
             { paddingBottom: (keyboardUp ? 0 : insets.bottom) + Spacing.md },
           ]}>
-          <View style={styles.footerInner}>{footer}</View>
+          <View style={styles.footerInner}>
+            <OnFloor.Provider value>{footer}</OnFloor.Provider>
+          </View>
         </View>
       ) : null}
     </KeyboardAvoidingView>
@@ -477,6 +483,21 @@ const toneSoft: Record<Tone, string> = {
   /* 바탕이 이미 진한 자리에 쓰므로 무른 배경은 두지 않습니다. */
   inverse: 'transparent',
 };
+
+/**
+ * 여기가 <b>바닥에 고정된 자리</b>인지.
+ *
+ * <h3>왜 문맥으로 아는가</h3>
+ *
+ * <p>색을 가득 칠하는 단추는 화면에 하나면 됩니다. 그 하나는 늘 바닥에
+ * 붙어 있는 것입니다 — "12곳 일정에 넣기", "쓴 돈 적기" 처럼 이 화면에
+ * 들어온 목적 그 자체인 것들입니다. 카드 안에 있는 단추는 그것이 아닙니다.
+ *
+ * <p>그 규칙을 호출부마다 적게 하면 열다섯 군데에 같은 판단이 흩어지고,
+ * 언젠가 한 곳이 어긋납니다. 바닥이 스스로 "여기는 바닥" 이라고 알리고
+ * 단추가 그것을 읽습니다.
+ */
+const OnFloor = createContext(false);
 
 /** 화면의 제목. 한 화면에 하나만. */
 export function Title({ children, tone }: { children: React.ReactNode; tone?: Tone }) {
@@ -719,13 +740,17 @@ export function Button({
   compact?: boolean;
 }) {
   const off = disabled || busy;
+  /* 바닥에 고정된 주 단추만 색을 가득 칠합니다. 카드 안에 있는 것은
+     옅은 물에 코랄 글씨로 남습니다 — 화면에 색 덩어리는 하나면 됩니다. */
+  const filled = variant === 'primary' && useContext(OnFloor);
 
   /* 못 누르는 버튼은 흐리게 만드는 대신 아예 다른 색으로 둡니다. 투명도만
      낮추면 그 아래 배경이 비쳐 글자가 읽기 어려워집니다. */
   /*
     단추의 세기.
 
-      주 동작   옅은 코랄 바탕에 코랄 글씨 — 화면에 하나
+      주 동작   바닥에 고정된 것이면 코랄로 꽉 채우고 흰 글씨,
+                카드 안이면 옅은 코랄 바탕에 코랄 글씨
       보조      흰 바탕에 검은 글씨
       위험      흰 바탕에 굵은 선 — 되돌릴 수 없다는 표시
       곁다리    아무것도 없는 글자
@@ -744,7 +769,9 @@ export function Button({
     하기 때문입니다. 그리고 그 앞에는 늘 확인 판이 한 번 더 섭니다.
   */
   const palette: Record<ButtonVariant, { bg: string; pressed: string; fg: string }> = {
-    primary: { bg: Colors.accentSoft, pressed: Colors.accentSoftPressed, fg: Colors.accentInk },
+    primary: filled
+      ? { bg: Colors.accentInk, pressed: Colors.accentPressed, fg: Colors.onAccent }
+      : { bg: Colors.accentSoft, pressed: Colors.accentSoftPressed, fg: Colors.accentInk },
     secondary: { bg: Colors.surface, pressed: Colors.fill, fg: Colors.text },
     danger: { bg: Colors.surface, pressed: Colors.fill, fg: Colors.text },
     ghost: { bg: 'transparent', pressed: Colors.fill, fg: Colors.textMuted },
@@ -1140,12 +1167,27 @@ export function MenuCard({
   caption,
   wide,
   soon,
+  image,
   onPress,
 }: {
   title: string;
   caption: string;
   wide?: boolean;
   soon?: boolean;
+  /**
+   * 카드 뒤에 옅게 까는 사진.
+   *
+   * <h3>왜 옅게인가</h3>
+   *
+   * <p>사진을 제 밝기로 깔면 그 위의 글자를 읽으려고 사진을 어둡게 덮어야
+   * 하고, 그러면 회색 바닥에 흰 카드를 놓아 만든 층이 카드 하나 때문에
+   * 무너집니다.
+   *
+   * <p>여기서 사진이 하는 일은 <b>무엇에 대한 카드인지 한눈에 알리는 것</b>
+   * 까지입니다. 글자는 이미 그 말을 하고 있으니 사진은 거들기만 하면 됩니다.
+   * 흐릿하게 깔면 카드가 저마다 다른 얼굴을 갖되 글자는 그대로 읽힙니다.
+   */
+  image?: ImageSourcePropType;
   onPress?: () => void;
 }) {
   return (
@@ -1159,6 +1201,19 @@ export function MenuCard({
         wide ? styles.menuCardWide : styles.menuCardHalf,
         soon ? styles.menuCardSoon : null,
       ]}>
+      {/* 아직 없는 것에는 안 깝니다 — 못 누르는 카드가 제일 화사하면
+          그쪽으로 손이 갑니다. */}
+      {image && !soon ? (
+        <Image
+          source={image}
+          style={styles.menuImage}
+          resizeMode="cover"
+          /* 읽어 주는 기기에는 안 읽힙니다. 글자가 이미 같은 말을 하고
+             있어서, 사진 이름을 또 읽으면 같은 카드를 두 번 말합니다. */
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        />
+      ) : null}
       <View style={styles.menuText}>
         <Row gap={Spacing.sm}>
           <Text style={[styles.menuTitle, soon && styles.menuTitleSoon]}>{title}</Text>
@@ -1498,7 +1553,11 @@ export function BottomSheet({
             {children}
           </ScrollView>
 
-          {footer ? <View style={styles.sheetFoot}>{footer}</View> : null}
+          {footer ? (
+            <View style={styles.sheetFoot}>
+              <OnFloor.Provider value>{footer}</OnFloor.Provider>
+            </View>
+          ) : null}
         </Animated.View>
       </KeyboardAvoidingView>
     </Modal>
@@ -2371,12 +2430,30 @@ const styles = StyleSheet.create({
 
   menuCard: {
     backgroundColor: Colors.surface,
+    overflow: 'hidden',
     borderRadius: Radius.md,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: Colors.border,
     padding: Spacing.lg,
     minHeight: 96,
     justifyContent: 'flex-end',
+  },
+  /*
+    뒤에 까는 사진.
+
+    투명도 하나로 흐릿하게 만듭니다. 위에 흰 장막을 한 겹 더 얹는 방법도
+    있지만, 흰 카드 위에서는 결과가 같고 층만 하나 늘어납니다.
+
+    카드 아래쪽은 글자가 앉는 자리라 사진을 위쪽에 몰아 둡니다 — 높이를
+    75% 만 주고 위에 붙입니다.
+  */
+  menuImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '75%',
+    opacity: 0.16,
   },
   /* 아직 없는 것은 띄우지 않습니다. 못 누른다는 것이 글자(준비 중) 말고
      생김새로도 읽혀야 합니다 — 떠 있지 않으면 손이 가지 않습니다. */

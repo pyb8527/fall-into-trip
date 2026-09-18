@@ -95,6 +95,7 @@ export function TripMap({
   fitAt,
   shape = 'default',
   panTo,
+  follow,
 }: TripMapProps) {
   const map = useRef<MapView | null>(null);
   const [full, setFull] = useState(false);
@@ -167,16 +168,41 @@ export function TripMap({
   /** 받은 경로 중 그릴 수 있는 것만. */
   const drawn = useMemo(() => (routes ?? []).filter((r) => r.points.length > 1), [routes]);
 
-  /** 실제 경로가 없을 때 같은 날끼리 이어 두는 선. */
+  /**
+   * 실제 경로를 못 받은 구간만 이어 두는 선.
+   *
+   * <h3>전에는 전부 아니면 전무였습니다</h3>
+   *
+   * <p>실제 경로가 하나라도 오면 그것들만 그리고 점선은 통째로 건너뛰었
+   * 습니다. 그런데 구글은 <b>구간을 가려 가며</b> 줍니다 — 일본에서 대중교통을
+   * 아예 안 주는 자리가 있고, 공항처럼 먼 구간이 대개 그렇습니다.
+   *
+   * <p>그러면 다섯 구간 중 넷만 실선이 그려지고 <b>한 구간은 아무 선도 없이
+   * 비었습니다.</b> 길이 한가운데서 끊긴 것처럼 보이는 것이 이것입니다.
+   *
+   * <p>이제 구간마다 봅니다. 받은 구간은 실선, 못 받은 구간만 점선.
+   */
   const hops = useMemo(() => {
+    /* 실제 경로가 덮은 구간. id 는 "떠나는곳-닿는곳" 입니다. */
+    const covered = new Set(drawn.map((r) => r.id));
     const byDay = new Map<number, MapPlace[]>();
     places.forEach((p) => {
       const list = byDay.get(p.dayIndex) ?? [];
       list.push(p);
       byDay.set(p.dayIndex, list);
     });
-    return [...byDay.values()].filter((list) => list.length >= 2);
-  }, [places]);
+    const out: { id: string; from: MapPlace; to: MapPlace }[] = [];
+    byDay.forEach((list) => {
+      for (let i = 0; i < list.length - 1; i++) {
+        const from = list[i];
+        const to = list[i + 1];
+        if (!covered.has(`${from.id}-${to.id}`)) {
+          out.push({ id: `${from.id}-${to.id}`, from, to });
+        }
+      }
+    });
+    return out;
+  }, [places, drawn]);
 
   /*
     장소 묶음이 실제로 바뀌었을 때만 화면을 다시 맞춥니다. 핀을 고르거나
@@ -198,6 +224,24 @@ export function TripMap({
     if (!chosen || !map.current) {
       return;
     }
+    if (follow) {
+      /* 따라가되 당기지 않습니다. 앞뒤 곳까지 한 화면에 넣으면 동선이
+         남은 채로 눈길만 옮겨 가고, 먼 구간에서는 저절로 물러납니다. */
+      const at = places.indexOf(chosen);
+      const near = [places[at - 1], chosen, places[at + 1]].filter(Boolean);
+      const lats = near.map((p) => p.lat);
+      const lngs = near.map((p) => p.lng);
+      map.current.animateToRegion(
+        {
+          latitude: (Math.min(...lats) + Math.max(...lats)) / 2,
+          longitude: (Math.min(...lngs) + Math.max(...lngs)) / 2,
+          latitudeDelta: Math.max(FOCUS_SPAN, (Math.max(...lats) - Math.min(...lats)) * 1.8),
+          longitudeDelta: Math.max(FOCUS_SPAN, (Math.max(...lngs) - Math.min(...lngs)) * 1.8),
+        },
+        350,
+      );
+      return;
+    }
     map.current.animateToRegion(
       {
         latitude: chosen.lat,
@@ -207,7 +251,7 @@ export function TripMap({
       },
       350,
     );
-  }, [activeId, places]);
+  }, [activeId, places, follow]);
 
   /*
     가까이 몰린 별을 하나로 묶습니다.
@@ -319,28 +363,31 @@ export function TripMap({
         })
       }>
       {/*
-        실제 경로를 받았으면 그것을 그립니다. 없을 때만 장소끼리 잇습니다.
-        그 선은 "이 순서로 간다" 는 뜻일 뿐 지나는 길이 아니므로, 실제 길과
-        헷갈리지 않게 점선으로 둡니다.
+        받은 구간은 실선, 못 받은 구간은 점선. 점선은 "이 순서로 간다" 는
+        뜻일 뿐 지나는 길이 아니므로 생김새를 달리 둡니다.
       */}
-      {drawn.length === 0 && !link ? null : drawn.length > 0
-        ? drawn.map((line) => (
+      {drawn.map((line) => (
+        <Polyline
+          key={line.id}
+          coordinates={line.points.map((p) => ({ latitude: p.lat, longitude: p.lng }))}
+          strokeColor={line.color}
+          strokeWidth={4}
+        />
+      ))}
+      {link
+        ? hops.map((hop) => (
             <Polyline
-              key={line.id}
-              coordinates={line.points.map((p) => ({ latitude: p.lat, longitude: p.lng }))}
-              strokeColor={line.color}
-              strokeWidth={4}
-            />
-          ))
-        : hops.map((list) => (
-            <Polyline
-              key={`hop-${list[0].dayIndex}`}
-              coordinates={list.map((p) => ({ latitude: p.lat, longitude: p.lng }))}
-              strokeColor={list[0].color}
+              key={`hop-${hop.id}`}
+              coordinates={[
+                { latitude: hop.from.lat, longitude: hop.from.lng },
+                { latitude: hop.to.lat, longitude: hop.to.lng },
+              ]}
+              strokeColor={hop.from.color}
               strokeWidth={3}
               lineDashPattern={[6, 8]}
             />
-          ))}
+          ))
+        : null}
 
       {places.map((p) =>
         p.radius ? (

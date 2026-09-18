@@ -298,6 +298,7 @@ export function TripMap({
   shape = 'default',
   panTo,
   myFace,
+  follow,
 }: TripMapProps) {
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -531,27 +532,39 @@ export function TripMap({
     });
 
     /*
-      실제 경로를 받았으면 그것을 그리고 끝냅니다. 아래 점선은 "이 순서로
-      간다" 는 뜻일 뿐 지나는 길이 아니라, 둘을 겹쳐 그리면 어느 쪽이 진짜
-      길인지 알 수 없게 됩니다.
+      길은 구간마다 따로 그립니다.
+
+      <h3>전에는 전부 아니면 전무였습니다</h3>
+
+      <p>실제 경로가 하나라도 오면 그것들만 그리고 점선은 통째로 건너뛰었
+      습니다. 그런데 구글은 <b>구간을 가려 가며</b> 줍니다 — 일본에서 대중교통을
+      아예 안 주는 자리가 있고(그래서 안내 문구까지 따로 만들어 두었습니다),
+      공항처럼 먼 구간이 대개 그렇습니다.
+
+      <p>그러면 다섯 구간 중 넷만 실선이 그려지고 <b>한 구간은 아무 선도 없이
+      비었습니다.</b> 길이 한가운데서 끊긴 것처럼 보이는 것이 이것입니다.
+
+      <p>이제 구간마다 봅니다. 받은 구간은 실선, 못 받은 구간은 점선. 길이
+      안 끊기고, 어디까지가 진짜 길이고 어디부터가 "이 순서로 간다" 인지도
+      생김새로 갈립니다.
     */
     const drawn = (routes ?? []).filter((r) => r.points.length > 1);
-    if (drawn.length > 0) {
-      drawn.forEach((line) => {
-        lines.current.push(
-          new g.Polyline({
-            path: line.points,
-            map: map.current,
-            strokeColor: line.color,
-            strokeOpacity: 0.9,
-            strokeWeight: 4,
-            zIndex: 2,
-          }),
-        );
-      });
-    } else if (link) {
-      /* 실제 경로가 없을 때만 같은 날끼리 잇습니다. 점선으로 둬야 도로와
-         헷갈리지 않습니다. */
+    drawn.forEach((line) => {
+      lines.current.push(
+        new g.Polyline({
+          path: line.points,
+          map: map.current,
+          strokeColor: line.color,
+          strokeOpacity: 0.9,
+          strokeWeight: 4,
+          zIndex: 2,
+        }),
+      );
+    });
+
+    if (link) {
+      /* 실제 경로가 덮은 구간. id 는 "떠나는곳-닿는곳" 입니다. */
+      const covered = new Set(drawn.map((r) => r.id));
       const byDay = new Map<number, MapPlace[]>();
       places.forEach((p) => {
         const list = byDay.get(p.dayIndex) ?? [];
@@ -559,30 +572,37 @@ export function TripMap({
         byDay.set(p.dayIndex, list);
       });
       byDay.forEach((list) => {
-        if (list.length < 2) {
-          return;
-        }
-        lines.current.push(
-          new g.Polyline({
-            path: list.map((p) => ({ lat: p.lat, lng: p.lng })),
-            map: map.current,
-            strokeOpacity: 0,
-            zIndex: 2,
-            icons: [
-              {
-                icon: {
-                  path: 'M 0,-1 0,1',
-                  strokeColor: list[0].color,
-                  strokeOpacity: 0.85,
-                  strokeWeight: 2.4,
-                  scale: 3,
+        for (let i = 0; i < list.length - 1; i++) {
+          const from = list[i];
+          const to = list[i + 1];
+          if (covered.has(`${from.id}-${to.id}`)) {
+            continue;
+          }
+          lines.current.push(
+            new g.Polyline({
+              path: [
+                { lat: from.lat, lng: from.lng },
+                { lat: to.lat, lng: to.lng },
+              ],
+              map: map.current,
+              strokeOpacity: 0,
+              zIndex: 2,
+              icons: [
+                {
+                  icon: {
+                    path: 'M 0,-1 0,1',
+                    strokeColor: from.color,
+                    strokeOpacity: 0.85,
+                    strokeWeight: 2.4,
+                    scale: 3,
+                  },
+                  offset: '0',
+                  repeat: '13px',
                 },
-                offset: '0',
-                repeat: '13px',
-              },
-            ],
-          }),
-        );
+              ],
+            }),
+          );
+        }
       });
     }
 
@@ -818,7 +838,26 @@ export function TripMap({
       marker.setZIndex(active ? 999 : 100 + p.order);
     });
     const chosen = places.find((p) => p.id === activeId);
-    if (chosen && map.current) {
+    if (chosen && map.current && follow) {
+      /*
+        따라가되 당기지 않습니다. 앞뒤 곳까지 한 화면에 넣으면 동선이 남은
+        채로 눈길만 옮겨 가고, 먼 구간에서는 저절로 물러납니다.
+      */
+      const at = places.indexOf(chosen);
+      const near = [places[at - 1], chosen, places[at + 1]].filter(Boolean);
+      const bounds = new g.LatLngBounds();
+      near.forEach((p) => bounds.extend({ lat: p.lat, lng: p.lng }));
+      map.current.fitBounds(bounds, {
+        top: 56,
+        right: 56,
+        bottom: 56 + bottomInset,
+        left: 56,
+      });
+      /* 한 곳만 있는 하루에서는 fitBounds 가 끝까지 당겨 버립니다. */
+      if ((map.current.getZoom() ?? 0) > FOCUS_ZOOM) {
+        map.current.setZoom(FOCUS_ZOOM);
+      }
+    } else if (chosen && map.current) {
       map.current.panTo({ lat: chosen.lat, lng: chosen.lng });
       if ((map.current.getZoom() ?? 0) < FOCUS_ZOOM) {
         map.current.setZoom(FOCUS_ZOOM);

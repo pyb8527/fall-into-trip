@@ -295,6 +295,10 @@ function Replay({ trip }: { trip: TripDetail }) {
            고르지 않아, 전부가 같은 크기로 남습니다. */
         activeId={now?.id ?? null}
         onSelect={() => {}}
+        /* 따라가되 당기지 않습니다. 1.1초마다 넘어가는 자리라 바짝 당기면
+           먼 다음 곳이 늘 화면 밖이고, 옮겨 가는 도중에 다음 옮김이 시작돼
+           앞엣것이 잘립니다 — 그것이 "멀리 있으면 끊긴다" 의 정체였습니다. */
+        follow
         fitAt={fitAt}
         height={320}
       />

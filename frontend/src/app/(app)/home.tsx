@@ -15,7 +15,7 @@ import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
 import { TripThumb } from '@/components/trip-thumb';
 import { iconOf, labelOf } from '@/constants/place-icons';
-import { Spacing } from '@/constants/theme';
+import { Colors, Radius, Spacing } from '@/constants/theme';
 import type { Countdown } from '@/lib/countdown';
 import { countdownIsNear, countdownLabel, countdownOf, todayIso } from '@/lib/countdown';
 import {
@@ -24,6 +24,7 @@ import {
   Button,
   Caption,
   Card,
+  Divider,
   Grow,
   Icon,
   IconButton,
@@ -38,6 +39,22 @@ import {
   Title,
 } from '@/ui';
 import { LogoMark } from '@/ui/logo';
+
+/**
+ * 메뉴 카드 뒤에 옅게 까는 사진.
+ *
+ * <p>한자리에 모아 둡니다. 화면 여기저기서 require 를 부르면 어느 카드에
+ * 무엇이 깔리는지 코드를 훑어야 알 수 있습니다.
+ *
+ * <p>올리는 사진이 아니라 앱에 함께 실리는 것입니다 — 서버에 쌓이는 것이
+ * 없습니다. 네 장 합쳐 128KB 로 줄여 두었습니다.
+ */
+const MENU = {
+  trips: require('@/assets/images/menu/trips.jpg'),
+  saved: require('@/assets/images/menu/saved.jpg'),
+  community: require('@/assets/images/menu/community.jpg'),
+  money: require('@/assets/images/menu/money.jpg'),
+} as const;
 
 /**
  * 첫 화면.
@@ -208,6 +225,7 @@ export default function Home() {
           <MenuCard
             title="내 여행"
             caption="짜고, 부르고, 같이 고치기"
+            image={MENU.trips}
             onPress={() => router.push('/(app)/trips')}
           />
         </Rise>
@@ -215,6 +233,7 @@ export default function Home() {
           <MenuCard
             title="보석함"
             caption="주워 둔 곳들"
+            image={MENU.saved}
             onPress={() => router.push('/(app)/saved')}
           />
         </Rise>
@@ -222,6 +241,7 @@ export default function Home() {
           <MenuCard
             title="여행 둘러보기"
             caption="남이 다녀온 길 구경하기"
+            image={MENU.community}
             onPress={() => router.push('/community')}
           />
         </Rise>
@@ -232,6 +252,7 @@ export default function Home() {
           <MenuCard
             title="가계부"
             caption="누가 얼마 냈는지"
+            image={MENU.money}
             onPress={() => router.push('/(app)/trips?for=money')}
           />
         </Rise>
@@ -262,50 +283,59 @@ export default function Home() {
       {next ? <NextTrip trip={next.trip} at={next.at} road={road} /> : null}
 
       {/*
-        내 여행 몇 개만.
+        내 여행 — 카드 하나에 목록으로.
 
-        목록은 「내 여행」 이 이미 합니다. 여기 두는 것은 되짚어 들어가는
-        자리입니다 — 어제 보던 여행을 다시 열려고 탭을 옮기고 목록을 훑는
-        것은 이미 아는 것을 다시 찾는 일입니다.
+        <h3>왜 줄마다 카드가 아닌가</h3>
 
-        셋만 냅니다. 넷을 넘으면 그것은 목록이고, 목록은 저쪽 것입니다.
+        <p>한동안 여행 하나에 카드 하나였습니다. 셋이면 사각형이 셋이고,
+        사이사이 여백까지 합치면 세 줄을 읽는 데 화면의 절반을 씁니다.
+        그런데 이것들은 <b>같은 종류의 것들</b>입니다 — 같은 묶음이면 한
+        상자에 들어가야 하고, 상자를 여럿 두면 그만큼 경계가 늘어납니다.
+
+        <p>토스의 자산 화면이 그렇게 서 있습니다. 카드 하나 안에 줄이 여럿
+        있고, 맨 아래 "전체보기" 가 한 칸 차지합니다. 줄 사이는 머리카락
+        굵기 선 하나가 가릅니다.
+
+        <h3>몇십 개여도 됩니다</h3>
+
+        <p>여기서 내는 것은 늘 <b>셋</b>입니다. 여행이 마흔 개여도 카드
+        높이는 그대로이고, 나머지는 "40개 전체보기" 한 줄이 맡습니다.
+        홈이 목록이 되면 홈이 아닙니다.
       */}
       {mine && mine.trips.length > 0 ? (
         <View style={styles.section}>
-          <Split align="baseline">
-            <Subtitle>내 여행</Subtitle>
-            {mine.trips.length > 3 ? (
-              <Button
-                label={`${mine.trips.length}개 전체보기`}
-                variant="ghost"
-                compact
-                onPress={() => router.push('/(app)/trips')}
-              />
-            ) : null}
-          </Split>
-          <View style={styles.rows}>
-            {mine.trips.slice(0, 3).map((trip) => (
-              <Press
-                key={trip.id}
-                onPress={() => router.push(`/trip/${trip.id}`)}
-                scale={0.99}
-                accessibilityLabel={`${trip.title} 열기`}>
-                <Card style={styles.row}>
+          <Subtitle>내 여행</Subtitle>
+          <Card style={styles.listCard}>
+            {mine.trips.slice(0, 3).map((trip, i) => (
+              <View key={trip.id}>
+                {i > 0 ? <Divider /> : null}
+                <Press
+                  onPress={() => router.push(`/trip/${trip.id}`)}
+                  scale={0.995}
+                  accessibilityLabel={`${trip.title} 열기`}
+                  style={styles.listRow}>
                   <Split>
-                    <Grow gap={2}>
-                      <Body strong numberOfLines={1}>
+                    <Grow gap={1}>
+                      <Body small strong numberOfLines={1}>
                         {trip.title}
                       </Body>
-                      <Caption tone="secondary">
+                      <Caption tone="muted">
                         {trip.dayCount}일 · 장소 {trip.placeCount}곳
                       </Caption>
                     </Grow>
-                    <Icon name="chevron-right" size={18} tone="muted" />
+                    <Icon name="chevron-right" size={16} tone="muted" />
                   </Split>
-                </Card>
-              </Press>
+                </Press>
+              </View>
             ))}
-          </View>
+            {mine.trips.length > 3 ? (
+              <Button
+                label={`${mine.trips.length}개 전체보기`}
+                variant="secondary"
+                onPress={() => router.push('/(app)/trips')}
+              />
+            ) : null}
+          </Card>
         </View>
       ) : null}
 
@@ -316,8 +346,8 @@ export default function Home() {
         동선 그림 한 장뿐인데, 그것으로 충분합니다 — 오사카를 도는 선과
         제주를 도는 선은 생김새가 다릅니다. 무엇보다 진짜 그 글의 내용입니다.
 
-        가로로 흘립니다. 세로로 쌓으면 셋만 놓아도 화면 하나를 먹고, 이
-        구역은 "이런 것도 있다" 를 보이는 자리이지 고르는 자리가 아닙니다.
+        이 구역만 가로로 흘립니다. 그림이 붙는 것은 줄로 세울 수 없고,
+        "이런 것도 있다" 를 보이는 자리이지 고르는 자리가 아닙니다.
       */}
       {shared && shared.posts.length > 0 ? (
         <View style={styles.section}>
@@ -339,7 +369,7 @@ export default function Home() {
                   scale={0.98}
                   accessibilityLabel={`${post.title} 보기`}
                   style={styles.postCard}>
-                  <TripThumb postId={post.id} height={104} label={post.title} />
+                  <TripThumb postId={post.id} height={96} label={post.title} />
                   <View style={styles.postText}>
                     {/* 작은 회색 메타 → 굵은 제목 → 작은 숫자. 문토가 카드
                         안에서 쓰는 차례 그대로입니다. */}
@@ -362,45 +392,43 @@ export default function Home() {
       ) : null}
 
       {/*
-        여럿이 간 곳.
+        여럿이 간 곳 — 이것도 카드 하나에.
 
-        처음 온 사람의 홈은 텅 비어 있습니다. "첫 여행을 만들어 보세요"
-        라고만 하면 무엇을 만들어야 할지가 그대로 숙제로 남습니다.
+        순위는 위아래로 견주며 읽는 것이라 한 상자에 담겨 있어야 합니다.
+        줄마다 카드로 떼어 놓으면 1위와 5위가 서로 다른 것처럼 보입니다.
 
-        다섯 줄만 냅니다. 나머지와 갈래별로 거르는 것은 저쪽 화면이 합니다 —
-        홈은 있다는 것만 알리는 자리입니다.
+        다섯 줄만 냅니다. 나머지와 갈래별로 거르는 것은 저쪽 화면이 하고,
+        홈은 있다는 것만 알립니다.
       */}
       {top && top.places.length > 0 ? (
         <View style={styles.section}>
-          <Split align="baseline">
-            <Subtitle>여럿이 간 곳</Subtitle>
-            <Button
-              label="더 보기"
-              variant="ghost"
-              compact
-              onPress={() => router.push('/(app)/popular')}
-            />
-          </Split>
-          <View style={styles.rows}>
+          <Subtitle>여럿이 간 곳</Subtitle>
+          <Card style={styles.listCard}>
             {top.places.slice(0, 5).map((place, i) => (
-              <Card key={place.key} style={styles.row}>
-                <Row gap={Spacing.md} style={styles.rank}>
-                  <Body strong={i < 3} tone={i < 3 ? 'default' : 'muted'} style={styles.at}>
+              <View key={place.key}>
+                {i > 0 ? <Divider /> : null}
+                <Row gap={Spacing.md} style={styles.rankRow}>
+                  <Body small strong={i < 3} tone={i < 3 ? 'default' : 'muted'} style={styles.at}>
                     {i + 1}
                   </Body>
                   <Mark emoji={iconOf(place.icon)} fallback="★" />
-                  <Grow gap={2}>
-                    <Body strong numberOfLines={1}>
+                  <Grow gap={1}>
+                    <Body small strong numberOfLines={1}>
                       {place.name}
                     </Body>
-                    <Caption tone="secondary">
+                    <Caption tone="muted">
                       {[labelOf(place.icon), `일정 ${place.posts}개에`].filter(Boolean).join(' · ')}
                     </Caption>
                   </Grow>
                 </Row>
-              </Card>
+              </View>
             ))}
-          </View>
+            <Button
+              label="갈래별로 더 보기"
+              variant="secondary"
+              onPress={() => router.push('/(app)/popular')}
+            />
+          </Card>
         </View>
       ) : null}
     </Screen>
@@ -459,12 +487,31 @@ function NextTrip({
             : router.push(`/trip/${trip.id}`)
         }
         accessibilityLabel={`${trip.title} — ${countdownLabel(at)}${line ? `, ${line}` : ''}`}>
-        <Card>
+        {/*
+          길 위에 있을 때는 이 카드가 달라집니다.
+
+          여태 다른 카드들과 똑같이 생겨 있었습니다. 그런데 여행 중에 홈을
+          여는 것은 하루에 몇 번씩 있는 일이고, 그때 찾는 것은 늘 이 줄
+          하나입니다. 다른 것들과 같은 무게로 서 있으면 눈이 한 번 훑고
+          지나갑니다.
+
+          왼쪽에 색 띠를 두릅니다 — 일정 화면에서 날짜 카드가 쓰는 것과
+          같은 방식이라, 두 화면 사이에서 "지금 이것" 이 같은 모양으로
+          읽힙니다. 바탕도 옅게 물들입니다.
+        */}
+        <Card style={going ? styles.onRoad : undefined}>
           <Split>
             <View style={styles.grow}>
               {/* 무엇에 대한 줄인지 먼저 말합니다. 제목만 있으면 이것이
                   다음 여행인지 방금 본 여행인지 알 수 없습니다. */}
-              <Caption tone="secondary">{going ? '지금 그 길 위' : '다음 여행'}</Caption>
+              <Row gap={Spacing.xs}>
+                {/* 길 위에서만 찍히는 점. 글자로 "지금" 이라고 적는 것보다
+                    눈에 먼저 걸립니다. */}
+                {going ? <View style={styles.live} /> : null}
+                <Caption tone={going ? 'brand' : 'secondary'} strong={going}>
+                  {going ? '지금 그 길 위' : '다음 여행'}
+                </Caption>
+              </Row>
               <Subtitle>{trip.title}</Subtitle>
               {/* 아직 안 받아 왔으면 아무 줄도 안 둡니다. 자리만 잡아 두면
                   카드가 한 번 흔들립니다. */}
@@ -472,7 +519,7 @@ function NextTrip({
             </View>
             <Badge
               label={going && road ? `${road.left}곳 남음` : countdownLabel(at)}
-              tone={going ? 'success' : countdownIsNear(at) ? 'accent' : 'muted'}
+              tone={going ? 'brand' : countdownIsNear(at) ? 'brand' : 'muted'}
             />
           </Split>
         </Card>
@@ -512,17 +559,40 @@ function FirstSteps() {
 
 const styles = StyleSheet.create({
   section: {
-    gap: Spacing.md,
+    gap: Spacing.sm,
   },
-  rows: {
-    gap: Spacing.xs,
-  },
-  row: {
-    paddingVertical: Spacing.md,
+  /*
+    줄을 담는 카드.
+
+    카드가 제 여백을 갖고 있으면 그 안의 줄마다 또 여백이 생겨 두 겹이
+    됩니다. 좌우만 남기고 위아래는 줄이 스스로 가집니다 — 그래야 머리카락
+    선이 카드 끝까지 닿습니다.
+  */
+  listCard: {
+    paddingVertical: Spacing.xs,
     paddingHorizontal: Spacing.lg,
+    gap: 0,
   },
-  rank: {
+  listRow: {
+    paddingVertical: Spacing.md,
+  },
+  /* 길 위에 있을 때만. 왼쪽 띠와 옅게 물든 바탕으로 다른 카드들과 갈립니다. */
+  onRoad: {
+    backgroundColor: Colors.accentSoft,
+    borderLeftWidth: 4,
+    borderLeftColor: Colors.accent,
+    paddingLeft: Spacing.lg - 4,
+  },
+  /* 길 위라는 점. 지도의 "내 위치" 와 같은 색입니다. */
+  live: {
+    width: 7,
+    height: 7,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.accent,
+  },
+  rankRow: {
     alignItems: 'center',
+    paddingVertical: Spacing.md,
   },
   /* 번호가 한 자리든 두 자리든 이름이 같은 자리에서 시작해야 합니다. */
   at: {

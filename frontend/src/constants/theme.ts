@@ -132,6 +132,13 @@ export const Colors = {
   accentText: Coral.ink,
   /** 강조를 글자·아이콘으로 쓸 때. */
   accentInk: Coral.ink,
+  /**
+   * 코랄을 가득 칠한 자리 위에 얹는 글자.
+   *
+   * <p>바닥에 고정된 주 단추 하나에만 씁니다. 진한 코랄과 흰 글씨는
+   * 5.5:1 이라 AA 를 넘습니다 — 밝은 코랄이었다면 3.9:1 로 못 넘습니다.
+   */
+  onAccent: Ink[0],
 
   /* 지금·오늘·여기 */
   hot: Coral.ink,
