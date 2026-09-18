@@ -15,17 +15,19 @@ import {
   Caption,
   Card,
   Chip,
-  ConfirmButton,
   Divider,
   Empty,
   ErrorNote,
   Field,
   Loading,
   Row,
+  Press,
   Screen,
   SegmentedTabs,
+  Snack,
   Split,
   Subtitle,
+  useUndo,
 } from '@/ui';
 
 /**
@@ -64,8 +66,16 @@ export default function Money() {
     [id],
   );
 
-  const [adding, setAdding] = useState(false);
+  /*
+    판에 무엇을 띄울지.
+
+    <p>{@code null} 이면 안 떠 있고, {@code 'new'} 면 새로 적는 것,
+    지출이면 그것을 고치는 것입니다. 적는 칸과 고치는 칸이 똑같아서
+    판을 두 개 둘 이유가 없습니다.
+  */
+  const [editing, setEditing] = useState<Spend | 'new' | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
+  const { undo, show: showUndo, hide: hideUndo } = useUndo();
 
   const days = trip?.days ?? [];
   /*
@@ -90,10 +100,54 @@ export default function Money() {
     books.reload();
   }
 
-  async function remove(expenseId: string) {
+  /*
+    지우고 나서 물러설 길을 줍니다.
+
+    <h3>왜 미리 안 묻는가</h3>
+
+    <p>"정말요?" 를 세우면 맞게 누른 사람도 한 번 더 눌러야 합니다. 열 번
+    중 아홉 번은 맞게 누르는데 아홉 번 다 두 번씩 누르는 셈입니다. 먼저
+    지우고 나중에 알리면 맞게 누른 사람은 아무것도 안 해도 됩니다.
+
+    <h3>되돌리는 것은 다시 적는 것입니다</h3>
+
+    <p>서버에는 되살리는 길이 없습니다. 그래서 되돌리기는 <b>같은 내용을
+    다시 적습니다.</b> 번호가 새로 붙고 적은 시각이 지금이 되는데, 지출은
+    번호로 남을 부르는 것이 아니라 상관없습니다.
+
+    <p>지우는 것을 미뤄 뒀다가 나중에 보내는 방법도 있지만, 그러면 그
+    사이에 앱을 닫은 사람의 지출이 안 지워진 채로 남습니다. 여럿이 같이
+    보는 가계부에서 <b>지운 줄 알았는데 남아 있는</b> 것이 제일 나쁩니다.
+  */
+  async function remove(spend: Spend) {
     setFailed(null);
     try {
-      await api.delete(`/api/expenses/${expenseId}`);
+      await api.delete(`/api/expenses/${spend.id}`);
+      refresh();
+      showUndo({
+        message: `'${spend.name}' 을 지웠습니다.`,
+        onUndo: () => restore(spend),
+      });
+    } catch (e) {
+      setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
+    }
+  }
+
+  /** 지운 것을 같은 내용으로 다시 적습니다. */
+  async function restore(spend: Spend) {
+    setFailed(null);
+    try {
+      await api.post(`/api/trips/${id}/expenses`, {
+        name: spend.name,
+        amount: spend.amount,
+        currency: spend.currency,
+        payerId: spend.payerId,
+        dayId: spend.dayId,
+        placeId: spend.placeId,
+        cat: spend.cat,
+        pay: spend.pay,
+        share: spend.share.length > 0 ? spend.share : null,
+      });
       refresh();
     } catch (e) {
       setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
@@ -113,8 +167,11 @@ export default function Money() {
 
   return (
     <Screen
+      snack={<Snack undo={undo} onHide={hideUndo} />}
       footer={
-        tab === 'list' ? <Button label="쓴 돈 적기" onPress={() => setAdding(true)} /> : undefined
+        tab === 'list' ? (
+          <Button label="쓴 돈 적기" onPress={() => setEditing('new')} />
+        ) : undefined
       }>
       <Stack.Screen options={{ title: trip?.trip.title ?? '가계부' }} />
 
@@ -170,7 +227,7 @@ export default function Money() {
                   spend={e}
                   people={people}
                   placeName={e.placeId ? (placeNames.get(e.placeId) ?? null) : null}
-                  onRemove={() => remove(e.id)}
+                  onOpen={() => setEditing(e)}
                 />
               ))}
             </View>
@@ -180,15 +237,28 @@ export default function Money() {
         <Settle books={books.data?.books ?? []} loading={books.loading} />
       )}
 
-      <AddSheet
-        visible={adding}
+      {/*
+        판을 대상마다 새로 답니다.
+
+        칸 값들은 판 안에 있어서, 같은 판을 다른 지출로 다시 열면 앞의 것이
+        남아 있습니다. key 를 바꿔 아예 새로 달면 그럴 일이 없습니다 —
+        칸마다 언제 비울지 따로 챙기는 것보다 이쪽이 틀릴 데가 적습니다.
+      */}
+      <SpendSheet
+        key={editing === 'new' || editing === null ? 'new' : editing.id}
+        visible={editing !== null}
+        spend={editing === 'new' ? null : editing}
         tripId={id}
         days={days}
         people={people}
         currencies={spent.data?.currencies ?? ['KRW']}
-        onCancel={() => setAdding(false)}
+        onCancel={() => setEditing(null)}
+        onRemove={(spend) => {
+          setEditing(null);
+          remove(spend);
+        }}
         onDone={() => {
-          setAdding(false);
+          setEditing(null);
           refresh();
         }}
       />
@@ -196,18 +266,26 @@ export default function Money() {
   );
 }
 
-/** 지출 한 줄. */
+/**
+ * 지출 한 줄.
+ *
+ * <p>줄 끝에 "지우기" 가 붙어 있었습니다. 줄마다 빨간 단추가 서 있어서
+ * 목록을 훑을 때 눈이 자꾸 거기로 갔고, 정작 <b>고치는 길은 없었습니다</b>
+ * — 오타 하나를 고치려면 지우고 처음부터 다시 적어야 했습니다.
+ *
+ * <p>줄 전체를 누르면 열립니다. 지우는 것도 거기 있습니다.
+ */
 function SpendRow({
   spend,
   people,
   placeName,
-  onRemove,
+  onOpen,
 }: {
   spend: Spend;
   people: Companion[];
   /** 어디서 썼는지. 안 정했거나 그 장소가 지워졌으면 비어 있습니다. */
   placeName: string | null;
-  onRemove: () => void;
+  onOpen: () => void;
 }) {
   /* 전원이 나누면 굳이 적지 않습니다. 대개 그렇고, 매번 적으면 줄만
      길어집니다. 몇몇이 나눌 때만 누가 나누는지 말해 줍니다. */
@@ -220,7 +298,11 @@ function SpendRow({
       : null;
 
   return (
-    <Row style={styles.row}>
+    <Press
+      onPress={onOpen}
+      scale={0.995}
+      accessibilityLabel={`${spend.name} 고치기`}
+      style={styles.row}>
       <View style={styles.grow}>
         <Row gap={Spacing.sm} style={styles.rowHead}>
           <Body strong numberOfLines={1}>
@@ -234,9 +316,12 @@ function SpendRow({
           {placeName ? ` · ${placeName}` : ''}
         </Caption>
       </View>
-      <Body strong>{money(spend.amount, spend.currency, spend.decimals)}</Body>
-      <ConfirmButton label="지우기" confirmLabel="정말" onConfirm={onRemove} />
-    </Row>
+      {/* 금액은 오른쪽 끝에 붙입니다. 지우기 단추가 빠지면서 자리가 났는데,
+          숫자가 줄마다 다른 데서 시작하면 위아래로 훑어 견줄 수가 없습니다. */}
+      <Body strong style={styles.amount}>
+        {money(spend.amount, spend.currency, spend.decimals)}
+      </Body>
+    </Press>
   );
 }
 
@@ -307,34 +392,50 @@ function Settle({ books, loading }: { books: Books[]; loading: boolean }) {
 }
 
 /** 쓴 돈 적기. */
-function AddSheet({
+/**
+ * 쓴 돈을 적는 판. 고칠 때도 같은 판입니다.
+ *
+ * <p>적는 칸과 고치는 칸이 똑같습니다. 판을 두 벌 두면 한쪽에 칸을 더할
+ * 때마다 다른 쪽을 잊게 됩니다.
+ *
+ * @param spend 고칠 것. {@code null} 이면 새로 적습니다.
+ */
+function SpendSheet({
   visible,
+  spend,
   tripId,
   days,
   people,
   currencies,
   onDone,
   onCancel,
+  onRemove,
 }: {
   visible: boolean;
+  spend: Spend | null;
   tripId: string;
   days: TripDetail['days'];
   people: Companion[];
   currencies: string[];
   onDone: () => void;
   onCancel: () => void;
+  onRemove: (spend: Spend) => void;
 }) {
-  const [name, setName] = useState('');
-  const [amount, setAmount] = useState('');
-  const [currency, setCurrency] = useState(currencies[0] ?? 'KRW');
-  const [payer, setPayer] = useState<string | null>(null);
-  const [dayId, setDayId] = useState<string | null>(null);
+  const [name, setName] = useState(spend?.name ?? '');
+  /* 서버는 최소 단위(엔은 1원, 달러는 1센트)로 셉니다. 사람이 고칠 것은
+     "12.50" 이므로 열 때 되돌려 놓습니다. */
+  const [amount, setAmount] = useState(
+    spend ? amountText(spend.amount, spend.decimals) : '',
+  );
+  const [currency, setCurrency] = useState(spend?.currency ?? currencies[0] ?? 'KRW');
+  const [payer, setPayer] = useState<string | null>(spend?.payerId ?? null);
+  const [dayId, setDayId] = useState<string | null>(spend?.dayId ?? null);
   /* 장소는 날에 딸려 있습니다. 날을 바꾸면 비웁니다 — 안 그러면 어제 고른
      가게가 오늘 지출에 붙습니다. */
-  const [placeId, setPlaceId] = useState<string | null>(null);
-  const [cat, setCat] = useState('');
+  const [placeId, setPlaceId] = useState<string | null>(spend?.placeId ?? null);
+  const [cat, setCat] = useState(spend?.cat ?? '');
   /* 비어 있으면 전원이 나눕니다. 여행 경비는 대개 그렇습니다. */
-  const [share, setShare] = useState<string[]>([]);
+  const [share, setShare] = useState<string[]>(spend?.share ?? []);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
 
@@ -350,17 +451,45 @@ function AddSheet({
       return;
     }
     setBusy(true);
+    const draft = {
+      name: name.trim(),
+      amount: units,
+      currency,
+      payerId: payer,
+      dayId,
+      placeId,
+      cat: cat.trim() || null,
+      share: share.length > 0 ? share : null,
+    };
     try {
-      await api.post(`/api/trips/${tripId}/expenses`, {
-        name: name.trim(),
-        amount: units,
-        currency,
-        payerId: payer,
-        dayId,
-        placeId,
-        cat: cat.trim() || null,
-        share: share.length > 0 ? share : null,
-      });
+      if (spend) {
+        /*
+          고칠 때는 <b>비어 있음을 빈 글로</b> 보냅니다.
+
+          <p>서버는 고치기에서 {@code null} 을 "안 보냈으니 그대로 둬라" 로
+          읽습니다. 그래서 갈래를 지우거나 날짜를 "아직 모름" 으로 되돌려
+          놓고 저장하면, 화면에서는 비워졌는데 서버는 옛 값을 그대로 들고
+          있습니다 — 다시 열면 슬그머니 돌아와 있습니다.
+
+          <p>빈 글("")과 빈 목록([])은 "비워라" 로 읽힙니다. 보석함 메모도
+          같은 약속을 씁니다.
+
+          <p>version 도 같이 보냅니다. 여럿이 같이 보는 가계부라, 내가 판을
+          열어 둔 사이에 남이 같은 줄을 고쳤을 수 있습니다. 그때는 서버가
+          막고, 나중에 누른 사람이 다시 열어 보게 됩니다.
+        */
+        await api.patch(`/api/expenses/${spend.id}`, {
+          ...draft,
+          payerId: payer ?? spend.payerId,
+          dayId: dayId ?? '',
+          placeId: placeId ?? '',
+          cat: cat.trim(),
+          share,
+          version: spend.version,
+        });
+      } else {
+        await api.post(`/api/trips/${tripId}/expenses`, draft);
+      }
       setName('');
       setAmount('');
       setCat('');
@@ -376,9 +505,9 @@ function AddSheet({
   return (
     <BottomSheet
       visible={visible}
-      title="쓴 돈 적기"
+      title={spend ? '고치기' : '쓴 돈 적기'}
       onClose={onCancel}
-      footer={<Button label="적기" onPress={submit} busy={busy} />}>
+      footer={<Button label={spend ? '고쳤습니다' : '적기'} onPress={submit} busy={busy} />}>
       <Field
         label="무엇에"
         value={name}
@@ -498,12 +627,39 @@ function AddSheet({
 
       <Field label="갈래" value={cat} onChangeText={setCat} placeholder="밥 / 교통 / 쇼핑" />
 
+      {/* 지우는 것은 맨 아래, 조용하게. 미리 묻지 않습니다 — 지운 뒤에
+          목록 위로 되돌리는 띠가 잠깐 뜹니다. */}
+      {spend ? (
+        <>
+          <Divider />
+          <Button
+            label="이 지출 지우기"
+            variant="danger"
+            onPress={() => onRemove(spend)}
+          />
+        </>
+      ) : null}
+
       {failed ? <ErrorNote message={failed} /> : null}
     </BottomSheet>
   );
 }
 
 /* ------------------------------------------------------------------ 조각 */
+
+/**
+ * 최소 단위로 세어 둔 돈을 사람이 고칠 글로.
+ *
+ * <p>{@link money} 는 "￥1,250" 처럼 통화 기호와 쉼표를 붙여 <b>읽으라고</b>
+ * 만듭니다. 그것을 입력칸에 넣으면 다시 숫자로 못 읽습니다.
+ */
+function amountText(units: number, decimals: number) {
+  if (decimals === 0) {
+    return String(units);
+  }
+  const div = 10 ** decimals;
+  return (units / div).toFixed(decimals);
+}
 
 
 /** 날짜별로 묶고, 묶음마다 통화별 합계를 답니다. */
@@ -558,9 +714,10 @@ const styles = StyleSheet.create({
     borderLeftColor: Colors.border,
   },
   row: {
+    flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
-    paddingVertical: Spacing.xs,
+    paddingVertical: Spacing.sm,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: Colors.border,
   },
@@ -569,6 +726,11 @@ const styles = StyleSheet.create({
   },
   grow: {
     flex: 1,
+  },
+  /* 오른쪽 끝에 맞춥니다. 자릿수가 다른 숫자들이 왼쪽에서 시작하면
+     한눈에 어느 것이 큰지 안 보입니다. */
+  amount: {
+    textAlign: 'right',
   },
   pick: {
     gap: Spacing.xs,

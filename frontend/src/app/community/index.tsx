@@ -21,6 +21,7 @@ import {
   Empty,
   ErrorNote,
   FilterChip,
+  Grow,
   Loading,
   Pager,
   Row,
@@ -38,12 +39,19 @@ import {
  * 요구합니다.
  */
 /**
- * 무엇을 볼지.
+ * 어느 글을 볼지.
  *
- * 정렬과 "내 글" 은 성격이 다르지만 한 줄에 둡니다. 내 글을 보러 화면을 따로
- * 만들면 올리고 나서 그것을 어디서 찾는지가 또 하나의 질문이 됩니다.
+ * <h3>한 줄에 두 가지가 섞여 있었습니다</h3>
+ *
+ * <p>인기·최신·추천순·내가 누른·내 글, 다섯이 한 띠에 있었습니다. 그런데
+ * 앞의 셋은 <b>세우는 법</b>이고 뒤의 둘은 <b>어느 글인지</b>라, 서로
+ * 대신할 수 있는 것이 아닙니다. 나란히 두면 하나를 고르는 순간 다른 쪽을
+ * 못 고릅니다 — "내 글을 최신순으로" 를 말할 방법이 없었습니다.
+ *
+ * <p>띠는 어느 글인지만 묻고, 세우는 법은 조건 판으로 내려갑니다. 칸도
+ * 다섯에서 셋으로 줄어 좁은 폰에서 글자가 안 눌립니다.
  */
-type Tab = PostSort | 'mine' | 'liked';
+type Tab = 'all' | 'mine' | 'liked';
 
 /**
  * 거를 수 있는 기간.
@@ -58,13 +66,18 @@ const DAYS: { value: PostDays; label: string }[] = [
 ];
 
 const TABS: { value: Tab; label: string }[] = [
-  { value: 'hot', label: '인기' },
-  { value: 'new', label: '최신' },
-  { value: 'top', label: '추천순' },
+  { value: 'all', label: '둘러보기' },
   /* 구경하다 마음에 든 것을 눌러 두고는 나중에 찾지 못했습니다. 추천이
      세는 데만 쓰이고 되찾는 길이 없었습니다. */
   { value: 'liked', label: '내가 누른' },
   { value: 'mine', label: '내 글' },
+];
+
+/** 세우는 법. 조건 판 안에 있습니다. */
+const SORTS: { value: PostSort; label: string }[] = [
+  { value: 'hot', label: '인기순' },
+  { value: 'new', label: '최신순' },
+  { value: 'top', label: '추천순' },
 ];
 
 /** 나만 볼 수 있는 것들. 로그인하지 않았으면 띠에서 뺍니다. */
@@ -73,7 +86,8 @@ const PRIVATE: Tab[] = ['mine', 'liked'];
 export default function Community() {
   const router = useRouter();
   const { user } = useAuth();
-  const [view, setView] = useState<Tab>('hot');
+  const [view, setView] = useState<Tab>('all');
+  const [sort, setSort] = useState<PostSort>('hot');
   const [page, setPage] = useState(0);
   /** 계정이 있어야 되는 것을 눌렀을 때. 이유를 말하는 판이 올라옵니다. */
   const [gate, setGate] = useState<Comeback | null>(null);
@@ -120,8 +134,8 @@ export default function Community() {
     (signal) =>
       view === 'mine' || view === 'liked'
         ? api.get(`/api/posts/${view}${query({ page })}`, signal)
-        : api.get(`/api/posts${query({ sort: view, region, days, q, page })}`, signal),
-    [view, page, region, days, q],
+        : api.get(`/api/posts${query({ sort, region, days, q, page })}`, signal),
+    [view, sort, page, region, days, q],
   );
 
   /** 조건을 바꾸면 첫 쪽부터 다시 봅니다. 3쪽에서 걸면 빈 화면이 됩니다. */
@@ -195,8 +209,15 @@ export default function Community() {
 
           <Split>
             <Row gap={Spacing.xs} style={styles.applied}>
+              {/* 세우는 법은 늘 걸려 있으므로 조건 칩으로 안 뺍니다. 대신
+                  지금 무엇으로 서 있는지를 단추에 적어 둡니다 — 판 안에만
+                  두면 어떻게 서 있는지 보려고 판을 열어야 합니다. */}
               <Button
-                label={picked.length > 0 ? `조건 ${picked.length}` : '조건'}
+                label={
+                  picked.length > 0
+                    ? `${SORTS.find((x) => x.value === sort)?.label} · 조건 ${picked.length}`
+                    : (SORTS.find((x) => x.value === sort)?.label ?? '인기순')
+                }
                 variant="secondary"
                 compact
                 onPress={() => setSifting(true)}
@@ -214,22 +235,60 @@ export default function Community() {
         visible={sifting}
         title="조건"
         onClose={() => setSifting(false)}
+        /*
+          몇 개가 남는지를 판을 닫기 전에 말합니다.
+
+          <p>조건을 걸어도 결과는 판 뒤에 가려 있습니다. 그래서 세 개를 걸고
+          닫았더니 빈 목록이면, 어느 조건이 지나쳤는지 모른 채 하나씩
+          풀어 보게 됩니다.
+
+          <p>목록은 조건을 바꿀 때마다 이미 다시 불러옵니다 — 그 개수를
+          여기 단추에 적기만 하면 됩니다. 셋을 다 걸기 전에 0 이 되는 것이
+          보이면 마지막 하나는 안 걸게 됩니다.
+        */
         footer={
-          picked.length > 0 ? (
-            <Button
-              label="조건 모두 지우기"
-              variant="secondary"
-              onPress={() =>
-                refilter(() => {
-                  setRegion(null);
-                  setDays(null);
-                  setTyped('');
-                  setQ('');
-                })
-              }
-            />
-          ) : undefined
+          <Row gap={Spacing.sm}>
+            <Grow>
+              <Button
+                label={
+                  loading || !data ? '세는 중' : `결과 ${data.total.toLocaleString()}개 보기`
+                }
+                disabled={loading || !data}
+                onPress={() => setSifting(false)}
+              />
+            </Grow>
+            {picked.length > 0 ? (
+              <Button
+                label="모두 지우기"
+                variant="secondary"
+                onPress={() =>
+                  refilter(() => {
+                    setRegion(null);
+                    setDays(null);
+                    setTyped('');
+                    setQ('');
+                  })
+                }
+              />
+            ) : null}
+          </Row>
         }>
+        <Body small strong>
+          세우는 법
+        </Body>
+        <Row gap={Spacing.xs} style={styles.applied}>
+          {SORTS.map((o) => (
+            <Chip
+              key={o.value}
+              label={o.label}
+              selected={sort === o.value}
+              onPress={() => refilter(() => setSort(o.value))}
+            />
+          ))}
+        </Row>
+
+        <Divider />
+
         <Body small strong>
           어디
         </Body>

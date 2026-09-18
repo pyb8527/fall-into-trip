@@ -156,6 +156,16 @@ public class ExpenseService {
     }
 
     @Transactional
+    /**
+     * 적어 둔 것을 고칩니다.
+     *
+     * <p><b>보낸 것만 바뀝니다.</b> {@code null} 인 칸은 손대지 않습니다 —
+     * 화면이 칸 하나만 고쳐 보낼 수 있어야 합니다.
+     *
+     * <p>그래서 <b>비우는 것은 빈 글("")과 빈 목록([])</b>로 보냅니다.
+     * {@code null} 로 보내면 비워지는 것이 아니라 옛 값이 그대로 남습니다.
+     * 보석함 메모도 같은 약속을 씁니다.
+     */
     public void update(AuthPrincipal me, String expenseId, Draft draft) {
         Expense expense = read(expenseId);
         access.requireCanEdit(expense.getTripId(), me.id());

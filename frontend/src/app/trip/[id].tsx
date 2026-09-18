@@ -8,7 +8,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Vibration,
   View,
 } from 'react-native';
 
@@ -36,6 +35,7 @@ import { TipSheet } from '@/components/tip-sheet';
 import { TripMap, type MapPlace } from '@/components/trip-map';
 import { iconOf } from '@/constants/place-icons';
 import { faceOf } from '@/constants/user-marks';
+import { feelDone, feelGrab, feelTick } from '@/lib/feel';
 import { SAME_SPOT, metersBetween, readableMeters } from '@/lib/geo';
 import type { Found } from '@/components/map-types';
 import { PlaceDetailSheet, type Looked } from '@/components/place-detail-sheet';
@@ -74,9 +74,12 @@ import {
   Press,
   Row,
   Screen,
+  Snack,
   Split,
   Subtitle,
   Switch,
+  type UndoNote,
+  useUndo,
 } from '@/ui';
 
 /** 전체를 보는 상태. 특정 날짜가 아니라는 뜻입니다. */
@@ -344,6 +347,7 @@ export default function TripScreen() {
   /* 판이 지금 몇 픽셀을 덮고 있는지. 지도가 이것을 알아야 고른 핀을 판에
      가리지 않는 자리에 놓습니다. */
   const [covered, setCovered] = useState(0);
+  const { undo, show: showUndo, hide: hideUndo } = useUndo();
   /* "내 위치로" 를 누른 횟수. 값이 바뀌면 지도가 그리로 갑니다. 자리가 아니라
      "눌렀다" 는 것만 넘겨야 같은 자리를 두 번 눌러도 두 번 다 움직입니다. */
   const [goHereAt, setGoHereAt] = useState(0);
@@ -855,9 +859,9 @@ export default function TripScreen() {
 
     try {
       await api.post(`/api/trips/${id}/pins`, { lat: at.lat, lng: at.lng });
-      /* 짧게 한 번. 길게 울리면 알림처럼 느껴집니다. 안 되는 기기에서는
-         조용히 넘어갑니다. */
-      Vibration.vibrate(20);
+      /* 깃발은 하나를 체크하는 것과 결이 다릅니다. 여기 왔다는 것을
+         남기는 일이라 마무리되는 느낌으로 짧게 두 번. */
+      feelDone();
       /* 꽂은 자리를 보여 줍니다. 판에 가려 안 보이면 꽂은 보람이 없습니다. */
       setLookAt({ lat: at.lat, lng: at.lng, at: Date.now() });
       setPlantedWith(already ? already.authorName : null);
@@ -1102,6 +1106,21 @@ export default function TripScreen() {
         </View>
       ) : null}
 
+      {/*
+        방금 한 일을 알리는 띠.
+
+        <p>이 화면은 Screen 이 아니라 지도 위에 판을 얹는 얼개라, 띠도
+        직접 얹습니다. 판 높이만큼 올려야 판 뒤로 안 들어갑니다 — 옆의
+        떠 있는 단추들이 이미 같은 값을 씁니다.
+      */}
+      <View
+        pointerEvents="box-none"
+        style={[styles.floatTop, { bottom: covered + Spacing.md }]}>
+        <View style={styles.snackRail}>
+          <Snack undo={undo} onHide={hideUndo} />
+        </View>
+      </View>
+
       <DragSheet
         ref={sheet}
         onHeightChange={setCovered}
@@ -1261,6 +1280,7 @@ export default function TripScreen() {
               onToggle={toggle}
               onFocus={setActivePlaceId}
               onChanged={refresh}
+              onNote={showUndo}
               onRemove={remove}
               gapAfter={gapAfter}
               gapping={gapping}
@@ -1557,6 +1577,7 @@ function DayCard({
   onToggle,
   onFocus,
   onChanged,
+  onNote,
   onRemove,
   gapAfter,
   gapping,
@@ -1582,6 +1603,8 @@ function DayCard({
   onToggle: (placeId: string) => void;
   onFocus: (placeId: string) => void;
   onChanged: () => void;
+  /** 방금 한 일을 목록 위에 띄웁니다. 물러설 길도 함께 줄 수 있습니다. */
+  onNote: (note: UndoNote) => void;
   onRemove: (placeId: string) => void;
   /** 이 장소를 떠나 다음 장소로 가는 구간. "전체" 를 볼 때는 비어 있습니다. */
   gapAfter: Map<string, Gap>;
@@ -1698,14 +1721,7 @@ function DayCard({
   const [staying, setStaying] = useState(false);
   const [tidy, setTidy] = useState<Tidy | null>(null);
   const [tidying, setTidying] = useState(false);
-  /*
-    바꾸기 전의 순서.
 
-    바꾸고 나서야 "아 이게 아닌데" 를 아는 일이 많습니다. 지도에서 보면
-    짧아 보여도 실제로는 문 여는 시간이 있고, 저 골목은 저녁에 가야 하고.
-    한 번 되돌릴 수 있어야 마음 놓고 눌러 봅니다.
-  */
-  const [undo, setUndo] = useState<Place[] | null>(null);
 
   async function askTidy() {
     setTidying(true);
@@ -1730,7 +1746,16 @@ function DayCard({
     setOrder(next);
     try {
       await api.post('/api/places/reorder', { dayId: day.id, placeIds: next.map((p) => p.id) });
-      setUndo(was);
+      /*
+        바꾸고 나서야 "아 이게 아닌데" 를 아는 일이 많습니다. 지도에서
+        짧아 보여도 문 여는 시간이 있고, 저 골목은 저녁에 가야 하고.
+        한 번 물러설 수 있어야 마음 놓고 눌러 봅니다.
+
+        <p>여기 카드로 띄우고 있었습니다. 그런데 되돌릴 것은 바로 위
+        목록이라, 그 아래에 카드가 끼면 목록이 밀리면서 무엇이 어떻게
+        바뀌었는지가 더 안 보였습니다. 이제 목록 위에 띄웁니다.
+      */
+      onNote({ message: '동선을 다시 세웠습니다.', onUndo: () => undoTidy(was) });
       onChanged();
     } catch {
       setOrder(was);
@@ -1738,12 +1763,7 @@ function DayCard({
   }
 
   /** 바꾸기 전으로. */
-  async function undoTidy() {
-    if (!undo) {
-      return;
-    }
-    const was = undo;
-    setUndo(null);
+  async function undoTidy(was: Place[]) {
     setOrder(was);
     try {
       await api.post('/api/places/reorder', { dayId: day.id, placeIds: was.map((p) => p.id) });
@@ -1751,7 +1771,7 @@ function DayCard({
     } catch {
       /* 못 되돌렸으면 화면도 그대로 둡니다. 화면만 옛 순서로 두면 다음에
          열 때 슬쩍 되돌아가 있습니다. */
-      setUndo(was);
+      onNote({ message: '되돌리지 못했습니다. 잠시 뒤에 다시 해 보세요.' });
     }
   }
 
@@ -1906,22 +1926,6 @@ function DayCard({
                   </Row>
                 </>
               )}
-            </Card>
-          ) : null}
-
-          {/*
-            바꾼 뒤에도 한 번은 물러설 수 있어야 합니다. 지도에서 짧아 보여도
-            문 여는 시간이 있고, 저 골목은 저녁에 가야 하는 일이 있습니다.
-          */}
-          {undo ? (
-            <Card style={styles.tidyCard}>
-              <Body small strong>
-                동선을 다시 세웠습니다.
-              </Body>
-              <Row gap={Spacing.sm}>
-                <Button label="이대로 갑니다" compact onPress={() => setUndo(null)} />
-                <Button label="되돌리기" variant="ghost" compact onPress={undoTidy} />
-              </Row>
             </Card>
           ) : null}
 
@@ -2466,7 +2470,12 @@ function DragHandle({
       onMoveShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponderCapture: () => true,
       onPanResponderTerminationRequest: () => false,
-      onPanResponderGrant: () => call.current.onStart(at.current),
+      onPanResponderGrant: () => {
+        /* 손잡이는 닿자마자 붙잡습니다. 그래서 집혔는지가 손끝으로만
+           확인됩니다 — 화면은 아직 아무것도 안 움직였으니까요. */
+        feelGrab();
+        call.current.onStart(at.current);
+      },
       onPanResponderMove: (_, g) => call.current.onMove(at.current, g.dy),
       onPanResponderRelease: () => call.current.onEnd(at.current),
       onPanResponderTerminate: () => call.current.onEnd(at.current),
@@ -2863,7 +2872,15 @@ function PackSheet({
               label={item.done ? `${item.name} 안 챙김으로` : `${item.name} 챙김으로`}
               tone="success"
               active={item.done}
-              onPress={() => run(() => api.patch(`/api/items/${item.id}`, { done: !item.done }))}
+              onPress={() => {
+                /* 안 챙김으로 되돌릴 때는 안 울립니다. 되돌리는 것은
+                   해낸 일이 아닙니다. */
+                if (!item.done) {
+                  /* 이것으로 마지막이면 한 벌이 끝난 것입니다. */
+                  done + 1 === items.length ? feelDone() : feelTick();
+                }
+                run(() => api.patch(`/api/items/${item.id}`, { done: !item.done }));
+              }}
             />
             <View style={styles.grow}>
               <Body small strong={!item.done} tone={item.done ? 'muted' : 'default'}>
@@ -3263,6 +3280,10 @@ const styles = StyleSheet.create({
     /* 옆으로 흐르는 띠라 높이를 내용만큼만 잡습니다. 안 잡으면 남은 화면을
        전부 차지해 지도를 못 누릅니다. */
     flexGrow: 0,
+  },
+  /* 띠는 지도 폭을 다 쓰지 않습니다. 양옆 여백은 화면의 다른 것들과 같게. */
+  snackRail: {
+    paddingHorizontal: Gutter,
   },
   chipRail: {
     paddingHorizontal: Gutter,

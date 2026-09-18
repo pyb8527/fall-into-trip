@@ -206,6 +206,14 @@ type ScreenProps = {
   header?: React.ReactNode;
   /** 화면의 주 동작. 아래에 고정해 엄지가 닿는 자리에 둡니다. */
   footer?: React.ReactNode;
+  /**
+   * 방금 한 일을 알리고 물러설 길을 주는 띠. {@link Snack} 을 둡니다.
+   *
+   * <p>목록 안에 끼우면 안 됩니다. 되돌릴 것은 대개 <b>방금 사라진 줄</b>
+   * 이라, 그 자리에 띠를 놓으면 목록이 밀리면서 무엇이 사라졌는지가 더
+   * 헷갈립니다. 목록 위에 띄웁니다.
+   */
+  snack?: React.ReactNode;
   scroll?: boolean;
   /** 위에 막대(헤더)가 없는 화면이면 켭니다. 노치를 피해 여백을 넣습니다. */
   safeTop?: boolean;
@@ -234,7 +242,7 @@ function useKeyboardUp() {
 }
 
 export const Screen = forwardRef<ScreenHandle, ScreenProps>(function Screen(
-  { children, header, footer, scroll = true, safeTop = false },
+  { children, header, footer, snack, scroll = true, safeTop = false },
   ref,
 ) {
   const insets = useSafeAreaInsets();
@@ -291,6 +299,19 @@ export const Screen = forwardRef<ScreenHandle, ScreenProps>(function Screen(
           {body}
         </View>
       )}
+
+      {/* 아래 단추가 있으면 그 위로 비켜 앉습니다 — 되돌리기를 누르려다
+          엉뚱한 것을 누르면 되돌릴 수 있다는 말이 무색해집니다. */}
+      {snack ? (
+        <View
+          pointerEvents="box-none"
+          style={[
+            styles.snackSlot,
+            { bottom: (keyboardUp ? 0 : insets.bottom) + (footer ? 84 : Spacing.lg) },
+          ]}>
+          {snack}
+        </View>
+      ) : null}
 
       {footer ? (
         <View
@@ -1940,6 +1961,136 @@ export function Empty({ message }: { message: string }) {
 }
 
 /**
+ * 방금 한 일과, 물러설 길.
+ *
+ * <h3>묻는 것과 알리는 것</h3>
+ *
+ * <p>되돌릴 수 없는 일에는 {@link ConfirmButton} 으로 <b>미리</b> 묻습니다.
+ * 그런데 되돌릴 수 있는 일까지 매번 "정말요?" 를 세우면, 열 번 중 아홉 번은
+ * 맞게 누른 사람이 아홉 번 다 한 번씩 더 눌러야 합니다.
+ *
+ * <p>그래서 되돌릴 수 있는 일은 <b>먼저 하고 나중에 알립니다.</b> 맞게 누른
+ * 사람은 아무것도 안 해도 되고, 잘못 누른 사람은 한 번 누르면 됩니다.
+ *
+ * <h3>스스로 사라집니다</h3>
+ *
+ * <p>물러설 틈은 잠깐이면 됩니다. 계속 떠 있으면 그것이 화면의 일부가
+ * 되어 버려서, 정작 무언가를 알릴 자리가 없습니다.
+ *
+ * @param seconds 떠 있는 동안. 글을 읽고 누를 만큼은 됩니다.
+ */
+export function useUndo(seconds = 5) {
+  const [undo, setUndo] = useState<UndoNote | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const hide = useCallback(() => {
+    if (timer.current) {
+      clearTimeout(timer.current);
+      timer.current = null;
+    }
+    setUndo(null);
+  }, []);
+
+  const show = useCallback(
+    (note: UndoNote) => {
+      if (timer.current) {
+        clearTimeout(timer.current);
+      }
+      setUndo(note);
+      timer.current = setTimeout(() => setUndo(null), seconds * 1000);
+    },
+    [seconds],
+  );
+
+  /* 화면을 떠나면 타이머도 접습니다. 안 접으면 사라진 화면을 다시 그리려
+     들고, 리액트가 그것을 경고로 알려 줍니다. */
+  useEffect(
+    () => () => {
+      if (timer.current) {
+        clearTimeout(timer.current);
+      }
+    },
+    [],
+  );
+
+  return { undo, show, hide };
+}
+
+/** 스낵 한 줄에 담기는 것. */
+export type UndoNote = {
+  /** 무슨 일이 있었는지. "지웠습니다" 처럼 <b>이미 끝난 일</b>로 적습니다. */
+  message: string;
+  /** 물러서는 길. 없으면 알리기만 합니다. */
+  onUndo?: () => void;
+  /** 되돌리는 단추에 적을 말. */
+  label?: string;
+};
+
+/**
+ * 화면 아래에 잠깐 떠 있는 띠.
+ *
+ * <p>바닥이 어둡습니다. 이 앱은 그림자를 안 쓰기로 했는데(Lift 참고), 흰
+ * 카드들 위에 흰 띠를 띄우면 어디까지가 띠인지 안 보입니다. 색을 뒤집는
+ * 것이 그림자 없이 "위에 떠 있다" 를 말하는 가장 조용한 방법입니다.
+ */
+export function Snack({ undo, onHide }: { undo: UndoNote | null; onHide: () => void }) {
+  const value = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(value, {
+      toValue: undo ? 1 : 0,
+      duration: Motion.base,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [undo, value]);
+
+  /* 사라지는 동안에도 글자는 남아 있어야 합니다. 없애 버리면 띠가 비어
+     있는 채로 내려갑니다. */
+  const last = useRef<UndoNote | null>(null);
+  if (undo) {
+    last.current = undo;
+  }
+  const shown = undo ?? last.current;
+  if (!shown) {
+    return null;
+  }
+
+  return (
+    <Animated.View
+      pointerEvents={undo ? 'auto' : 'none'}
+      style={[
+        styles.snack,
+        {
+          opacity: value,
+          transform: [
+            { translateY: value.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) },
+          ],
+        },
+      ]}>
+      <Text style={styles.snackText} numberOfLines={2}>
+        {shown.message}
+      </Text>
+      {shown.onUndo ? (
+        <Press
+          onPress={() => {
+            onHide();
+            shown.onUndo?.();
+          }}
+          accessibilityLabel={shown.label ?? '되돌리기'}
+          style={styles.snackAction}>
+          <Text style={styles.snackActionText}>{shown.label ?? '되돌리기'}</Text>
+        </Press>
+      ) : (
+        <Press onPress={onHide} accessibilityLabel="닫기" style={styles.snackAction}>
+          <Feather name="x" size={16} color={Colors.surface} />
+        </Press>
+      )}
+    </Animated.View>
+  );
+}
+
+/**
  * 되돌릴 수 없는 일에는 한 번 더 묻습니다.
  *
  * React Native 의 Alert 은 웹에서 동작이 제각각이라 화면 안에서 처리합니다.
@@ -2733,6 +2884,44 @@ const styles = StyleSheet.create({
     color: Colors.text,
   },
 
+  /* 목록 위에 띄웁니다. box-none 이라 띠 바깥은 그대로 눌립니다. */
+  snackSlot: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    paddingHorizontal: Gutter,
+  },
+  snack: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    maxWidth: 520,
+    width: '100%',
+    paddingVertical: Spacing.sm + 2,
+    paddingLeft: Spacing.md,
+    paddingRight: Spacing.sm,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.text,
+  },
+  snackText: {
+    flex: 1,
+    ...Type.bodySmall,
+    fontWeight: Weight.medium,
+    color: Colors.surface,
+  },
+  snackAction: {
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
+    borderRadius: Radius.sm,
+  },
+  /* 어두운 바닥 위입니다. 코랄 잉크는 검정 위에서 어두워 안 보이므로
+     여기서만 옅은 쪽을 씁니다. */
+  snackActionText: {
+    ...Type.bodySmall,
+    fontWeight: Weight.bold,
+    color: Colors.accentSoft,
+  },
   center: {
     alignItems: 'center',
     justifyContent: 'center',

@@ -324,7 +324,15 @@ export default function Saved() {
         </Split>
       ) : null}
 
-      <BottomSheet visible={sifting} title="조건" onClose={() => setSifting(false)}>
+      {/* 몇 곳이 남는지를 판을 닫기 전에 말합니다. 여기 목록은 이미 받아
+          둔 것을 거르는 것이라 개수가 곧바로 따라옵니다. */}
+      <BottomSheet
+        visible={sifting}
+        title="조건"
+        onClose={() => setSifting(false)}
+        footer={
+          <Button label={`결과 ${shown.length}곳 보기`} onPress={() => setSifting(false)} />
+        }>
         {kinds.length > 1 ? (
           <>
             <Body small strong>

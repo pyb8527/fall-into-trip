@@ -277,6 +277,48 @@ r = await call("POST", `/api/trips/${tripId}/expenses`, { token: A,
   body: { name: "없는 장소", amount: 100, currency: "JPY", placeId: "ZZZZZZZZZZZZ" } });
 T("없는 장소는 404", r.status === 404, r.data);
 
+/* --------------------------------------------------------------- 비우기
+   고치기에서 null 은 "안 보냈으니 그대로 둬라" 입니다. 그러면 갈래를 지우고
+   저장했을 때 화면에서는 비워졌는데 서버는 옛 값을 들고 있게 됩니다 — 다시
+   열면 슬그머니 돌아와 있습니다.
+
+   비우는 것은 빈 글("")과 빈 목록([])입니다. 화면 가계부가 이 약속에
+   기대고 있어서, 여기가 깨지면 고치기가 조용히 안 먹습니다. */
+r = await call("POST", `/api/trips/${tripId}/expenses`, { token: A,
+  body: { name: "지울 것들", amount: 500, currency: "JPY", cat: "밥",
+          dayId: days[0].id, placeId: ichiran, share: [aId, bId] } });
+T("비우기 대상을 적는다", r.status === 200, r.data);
+const full = r.data.id;
+
+const readBack = async () => {
+  const got = await call("GET", `/api/trips/${tripId}/expenses`, { token: A });
+  return got.data.expenses.find((e) => e.id === full);
+};
+
+let it = await readBack();
+T("갈래·날짜·장소·나눔이 다 붙어 있다",
+  it?.cat === "밥" && it?.dayId === days[0].id && it?.placeId === ichiran
+    && it?.share.length === 2, it);
+
+/* null 은 손대지 않습니다 */
+r = await call("PATCH", `/api/expenses/${full}`, { token: A,
+  body: { name: "이름만 고침", cat: null, dayId: null, placeId: null, share: null } });
+T("null 은 그대로 둔다 — 저장은 된다", r.status === 200, r.data);
+it = await readBack();
+T("null 로 보낸 칸은 안 지워진다",
+  it?.name === "이름만 고침" && it?.cat === "밥" && it?.dayId === days[0].id
+    && it?.placeId === ichiran && it?.share.length === 2, it);
+
+/* 빈 글과 빈 목록은 비웁니다 */
+r = await call("PATCH", `/api/expenses/${full}`, { token: A,
+  body: { cat: "", dayId: "", placeId: "", share: [] } });
+T("빈 글로 보내면 저장된다", r.status === 200, r.data);
+it = await readBack();
+T("갈래가 비워진다", !it?.cat, it);
+T("날짜가 비워진다", !it?.dayId, it);
+T("장소가 비워진다", !it?.placeId, it);
+T("나눔이 전원으로 돌아간다", it?.share.length === 0, it);
+
 /* 장소를 지워도 돈은 남습니다. 지출까지 지우면 정산이 틀리고, 장소를 못
    지우게 막으면 짜는 일이 막힙니다. 화면이 이름을 못 찾으면 그 줄만
    안 적습니다. */

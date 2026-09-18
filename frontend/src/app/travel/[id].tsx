@@ -6,7 +6,6 @@ import {
   ScrollView,
   StyleSheet,
   useWindowDimensions,
-  Vibration,
   View,
 } from 'react-native';
 
@@ -15,6 +14,7 @@ import type { Day, DayRoute, Place, PlaceInfo, RouteLeg, TripDetail } from '@/ap
 import { useAsync } from '@/api/use-async';
 import { iconOf } from '@/constants/place-icons';
 import { Colors, dayColor, Gutter, Motion, Radius, Spacing } from '@/constants/theme';
+import { feelTick } from '@/lib/feel';
 import { todayIso } from '@/lib/countdown';
 import { openDirections } from '@/lib/directions';
 import {
@@ -116,9 +116,10 @@ export default function Travel() {
   async function toggle(place: Place) {
     const on = visited.has(place.id);
     if (!on) {
-      /* 짧게 한 번. 도장이 종이에 닿는 그 순간에 손끝이 울려야 찍힌 느낌이
-         납니다. 안 되는 기기에서는 조용히 넘어갑니다. */
-      Vibration.vibrate(18);
+      /* 도장이 종이에 닿는 그 순간에 손끝이 울려야 찍힌 느낌이 납니다.
+         진동 API 를 쓰고 있었는데 iOS 는 길이를 안 봐서, 톡 한 번을
+         바랐던 자리에서 길게 웅웅거렸습니다. */
+      feelTick();
     }
     setMarks((prev) => {
       const next = new Set(prev ?? data?.visited ?? []);
