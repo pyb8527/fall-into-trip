@@ -165,7 +165,7 @@ export function PlaceSearch({ onPick, here }: PlaceSearchProps) {
 
                 {/* 지금 넣지 않고 나중에 쓰려고 담아만 둘 수도 있습니다. */}
                 <IconButton
-                  name="star"
+                  name="bookmark"
                   label={`${r.name} 보석함에 담기`}
                   tone={kept.has(r.name) ? 'accent' : 'default'}
                   active={kept.has(r.name)}

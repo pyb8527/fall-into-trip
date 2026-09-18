@@ -351,6 +351,8 @@ export default function TripScreen() {
   /* "내 위치로" 를 누른 횟수. 값이 바뀌면 지도가 그리로 갑니다. 자리가 아니라
      "눌렀다" 는 것만 넘겨야 같은 자리를 두 번 눌러도 두 번 다 움직입니다. */
   const [goHereAt, setGoHereAt] = useState(0);
+  /** 십자 옆에 위치 공유·깃발을 펼쳐 두었는지. */
+  const [tools, setTools] = useState(false);
   /** 꽂아 둔 깃발 목록을 열어 두었는지. */
   const [flags, setFlags] = useState(false);
   /** 지도를 옮겨 달라고 가리키는 자리. 일정에 없는 것(깃발)을 볼 때 씁니다. */
@@ -756,20 +758,33 @@ export default function TripScreen() {
      서 있어도 값이 떨려 계속 보냅니다. */
   const herePoint = me.here ? `${me.here.lat.toFixed(4)},${me.here.lng.toFixed(4)}` : null;
 
-  /* 켜서 처음 자리가 잡히면 그리로 옮겨 줍니다. 켰는데 지도가 딴 데를 보고
-     있으면 켠 보람이 없습니다. 그 뒤로는 따라다니지 않습니다 — 걸을 때마다
-     지도가 끌려가면 다른 곳을 볼 수가 없습니다. */
-  const arrived = useRef(false);
+  /*
+    위치는 들어오면 바로 켭니다.
+
+    <h3>켜고 끄는 단추였습니다</h3>
+
+    <p>십자 단추가 위치를 켜고 끄는 것이었습니다. 그래서 길 위에서 지도를
+    열 때마다 먼저 한 번 눌러 켜야 했고, 켜는 것을 잊으면 내 점이 없는
+    지도를 보며 "내가 어디쯤이지" 를 지형으로 가늠했습니다.
+
+    <p>이제 늘 켭니다. 십자 단추는 <b>지도를 내 자리로 옮기는 것</b>만
+    맡습니다 — 원래 그 그림이 뜻하는 일입니다.
+
+    <h3>다만 처음에 지도를 옮기지는 않습니다</h3>
+
+    <p>전에는 자리가 처음 잡히면 그리로 옮겨 줬습니다. 눌러서 켰을 때는
+    그것이 맞습니다 — 켜 달라고 한 사람은 제 자리를 보려는 것입니다.
+
+    <p>그런데 안 눌러도 켜지는 지금은 다릅니다. 일정을 보러 들어왔는데
+    첫 장소들을 비추던 지도가 잠시 뒤 혼자 서울 어딘가로 튑니다. 옮기는
+    것은 십자를 눌렀을 때만 합니다.
+  */
   useEffect(() => {
-    if (!me.watching) {
-      arrived.current = false;
-      return;
+    if (me.supported && !keptMap) {
+      me.start();
     }
-    if (herePoint && !arrived.current) {
-      arrived.current = true;
-      setGoHereAt((n) => n + 1);
-    }
-  }, [me.watching, herePoint]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me.supported, keptMap]);
   useEffect(() => {
     if (!sharing || !herePoint || !me.here) {
       return;
@@ -802,21 +817,6 @@ export default function TripScreen() {
     } catch (e) {
       setActionError(e instanceof ApiError ? e.message : UNEXPECTED);
     }
-  }
-
-  /**
-   * 내 위치를 끕니다.
-   *
-   * <p>동행자에게 알리는 중이었다면 그것도 함께 끕니다. 점만 지우고 두면 동행자
-   * 화면에는 마지막 자리가 그대로 남아, 지금 거기 있는 것처럼 보입니다.
-   */
-  async function stopLive() {
-    if (sharing) {
-      await api.delete(`/api/trips/${id}/location`).catch(() => {});
-      setSharing(false);
-    }
-    me.stop();
-    pullLive();
   }
 
   /**
@@ -1046,28 +1046,47 @@ export default function TripScreen() {
       {me.supported && !keptMap ? (
         <View style={[styles.floatRight, { bottom: covered + Spacing.md }]}>
           {/*
-            위치를 켜 둔 동안에만 나오는 둘.
+            십자를 누르면 나오는 둘.
 
-            판 안에 있었습니다. 그런데 이 둘을 쓰는 때는 <b>길 위에 서서
-            지도를 보고 있을 때</b>입니다 — 그때 판은 아래로 내려가 있고,
-            올려서 찾아야 하는 단추는 없는 것과 같습니다. 지도 위로 올립니다.
+            <h3>왜 접어 두는가</h3>
 
-            그림만 있는 동그라미로는 안 됩니다. 내가 어디 있는지가 남에게
-            가는 일을 그림 하나로 둘 수 없습니다. 글자를 단 알약으로 둡니다.
+            <p>늘 펼쳐 두었습니다. 그런데 이 둘은 <b>길 위에 서 있을 때</b>
+            쓰는 것이고, 일정을 짜는 동안에는 지도만 가립니다. 일정 화면에서
+            보내는 시간의 대부분이 그 짜는 동안입니다.
+
+            <p>십자 옆에 붙습니다 — 셋 다 "지금 내가 있는 자리" 에 대한
+            일이라 한 손짓 안에서 이어집니다.
+
+            <h3>공유 중일 때는 글자로 말합니다</h3>
+
+            <p>내가 어디 있는지가 남에게 가는 일을 그림 하나로 둘 수는
+            없습니다. 다만 그것이 걱정되는 때는 <b>켜져 있는 동안</b>이지
+            꺼져 있는 동안이 아닙니다. 평소에는 그림만 두고, 켜지면 그때
+            글자를 답니다.
           */}
-          {me.watching ? (
+          {tools ? (
             <>
-              <Button
-                label={sharing ? '위치 공유 중 · 끄기' : '위치 공유'}
-                variant={sharing ? 'primary' : 'secondary'}
-                compact
-                onMap
-                onPress={toggleSharing}
-              />
-              <Button
-                label="여기에 깃발"
-                variant="secondary"
-                compact
+              {sharing ? (
+                <Button
+                  label="위치 공유 중 · 끄기"
+                  variant="primary"
+                  compact
+                  onMap
+                  onPress={toggleSharing}
+                />
+              ) : (
+                <IconButton
+                  name="share-2"
+                  label="동행자에게 내 위치 알리기"
+                  tone="accent"
+                  onMap
+                  onPress={toggleSharing}
+                />
+              )}
+              <IconButton
+                name="flag"
+                label="여기에 깃발 꽂기"
+                tone="accent"
                 onMap
                 onPress={dropPin}
               />
@@ -1075,13 +1094,16 @@ export default function TripScreen() {
           ) : null}
           <IconButton
             name="crosshair"
-            label={me.watching ? '내 위치로' : '내 위치 보기'}
-            active={me.watching}
+            label={tools ? '내 위치로 · 접기' : '내 위치로'}
+            active={tools}
             tone="accent"
             onMap
-            /* 한 번 누르면 켜지면서 그리로 가고, 한 번 더 누르면 꺼집니다.
-               끄는 단추를 따로 두면 지도 위에 단추가 또 하나 늘어납니다. */
-            onPress={() => (me.watching ? stopLive() : me.start())}
+            /* 누를 때마다 지도를 내 자리로 옮깁니다. 걷다가 다시 누르는 일이
+               잦아서, 두 번째부터는 접기만 하고 안 옮기면 헛눌림이 됩니다. */
+            onPress={() => {
+              setGoHereAt((n) => n + 1);
+              setTools((on) => !on);
+            }}
           />
         </View>
       ) : null}
@@ -1230,7 +1252,7 @@ export default function TripScreen() {
             ) : null}
             {/* 아직 정하지 않은 곳은 일정이 아니라 여기에 모입니다. */}
             <Shortcut
-              icon="star"
+              icon="thumbs-up"
               label="가고 싶은 곳"
               onPress={() => router.push({ pathname: '/vote/[id]', params: { id } })}
             />
@@ -1246,7 +1268,7 @@ export default function TripScreen() {
             {/* "추억" 이었습니다. 실제로 여는 것은 영수증과 동선 다시보기라,
                 이름이 그 둘 중 어느 것도 가리키지 않았습니다. */}
             <Shortcut
-              icon="bookmark"
+              icon="book-open"
               label="여행 요약"
               onPress={() => router.push({ pathname: '/card/[id]', params: { id } })}
             />
@@ -1812,7 +1834,7 @@ function DayCard({
           ) : null}
           {canEdit ? (
             <IconButton
-              name="star"
+              name="bookmark"
               label={`${day.date || day.label}에 보석함에서 꺼내 넣기`}
               onPress={() => {
                 setFolded(false);

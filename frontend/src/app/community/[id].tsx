@@ -606,7 +606,7 @@ function DayBlock({
           />
           {/* 일정을 통째로 가져오지 않고 이 집만 담을 수 있어야 합니다. */}
           <IconButton
-            name="star"
+            name="bookmark"
             label={`${place.name} 담기`}
             tone={savedNames.has(place.name) ? 'accent' : 'default'}
             active={savedNames.has(place.name)}

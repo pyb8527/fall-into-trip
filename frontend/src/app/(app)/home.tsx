@@ -30,6 +30,7 @@ import {
   IconButton,
   Mark,
   MenuCard,
+  Panel,
   Press,
   Rise,
   Row,
@@ -39,22 +40,6 @@ import {
   Title,
 } from '@/ui';
 import { LogoMark } from '@/ui/logo';
-
-/**
- * 메뉴 카드 뒤에 옅게 까는 사진.
- *
- * <p>한자리에 모아 둡니다. 화면 여기저기서 require 를 부르면 어느 카드에
- * 무엇이 깔리는지 코드를 훑어야 알 수 있습니다.
- *
- * <p>올리는 사진이 아니라 앱에 함께 실리는 것입니다 — 서버에 쌓이는 것이
- * 없습니다. 네 장 합쳐 128KB 로 줄여 두었습니다.
- */
-const MENU = {
-  trips: require('@/assets/images/menu/trips.jpg'),
-  saved: require('@/assets/images/menu/saved.jpg'),
-  community: require('@/assets/images/menu/community.jpg'),
-  money: require('@/assets/images/menu/money.jpg'),
-} as const;
 
 /**
  * 첫 화면.
@@ -244,45 +229,55 @@ export default function Home() {
         <NextTrip trip={next.trip} at={next.at} road={road} />
       ) : null}
 
-      {/* 카드가 한 번에 툭 나타나면 화면이 갈아 끼워진 것처럼 보입니다.
-          위에서부터 조금씩 늦게 떠오르면 눈이 따라 내려갑니다. */}
-      <Row gap={Spacing.md} style={styles.grid}>
-        <Rise order={0} style={styles.half}>
-          <MenuCard
-            title="내 여행"
-            caption="짜고, 부르고, 같이 고치기"
-            image={MENU.trips}
-            onPress={() => router.push('/(app)/trips')}
-          />
-        </Rise>
-        <Rise order={1} style={styles.half}>
-          <MenuCard
-            title="보석함"
-            caption="주워 둔 곳들"
-            image={MENU.saved}
-            onPress={() => router.push('/(app)/saved')}
-          />
-        </Rise>
-        <Rise order={2} style={styles.half}>
-          <MenuCard
-            title="여행 둘러보기"
-            caption="남이 다녀온 길 구경하기"
-            image={MENU.community}
-            onPress={() => router.push('/community')}
-          />
-        </Rise>
-        {/* 가계부는 여행 하나에 딸립니다. 먼저 어느 여행인지를 고르고,
-            고르면 곧장 그 여행의 가계부로 갑니다 — 일정 화면을 거치지
-            않습니다. */}
-        <Rise order={3} style={styles.half}>
-          <MenuCard
-            title="가계부"
-            caption="누가 얼마 냈는지"
-            image={MENU.money}
-            onPress={() => router.push('/(app)/trips?for=money')}
-          />
-        </Rise>
-      </Row>
+      {/*
+        넷을 한 장에 담습니다.
+
+        <p>회색 바닥 위에 흰 카드 넷이 저마다 떠 있었습니다. 카드 하나하나는
+        흰데 사이가 전부 회색이라, 넷이 <b>한 묶음</b>이라는 것이 안 읽히고
+        따로 놓인 네 개로 보였습니다. 묶음이면 한 장에 담아야 묶음입니다.
+
+        <p>안의 카드들은 제 바탕과 테두리를 걷습니다 — 판이 이미 바탕입니다.
+        흰 판에 흰 카드를 얹으면 층이 둘인데 눈에는 하나로 보여, 테두리만
+        공연히 늘어납니다.
+
+        <p>카드가 한 번에 툭 나타나면 화면이 갈아 끼워진 것처럼 보입니다.
+        위에서부터 조금씩 늦게 떠오르면 눈이 따라 내려갑니다.
+      */}
+      <Panel>
+        <Row gap={Spacing.sm} style={styles.grid}>
+          <Rise order={0} style={styles.half}>
+            <MenuCard
+              title="내 여행"
+              caption="짜고, 부르고, 같이 고치기"
+              onPress={() => router.push('/(app)/trips')}
+            />
+          </Rise>
+          <Rise order={1} style={styles.half}>
+            <MenuCard
+              title="보석함"
+              caption="주워 둔 곳들"
+              onPress={() => router.push('/(app)/saved')}
+            />
+          </Rise>
+          <Rise order={2} style={styles.half}>
+            <MenuCard
+              title="여행 둘러보기"
+              caption="남이 다녀온 길 구경하기"
+              onPress={() => router.push('/community')}
+            />
+          </Rise>
+          {/* 가계부는 여행 하나에 딸립니다. 먼저 어느 여행인지를 고르고,
+              고르면 곧장 그 여행의 가계부로 갑니다 — 일정 화면을 거치지
+              않습니다. */}
+          <Rise order={3} style={styles.half}>
+            <MenuCard
+              title="가계부"
+              caption="누가 얼마 냈는지"
+              onPress={() => router.push('/(app)/trips?for=money')}
+            />
+          </Rise>
+        </Row>
+      </Panel>
 
       {/*
         갓 가입한 사람의 홈은 텅 비어 있습니다. 메뉴 넷이 있지만 무엇부터
@@ -323,7 +318,20 @@ export default function Home() {
       */}
       {mine && mine.trips.length > 0 ? (
         <View style={styles.section}>
-          <Subtitle>내 여행</Subtitle>
+          {/* 전체보기를 카드 안 맨 아래 큰 단추로 두었었습니다. 그런데 그것은
+              이 카드에서 제일 굵은 것이 아닌데 제일 커 보였습니다. 아래
+              「다양한 경험들」과 같은 자리, 같은 크기로 맞춥니다. */}
+          <Split align="baseline">
+            <Subtitle>내 여행</Subtitle>
+            {mine.trips.length > shortlist.length ? (
+              <Button
+                label="전체보기"
+                variant="ghost"
+                compact
+                onPress={() => router.push('/(app)/trips')}
+              />
+            ) : null}
+          </Split>
           <Card style={styles.listCard}>
             {shortlist.map((trip, i) => (
               <View key={trip.id}>
@@ -365,19 +373,12 @@ export default function Home() {
                 </Press>
               </View>
             ))}
-            {mine.trips.length > shortlist.length ? (
-              <Button
-                label={`${mine.trips.length}개 전체보기`}
-                variant="secondary"
-                onPress={() => router.push('/(app)/trips')}
-              />
-            ) : null}
           </Card>
         </View>
       ) : null}
 
       {/*
-        남들이 다녀온 길.
+        다양한 경험들.
 
         여기만 그림이 붙습니다. 사진을 안 올리는 앱이라 쓸 수 있는 것은
         동선 그림 한 장뿐인데, 그것으로 충분합니다 — 오사카를 도는 선과
@@ -389,7 +390,7 @@ export default function Home() {
       {shared && shared.posts.length > 0 ? (
         <View style={styles.section}>
           <Split align="baseline">
-            <Subtitle>남들이 다녀온 길</Subtitle>
+            <Subtitle>다양한 경험들</Subtitle>
             <Button
               label="둘러보기"
               variant="ghost"
@@ -397,39 +398,43 @@ export default function Home() {
               onPress={() => router.push('/community')}
             />
           </Split>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <Row gap={Spacing.md} style={styles.strip}>
-              {shared.posts.slice(0, 6).map((post) => (
-                <Press
-                  key={post.id}
-                  onPress={() => router.push(`/community/${post.id}`)}
-                  scale={0.98}
-                  accessibilityLabel={`${post.title} 보기`}
-                  style={styles.postCard}>
-                  <TripThumb postId={post.id} height={96} label={post.title} />
-                  <View style={styles.postText}>
-                    {/* 작은 회색 메타 → 굵은 제목 → 작은 숫자. 문토가 카드
-                        안에서 쓰는 차례 그대로입니다. */}
-                    <Caption tone="muted" numberOfLines={1}>
-                      {[post.region, `${post.dayCount}일`].filter(Boolean).join(' · ')}
-                    </Caption>
-                    <Body small strong numberOfLines={2}>
-                      {post.title}
-                    </Body>
-                    <Caption tone="secondary">
-                      장소 {post.placeCount}곳
-                      {post.likeCount > 0 ? ` · 추천 ${post.likeCount}` : ''}
-                    </Caption>
-                  </View>
-                </Press>
-              ))}
-            </Row>
-          </ScrollView>
+          {/* 이것도 한 장 위에 놓습니다. 회색 바닥에 그림 카드가 그냥
+              떠 있으면 어디까지가 이 구역인지 안 보입니다. */}
+          <Panel style={styles.stripPanel}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <Row gap={Spacing.md} style={styles.strip}>
+                {shared.posts.slice(0, 6).map((post) => (
+                  <Press
+                    key={post.id}
+                    onPress={() => router.push(`/community/${post.id}`)}
+                    scale={0.98}
+                    accessibilityLabel={`${post.title} 보기`}
+                    style={styles.postCard}>
+                    <TripThumb postId={post.id} height={96} label={post.title} />
+                    <View style={styles.postText}>
+                      {/* 작은 회색 메타 → 굵은 제목 → 작은 숫자. 문토가 카드
+                          안에서 쓰는 차례 그대로입니다. */}
+                      <Caption tone="muted" numberOfLines={1}>
+                        {[post.region, `${post.dayCount}일`].filter(Boolean).join(' · ')}
+                      </Caption>
+                      <Body small strong numberOfLines={2}>
+                        {post.title}
+                      </Body>
+                      <Caption tone="secondary">
+                        장소 {post.placeCount}곳
+                        {post.likeCount > 0 ? ` · 추천 ${post.likeCount}` : ''}
+                      </Caption>
+                    </View>
+                  </Press>
+                ))}
+              </Row>
+            </ScrollView>
+          </Panel>
         </View>
       ) : null}
 
       {/*
-        여럿이 간 곳 — 이것도 카드 하나에.
+        지금 핫플레이스 — 이것도 카드 하나에.
 
         순위는 위아래로 견주며 읽는 것이라 한 상자에 담겨 있어야 합니다.
         줄마다 카드로 떼어 놓으면 1위와 5위가 서로 다른 것처럼 보입니다.
@@ -445,7 +450,7 @@ export default function Home() {
       */}
       {top && top.places.length > 0 ? (
         <View style={styles.section}>
-          <Subtitle>여럿이 간 곳</Subtitle>
+          <Subtitle>지금 핫플레이스</Subtitle>
           <Card style={styles.listCard}>
             {top.places.slice(0, 5).map((place, i) => (
               <View key={place.key}>
@@ -454,7 +459,7 @@ export default function Home() {
                   <Body small strong={i < 3} tone={i < 3 ? 'default' : 'muted'} style={styles.at}>
                     {i + 1}
                   </Body>
-                  <Mark emoji={iconOf(place.icon)} fallback="★" />
+                  <Mark emoji={iconOf(place.icon)} fallback="📍" />
                   <Grow gap={1}>
                     <Body small strong numberOfLines={1}>
                       {place.name}
@@ -467,7 +472,7 @@ export default function Home() {
               </View>
             ))}
             <Button
-              label="갈래별로 더 보기"
+              label="더 보러가기"
               variant="secondary"
               onPress={() => router.push('/(app)/popular')}
             />
@@ -546,9 +551,10 @@ function NextTrip({
           하나입니다. 다른 것들과 같은 무게로 서 있으면 눈이 한 번 훑고
           지나갑니다.
 
-          왼쪽에 색 띠를 두릅니다 — 일정 화면에서 날짜 카드가 쓰는 것과
-          같은 방식이라, 두 화면 사이에서 "지금 이것" 이 같은 모양으로
-          읽힙니다. 바탕도 옅게 물들입니다.
+          바탕을 옅게 물들입니다. 왼쪽에 색 띠도 둘렀었는데, 이 카드에는
+          이미 점과 「지금 그 길 위」와 남은 곳 배지가 있어서 넷째 표시가
+          되었습니다. 하나를 도드라지게 하려고 표시를 넷씩 붙이면 그때부터는
+          그냥 시끄러운 카드입니다.
         */}
         <Card style={going ? styles.onRoad : undefined}>
           <Split>
@@ -627,12 +633,9 @@ const styles = StyleSheet.create({
   listRow: {
     paddingVertical: Spacing.md,
   },
-  /* 길 위에 있을 때만. 왼쪽 띠와 옅게 물든 바탕으로 다른 카드들과 갈립니다. */
+  /* 길 위에 있을 때만. 옅게 물든 바탕으로 다른 카드들과 갈립니다. */
   onRoad: {
     backgroundColor: Colors.accentSoft,
-    borderLeftWidth: 4,
-    borderLeftColor: Colors.accent,
-    paddingLeft: Spacing.lg - 4,
   },
   /* 길 위라는 점. 지도의 "내 위치" 와 같은 색입니다. */
   live: {
@@ -650,10 +653,15 @@ const styles = StyleSheet.create({
     width: 20,
     textAlign: 'center',
   },
+  /* 가로로 흘리는 것을 담는 판. 좌우 여백은 띠가 스스로 가져야 카드가
+     판 끝까지 흘러 나갑니다. */
+  stripPanel: {
+    paddingHorizontal: 0,
+  },
   /* 가로로 흘리는 띠. 끝을 띄워 둬야 마지막 카드가 잘린 것처럼 안 보입니다. */
   strip: {
     flexWrap: 'nowrap',
-    paddingRight: Spacing.lg,
+    paddingHorizontal: Spacing.sm,
   },
   postCard: {
     width: 208,

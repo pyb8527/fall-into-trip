@@ -13,7 +13,6 @@ import {
   ActivityIndicator,
   Animated,
   Easing,
-  Image,
   Keyboard,
   KeyboardAvoidingView,
   Modal,
@@ -26,7 +25,6 @@ import {
   TextInput,
   useWindowDimensions,
   View,
-  type ImageSourcePropType,
   type StyleProp,
   type TextInputProps,
   type TextStyle,
@@ -1183,6 +1181,38 @@ export function SegmentedTabs<T extends string>({
 }
 
 /**
+ * 판 위에 있는가.
+ *
+ * <p>{@link Panel} 이 스스로 "여기는 흰 판" 이라고 알리고, 그 안의 카드가
+ * 그것을 읽어 <b>제 바탕과 테두리를 걷습니다.</b> 흰 판 위에 흰 카드를
+ * 얹으면 층이 둘인데 눈에는 하나로 보여, 테두리만 공연히 늘어납니다.
+ *
+ * <p>호출부마다 "지금 판 안이니 납작하게" 를 넘기게 하면 같은 판단이
+ * 여러 군데로 흩어지고 언젠가 한 곳이 어긋납니다. 바닥 단추가 쓰는 것과
+ * 같은 방식입니다.
+ */
+const OnPanel = createContext(false);
+
+/**
+ * 같은 종류를 한 장에 담는 흰 판.
+ *
+ * <h3>왜 필요한가</h3>
+ *
+ * <p>회색 바닥 위에 카드들이 저마다 떠 있었습니다. 카드 하나하나는 흰데
+ * 사이가 전부 회색이라, 네 칸이 <b>한 묶음</b>이라는 것이 안 읽히고 따로
+ * 놓인 네 개로 보였습니다. 묶음이면 한 장에 담아야 묶음입니다.
+ *
+ * <p>안에 든 것들은 제 바탕을 걷고 이 판을 바탕으로 씁니다.
+ */
+export function Panel({ children, style, ...rest }: ViewProps) {
+  return (
+    <View style={[styles.panel, style]} {...rest}>
+      <OnPanel.Provider value>{children}</OnPanel.Provider>
+    </View>
+  );
+}
+
+/**
  * 첫 화면에 늘어놓는 메뉴 카드.
  *
  * <p>두 칸씩 나란히 섭니다(`wide` 면 한 줄 전체). 좁은 폰에서도 두 칸이
@@ -1190,6 +1220,10 @@ export function SegmentedTabs<T extends string>({
  *
  * <p>그림 없이 글자만 씁니다. 뜻이 분명한 아이콘 묶음이 없는 상태에서
  * 아무 그림이나 붙이면 뜻을 돕지 못하고 장식만 됩니다.
+ *
+ * <p>한동안 뒤에 사진을 옅게 깔았습니다. 카드마다 다른 얼굴을 주려던
+ * 것인데, 네 장이 나란히 서니 무엇에 대한 카드인지를 돕기보다 <b>글자를
+ * 읽는 데 방해</b>가 되었습니다. 걷어 냈습니다.
  *
  * <p>아직 만들지 않은 것은 `soon` 으로 둡니다. 눌러도 아무 일이 없으면
  * 고장 난 것처럼 보이므로 아예 누를 수 없게 하고 그렇다고 적어 둡니다.
@@ -1199,29 +1233,17 @@ export function MenuCard({
   caption,
   wide,
   soon,
-  image,
   onPress,
 }: {
   title: string;
   caption: string;
   wide?: boolean;
   soon?: boolean;
-  /**
-   * 카드 뒤에 옅게 까는 사진.
-   *
-   * <h3>왜 옅게인가</h3>
-   *
-   * <p>사진을 제 밝기로 깔면 그 위의 글자를 읽으려고 사진을 어둡게 덮어야
-   * 하고, 그러면 회색 바닥에 흰 카드를 놓아 만든 층이 카드 하나 때문에
-   * 무너집니다.
-   *
-   * <p>여기서 사진이 하는 일은 <b>무엇에 대한 카드인지 한눈에 알리는 것</b>
-   * 까지입니다. 글자는 이미 그 말을 하고 있으니 사진은 거들기만 하면 됩니다.
-   * 흐릿하게 깔면 카드가 저마다 다른 얼굴을 갖되 글자는 그대로 읽힙니다.
-   */
-  image?: ImageSourcePropType;
   onPress?: () => void;
 }) {
+  /* 흰 판 안이면 제 바탕과 테두리를 걷습니다. 판이 이미 바탕입니다. */
+  const flat = useContext(OnPanel);
+
   return (
     <Press
       onPress={onPress}
@@ -1231,21 +1253,9 @@ export function MenuCard({
       style={[
         styles.menuCard,
         wide ? styles.menuCardWide : styles.menuCardHalf,
+        flat ? styles.menuCardFlat : null,
         soon ? styles.menuCardSoon : null,
       ]}>
-      {/* 아직 없는 것에는 안 깝니다 — 못 누르는 카드가 제일 화사하면
-          그쪽으로 손이 갑니다. */}
-      {image && !soon ? (
-        <Image
-          source={image}
-          style={styles.menuImage}
-          resizeMode="cover"
-          /* 읽어 주는 기기에는 안 읽힙니다. 글자가 이미 같은 말을 하고
-             있어서, 사진 이름을 또 읽으면 같은 카드를 두 번 말합니다. */
-          accessibilityElementsHidden
-          importantForAccessibility="no-hide-descendants"
-        />
-      ) : null}
       <View style={styles.menuText}>
         <Row gap={Spacing.sm}>
           <Text style={[styles.menuTitle, soon && styles.menuTitleSoon]}>{title}</Text>
@@ -1300,8 +1310,23 @@ export type IconName =
   | 'arrow-up'
   | 'arrow-down'
   | 'folder'
+  /**
+   * 즐겨찾기가 아닙니다.
+   *
+   * <p>한동안 <b>보석함에 담기</b>와 <b>가고 싶은 곳</b>을 둘 다 별로
+   * 그렸습니다. 그런데 별은 어느 앱에서나 "즐겨찾기" 나 "몇 점" 을
+   * 뜻해서, 담는 것도 고르는 것도 아닌 제삼의 뜻으로 읽혔습니다.
+   *
+   * <p>지금은 아무 데도 안 씁니다. 되살릴 일이 생기면 <b>점수</b>를
+   * 매기는 자리여야 합니다.
+   */
   | 'star'
+  /** 보석함. 담고 꺼내는 일 전부 이 그림입니다. */
   | 'bookmark'
+  /** 여행 요약. 덮어 둔 것을 펼쳐 보는 뜻입니다. */
+  | 'book-open'
+  /** 가고 싶은 곳. 각자 좋다·아니다를 누르는 자리입니다. */
+  | 'thumbs-up'
   | 'compass'
   | 'message-square'
   | 'upload'
@@ -2604,6 +2629,15 @@ const styles = StyleSheet.create({
     fontWeight: Weight.semibold,
   },
 
+  /* 같은 종류를 담는 흰 판. 카드가 제 여백을 갖는 것과 같은 크기입니다. */
+  panel: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.border,
+    padding: Spacing.sm,
+    gap: Spacing.sm,
+  },
   menuCard: {
     backgroundColor: Colors.surface,
     overflow: 'hidden',
@@ -2614,27 +2648,6 @@ const styles = StyleSheet.create({
     minHeight: 96,
     justifyContent: 'flex-end',
   },
-  /*
-    뒤에 까는 사진.
-
-    투명도 하나로 흐릿하게 만듭니다. 위에 흰 장막을 한 겹 더 얹는 방법도
-    있지만, 흰 카드 위에서는 결과가 같고 층만 하나 늘어납니다.
-
-    <p>한동안 높이를 75% 만 주고 위에 붙였습니다. 글자가 앉는 아래쪽을
-    비워 두려던 것인데, 사진이 끝나는 자리에 <b>가로로 선이 하나 생겼습니다.</b>
-    비워 둔 것이 아니라 잘린 것으로 보입니다.
-
-    <p>카드를 다 덮습니다. 이만큼 옅으면 글자는 그대로 읽히고, 끊기는
-    자리가 없어 사진이 카드의 바탕으로 읽힙니다.
-  */
-  menuImage: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    opacity: 0.16,
-  },
   /* 아직 없는 것은 띄우지 않습니다. 못 누른다는 것이 글자(준비 중) 말고
      생김새로도 읽혀야 합니다 — 떠 있지 않으면 손이 가지 않습니다. */
   menuCardSoon: {
@@ -2643,6 +2656,14 @@ const styles = StyleSheet.create({
     elevation: 0,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: Colors.border,
+  },
+  /* 판 안에서는 납작하게. 판이 바탕이라 제 바탕과 테두리가 필요 없습니다.
+     여백은 줄여도 됩니다 — 판이 바깥 여백을 이미 가지고 있습니다. */
+  menuCardFlat: {
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    padding: Spacing.md,
+    minHeight: 76,
   },
   menuCardHalf: {
     /* 두 칸씩. 사이 간격(md)을 빼고 반씩 나눠 가집니다. */

@@ -130,7 +130,7 @@ export default function Popular() {
               <Rank
                 key={place.key}
                 at={i + 1}
-                mark={<Mark emoji={iconOf(place.icon)} fallback="★" />}
+                mark={<Mark emoji={iconOf(place.icon)} fallback="📍" />}
                 title={place.name}
                 sub={[labelOf(place.icon), `일정 ${place.posts}개에`].filter(Boolean).join(' · ')}
                 onPress={

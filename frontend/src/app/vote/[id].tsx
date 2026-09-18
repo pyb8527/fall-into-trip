@@ -115,7 +115,7 @@ export default function Vote() {
         <Card key={candidate.id}>
           <Split align="start" gap={Spacing.md}>
             <View style={styles.grow}>
-              <Mark emoji={iconOf(candidate.icon)} fallback="★" />
+              <Mark emoji={iconOf(candidate.icon)} fallback="📍" />
               <Subtitle>{candidate.name}</Subtitle>
               {candidate.note || candidate.cat ? (
                 <Caption tone="secondary">{candidate.note ?? candidate.cat}</Caption>
@@ -278,7 +278,7 @@ function AddSheet({
             <ListRow
               key={place.id}
               title={place.name}
-              left={<Mark emoji={iconOf(place.icon)} fallback="★" />}
+              left={<Mark emoji={iconOf(place.icon)} fallback="📍" />}
               subtitle={place.note ?? place.cat ?? '메모 없음'}
               onPress={() => add({ savedId: place.id })}
             />
