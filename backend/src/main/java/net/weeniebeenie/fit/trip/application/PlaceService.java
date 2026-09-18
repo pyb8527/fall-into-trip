@@ -12,9 +12,9 @@ import net.weeniebeenie.fit.trip.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.regex.Pattern;
 
 /** 장소를 더하고 고치고 지웁니다. */
@@ -98,6 +98,10 @@ public class PlaceService {
         access.requireCanEdit(day.getTripId(), me.id());
         Versioned.check(draft.version(), place.getVersion());
 
+        /* 적어 둔 시각이 실제로 바뀌었는지. 아래에서 차례를 다시 셀지 말지를
+           이것 하나로 정합니다 — 메모만 고쳤는데 순서가 움직이면 안 됩니다. */
+        String wasTime = place.getTime();
+
         if (draft.name() != null) place.setName(requireName(draft.name()));
         if (draft.lat() != null || draft.lng() != null) {
             Coordinates at = Coordinates.of(
@@ -132,6 +136,7 @@ public class PlaceService {
 
         /* 날짜를 옮기는 것도 수정으로 봅니다. 하루 늦춰졌을 때 지웠다 다시
            넣게 하면 방문기록과 지출이 딸려 사라집니다. */
+        boolean moved = false;
         if (draft.dayId() != null && !draft.dayId().equals(place.getDayId())) {
             Day target = days.findById(draft.dayId())
                     .orElseThrow(() -> ApiException.notFound("옮길 날짜를 찾을 수 없습니다."));
@@ -140,11 +145,20 @@ public class PlaceService {
             }
             String from = place.getDayId();
             place.setDayId(target.getId());
+            /* 옮겨 간 날의 맨 뒤에 섭니다. 들고 온 번호를 그대로 두면 그 날에
+               이미 그 번호를 쓰는 곳과 겹쳐, 둘 중 누가 앞인지가 운에 달립니다.
+               아래 resort 가 시각을 보고 제자리를 찾아 줍니다. */
+            place.setSort(Integer.MAX_VALUE);
             resort(from);
+            moved = true;
         }
 
         place.touch(me.id());
-        resort(place.getDayId());
+        /* 순서를 건드릴 일이 있을 때만 건드립니다. 끌어서 옮겨 둔 자리는
+           그것 말고는 아무것도 흔들 수 없습니다. */
+        if (moved || !Objects.equals(wasTime, place.getTime())) {
+            resort(place.getDayId());
+        }
         audit.log(me.id(), "place.update", place.getId(), Map.of("name", place.getName()));
         days.findById(place.getDayId()).ifPresent(d ->
                 announce(me, d.getTripId(), "「" + place.getName() + "」 를 고쳤습니다."));
@@ -205,19 +219,17 @@ public class PlaceService {
     }
 
     /**
-     * 시간이 적힌 것을 앞에 두고 시간순으로 세웁니다.
+     * 그 날의 차례를 다시 세웁니다.
      *
-     * 시간을 비워 둔 장소는 원래 순서를 지킨 채 뒤로 갑니다. "언제 갈지는
-     * 아직 모르지만 이 날 어딘가" 인 곳을 넣어 두는 쓰임이 있어서입니다.
+     * <p>어떻게 세우는지는 {@link PlaceOrder} 가 압니다 — 시간이 적힌 곳은
+     * 제 시각에, 시간 없는 곳은 제가 따라다니던 곳 뒤에.
+     *
+     * <p>부르는 자리를 골라 둡니다. 장소가 늘거나 줄었을 때, 적어 둔 시각이
+     * 바뀌었을 때, 날짜를 옮겼을 때뿐입니다. 메모나 비용만 고쳤는데 순서가
+     * 흔들리면 고친 사람은 자기가 무엇을 건드렸는지 모릅니다.
      */
     private void resort(String dayId) {
-        List<Place> list = places.findAllByDayIdOrderBySortAsc(dayId);
-        List<Place> sorted = list.stream()
-                .sorted(Comparator
-                        .comparing((Place p) -> p.getTime() == null)      // 시간 있는 것 먼저
-                        .thenComparing(p -> p.getTime() == null ? "" : p.getTime())
-                        .thenComparing(Place::getSort))
-                .toList();
+        List<Place> sorted = PlaceOrder.arrange(places.findAllByDayIdOrderBySortAsc(dayId));
         for (int i = 0; i < sorted.size(); i++) {
             sorted.get(i).setSort(i);
         }

@@ -63,6 +63,33 @@ const names = r.data.days[0].places.map(p => p.name);
 T("시간순 정렬", JSON.stringify(names) === JSON.stringify(["점심","나리타 공항","저녁","미정"]), names);
 T("시간 없는 곳은 뒤로", names[names.length-1] === "미정", names);
 
+/*
+  끌어다 둔 자리는 고쳐도 안 움직인다.
+
+  시간을 안 적은 곳을 전부 뒤로 보내던 때에는, 끌어서 둘째 자리에 옮겨 둔
+  곳을 열어 메모 한 줄만 고쳐도 맨 아래로 내려갔습니다. 옮긴 사람 눈에는
+  고친 것과 아무 상관 없는 일이 벌어진 것입니다.
+*/
+const loose = r.data.days[0].places.find(p => p.name === "미정").id;
+const first = r.data.days[0].places[0].id;
+const rest = r.data.days[0].places.map(p => p.id).filter(id => id !== first && id !== loose);
+r = await call("POST", "/api/places/reorder", { token: admin, body: { dayId: day1, placeIds: [first, loose, ...rest] } });
+T("끌어서 둘째 자리로", r.status === 200, r.data);
+r = await call("GET", "/api/trip?trip=" + tripId, { token: admin });
+T("옮긴 자리에 섬", r.data.days[0].places[1].name === "미정", r.data.days[0].places.map(p => p.name));
+
+r = await call("PATCH", "/api/places/" + loose, { token: admin, body: { note: "여기 들렀다가" } });
+T("메모만 고침", r.status === 200, r.data);
+r = await call("GET", "/api/trip?trip=" + tripId, { token: admin });
+T("고쳐도 자리를 지킴", r.data.days[0].places[1].name === "미정", r.data.days[0].places.map(p => p.name));
+
+/* 순서를 움직일 수 있는 것은 적어 둔 시각 하나뿐입니다. */
+r = await call("PATCH", "/api/places/" + loose, { token: admin, body: { time: "23:00" } });
+r = await call("GET", "/api/trip?trip=" + tripId, { token: admin });
+T("시각을 적으면 제 시각으로 감", r.data.days[0].places[3].name === "미정", r.data.days[0].places.map(p => p.name));
+r = await call("PATCH", "/api/places/" + loose, { token: admin, body: { time: "" } });
+T("시각을 지워도 그 자리에 남음", r.status === 200, r.data);
+
 r = await call("PATCH", "/api/places/" + p1, { token: admin, body: { cost: "¥2,580", note: "스카이라이너" } });
 T("장소 수정", r.status === 200 && r.data.place.cost === "¥2,580", r.data);
 T("고칠 때마다 version 이 오름", r.data.place.version > 0, r.data.place.version);
