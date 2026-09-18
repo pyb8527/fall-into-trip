@@ -113,7 +113,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.surface,
-    borderRadius: Radius.none,
+    borderRadius: Radius.md,
     borderWidth: 1.5,
     borderColor: 'transparent',
     paddingRight: Spacing.sm,
@@ -139,7 +139,7 @@ const styles = StyleSheet.create({
   mark: {
     width: 36,
     height: 36,
-    borderRadius: Radius.none,
+    borderRadius: Radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: Colors.fill,

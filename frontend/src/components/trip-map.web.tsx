@@ -916,7 +916,7 @@ export function TripMap({
         position: 'relative',
         width: '100%',
         height: full || bleed ? '100%' : height,
-        borderRadius: full || bleed ? 0 : Radius.none,
+        borderRadius: full || bleed ? 0 : Radius.lg,
         overflow: 'hidden',
         backgroundColor: Colors.abyss,
       }}>
@@ -1030,8 +1030,8 @@ const styles = StyleSheet.create({
     bottom: 0,
     zIndex: 3,
     backgroundColor: Colors.surface,
-    borderTopLeftRadius: Radius.none,
-    borderTopRightRadius: Radius.none,
+    borderTopLeftRadius: Radius.lg,
+    borderTopRightRadius: Radius.lg,
     paddingHorizontal: Spacing.xl,
     paddingTop: Spacing.md,
     paddingBottom: Spacing.xxl,
@@ -1068,7 +1068,7 @@ const styles = StyleSheet.create({
     minHeight: Tap.min,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: Radius.none,
+    borderRadius: Radius.md,
     backgroundColor: Colors.fill,
   },
 });

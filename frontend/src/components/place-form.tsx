@@ -307,7 +307,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.md,
     backgroundColor: Colors.accentSoft,
-    borderRadius: Radius.none,
+    borderRadius: Radius.md,
     padding: Spacing.lg,
   },
   spotText: {

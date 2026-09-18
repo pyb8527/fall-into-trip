@@ -45,7 +45,7 @@ export function PostMap({
 const styles = StyleSheet.create({
   thumb: {
     width: '100%',
-    borderRadius: Radius.none,
+    borderRadius: Radius.md,
     backgroundColor: Colors.fill,
   },
 });

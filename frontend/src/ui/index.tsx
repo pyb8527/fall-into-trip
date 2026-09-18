@@ -430,6 +430,7 @@ type Tone =
   /** 지금·오늘·여기. 강조(라임)와 색상환 반대편이라 나란히 놓아도 안 죽습니다. */
   | 'hot'
   | 'warning'
+  | 'brand'
   | 'inverse';
 
 const toneColor: Record<Tone, string> = {
@@ -438,8 +439,20 @@ const toneColor: Record<Tone, string> = {
   muted: Colors.textMuted,
   danger: Colors.danger,
   success: Colors.success,
-  /* 칠하는 색(파스텔)이 아니라 글자로 읽히는 짙은 쪽을 씁니다. */
-  accent: Colors.accentInk,
+  /*
+    글자와 아이콘의 "강조" 는 여전히 검정입니다.
+
+    이 이름은 화면 마흔 군데에서 <b>가장 강한 것</b>이라는 뜻으로 쓰입니다 —
+    사용자 이름, 메뉴 그림, 적어 둔 시각, 숙소 표시. 강조색을 코랄로 들이면서
+    이것까지 코랄로 돌렸더니 한 화면에 코랄이 열 군데씩 생겼고, 그러면
+    정작 눌러야 할 것이 안 보입니다.
+
+    색을 쓰는 자리는 키트가 직접 정합니다 — 주 단추, 고른 칩, 체크, 고른 줄,
+    지금 쓰고 있는 칸. 그것 말고는 검정입니다.
+   */
+  accent: Colors.text,
+  /** 코랄을 글자로 써야 하는 드문 자리. 옅은 물 위에 얹을 때만. */
+  brand: Colors.accentInk,
   hot: Colors.hot,
   warning: Colors.warning,
   /* 색으로 채운 자리 위에 얹는 것. 우리 강조색은 모두 밝아서, 그 위에는
@@ -456,6 +469,7 @@ const toneSoft: Record<Tone, string> = {
   accent: Colors.accentSoft,
   hot: Colors.hotSoft,
   warning: Colors.warningSoft,
+  brand: Colors.accentSoft,
   /* 바탕이 이미 진한 자리에 쓰므로 무른 배경은 두지 않습니다. */
   inverse: 'transparent',
 };
@@ -703,7 +717,9 @@ export function Button({
     때문입니다. 그리고 그 앞에는 늘 확인 판이 한 번 더 섭니다.
   */
   const palette: Record<ButtonVariant, { bg: string; pressed: string; fg: string }> = {
-    primary: { bg: Colors.accent, pressed: Colors.accentPressed, fg: Colors.accentText },
+    /* 흰 글씨를 얹는 자리라 진한 쪽을 씁니다. 밝은 코랄에 흰 글씨는
+       대비가 3.9:1 로 WCAG AA 에 못 미칩니다. */
+    primary: { bg: Colors.accentStrong, pressed: Colors.accentPressed, fg: Colors.accentText },
     secondary: { bg: Colors.surface, pressed: Colors.fill, fg: Colors.text },
     danger: { bg: Colors.surface, pressed: Colors.fill, fg: Colors.text },
     ghost: { bg: 'transparent', pressed: Colors.fill, fg: Colors.textMuted },
@@ -746,6 +762,19 @@ export function Button({
 }
 
 /** 켜고 끄는 한 줄짜리 선택지. 필터에 씁니다. */
+/**
+ * 무엇을 볼지 고르는 알약.
+ *
+ * <h3>고른 것을 색으로 꽉 채우지 않습니다</h3>
+ *
+ * <p>한때 고른 칩을 강조색으로 가득 채웠습니다. 그랬더니 갈래를 거르는
+ * 칩 하나와 "일정에 넣기" 단추가 화면에서 같은 무게로 섰습니다. 둘은
+ * 같은 일이 아닙니다 — 하나는 <b>보는 방식</b>을 바꾸고 하나는 <b>실제로
+ * 무슨 일을 일으킵니다.</b>
+ *
+ * <p>고른 칩은 옅은 물을 깔고 글씨만 강조색으로 둡니다. 눈에는 충분히
+ * 걸리고, 색을 가득 쓰는 자리는 화면에 하나만 남습니다.
+ */
 export function Chip({
   label,
   selected,
@@ -764,14 +793,15 @@ export function Chip({
       style={[
         styles.chip,
         {
-          backgroundColor: selected ? Colors.accent : Colors.surface,
+          backgroundColor: selected ? Colors.accentSoft : Colors.surface,
           borderColor: selected ? Colors.accent : Colors.border,
         },
       ]}>
       <Text
         style={[
           styles.chipLabel,
-          { color: selected ? Colors.accentText : Colors.textMuted },
+          selected ? styles.chipLabelOn : null,
+          { color: selected ? Colors.accentInk : Colors.textMuted },
         ]}>
         {label}
       </Text>
@@ -1832,27 +1862,23 @@ const styles = StyleSheet.create({
   /*
     카드는 상자가 아니라 묶음입니다.
 
-    전에는 흰 바탕 위에 흰 카드를 그림자로 띄웠습니다. 그림자가 하나면
-    떠 보이지만 넷이 놓이면 화면 전체가 부옇게 뜨고, 그 상태에서는 어느
-    것을 먼저 봐야 할지 눈이 고르지 못합니다.
+    그림자로 띄우던 것을 걷고 선 한 가닥을 둘렀다가, 그 선마저 걷었습니다.
+    선을 두르면 화면이 테두리 쳐진 사각형의 더미가 되고, 카드가 넷 놓이면
+    사각형이 넷입니다. 정작 봐야 할 것은 그 안의 글자입니다.
 
-    이제 선 한 가닥이 테두리를 대신합니다. 굵기는 기기가 그릴 수 있는
-    가장 가는 선이라, 안의 글자보다 앞에 나서지 않습니다.
+    이제 바닥이 한 단 어둡고 카드가 흰색입니다. 밝기 차이만으로 어디까지가
+    한 덩어리인지 보이고, 화면에 그어진 선은 하나도 없습니다.
   */
   card: {
     backgroundColor: Colors.surface,
-    borderRadius: Radius.none,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: Colors.border,
+    borderRadius: Radius.md,
     padding: Spacing.lg,
     gap: Spacing.md,
   },
 
   listRow: {
     backgroundColor: Colors.surface,
-    borderRadius: Radius.none,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: Colors.border,
+    borderRadius: Radius.md,
     paddingVertical: Spacing.lg,
     paddingHorizontal: Spacing.xl,
     minHeight: Tap.min + Spacing.lg,
@@ -1896,9 +1922,11 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: Colors.surface,
-    borderTopLeftRadius: Radius.none,
-    borderTopRightRadius: Radius.none,
+    /* 판 안에도 카드가 놓입니다. 판이 흰색이면 그 위의 흰 카드가 안 보여
+       화면이 다시 밋밋해집니다. 판은 바닥이고 카드가 종이입니다. */
+    backgroundColor: Colors.background,
+    borderTopLeftRadius: Radius.lg,
+    borderTopRightRadius: Radius.lg,
     /* 지도 위에 얹히는 판이라 위쪽으로 그림자를 드리웁니다. 실선만 두면
        지도의 길과 섞여 판의 시작이 보이지 않습니다. */
     shadowColor: '#000000',
@@ -1921,7 +1949,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     width: 44,
     height: 4,
-    borderRadius: Radius.none,
+    borderRadius: Radius.full,
     backgroundColor: Colors.borderStrong,
   },
   /* 넓은 화면에서 글줄이 지나치게 길어지지 않게 가운데로 모읍니다. 판이
@@ -2064,12 +2092,12 @@ const styles = StyleSheet.create({
   },
   buttonFull: {
     height: Tap.control,
-    borderRadius: Radius.none,
+    borderRadius: Radius.md,
     paddingHorizontal: Spacing.xl,
   },
   buttonCompact: {
     height: Tap.compact,
-    borderRadius: Radius.none,
+    borderRadius: Radius.sm,
     paddingHorizontal: Spacing.lg,
   },
   /* 주 동작은 뜨지 않습니다. 검정 채움 자체가 화면에서 가장 강한 것이라
@@ -2095,7 +2123,7 @@ const styles = StyleSheet.create({
 
   chip: {
     height: Tap.compact,
-    borderRadius: Radius.none,
+    borderRadius: Radius.full,
     paddingHorizontal: Spacing.lg,
     alignItems: 'center',
     justifyContent: 'center',
@@ -2140,6 +2168,10 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     shadowOffset: { width: 0, height: 1 },
     elevation: 2,
+  },
+  /* 고른 것은 굵기로도 말합니다. 옅은 물만으로는 한 단이 모자랍니다. */
+  chipLabelOn: {
+    fontWeight: Weight.bold,
   },
   chipLabel: {
     ...Type.bodySmall,
@@ -2186,7 +2218,7 @@ const styles = StyleSheet.create({
 
   menuCard: {
     backgroundColor: Colors.surface,
-    borderRadius: Radius.none,
+    borderRadius: Radius.md,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: Colors.border,
     padding: Spacing.lg,
@@ -2248,7 +2280,7 @@ const styles = StyleSheet.create({
   check: {
     width: 22,
     height: 22,
-    borderRadius: Radius.none,
+    borderRadius: 6,
     borderWidth: 1.5,
     borderColor: Colors.borderStrong,
     alignItems: 'center',
@@ -2263,9 +2295,9 @@ const styles = StyleSheet.create({
     minWidth: 56,
     minHeight: Tap.min,
     /* 이름이 붙는 칸은 글자가 들어갈 만큼 넓어야 합니다. */
-    borderRadius: Radius.none,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: Colors.border,
+    borderRadius: Radius.sm,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
     backgroundColor: Colors.fill,
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.sm,
@@ -2299,7 +2331,7 @@ const styles = StyleSheet.create({
   },
 
   badge: {
-    borderRadius: Radius.none,
+    borderRadius: Radius.full,
     borderWidth: StyleSheet.hairlineWidth,
     paddingVertical: 2,
     paddingHorizontal: Spacing.sm - 1,
@@ -2312,7 +2344,7 @@ const styles = StyleSheet.create({
   iconButton: {
     width: Tap.min,
     height: Tap.min,
-    borderRadius: Radius.none,
+    borderRadius: Radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -2334,7 +2366,7 @@ const styles = StyleSheet.create({
   },
   /* 지도 위에 떠 있는 단추. 동그랗고, 실선과 그림자로 지도에서 떼어 놓습니다. */
   iconButtonOnMap: {
-    borderRadius: Radius.none,
+    borderRadius: Radius.full,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: Colors.border,
     shadowColor: '#000000',
@@ -2355,7 +2387,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 360,
     backgroundColor: Colors.surface,
-    borderRadius: Radius.none,
+    borderRadius: Radius.lg,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: Colors.borderStrong,
     padding: Spacing.xl,
@@ -2383,8 +2415,8 @@ const styles = StyleSheet.create({
   },
   sheet: {
     backgroundColor: Colors.surface,
-    borderTopLeftRadius: Radius.none,
-    borderTopRightRadius: Radius.none,
+    borderTopLeftRadius: Radius.lg,
+    borderTopRightRadius: Radius.lg,
     /* 모서리를 각지게 두었으니 판이 어디서 시작하는지는 선이 말합니다. */
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: Colors.borderStrong,
@@ -2401,7 +2433,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     width: 40,
     height: 4,
-    borderRadius: Radius.none,
+    borderRadius: Radius.full,
     backgroundColor: Colors.fillPressed,
   },
   sheetHead: {
@@ -2433,7 +2465,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: Colors.fill,
-    borderRadius: Radius.none,
+    borderRadius: Radius.sm,
     paddingHorizontal: Spacing.sm,
     height: Tap.control,
   },

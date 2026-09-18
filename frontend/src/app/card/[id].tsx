@@ -336,7 +336,7 @@ function Replay({ trip }: { trip: TripDetail }) {
 const styles = StyleSheet.create({
   paper: {
     backgroundColor: Colors.surface,
-    borderRadius: Radius.none,
+    borderRadius: Radius.md,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: Colors.border,
     padding: Spacing.xl,

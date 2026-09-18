@@ -648,7 +648,7 @@ const styles = StyleSheet.create({
   place: {
     alignItems: 'flex-start',
     flexWrap: 'nowrap',
-    borderRadius: Radius.none,
+    borderRadius: Radius.sm,
     borderWidth: 1.5,
     borderColor: 'transparent',
   },

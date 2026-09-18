@@ -403,7 +403,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: Spacing.xs,
     backgroundColor: Colors.surface,
-    borderRadius: Radius.none,
+    borderRadius: Radius.sm,
     padding: Spacing.lg,
   },
   section: {
