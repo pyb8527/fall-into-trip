@@ -1,20 +1,33 @@
 import { useRouter } from 'expo-router';
 import { useMemo } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { api } from '@/api/client';
-import type { News, Place, TripDetail, TripSummary } from '@/api/types';
+import type {
+  News,
+  Place,
+  PopularPlace,
+  PostPage,
+  TripDetail,
+  TripSummary,
+} from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
+import { TripThumb } from '@/components/trip-thumb';
+import { iconOf, labelOf } from '@/constants/place-icons';
 import { Spacing } from '@/constants/theme';
 import type { Countdown } from '@/lib/countdown';
 import { countdownIsNear, countdownLabel, countdownOf, todayIso } from '@/lib/countdown';
 import {
   Badge,
+  Body,
   Button,
   Caption,
   Card,
+  Grow,
+  Icon,
   IconButton,
+  Mark,
   MenuCard,
   Press,
   Rise,
@@ -62,6 +75,21 @@ export default function Home() {
     없는 사람에게도 앱이 느려집니다.
   */
   const { data: news } = useAsync<News>((signal) => api.get('/api/news', signal), []);
+
+  /*
+    남들이 다녀온 길, 그리고 여럿이 간 곳.
+
+    둘 다 로그인 없이 열리는 것이라 갓 들어온 사람에게도 보입니다. 못 받아
+    와도 조용히 넘어갑니다 — 구역이 통째로 안 뜰 뿐 홈은 멉니다.
+  */
+  const { data: shared } = useAsync<PostPage>(
+    (signal) => api.get('/api/posts?sort=hot', signal),
+    [],
+  );
+  const { data: top } = useAsync<{ places: PopularPlace[] }>(
+    (signal) => api.get('/api/popular/places', signal),
+    [],
+  );
 
 
   /*
@@ -232,6 +260,149 @@ export default function Home() {
       */}
       {mine && mine.trips.length === 0 ? <FirstSteps /> : null}
       {next ? <NextTrip trip={next.trip} at={next.at} road={road} /> : null}
+
+      {/*
+        내 여행 몇 개만.
+
+        목록은 「내 여행」 이 이미 합니다. 여기 두는 것은 되짚어 들어가는
+        자리입니다 — 어제 보던 여행을 다시 열려고 탭을 옮기고 목록을 훑는
+        것은 이미 아는 것을 다시 찾는 일입니다.
+
+        셋만 냅니다. 넷을 넘으면 그것은 목록이고, 목록은 저쪽 것입니다.
+      */}
+      {mine && mine.trips.length > 0 ? (
+        <View style={styles.section}>
+          <Split align="baseline">
+            <Subtitle>내 여행</Subtitle>
+            {mine.trips.length > 3 ? (
+              <Button
+                label={`${mine.trips.length}개 전체보기`}
+                variant="ghost"
+                compact
+                onPress={() => router.push('/(app)/trips')}
+              />
+            ) : null}
+          </Split>
+          <View style={styles.rows}>
+            {mine.trips.slice(0, 3).map((trip) => (
+              <Press
+                key={trip.id}
+                onPress={() => router.push(`/trip/${trip.id}`)}
+                scale={0.99}
+                accessibilityLabel={`${trip.title} 열기`}>
+                <Card style={styles.row}>
+                  <Split>
+                    <Grow gap={2}>
+                      <Body strong numberOfLines={1}>
+                        {trip.title}
+                      </Body>
+                      <Caption tone="secondary">
+                        {trip.dayCount}일 · 장소 {trip.placeCount}곳
+                      </Caption>
+                    </Grow>
+                    <Icon name="chevron-right" size={18} tone="muted" />
+                  </Split>
+                </Card>
+              </Press>
+            ))}
+          </View>
+        </View>
+      ) : null}
+
+      {/*
+        남들이 다녀온 길.
+
+        여기만 그림이 붙습니다. 사진을 안 올리는 앱이라 쓸 수 있는 것은
+        동선 그림 한 장뿐인데, 그것으로 충분합니다 — 오사카를 도는 선과
+        제주를 도는 선은 생김새가 다릅니다. 무엇보다 진짜 그 글의 내용입니다.
+
+        가로로 흘립니다. 세로로 쌓으면 셋만 놓아도 화면 하나를 먹고, 이
+        구역은 "이런 것도 있다" 를 보이는 자리이지 고르는 자리가 아닙니다.
+      */}
+      {shared && shared.posts.length > 0 ? (
+        <View style={styles.section}>
+          <Split align="baseline">
+            <Subtitle>남들이 다녀온 길</Subtitle>
+            <Button
+              label="둘러보기"
+              variant="ghost"
+              compact
+              onPress={() => router.push('/community')}
+            />
+          </Split>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <Row gap={Spacing.md} style={styles.strip}>
+              {shared.posts.slice(0, 6).map((post) => (
+                <Press
+                  key={post.id}
+                  onPress={() => router.push(`/community/${post.id}`)}
+                  scale={0.98}
+                  accessibilityLabel={`${post.title} 보기`}
+                  style={styles.postCard}>
+                  <TripThumb postId={post.id} height={104} label={post.title} />
+                  <View style={styles.postText}>
+                    {/* 작은 회색 메타 → 굵은 제목 → 작은 숫자. 문토가 카드
+                        안에서 쓰는 차례 그대로입니다. */}
+                    <Caption tone="muted" numberOfLines={1}>
+                      {[post.region, `${post.dayCount}일`].filter(Boolean).join(' · ')}
+                    </Caption>
+                    <Body small strong numberOfLines={2}>
+                      {post.title}
+                    </Body>
+                    <Caption tone="secondary">
+                      장소 {post.placeCount}곳
+                      {post.likeCount > 0 ? ` · 추천 ${post.likeCount}` : ''}
+                    </Caption>
+                  </View>
+                </Press>
+              ))}
+            </Row>
+          </ScrollView>
+        </View>
+      ) : null}
+
+      {/*
+        여럿이 간 곳.
+
+        처음 온 사람의 홈은 텅 비어 있습니다. "첫 여행을 만들어 보세요"
+        라고만 하면 무엇을 만들어야 할지가 그대로 숙제로 남습니다.
+
+        다섯 줄만 냅니다. 나머지와 갈래별로 거르는 것은 저쪽 화면이 합니다 —
+        홈은 있다는 것만 알리는 자리입니다.
+      */}
+      {top && top.places.length > 0 ? (
+        <View style={styles.section}>
+          <Split align="baseline">
+            <Subtitle>여럿이 간 곳</Subtitle>
+            <Button
+              label="더 보기"
+              variant="ghost"
+              compact
+              onPress={() => router.push('/(app)/popular')}
+            />
+          </Split>
+          <View style={styles.rows}>
+            {top.places.slice(0, 5).map((place, i) => (
+              <Card key={place.key} style={styles.row}>
+                <Row gap={Spacing.md} style={styles.rank}>
+                  <Body strong={i < 3} tone={i < 3 ? 'default' : 'muted'} style={styles.at}>
+                    {i + 1}
+                  </Body>
+                  <Mark emoji={iconOf(place.icon)} fallback="★" />
+                  <Grow gap={2}>
+                    <Body strong numberOfLines={1}>
+                      {place.name}
+                    </Body>
+                    <Caption tone="secondary">
+                      {[labelOf(place.icon), `일정 ${place.posts}개에`].filter(Boolean).join(' · ')}
+                    </Caption>
+                  </Grow>
+                </Row>
+              </Card>
+            ))}
+          </View>
+        </View>
+      ) : null}
     </Screen>
   );
 }
@@ -340,6 +511,36 @@ function FirstSteps() {
 }
 
 const styles = StyleSheet.create({
+  section: {
+    gap: Spacing.md,
+  },
+  rows: {
+    gap: Spacing.xs,
+  },
+  row: {
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+  },
+  rank: {
+    alignItems: 'center',
+  },
+  /* 번호가 한 자리든 두 자리든 이름이 같은 자리에서 시작해야 합니다. */
+  at: {
+    width: 20,
+    textAlign: 'center',
+  },
+  /* 가로로 흘리는 띠. 끝을 띄워 둬야 마지막 카드가 잘린 것처럼 안 보입니다. */
+  strip: {
+    flexWrap: 'nowrap',
+    paddingRight: Spacing.lg,
+  },
+  postCard: {
+    width: 208,
+    gap: Spacing.sm,
+  },
+  postText: {
+    gap: 2,
+  },
   head: {
     gap: Spacing.md,
   },

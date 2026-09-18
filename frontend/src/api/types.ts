@@ -441,6 +441,40 @@ export type Comment = {
   createdAt: string;
 };
 
+/**
+ * 여럿이 다녀온 지역.
+ *
+ * <p>따로 채워 두는 것이 아니라 올라온 글을 세어 만듭니다. 글이 없으면
+ * 목록도 비고, 그때는 화면이 다른 말을 합니다.
+ */
+export type PopularRegion = {
+  region: string;
+  /** 이 지역을 다녀온 글이 몇 개인지. */
+  posts: number;
+  likes: number;
+  views: number;
+};
+
+/** 여럿이 일정에 넣은 장소. 한 글에서 두 번 넣었어도 한 번으로 셉니다. */
+export type PopularPlace = {
+  /** 같은 곳끼리 묶은 열쇠. 구글 번호가 있으면 그것, 없으면 이름. */
+  key: string;
+  name: string;
+  icon: Maybe<string>;
+  lat: Maybe<number>;
+  lng: Maybe<number>;
+  placeId: Maybe<string>;
+  /** 몇 개의 글이 이 곳을 넣었는지. */
+  posts: number;
+  likes: number;
+};
+
+/** 올라온 글에 실제로 쓰인 갈래. 누를 수 있는 것만 냅니다. */
+export type PopularKind = {
+  kind: string;
+  places: number;
+};
+
 export type PostPage = {
   posts: PostCard[];
   page: number;

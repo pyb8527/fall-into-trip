@@ -1197,6 +1197,8 @@ export type IconName =
   | 'log-out'
   | 'user-minus'
   | 'chevron-left'
+  /** 줄 끝에서 "눌러서 들어간다" 는 표시 */
+  | 'chevron-right'
   | 'navigation'
   | 'clock'
   | 'phone'

@@ -281,6 +281,7 @@ node backend/src/test/http/tip.test.mjs        # 장소 팁·신고·남긴 한 
 node backend/src/test/http/expense.test.mjs    # 가계부와 정산
 node backend/src/test/http/candidate.test.mjs  # 후보와 투표
 node backend/src/test/http/saved.test.mjs      # 보석함
+node backend/src/test/http/popular.test.mjs    # 여럿이 간 곳 — 순위 집계
 node backend/src/test/http/folder.test.mjs     # 여행 폴더
 node backend/src/test/http/live.test.mjs       # 임시 핀과 실시간 위치
 node backend/src/test/http/icon.test.mjs       # 핀 그림과 이동 비교

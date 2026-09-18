@@ -102,6 +102,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/posts/mine", "/api/posts/liked")
                         .authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/posts", "/api/posts/*").permitAll()
+                        /* 이미 공개된 글을 세는 것이라 새로 드러나는 것이 없습니다.
+                           가입하기 전에 볼 수 있어야 가입할 이유가 생깁니다. */
+                        .requestMatchers(HttpMethod.GET, "/api/popular/**").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().denyAll())
