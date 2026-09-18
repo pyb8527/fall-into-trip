@@ -32,6 +32,7 @@ import {
   Subtitle,
   Title,
 } from '@/ui';
+import { TripTabs } from '@/ui/tab-bar';
 
 /**
  * 여행 중에 보는 화면 — 스탬프첩.
@@ -161,7 +162,7 @@ export default function Travel() {
   const cardWidth = Math.min(width - Gutter * 2, 420);
 
   return (
-    <Screen scroll={false}>
+    <Screen scroll={false} tabs={<TripTabs tripId={id} active="travel" />}>
       <Stack.Screen
         options={{
           title: data.trip.title,

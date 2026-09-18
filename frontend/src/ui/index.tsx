@@ -42,6 +42,7 @@ import {
   Radius,
   ScreenGap,
   Spacing,
+  TabDock,
   Tap,
   Type,
   Weight,
@@ -298,7 +299,7 @@ export const Screen = forwardRef<ScreenHandle, ScreenProps>(function Screen(
                  갈래 띠까지 있으면 그만큼 더 비웁니다 — 마지막 줄이 띠 뒤로
                  들어가면 아무리 굴려도 안 보입니다. */
               paddingBottom:
-                (footer ? Spacing.xl : insets.bottom + Spacing.huge) + (tabs ? TAB_DOCK : 0),
+                (footer ? Spacing.xl : insets.bottom + Spacing.huge) + (tabs ? TabDock : 0),
             },
           ]}
           keyboardShouldPersistTaps="handled"
@@ -329,17 +330,13 @@ export const Screen = forwardRef<ScreenHandle, ScreenProps>(function Screen(
         </View>
       ) : null}
 
-      {/* 갈래 띠. 자판이 올라와 있으면 걷습니다 — 글을 치는 동안 띠가
-          자판 위에 얹혀 있으면 그것대로 자리를 먹습니다. */}
-      {tabs && !keyboardUp ? tabs : null}
-
       {footer ? (
         <View
           style={[
             styles.footer,
             {
               paddingBottom:
-                (keyboardUp ? 0 : insets.bottom) + Spacing.md + (tabs && !keyboardUp ? TAB_DOCK : 0),
+                (keyboardUp ? 0 : insets.bottom) + Spacing.md + (tabs && !keyboardUp ? TabDock : 0),
             },
           ]}>
           <View style={styles.footerInner}>
@@ -347,6 +344,19 @@ export const Screen = forwardRef<ScreenHandle, ScreenProps>(function Screen(
           </View>
         </View>
       ) : null}
+
+      {/*
+        갈래 띠. <b>단추보다 뒤에 그립니다.</b>
+
+        <p>앞에 뒀더니 「내 여행」처럼 아래 단추가 있는 화면에서 띠가 통째로
+        안 보였습니다. 단추 판은 흐름 안에 서고 제 바탕색을 가지는데, 띠는
+        떠 있는 것이라 나중에 그린 쪽이 위에 옵니다 — 단추 판이 띠를 덮고
+        있었습니다.
+
+        <p>자판이 올라와 있으면 걷습니다. 글을 치는 동안 띠가 자판 위에
+        얹혀 있으면 그것대로 자리를 먹습니다.
+      */}
+      {tabs && !keyboardUp ? tabs : null}
     </KeyboardAvoidingView>
   );
 });
@@ -543,14 +553,7 @@ const toneSoft: Record<Tone, string> = {
  */
 const OnFloor = createContext(false);
 
-/**
- * 갈래 띠가 먹는 높이.
- *
- * <p>띠를 재서 쓰는 편이 정확하지만, 그러려면 처음 한 번은 띠 없이 그렸다가
- * 잰 뒤 다시 그려야 해서 화면이 한 번 덜컥합니다. 띠 높이는 내용에 따라
- * 변하지 않으므로(그림 하나와 작은 글자 하나) 값으로 둡니다.
- */
-const TAB_DOCK = 68;
+
 
 /** 화면의 제목. 한 화면에 하나만. */
 export function Title({ children, tone }: { children: React.ReactNode; tone?: Tone }) {

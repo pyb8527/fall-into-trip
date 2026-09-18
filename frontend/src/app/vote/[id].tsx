@@ -31,6 +31,7 @@ import {
   Subtitle,
   Title,
 } from '@/ui';
+import { TripTabs } from '@/ui/tab-bar';
 
 /**
  * 가고 싶은 곳 고르기.
@@ -87,6 +88,7 @@ export default function Vote() {
 
   return (
     <Screen
+      tabs={<TripTabs tripId={id} active="vote" />}
       footer={
         agreed.length > 0 ? (
           <Button label={`정해진 ${agreed.length}곳 일정에 넣기`} onPress={() => setPouring(true)} />

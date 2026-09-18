@@ -29,6 +29,7 @@ import {
   Subtitle,
   useUndo,
 } from '@/ui';
+import { TripTabs } from '@/ui/tab-bar';
 
 /**
  * 가계부와 정산.
@@ -167,6 +168,7 @@ export default function Money() {
 
   return (
     <Screen
+      tabs={<TripTabs tripId={id} active="money" />}
       snack={<Snack undo={undo} onHide={hideUndo} />}
       footer={
         tab === 'list' ? (

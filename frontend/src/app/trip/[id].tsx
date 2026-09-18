@@ -53,7 +53,16 @@ import { canPrint, printItinerary } from '@/lib/print';
 import { useHere } from '@/lib/here';
 import { decodePolyline } from '@/lib/polyline';
 import { DateField } from '@/ui/date-field';
-import { Colors, DayColors, dayColor, Gutter, Radius, Spacing, Tap } from '@/constants/theme';
+import {
+  Colors,
+  DayColors,
+  dayColor,
+  Gutter,
+  Radius,
+  Spacing,
+  TabDock,
+  Tap,
+} from '@/constants/theme';
 import {
   Body,
   BottomSheet,
@@ -68,6 +77,7 @@ import {
   Empty,
   ErrorNote,
   Field,
+  Grow,
   Icon,
   IconButton,
   type IconName,
@@ -83,7 +93,8 @@ import {
   type UndoNote,
   useUndo,
 } from '@/ui';
-import { TabBar } from '@/ui/tab-bar';
+import { TripTabs } from '@/ui/tab-bar';
+import { TripMark } from '@/components/trip-mark';
 
 /** 전체를 보는 상태. 특정 날짜가 아니라는 뜻입니다. */
 const ALL = -1;
@@ -357,7 +368,7 @@ export default function TripScreen() {
     띠가 스스로 챙기므로 여기서는 띠 몸통만 셉니다.
   */
   const insets = useSafeAreaInsets();
-  const dock = Math.max(insets.bottom, Spacing.sm) + 60;
+  const dock = Math.max(insets.bottom, Spacing.sm) + TabDock;
   /** 단추 줄이 실제로 몇 픽셀인지. 판을 내렸을 때 여기까지 보입니다. */
   const [railTall, setRailTall] = useState(0);
   const { undo, show: showUndo, hide: hideUndo } = useUndo();
@@ -1205,53 +1216,15 @@ export default function TripScreen() {
       {/*
         이 여행에서 갈 수 있는 곳들.
 
-        <p>앱 전체의 갈래 대신 <b>이 여행의 갈래</b>가 섭니다. 여행 하나에
-        들어오면 그 안에서 오가는 것이 대부분이라, 바깥 갈래를 그대로 두면
-        정작 자주 쓰는 것들이 다시 화면 어딘가로 흩어집니다.
-
-        <p>왼쪽에 나가는 길을 답니다. 갈래가 통째로 바뀌었으므로 어디서
-        빠져나가는지가 보여야 합니다.
+        <p>다섯 화면이 같은 띠를 나눠 씁니다(ui/tab-bar). 일정에만 달아
+        두었더니 「여행 중」으로 넘어가는 순간 띠가 사라져서, 거기서 가계부로
+        가려면 뒤로 → 일정 → 가계부를 밟아야 했습니다.
       */}
-      <TabBar
+      <TripTabs
+        tripId={id}
+        active="plan"
+        onTrip={onTrip}
         onBack={() => (navigation.canGoBack() ? navigation.goBack() : router.push('/(app)/home'))}
-        items={[
-          {
-            key: 'plan',
-            label: '일정',
-            icon: 'calendar',
-            /* 지금 이 화면입니다. 눌러도 아무 일이 없는 것이 맞습니다 —
-               같은 곳을 다시 쌓으면 뒤로가기가 한 번 헛돕니다. */
-            active: true,
-            onPress: () => {},
-          },
-          {
-            key: 'travel',
-            label: '여행 중',
-            icon: 'flag',
-            /* 오늘이 이 여행의 날 중 하나면 점을 찍습니다. 그날 이 화면에서
-               가장 먼저 누를 것이 그것입니다. */
-            dot: onTrip,
-            onPress: () => router.push({ pathname: '/travel/[id]', params: { id } }),
-          },
-          {
-            key: 'vote',
-            label: '가고 싶은 곳',
-            icon: 'thumbs-up',
-            onPress: () => router.push({ pathname: '/vote/[id]', params: { id } }),
-          },
-          {
-            key: 'money',
-            label: '가계부',
-            icon: 'credit-card',
-            onPress: () => router.push({ pathname: '/money/[id]', params: { id } }),
-          },
-          {
-            key: 'card',
-            label: '요약',
-            icon: 'book-open',
-            onPress: () => router.push({ pathname: '/card/[id]', params: { id } }),
-          },
-        ]}
       />
 
       <DragSheet
@@ -1348,12 +1321,21 @@ export default function TripScreen() {
           있고, 지금 어디인지도 거기서 말합니다. 여기 남는 것은 이 화면에서
           하는 일뿐이라 셋이고, 한 줄에 다 들어갑니다.
         */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
+        {/*
+          가로로 흘리지 않습니다.
+
+          <p>일곱이던 시절에는 흘려야 했습니다. 지금은 <b>많아야 셋</b>이라
+          한 줄에 다 들어가는데, 흘리는 틀에 그대로 두었더니 셋이 왼쪽에
+          몰리고 오른쪽 절반이 비었습니다.
+
+          <p>칸을 고르게 나눠 가집니다. 고칠 수 있는 사람인지, 주인인지에
+          따라 하나에서 셋까지 달라지는데 그때마다 줄 모양이 저절로 맞습니다.
+        */}
+        <Row
+          gap={Spacing.xs}
+          style={styles.shortcuts}
           /* 판을 내렸을 때 여기까지 보이게 하려고 높이를 재 둡니다. */
           onLayout={(e) => setRailTall(e.nativeEvent.layout.height)}>
-          <Row gap={Spacing.xs} style={styles.shortcuts}>
             {/* 갈 곳의 이름을 알아야만 넣을 수 있었습니다. "비 올 때 갈 만한
                 실내" 는 적을 데가 없어서, 블로그를 뒤져 이름을 알아낸 다음에야
                 여기로 돌아와야 했습니다. */}
@@ -1367,8 +1349,7 @@ export default function TripScreen() {
             {mine ? (
               <Shortcut icon="upload" label="글 올리기" onPress={() => setPublishing(true)} />
             ) : null}
-          </Row>
-        </ScrollView>
+        </Row>
 
         {days.length === 0 ? <Empty message="아직 날짜가 없습니다." /> : null}
 
@@ -1425,7 +1406,7 @@ export default function TripScreen() {
         {canEdit ? (
           <>
             <Divider />
-            <TripMark trip={data.trip} onChanged={refresh} />
+            <TripMarkPicker trip={data.trip} onChanged={refresh} />
           </>
         ) : null}
 
@@ -1632,7 +1613,7 @@ const MARKS = ['✈️', '🏖️', '⛰️', '🏯', '🍜', '🎒', '🚗', '�
  * 말하고, 이 색은 <b>목록에서</b> 어느 여행인지를 말합니다. 같은 팔레트를
  * 쓰되 만나는 자리가 없습니다.
  */
-function TripMark({ trip, onChanged }: { trip: Trip; onChanged: () => void }) {
+function TripMarkPicker({ trip, onChanged }: { trip: Trip; onChanged: () => void }) {
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
 
@@ -1651,12 +1632,38 @@ function TripMark({ trip, onChanged }: { trip: Trip; onChanged: () => void }) {
     }
   }
 
+  const chosen = trip.theme || trip.emoji;
+
   return (
     <View style={styles.mark}>
-      <Body small strong>
-        이 여행의 표식
-      </Body>
-      <Caption tone="muted">목록에서 이름을 읽기 전에 알아볼 수 있습니다.</Caption>
+      {/*
+        고른 것을 그 자리에서 보여 줍니다.
+
+        <p>색 동그라미에 찍히는 흰 점과 칩의 눌린 모양만으로는, 고르고 나서
+        <b>무엇이 정해졌는지</b>가 안 보였습니다. 정작 이 표식이 쓰이는 데는
+        여행 목록이라 이 화면에는 그 결과가 어디에도 없었습니다.
+
+        <p>목록에 설 모양 그대로를 여기 띄웁니다. 고르는 순간 이름 옆에서
+        바뀌므로 무엇을 고른 것인지 볼 수 있습니다.
+      */}
+      <Split align="center">
+        <Grow gap={1}>
+          <Body small strong>
+            이 여행의 표식
+          </Body>
+          <Caption tone="muted">
+            {chosen
+              ? '내 여행 목록에서 이렇게 보입니다.'
+              : '목록에서 이름을 읽기 전에 알아볼 수 있습니다.'}
+          </Caption>
+        </Grow>
+        <Row gap={Spacing.sm}>
+          <TripMark theme={trip.theme} emoji={trip.emoji} />
+          <Body small numberOfLines={1} tone={chosen ? 'default' : 'muted'}>
+            {trip.title}
+          </Body>
+        </Row>
+      </Split>
 
       <Row gap={Spacing.xs} style={styles.markRow}>
         {/* 빈 글이 "무채색으로" 라는 뜻입니다. null 로 보내면 서버가 그대로
@@ -3582,16 +3589,15 @@ const styles = StyleSheet.create({
   head: {
     gap: Spacing.sm,
   },
-  /* 가로로 흘리는 줄. 끝을 띄워 둬야 마지막 칸이 잘린 것처럼 안 보입니다. */
   shortcuts: {
     flexWrap: 'nowrap',
     alignItems: 'stretch',
-    paddingRight: Spacing.lg,
   },
   shortcut: {
-    /* 늘리지 않습니다. 가로로 흐르는 줄에서 늘어나면 칸마다 폭이 달라져
-       다음 것이 반쯤 걸치는 모양이 안 나옵니다. */
-    width: 78,
+    /* 칸을 고르게 나눠 가집니다. 개수가 하나에서 셋까지 달라지는데
+       그때마다 줄 모양이 저절로 맞습니다. */
+    flex: 1,
+    minWidth: 0,
     alignItems: 'center',
     justifyContent: 'center',
     gap: Spacing.xs,

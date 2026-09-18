@@ -25,6 +25,7 @@ import {
   Subtitle,
   Title,
 } from '@/ui';
+import { TripTabs } from '@/ui/tab-bar';
 
 /**
  * 다녀온 여행을 한 장으로.
@@ -82,7 +83,7 @@ export default function Card() {
   }
 
   return (
-    <Screen>
+    <Screen tabs={<TripTabs tripId={id} active="card" />}>
       <Stack.Screen options={{ title: data.trip.title }} />
 
       <SegmentedTabs items={FACES} value={face} onChange={setFace} />

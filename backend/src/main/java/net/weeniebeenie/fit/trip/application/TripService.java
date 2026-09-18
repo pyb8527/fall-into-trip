@@ -187,19 +187,16 @@ public class TripService {
     }
 
     /**
-     * 이름과 시작일을 고칩니다.
+     * 여행을 고칩니다 — 이름·시작일·색·표식.
      *
-     * 시작일을 옮기면 나머지 날짜도 같은 간격으로 따라 움직입니다. 하루만
+     * <p>시작일을 옮기면 나머지 날짜도 같은 간격으로 따라 움직입니다. 하루만
      * 밀렸는데 날짜를 전부 다시 잡게 하면 번거롭기 때문입니다.
-     */
-    @Transactional
-    /**
-     * 여행을 고칩니다.
      *
      * <p><b>보낸 것만 바뀝니다.</b> {@code null} 인 칸은 손대지 않습니다.
      * 그래서 <b>비우는 것은 빈 글("")</b>입니다 — 색과 표식을 도로 무채색으로
      * 되돌리는 길이 있어야 합니다. 가계부·보석함과 같은 약속입니다.
      */
+    @Transactional
     public void update(AuthPrincipal me, String tripId, String title, String startIso,
                        String theme, String emoji) {
         Trip trip = resolveFor(me, tripId);

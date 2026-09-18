@@ -2,7 +2,7 @@ import { usePathname, useRouter } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Colors, Radius, Spacing, Tap, Type, Weight } from '@/constants/theme';
+import { Colors, Radius, Spacing, TabDock, Tap, Type, Weight } from '@/constants/theme';
 import { Icon, type IconName, Press } from '@/ui';
 
 /**
@@ -138,8 +138,118 @@ export function AppTabs() {
   );
 }
 
+/** 여행 안에서 오갈 수 있는 곳들. 어느 화면에 있든 같은 순서로 섭니다. */
+export type TripTabKey = 'plan' | 'travel' | 'vote' | 'money' | 'card';
+
+/**
+ * 여행 하나의 갈래.
+ *
+ * <h3>왜 여행마다 띠가 바뀌는가</h3>
+ *
+ * <p>여행에 들어오면 그 안에서 오가는 것이 대부분입니다. 바깥 갈래(홈·보석함…)
+ * 를 그대로 두면 정작 자주 쓰는 것들이 다시 화면 어딘가로 흩어집니다.
+ *
+ * <h3>다섯 화면이 같은 띠를 나눠 씁니다</h3>
+ *
+ * <p>일정에만 달아 두었더니 「여행 중」으로 넘어가는 순간 띠가 사라져서,
+ * 거기서 가계부로 가려면 뒤로 → 일정 → 가계부를 밟아야 했습니다. 갈래라고
+ * 해 놓고 한 화면에서만 갈래인 셈이었습니다.
+ *
+ * <p>여기 한 벌만 두고 다섯이 같이 씁니다. 화면이 하나 늘어도 고칠 데는
+ * 여기뿐입니다.
+ *
+ * @param active 지금 이 화면. 그 칸은 눌러도 아무 일이 없습니다 — 같은 곳을
+ *               다시 쌓으면 뒤로가기가 한 번 헛돕니다
+ * @param onTrip 오늘이 이 여행의 날 중 하나인지. 맞으면 「여행 중」에 점을
+ *               찍습니다
+ */
+export function TripTabs({
+  tripId,
+  active,
+  onTrip = false,
+  onBack,
+}: {
+  tripId: string;
+  active: TripTabKey;
+  onTrip?: boolean;
+  /** 나가는 길. 안 주면 일정 화면으로 돌아갑니다. */
+  onBack?: () => void;
+}) {
+  const router = useRouter();
+
+  const go = (path: string) => () => {
+    if (active === 'plan' && path === '/trip/[id]') {
+      return;
+    }
+    /* replace 입니다. 갈래끼리 오가는 것은 <b>같은 층에서 자리를 옮기는
+       일</b>이라, push 로 쌓으면 뒤로가기를 다섯 번 눌러야 여행 밖으로
+       나갑니다. */
+    router.replace({ pathname: path as never, params: { id: tripId } as never });
+  };
+
+  return (
+    <TabBar
+      onBack={onBack ?? (() => router.replace({ pathname: '/trip/[id]', params: { id: tripId } }))}
+      items={[
+        {
+          key: 'plan',
+          label: '일정',
+          icon: 'calendar',
+          active: active === 'plan',
+          onPress: active === 'plan' ? () => {} : go('/trip/[id]'),
+        },
+        {
+          key: 'travel',
+          label: '여행 중',
+          icon: 'flag',
+          active: active === 'travel',
+          dot: onTrip && active !== 'travel',
+          onPress: active === 'travel' ? () => {} : go('/travel/[id]'),
+        },
+        {
+          key: 'vote',
+          label: '가고 싶은 곳',
+          icon: 'thumbs-up',
+          active: active === 'vote',
+          onPress: active === 'vote' ? () => {} : go('/vote/[id]'),
+        },
+        {
+          key: 'money',
+          label: '가계부',
+          icon: 'credit-card',
+          active: active === 'money',
+          onPress: active === 'money' ? () => {} : go('/money/[id]'),
+        },
+        {
+          key: 'card',
+          label: '요약',
+          icon: 'book-open',
+          active: active === 'card',
+          onPress: active === 'card' ? () => {} : go('/card/[id]'),
+        },
+      ]}
+    />
+  );
+}
+
 const styles = StyleSheet.create({
+  /*
+    띠가 앉는 자리.
+
+    <h3>뒤로 지도가 비쳤습니다</h3>
+
+    <p>일정 화면은 지도가 바탕이라, 떠 있는 띠 뒤로 <b>지도가 그대로
+    보였습니다.</b> 흰 판 위에서는 떠 있는 것으로 읽히던 모양이 지도 위에서는
+    지도에 얹힌 조각으로 보입니다.
+
+    <p>띠가 앉는 자리에 바탕색을 깝니다. 화면 아래 한 자락이 지도가 아니라
+    <b>앱의 바닥</b>이라는 것이 보여야, 띠가 그 위에 놓인 것으로 읽힙니다.
+  */
   dock: {
+    backgroundColor: Colors.background,
+    /* 비우라고 알려 준 높이와 실제 높이가 같아야 합니다. 안 맞으면 어떤
+       화면은 띠 뒤로 한 줄이 들어가고 어떤 화면은 쓸데없이 떠 있습니다. */
+    minHeight: TabDock,
     position: 'absolute',
     left: 0,
     right: 0,
