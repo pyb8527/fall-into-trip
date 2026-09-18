@@ -17,7 +17,7 @@ import { TripThumb } from '@/components/trip-thumb';
 import { iconOf, labelOf } from '@/constants/place-icons';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import type { Countdown } from '@/lib/countdown';
-import { countdownIsNear, countdownLabel, countdownOf, todayIso } from '@/lib/countdown';
+import { countdownIsNear, countdownLabel, countdownOf, formatSpan, todayIso } from '@/lib/countdown';
 import {
   Badge,
   Body,
@@ -173,6 +173,18 @@ export default function Home() {
     return { next: left[0] ?? null, left: left.length, total: day.places.length };
   }, [today]);
 
+  /*
+    아래 목록에 낼 셋.
+
+    위 카드에 이미 나온 여행은 뺍니다. 여행 중이든 다음 여행이든 마찬가지
+    입니다 — 같은 제목에 같은 배지가 한 화면에 두 번 있으면 둘 중 무엇이
+    진짜인지 잠깐 헷갈리고, 무엇보다 자리가 아깝습니다.
+  */
+  const shortlist = useMemo(
+    () => (mine?.trips ?? []).filter((t) => t.id !== next?.trip.id).slice(0, 3),
+    [mine, next],
+  );
+
   return (
     <Screen safeTop>
       <View style={styles.head}>
@@ -218,6 +230,20 @@ export default function Home() {
         </Title>
       </View>
 
+      {/*
+        길 위에 있으면 이것이 맨 위입니다.
+
+        <p>메뉴 넷 밑에 있었습니다. 그런데 여행 중에 홈을 여는 것은 하루에
+        몇 번씩 있는 일이고, 그때 찾는 것은 늘 이 줄 하나입니다. 메뉴를
+        지나 내려가야 보이면 그만큼 늦게 찾습니다.
+
+        <p>여행 중일 때만 올립니다. 아직 안 떠난 여행은 지금 할 일이 아니라
+        지난 자리에 그대로 둡니다 — 메뉴가 먼저인 것이 맞습니다.
+      */}
+      {next && next.at.kind === 'going' ? (
+        <NextTrip trip={next.trip} at={next.at} road={road} />
+      ) : null}
+
       {/* 카드가 한 번에 툭 나타나면 화면이 갈아 끼워진 것처럼 보입니다.
           위에서부터 조금씩 늦게 떠오르면 눈이 따라 내려갑니다. */}
       <Row gap={Spacing.md} style={styles.grid}>
@@ -256,16 +282,6 @@ export default function Home() {
             onPress={() => router.push('/(app)/trips?for=money')}
           />
         </Rise>
-        {user?.role === 'ADMIN' ? (
-          <Rise order={4} style={styles.wide}>
-            <MenuCard
-              title="운영"
-              caption="계정 관리·감사 로그"
-              wide
-              onPress={() => router.push('/admin')}
-            />
-          </Rise>
-        ) : null}
       </Row>
 
       {/*
@@ -280,7 +296,10 @@ export default function Home() {
         덤으로 여행을 다 지운 사람에게도 맞는 안내가 됩니다.
       */}
       {mine && mine.trips.length === 0 ? <FirstSteps /> : null}
-      {next ? <NextTrip trip={next.trip} at={next.at} road={road} /> : null}
+      {/* 길 위에 있는 것은 이미 맨 위에 올라가 있습니다. */}
+      {next && next.at.kind !== 'going' ? (
+        <NextTrip trip={next.trip} at={next.at} road={road} />
+      ) : null}
 
       {/*
         내 여행 — 카드 하나에 목록으로.
@@ -306,7 +325,7 @@ export default function Home() {
         <View style={styles.section}>
           <Subtitle>내 여행</Subtitle>
           <Card style={styles.listCard}>
-            {mine.trips.slice(0, 3).map((trip, i) => (
+            {shortlist.map((trip, i) => (
               <View key={trip.id}>
                 {i > 0 ? <Divider /> : null}
                 <Press
@@ -319,16 +338,34 @@ export default function Home() {
                       <Body small strong numberOfLines={1}>
                         {trip.title}
                       </Body>
+                      {/*
+                        날짜와 남은 날을 답니다. 전에는 "3일 · 장소 4곳" 뿐이라
+                        「내 여행」 화면보다 아는 것이 적었습니다 — 같은 것을
+                        보여 주면서 덜 말하면 이 줄을 둘 이유가 없습니다.
+                      */}
                       <Caption tone="muted">
-                        {trip.dayCount}일 · 장소 {trip.placeCount}곳
+                        {[formatSpan(trip.startIso, trip.endIso), `장소 ${trip.placeCount}곳`]
+                          .filter(Boolean)
+                          .join(' · ')}
                       </Caption>
                     </Grow>
-                    <Icon name="chevron-right" size={16} tone="muted" />
+                    {countdownOf(trip.startIso, trip.endIso) ? (
+                      <Badge
+                        label={countdownLabel(countdownOf(trip.startIso, trip.endIso)!)}
+                        tone={
+                          countdownIsNear(countdownOf(trip.startIso, trip.endIso)!)
+                            ? 'brand'
+                            : 'muted'
+                        }
+                      />
+                    ) : (
+                      <Icon name="chevron-right" size={16} tone="muted" />
+                    )}
                   </Split>
                 </Press>
               </View>
             ))}
-            {mine.trips.length > 3 ? (
+            {mine.trips.length > shortlist.length ? (
               <Button
                 label={`${mine.trips.length}개 전체보기`}
                 variant="secondary"
@@ -400,6 +437,12 @@ export default function Home() {
         다섯 줄만 냅니다. 나머지와 갈래별로 거르는 것은 저쪽 화면이 하고,
         홈은 있다는 것만 알립니다.
       */}
+      {/*
+        운영은 맨 아래입니다.
+
+        여행을 짜는 것들과 같은 자리에 두면 같은 무게로 읽힙니다. 관리자만
+        보이는 데다 자주 쓸 것도 아니라, 쓸 일이 있을 때 찾아 내려오면 됩니다.
+      */}
       {top && top.places.length > 0 ? (
         <View style={styles.section}>
           <Subtitle>여럿이 간 곳</Subtitle>
@@ -430,6 +473,14 @@ export default function Home() {
             />
           </Card>
         </View>
+      ) : null}
+      {user?.role === 'ADMIN' ? (
+        <MenuCard
+          title="운영"
+          caption="계정 관리·감사 로그"
+          wide
+          onPress={() => router.push('/admin')}
+        />
       ) : null}
     </Screen>
   );

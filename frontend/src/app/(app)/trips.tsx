@@ -9,7 +9,7 @@ import { useAuth } from '@/auth/auth-provider';
 import { FolderSheet } from '@/components/folder-sheet';
 import { TripForm } from '@/components/trip-form';
 import { Colors, Radius, Spacing } from '@/constants/theme';
-import { countdownIsNear, countdownLabel, countdownOf, todayIso } from '@/lib/countdown';
+import { countdownIsNear, countdownLabel, countdownOf, formatNights, formatSpan, todayIso } from '@/lib/countdown';
 import {
   Badge,
   Body,
@@ -295,7 +295,7 @@ function TripRow({
       <View style={styles.grow}>
         <ListRow
           title={trip.title}
-          subtitle={`${formatRange(trip.startIso, trip.endIso)} · ${trip.dayCount}일 · 장소 ${trip.placeCount}곳`}
+          subtitle={`${formatSpan(trip.startIso, trip.endIso)} · ${formatNights(trip.dayCount)} · 장소 ${trip.placeCount}곳`}
           right={
             <Row gap={Spacing.xs}>
               {countdownBadge(trip.startIso, trip.endIso)}
@@ -381,15 +381,6 @@ function byWhen(trips: TripSummary[]): Section[] {
   ].filter((s) => s.trips.length > 0);
 }
 
-function formatRange(start: string | null, end: string | null) {
-  if (!start) {
-    return '아직 날짜 없음';
-  }
-  if (!end || end === start) {
-    return start;
-  }
-  return `${start} ~ ${end}`;
-}
 
 const styles = StyleSheet.create({
   /* 폴더를 늘어놓는 선반. 좁은 폰에서는 두 칸, 넓으면 더 들어갑니다. */

@@ -1170,72 +1170,81 @@ export default function TripScreen() {
         {/*
           가끔 쓰는 것들.
 
-          맨 아래에 두었더니 날짜가 여럿인 여행에서는 한참 굴려야 닿아서, 있는
-          줄도 모르고 지나갔습니다. 판을 열면 바로 보이는 자리로 올립니다.
+          <h3>일곱 개가 일정을 밀어냈습니다</h3>
+
+          <p>이 화면의 주인공은 일정입니다. 그런데 칸 다섯에 다음 줄 둘이
+          얹혀 판을 열자마자 보이는 것의 절반을 먹었고, 둘째 줄에 두 개만
+          남은 모양도 어색했습니다.
+
+          <p>한 줄로 흘립니다. 앞의 넷이 온전히 보이고 다음 것이 반쯤 걸쳐
+          있어, 더 있다는 것이 눈으로 읽힙니다 — 접어 숨기면 있는 줄도
+          모르고 지나가는데 그건 이 화면이 이미 겪은 일입니다.
+
+          <h3>이름은 기능이 드러나게</h3>
+
+          <p>"내놓기"·"추억" 은 눌러 보기 전에는 무엇인지 몰랐습니다. 재치
+          있는 말은 화면 안 제목과 설명에 두고, <b>단추 이름은 무슨 일이
+          일어나는지</b>를 적습니다. 카피가 사라지는 것이 아니라 제자리를
+          찾아가는 것입니다.
         */}
-        <Row gap={Spacing.xs} style={styles.shortcuts}>
-          {/*
-            길 위에서는 짜는 화면이 방해입니다. 지금 갈 곳만 크게 보는 쪽으로
-            넘어갑니다.
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <Row gap={Spacing.xs} style={styles.shortcuts}>
+            {/*
+              길 위에서는 짜는 화면이 방해입니다. 지금 갈 곳만 크게 보는
+              쪽으로 넘어갑니다.
 
-            오늘이 이 여행의 날 중 하나면 맨 앞에 둡니다. 그날 이 화면에서
-            가장 먼저 누를 것이 그것입니다. 아니면 하던 자리(검색 다음)에
-            그대로 둡니다 — 짜는 동안에는 자주 쓸 것이 아닙니다.
-
-            이름이 "스탬프 찍기" 였습니다. 나머지가 전부 자리나 물건인데
-            (투표장·챙길 것·가계부·추억) 이것만 손짓이라, 어디로 가는
-            단추인지 안 읽혔습니다. 앱이 이미 쓰는 말로 바꿉니다 — 홈이
-            "지금 그 길 위" 라고 적고 있습니다.
-
-            그림도 바꿉니다. 체크 표시는 "챙길 것" 이 쓰고 있어서 둘이
-            같았고, 그 화면이 일부러 피한 것이 바로 그 읽힘입니다 —
-            "들르는 것은 처리한 일이 아니라 갔다 온 자리".
-          */}
-          {onTrip ? (
+              오늘이 이 여행의 날 중 하나면 맨 앞에 둡니다. 그날 이 화면에서
+              가장 먼저 누를 것이 그것입니다.
+            */}
+            {onTrip ? (
+              <Shortcut
+                icon="flag"
+                label="여행 중"
+                onPress={() => router.push({ pathname: '/travel/[id]', params: { id } })}
+              />
+            ) : null}
+            {/* 갈 곳의 이름을 알아야만 넣을 수 있었습니다. "비 올 때 갈 만한
+                실내" 는 적을 데가 없어서, 블로그를 뒤져 이름을 알아낸 다음에야
+                여기로 돌아와야 했습니다. */}
+            {canEdit ? (
+              <Shortcut icon="search" label="어디 갈까" onPress={() => setAsking(true)} />
+            ) : null}
+            {/* 아직 정하지 않은 곳은 일정이 아니라 여기에 모입니다. */}
             <Shortcut
-              icon="flag"
-              label="길 위에서"
-              onPress={() => router.push({ pathname: '/travel/[id]', params: { id } })}
+              icon="star"
+              label="가고 싶은 곳"
+              onPress={() => router.push({ pathname: '/vote/[id]', params: { id } })}
             />
-          ) : null}
-          {/* 갈 곳의 이름을 알아야만 넣을 수 있었습니다. "비 올 때 갈 만한
-              실내" 는 적을 데가 없어서, 블로그를 뒤져 이름을 알아낸 다음에야
-              여기로 돌아와야 했습니다. */}
-          {canEdit ? (
-            <Shortcut icon="search" label="어디 갈까" onPress={() => setAsking(true)} />
-          ) : null}
-          {onTrip ? null : (
+            {/* 떠나기 전에 서로 "그거 챙겼어?" 를 몇 번씩 묻게 됩니다. */}
+            <Shortcut icon="check" label="챙길 것" onPress={() => setPacking(true)} />
+            {/* 여행에서 서로 껄끄러워지는 자리는 돈입니다. 쓴 김에 적어 두면
+                돌아와서 카톡을 거슬러 올라갈 일이 없습니다. */}
             <Shortcut
-              icon="flag"
-              label="길 위에서"
-              onPress={() => router.push({ pathname: '/travel/[id]', params: { id } })}
+              icon="credit-card"
+              label="가계부"
+              onPress={() => router.push({ pathname: '/money/[id]', params: { id } })}
             />
-          )}
-          {/* 아직 정하지 않은 곳은 일정이 아니라 여기에 모입니다. */}
-          <Shortcut
-            icon="star"
-            label="투표장"
-            onPress={() => router.push({ pathname: '/vote/[id]', params: { id } })}
-          />
-          {/* 떠나기 전에 서로 "그거 챙겼어?" 를 몇 번씩 묻게 됩니다. */}
-          <Shortcut icon="check" label="챙길 것" onPress={() => setPacking(true)} />
-          {/* 여행에서 서로 껄끄러워지는 자리는 돈입니다. 쓴 김에 적어 두면
-              돌아와서 카톡을 거슬러 올라갈 일이 없습니다. */}
-          <Shortcut
-            icon="credit-card"
-            label="가계부"
-            onPress={() => router.push({ pathname: '/money/[id]', params: { id } })}
-          />
-          <Shortcut
-            icon="bookmark"
-            label="추억"
-            onPress={() => router.push({ pathname: '/card/[id]', params: { id } })}
-          />
-          {/* 올리는 것은 주인만 할 수 있습니다. 서버도 그렇게 막습니다. */}
-          {mine ? (
-            <Shortcut icon="upload" label="내놓기" onPress={() => setPublishing(true)} />
-          ) : null}
-        </Row>
+            {/* "추억" 이었습니다. 실제로 여는 것은 영수증과 동선 다시보기라,
+                이름이 그 둘 중 어느 것도 가리키지 않았습니다. */}
+            <Shortcut
+              icon="bookmark"
+              label="여행 요약"
+              onPress={() => router.push({ pathname: '/card/[id]', params: { id } })}
+            />
+            {onTrip ? null : (
+              <Shortcut
+                icon="flag"
+                label="여행 중"
+                onPress={() => router.push({ pathname: '/travel/[id]', params: { id } })}
+              />
+            )}
+            {/* "내놓기" 였습니다. 무엇을 어디에 내놓는지가 안 읽혔습니다.
+                올리는 것은 주인만 할 수 있습니다 — 서버도 그렇게 막습니다. */}
+            {mine ? (
+              <Shortcut icon="upload" label="글 올리기" onPress={() => setPublishing(true)} />
+            ) : null}
+          </Row>
+        </ScrollView>
 
         {days.length === 0 ? <Empty message="아직 날짜가 없습니다." /> : null}
 
@@ -3284,12 +3293,16 @@ const styles = StyleSheet.create({
   head: {
     gap: Spacing.sm,
   },
+  /* 가로로 흘리는 줄. 끝을 띄워 둬야 마지막 칸이 잘린 것처럼 안 보입니다. */
   shortcuts: {
+    flexWrap: 'nowrap',
     alignItems: 'stretch',
+    paddingRight: Spacing.lg,
   },
   shortcut: {
-    flexGrow: 1,
-    flexBasis: 72,
+    /* 늘리지 않습니다. 가로로 흐르는 줄에서 늘어나면 칸마다 폭이 달라져
+       다음 것이 반쯤 걸치는 모양이 안 나옵니다. */
+    width: 78,
     alignItems: 'center',
     justifyContent: 'center',
     gap: Spacing.xs,

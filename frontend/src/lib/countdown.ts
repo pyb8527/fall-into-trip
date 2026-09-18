@@ -113,3 +113,62 @@ export function ago(at: number) {
   const hours = Math.round(minutes / 60);
   return hours < 24 ? `${hours}시간 전` : `${Math.round(hours / 24)}일 전`;
 }
+
+/**
+ * 날짜 하나를 사람이 읽는 말로. "9.14(월)".
+ *
+ * <h3>왜 여기 두는가</h3>
+ *
+ * <p>화면마다 따로 적고 있었습니다. 여행 목록은 <code>2026-09-14 ~ 2026-09-18</code>
+ * 을 그대로 내놓았고, 일정은 서버가 만든 <code>10.08 (목)</code> 을 썼습니다.
+ * 같은 앱에서 같은 것이 세 가지 모양으로 보였고, 그중 하나는 사람이 읽는
+ * 글자가 아니라 저장된 값이었습니다.
+ *
+ * <h3>올해는 안 적습니다</h3>
+ *
+ * <p>대개 올해나 내년 여행입니다. 네 자리 연도를 늘 달아 두면 읽을 것만
+ * 늘고, 정작 다른 해일 때 그것이 눈에 안 띕니다. 다른 해일 때만 적습니다.
+ */
+export function formatDay(iso: string | null | undefined): string {
+  if (!iso) {
+    return '';
+  }
+  const at = new Date(`${iso}T00:00:00`);
+  if (Number.isNaN(at.getTime())) {
+    return '';
+  }
+  const week = ['일', '월', '화', '수', '목', '금', '토'][at.getDay()];
+  const head = at.getFullYear() === new Date().getFullYear() ? '' : `${at.getFullYear()}. `;
+  return `${head}${at.getMonth() + 1}.${at.getDate()}(${week})`;
+}
+
+/**
+ * 하루부터 하루까지. "9.14(월) – 9.18(금)".
+ *
+ * <p>가운데는 하이픈이 아니라 엔 대시입니다. 하이픈은 글자에 붙어 "9.14-9.18"
+ * 처럼 한 덩어리로 읽히는데, 이것은 두 날짜 사이의 <b>동안</b>입니다.
+ */
+export function formatSpan(start: string | null, end: string | null): string {
+  if (!start) {
+    return '아직 날짜 없음';
+  }
+  if (!end || end === start) {
+    return formatDay(start);
+  }
+  return `${formatDay(start)} – ${formatDay(end)}`;
+}
+
+/**
+ * 며칠짜리인지. "4박 5일".
+ *
+ * <p>"5일" 이라고만 적고 있었습니다. 한국에서 여행 길이를 말할 때 쓰는 말은
+ * 박과 일을 함께 세는 쪽이고, 숙소를 몇 밤 잡아야 하는지가 거기 들어 있습니다.
+ *
+ * <p>당일치기는 박이 없습니다. "0박 1일" 은 말이 안 되므로 그때만 다릅니다.
+ */
+export function formatNights(dayCount: number): string {
+  if (dayCount <= 1) {
+    return '당일';
+  }
+  return `${dayCount - 1}박 ${dayCount}일`;
+}
