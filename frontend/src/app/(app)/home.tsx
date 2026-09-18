@@ -13,6 +13,7 @@ import type {
 } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
+import { TripMark } from '@/components/trip-mark';
 import { TripThumb } from '@/components/trip-thumb';
 import { iconOf, labelOf } from '@/constants/place-icons';
 import { Colors, Radius, Spacing } from '@/constants/theme';
@@ -342,7 +343,9 @@ export default function Home() {
                   accessibilityLabel={`${trip.title} 열기`}
                   style={styles.listRow}>
                   <Split>
-                    <Grow gap={1}>
+                    <Row gap={Spacing.sm} style={styles.grow}>
+                      <TripMark theme={trip.theme} emoji={trip.emoji} />
+                      <Grow gap={1}>
                       <Body small strong numberOfLines={1}>
                         {trip.title}
                       </Body>
@@ -356,7 +359,8 @@ export default function Home() {
                           .filter(Boolean)
                           .join(' · ')}
                       </Caption>
-                    </Grow>
+                      </Grow>
+                    </Row>
                     {countdownOf(trip.startIso, trip.endIso) ? (
                       <Badge
                         label={countdownLabel(countdownOf(trip.startIso, trip.endIso)!)}

@@ -22,6 +22,7 @@ import type { Companion,Day,
   PlaceInfo,
   Spend,
   TravelMode,
+  Trip,
   TripDetail,
 } from '@/api/types';
 import { useAsync } from '@/api/use-async';
@@ -51,7 +52,7 @@ import { canPrint, printItinerary } from '@/lib/print';
 import { useHere } from '@/lib/here';
 import { decodePolyline } from '@/lib/polyline';
 import { DateField } from '@/ui/date-field';
-import { Colors, dayColor, Gutter, Radius, Spacing, Tap } from '@/constants/theme';
+import { Colors, DayColors, dayColor, Gutter, Radius, Spacing, Tap } from '@/constants/theme';
 import {
   Body,
   BottomSheet,
@@ -1322,6 +1323,13 @@ export default function TripScreen() {
           ) : null,
         )}
 
+        {canEdit ? (
+          <>
+            <Divider />
+            <TripMark trip={data.trip} onChanged={refresh} />
+          </>
+        ) : null}
+
         {/*
           같은 데를 또 가는 일은 흔합니다. 매년 가는 곳, 이번엔 다른 사람과
           가는 곳. 그때마다 스무 곳을 다시 찾아 넣게 하면 그 자체가 일입니다.
@@ -1494,6 +1502,105 @@ export default function TripScreen() {
           }
         }}
       />
+    </View>
+  );
+}
+
+/** 고를 수 있는 표식. 여행에 흔한 것부터. */
+const MARKS = ['✈️', '🏖️', '⛰️', '🏯', '🍜', '🎒', '🚗', '🚆', '🌸', '❄️', '🎡', '🐟'];
+
+/**
+ * 이 여행을 가리키는 색과 표식.
+ *
+ * <h3>왜 필요한가</h3>
+ *
+ * <p>목록에서 여행 넷이 나란히 서면 전부 같은 흰 줄이라, <b>이름을 읽어야만</b>
+ * 어느 것인지 압니다. 매년 가는 곳이면 이름까지 비슷합니다("오사카",
+ * "오사카 2"). 색과 표식은 이름을 읽기 전에 눈에 걸립니다.
+ *
+ * <h3>안 정해도 됩니다</h3>
+ *
+ * <p>기본값을 억지로 주지 않습니다. 새 여행마다 색이 자동으로 붙으면 정한
+ * 것과 안 정한 것을 구별할 수 없고, 정하는 일 자체가 뜻을 잃습니다. 안 정한
+ * 것은 지금까지처럼 무채색입니다.
+ *
+ * <h3>날짜 띠와 같은 여덟 가지</h3>
+ *
+ * <p>아무 색이나 고르게 하면 흰 글씨가 안 읽히는 색과 코랄에 붙는 색이
+ * 들어옵니다. 서버도 이 여덟 가지만 받습니다.
+ *
+ * <p>색이 뜻을 겹치지는 않습니다. 날짜 색은 <b>여행 안에서</b> 며칟날인지를
+ * 말하고, 이 색은 <b>목록에서</b> 어느 여행인지를 말합니다. 같은 팔레트를
+ * 쓰되 만나는 자리가 없습니다.
+ */
+function TripMark({ trip, onChanged }: { trip: Trip; onChanged: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
+
+  /* 고르면 바로 저장합니다. 따로 저장 단추를 두면 두 번 눌러야 하는데,
+     그러기에는 되돌리기 쉬운 일입니다. */
+  async function save(patch: { theme?: string; emoji?: string }) {
+    setBusy(true);
+    setFailed(null);
+    try {
+      await api.patch(`/api/trips/${trip.id}`, patch);
+      onChanged();
+    } catch (e) {
+      setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <View style={styles.mark}>
+      <Body small strong>
+        이 여행의 표식
+      </Body>
+      <Caption tone="muted">목록에서 이름을 읽기 전에 알아볼 수 있습니다.</Caption>
+
+      <Row gap={Spacing.xs} style={styles.markRow}>
+        {/* 빈 글이 "무채색으로" 라는 뜻입니다. null 로 보내면 서버가 그대로
+            두므로 되돌릴 길이 없어집니다. */}
+        <Press
+          onPress={() => save({ theme: '' })}
+          disabled={busy}
+          accessibilityLabel="색 없이"
+          style={[styles.swatch, styles.swatchNone, !trip.theme ? styles.swatchOn : null]}>
+          <Icon name="minus" size={14} tone="muted" />
+        </Press>
+        {DayColors.map((color) => (
+          <Press
+            key={color}
+            onPress={() => save({ theme: color })}
+            disabled={busy}
+            accessibilityLabel={`${color} 색으로`}
+            accessibilityState={{ selected: trip.theme === color }}
+            style={[
+              styles.swatch,
+              { backgroundColor: color },
+              trip.theme === color ? styles.swatchOn : null,
+            ]}>
+            {/* 흰 점 하나. 색 위에 얹는 그림은 색마다 읽히는 정도가 달라
+                지는데, 흰색은 이 여덟 가지 위에서 전부 읽힙니다. */}
+            {trip.theme === color ? <View style={styles.swatchDot} /> : null}
+          </Press>
+        ))}
+      </Row>
+
+      <Row gap={Spacing.xs} style={styles.markRow}>
+        <Chip label="없이" selected={!trip.emoji} onPress={() => save({ emoji: '' })} />
+        {MARKS.map((mark) => (
+          <Chip
+            key={mark}
+            label={mark}
+            selected={trip.emoji === mark}
+            onPress={() => save({ emoji: trip.emoji === mark ? '' : mark })}
+          />
+        ))}
+      </Row>
+
+      {failed ? <ErrorNote message={failed} /> : null}
     </View>
   );
 }
@@ -3302,6 +3409,34 @@ const styles = StyleSheet.create({
     /* 옆으로 흐르는 띠라 높이를 내용만큼만 잡습니다. 안 잡으면 남은 화면을
        전부 차지해 지도를 못 누릅니다. */
     flexGrow: 0,
+  },
+  mark: {
+    gap: Spacing.sm,
+  },
+  markRow: {
+    flexWrap: 'wrap',
+  },
+  /* 색 자체가 무엇인지 말하므로 안에 글자를 두지 않습니다. 고른 것에만
+     체크가 들어갑니다 — 테두리만으로는 여덟 개 중 어느 것인지 헷갈립니다. */
+  swatch: {
+    width: Tap.min,
+    height: Tap.min,
+    borderRadius: Radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  swatchNone: {
+    backgroundColor: Colors.fill,
+  },
+  swatchDot: {
+    width: 10,
+    height: 10,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.surface,
+  },
+  swatchOn: {
+    borderWidth: 2,
+    borderColor: Colors.text,
   },
   /* 띠는 지도 폭을 다 쓰지 않습니다. 양옆 여백은 화면의 다른 것들과 같게. */
   snackRail: {

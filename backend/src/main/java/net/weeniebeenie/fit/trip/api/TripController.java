@@ -131,7 +131,7 @@ public class TripController {
     public Map<String, Object> update(@CurrentUser AuthPrincipal me,
                                       @PathVariable String id,
                                       @RequestBody UpdateTripRequest req) {
-        trips.update(me, id, req.title(), req.startIso());
+        trips.update(me, id, req.title(), req.startIso(), req.theme(), req.emoji());
         return Map.of("ok", true);
     }
 

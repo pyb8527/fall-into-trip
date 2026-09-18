@@ -6,6 +6,7 @@ import { api } from '@/api/client';
 import type { Folder, TripSummary } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
+import { TripMark } from '@/components/trip-mark';
 import { FolderSheet } from '@/components/folder-sheet';
 import { TripForm } from '@/components/trip-form';
 import { Colors, Radius, Spacing } from '@/constants/theme';
@@ -294,6 +295,7 @@ function TripRow({
     <Row style={styles.row}>
       <View style={styles.grow}>
         <ListRow
+          left={<TripMark theme={trip.theme} emoji={trip.emoji} />}
           title={trip.title}
           subtitle={`${formatSpan(trip.startIso, trip.endIso)} · ${formatNights(trip.dayCount)} · 장소 ${trip.placeCount}곳`}
           right={

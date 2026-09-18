@@ -43,6 +43,15 @@ export type TripSummary = {
   ownerId: string;
   /** 내가 넣어 둔 폴더. 폴더는 보는 사람 것이라 사람마다 다릅니다. */
   folderId: Maybe<string>;
+  /**
+   * 목록에서 이 여행을 가리키는 색. 안 정했으면 비어 있습니다.
+   *
+   * <p>날짜 띠가 쓰는 여덟 가지 중 하나입니다. 기본값이 없습니다 — 있으면
+   * 정한 것과 안 정한 것을 구별할 수 없습니다.
+   */
+  theme: Maybe<string>;
+  /** 이름 앞에 붙는 표식 하나. 안 정했으면 비어 있습니다. */
+  emoji: Maybe<string>;
   startIso: string | null;
   endIso: string | null;
   dayCount: number;
@@ -53,6 +62,15 @@ export type Trip = {
   id: string;
   title: string;
   ownerId: string;
+  /**
+   * 목록에서 이 여행을 가리키는 색. 안 정했으면 비어 있습니다.
+   *
+   * <p>날짜 띠가 쓰는 여덟 가지 중 하나입니다. 기본값이 없습니다 — 있으면
+   * 정한 것과 안 정한 것을 구별할 수 없습니다.
+   */
+  theme: Maybe<string>;
+  /** 이름 앞에 붙는 표식 하나. 안 정했으면 비어 있습니다. */
+  emoji: Maybe<string>;
   createdAt: string;
 };
 

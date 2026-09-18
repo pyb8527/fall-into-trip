@@ -44,6 +44,7 @@ public class TripService {
             List<Day> dayList = days.findAllByTripIdOrderBySortAsc(trip.getId());
             return new TripSummary(
                     trip.getId(), trip.getTitle(), trip.getOwnerId(),
+                    trip.getTheme(), trip.getEmoji(),
                     dayList.isEmpty() ? null : dayList.get(0).getIso(),
                     dayList.isEmpty() ? null : dayList.get(dayList.size() - 1).getIso(),
                     dayList.size(),
@@ -192,7 +193,15 @@ public class TripService {
      * 밀렸는데 날짜를 전부 다시 잡게 하면 번거롭기 때문입니다.
      */
     @Transactional
-    public void update(AuthPrincipal me, String tripId, String title, String startIso) {
+    /**
+     * 여행을 고칩니다.
+     *
+     * <p><b>보낸 것만 바뀝니다.</b> {@code null} 인 칸은 손대지 않습니다.
+     * 그래서 <b>비우는 것은 빈 글("")</b>입니다 — 색과 표식을 도로 무채색으로
+     * 되돌리는 길이 있어야 합니다. 가계부·보석함과 같은 약속입니다.
+     */
+    public void update(AuthPrincipal me, String tripId, String title, String startIso,
+                       String theme, String emoji) {
         Trip trip = resolveFor(me, tripId);
         access.requireCanEdit(trip.getId(), me.id());
 
@@ -213,6 +222,20 @@ public class TripService {
                 dayList.get(i).setDate(DayLabels.display(moved));
             }
         }
+        if (theme != null) {
+            trip.setTheme(DayLabels.pickColor(theme));
+        }
+        if (emoji != null) {
+            /* 글자 수로 자르지 않습니다. 이모지 하나가 코드포인트 여럿으로
+               이뤄지는 일이 흔해서(국기·가족·피부색), 가운데를 자르면 깨진
+               조각이 남습니다. 너무 길면 통째로 물립니다. */
+            String clean = emoji.trim();
+            if (clean.length() > 16) {
+                throw ApiException.badRequest("표식이 너무 깁니다.");
+            }
+            trip.setEmoji(clean.isEmpty() ? null : clean);
+        }
+
         audit.log(me.id(), "trip.update", trip.getId(),
                 Map.of("title", String.valueOf(title), "startIso", String.valueOf(startIso)));
     }
@@ -231,6 +254,7 @@ public class TripService {
     }
 
     public record TripSummary(String id, String title, String ownerId,
+                              String theme, String emoji,
                               LocalDate startIso, LocalDate endIso,
                               int dayCount, int placeCount) {
     }

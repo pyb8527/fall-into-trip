@@ -35,6 +35,29 @@ public final class DayLabels {
      * <p>이제 여덟 색이 서로 최소 ΔE 40 만큼 떨어져 있고, 모두 흰 글씨를
      * 얹어도 읽힐 만큼 진하며, 강조색과도 ΔE 33 이상 멉니다.
      */
+    /**
+     * 고를 수 있는 색인가.
+     *
+     * <p>날짜 띠와 여행 표식이 같은 여덟 가지를 씁니다. 화면이 보내 온
+     * 값을 그대로 저장하면 흰 글씨가 안 읽히는 색이나 코랄에 붙는 색이
+     * 들어오는데, 그때는 이미 늦습니다.
+     *
+     * @return 우리 팔레트에 있으면 그 값, 비었으면 {@code null}
+     * @throws ApiException 우리 것이 아닌 색이면
+     */
+    public static String pickColor(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String want = value.trim();
+        for (String known : COLORS) {
+            if (known.equalsIgnoreCase(want)) {
+                return known;
+            }
+        }
+        throw ApiException.badRequest("고를 수 없는 색입니다.");
+    }
+
     public static final String[] COLORS = {
             "#3182f6", "#e8590c", "#0ca678", "#9c36b5",
             "#0b7285", "#8b5a2b", "#5c7f1a", "#7b2d4e"

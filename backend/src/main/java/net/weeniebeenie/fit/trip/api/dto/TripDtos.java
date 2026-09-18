@@ -59,7 +59,13 @@ public final class TripDtos {
         }
     }
 
-    public record UpdateTripRequest(String title, String startIso) {
+    /**
+     * @param theme 목록에서 이 여행을 가리키는 색. 날짜 띠가 쓰는 여덟 가지
+     *              중 하나. 빈 글이면 무채색으로 되돌립니다
+     * @param emoji 이름 앞에 붙는 표식. 빈 글이면 뗍니다
+     */
+    public record UpdateTripRequest(String title, String startIso,
+                                    String theme, String emoji) {
     }
 
     public record CreateDayRequest(String tripId, String iso, String label, String shortName) {
@@ -83,19 +89,23 @@ public final class TripDtos {
      * @param folderId 이 사람이 넣어 둔 폴더. 안 넣었으면 비어 있습니다.
      */
     public record TripSummaryView(String id, String title, String ownerId, String folderId,
+                                  String theme, String emoji,
                                   LocalDate startIso, LocalDate endIso,
                                   int dayCount, int placeCount) {
 
         public static TripSummaryView of(TripService.TripSummary s, String folderId) {
             return new TripSummaryView(s.id(), s.title(), s.ownerId(), folderId,
+                    s.theme(), s.emoji(),
                     s.startIso(), s.endIso(), s.dayCount(), s.placeCount());
         }
     }
 
-    public record TripView(String id, String title, String ownerId, Instant createdAt) {
+    public record TripView(String id, String title, String ownerId,
+                           String theme, String emoji, Instant createdAt) {
 
         public static TripView of(Trip t) {
-            return new TripView(t.getId(), t.getTitle(), t.getOwnerId(), t.getCreatedAt());
+            return new TripView(t.getId(), t.getTitle(), t.getOwnerId(),
+                    t.getTheme(), t.getEmoji(), t.getCreatedAt());
         }
     }
 
