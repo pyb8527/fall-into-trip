@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import type { MapPlace, TripMapProps } from '@/components/map-types';
 import { gmaps, hasMaps, loadMaps } from '@/lib/gmaps.web';
@@ -285,6 +285,7 @@ export function TripMap({
   activeId,
   onSelect,
   routes,
+  routesPending = false,
   here,
   mates,
   notes,
@@ -562,7 +563,9 @@ export function TripMap({
       );
     });
 
-    if (link) {
+    /* 묻고 있는 동안에는 점선도 안 그립니다. 점선은 "길을 못 찾았다" 는
+       뜻인데, 찾는 중에 그렇게 말하면 틀린 말입니다. */
+    if (link && !routesPending) {
       /* 실제 경로가 덮은 구간. id 는 "떠나는곳-닿는곳" 입니다. */
       const covered = new Set(drawn.map((r) => r.id));
       const byDay = new Map<number, MapPlace[]>();
@@ -637,7 +640,7 @@ export function TripMap({
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, places, routes, link]);
+  }, [ready, places, routes, link, routesPending]);
 
   /*
     동행자와 임시 핀.
@@ -973,6 +976,15 @@ export function TripMap({
         </View>
       ) : null}
 
+      {/* 지도 위에서 말합니다. 판 안 목록에도 같은 안내가 있지만, 판을
+          내리고 지도를 보는 동안에는 그것이 안 보입니다. */}
+      {routesPending ? (
+        <View style={styles.pending} pointerEvents="none">
+          <ActivityIndicator size="small" color={Colors.textSecondary} />
+          <Caption tone="secondary">길 찾는 중</Caption>
+        </View>
+      ) : null}
+
       {chosen ? <PlaceSheet place={chosen} onClose={() => setSheetId(null)} /> : null}
     </div>
   );
@@ -1047,6 +1059,21 @@ const styles = StyleSheet.create({
     top: Spacing.md,
     right: Spacing.md,
     /* 지도가 만든 층 위로 올려야 눌립니다. */
+    zIndex: 2,
+  },
+  /* 지도 한가운데 위쪽. 왼쪽 위는 날짜 띠가, 오른쪽 위는 단추들이,
+     아래쪽은 판이 씁니다. 남는 자리가 여기뿐입니다. */
+  pending: {
+    position: 'absolute',
+    top: Spacing.md,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.md,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.surface,
     zIndex: 2,
   },
   chip: {

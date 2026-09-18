@@ -348,9 +348,21 @@ export default function TripScreen() {
   /* 판이 지금 몇 픽셀을 덮고 있는지. 지도가 이것을 알아야 고른 핀을 판에
      가리지 않는 자리에 놓습니다. */
   const [covered, setCovered] = useState(0);
+  /** 단추 줄이 실제로 몇 픽셀인지. 판을 내렸을 때 여기까지 보입니다. */
+  const [railTall, setRailTall] = useState(0);
   const { undo, show: showUndo, hide: hideUndo } = useUndo();
   /* "내 위치로" 를 누른 횟수. 값이 바뀌면 지도가 그리로 갑니다. 자리가 아니라
      "눌렀다" 는 것만 넘겨야 같은 자리를 두 번 눌러도 두 번 다 움직입니다. */
+  /*
+    이동 시간을 볼지.
+
+    <p>켜 둔 채로 시작합니다. 쓸모 있는 값이고, 처음 여는 사람에게 숨겨
+    두면 그런 것이 있는 줄도 모릅니다.
+
+    <p>이 화면을 보는 동안만 기억합니다. 렌터카로 도는 날이나 이미 아는
+    동네에서 잠깐 걷어 두는 것이지, 계정에 새겨 둘 만한 일이 아닙니다.
+  */
+  const [showGaps, setShowGaps] = useState(true);
   const [goHereAt, setGoHereAt] = useState(0);
   /** 십자 옆에 위치 공유·깃발을 펼쳐 두었는지. */
   const [tools, setTools] = useState(false);
@@ -571,13 +583,15 @@ export default function TripScreen() {
     error: gapError,
   } = useAsync<{ gaps: Gap[]; note?: string | null }>(
     (signal) =>
-      dayId
+      dayId && showGaps
         ? api.get<{ gaps: Gap[]; note?: string | null }>(
             `/api/days/${dayId}/route/compare`,
             signal,
           )
-        : Promise.resolve({ gaps: [], note: null }),
-    [dayId, daySeq],
+        : /* 꺼 두었으면 부르지도 않습니다. 구간마다 수단마다 구글에 묻는
+             호출이라, 안 보는 것을 사 올 이유가 없습니다. */
+          Promise.resolve({ gaps: [], note: null }),
+    [dayId, daySeq, showGaps],
   );
   const gaps = compared?.gaps ?? null;
   /*
@@ -615,14 +629,34 @@ export default function TripScreen() {
     [picked],
   );
 
-  /** 고른 수단의 길만 지도에 그립니다. 셋을 다 그리면 어느 것이 진짜인지 모릅니다. */
+  /**
+   * 고른 수단의 길만 지도에 그립니다. 셋을 다 그리면 어느 것이 진짜인지 모릅니다.
+   *
+   * <h3>지난 날의 길이 남아 있었습니다</h3>
+   *
+   * <p>날짜를 바꾸면 장소는 곧바로 바뀌는데 구간은 다시 물어봐야 합니다.
+   * 그동안 {@code gaps} 에는 <b>직전 날의 것</b>이 그대로 들어 있습니다 —
+   * 다시 읽는 동안 화면을 비우지 않는 것이 useAsync 의 뜻이고, 목록에서는
+   * 그것이 맞습니다.
+   *
+   * <p>그런데 지도에서는 아니었습니다. 어제의 실선이 그대로 그려진 채,
+   * 오늘 구간에는 아직 길이 없으니 점선까지 얹혔습니다. 두 날의 길이 한
+   * 지도에 겹쳐 있었던 것입니다.
+   *
+   * <p>지금 보고 있는 날의 장소에서 출발하는 구간만 씁니다. 어제 것은
+   * 여기서 걸러지므로, 다시 읽는 동안에는 아예 아무 길도 안 그립니다.
+   */
   const routeLines = useMemo<RouteLine[]>(() => {
     if (dayIndex < 0) {
       return [];
     }
+    const here = new Set((days[dayIndex]?.places ?? []).map((p) => p.id));
     const color = days[dayIndex]?.color || dayColor(dayIndex);
     const out: RouteLine[] = [];
     for (const gap of gaps ?? []) {
+      if (!here.has(gap.fromId) || !here.has(gap.toId)) {
+        continue;
+      }
       const option = chosenOf(gap);
       if (option?.polyline) {
         out.push({
@@ -635,7 +669,16 @@ export default function TripScreen() {
     return out;
   }, [gaps, chosenOf, dayIndex, days]);
 
-  const gapAfter = useMemo(() => new Map((gaps ?? []).map((g) => [g.fromId, g])), [gaps]);
+  /* 구간 정보도 같은 이유로 거릅니다. 어제 구간이 오늘 줄 밑에 붙으면
+     "버스 12분" 이 엉뚱한 두 곳 사이의 값이 됩니다. */
+  const gapAfter = useMemo(() => {
+    const here = dayIndex >= 0 ? new Set((days[dayIndex]?.places ?? []).map((p) => p.id)) : null;
+    return new Map(
+      (gaps ?? [])
+        .filter((g) => !here || (here.has(g.fromId) && here.has(g.toId)))
+        .map((g) => [g.fromId, g]),
+    );
+  }, [gaps, dayIndex, days]);
 
   /*
     이 날 장소들이 언제 문을 여는지. 월요일 휴관을 모르고 갔다가 하루를 날리는
@@ -977,6 +1020,9 @@ export default function TripScreen() {
         notes={pins.map((p) => ({ id: p.id, label: p.label ?? null, lat: p.lat, lng: p.lng }))}
         bleed
         chrome={false}
+        /* 길을 다시 묻는 동안에는 지도가 아무 길도 안 그리고 그렇다고 말합니다.
+           안 그러면 어제 길과 오늘 점선이 한 지도에 겹칩니다. */
+        routesPending={gapping}
         bottomInset={covered}
         goHereAt={goHereAt}
         panTo={lookAt}
@@ -1146,6 +1192,17 @@ export default function TripScreen() {
 
       <DragSheet
         ref={sheet}
+        /*
+          내렸을 때 단추 줄까지는 보여야 합니다.
+
+          <p>맨 아래 자리가 화면 높이의 0.28 이었습니다. 그런데 화면 높이와
+          단추 줄 높이는 아무 상관이 없는 값이라, 작은 폰에서는 단추가 반쯤
+          잘리고 큰 폰에서는 그 아래 일정까지 딸려 나왔습니다.
+
+          <p>단추 줄을 재서 그만큼 알려 줍니다. 아직 못 쟀으면(첫 그림)
+          넘기지 않고 지금까지 쓰던 비율에 맡깁니다.
+        */
+        revealAtLow={railTall > 0 ? railTall + Spacing.lg : undefined}
         onHeightChange={setCovered}
         peek={
           <SheetHead
@@ -1229,7 +1286,11 @@ export default function TripScreen() {
           일어나는지</b>를 적습니다. 카피가 사라지는 것이 아니라 제자리를
           찾아가는 것입니다.
         */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          /* 판을 내렸을 때 여기까지 보이게 하려고 높이를 재 둡니다. */
+          onLayout={(e) => setRailTall(e.nativeEvent.layout.height)}>
           <Row gap={Spacing.xs} style={styles.shortcuts}>
             {/*
               길 위에서는 짜는 화면이 방해입니다. 지금 갈 곳만 크게 보는
@@ -1322,6 +1383,23 @@ export default function TripScreen() {
             />
           ) : null,
         )}
+
+        <Divider />
+        {/*
+          장소 사이마다 "걸어서 12분 · 택시 6분" 줄이 들어갑니다. 쓸모 있는
+          값이지만 목록 길이를 두 배로 만들고, 렌터카로 도는 여행이나 이미
+          익숙한 동네에서는 볼 일이 없습니다.
+
+          <p>끄면 길찾기를 아예 안 부릅니다. 여기서 끄는 것이 화면만 가리는
+          것이 아니라 <b>사 오지 않는 것</b>입니다 — 구간마다 수단마다 구글에
+          묻는 호출이라 요금이 붙습니다.
+        */}
+        <Switch
+          label="이동 시간 보기"
+          hint="장소 사이에 걸어서·택시·대중교통 시간을 답니다."
+          value={showGaps}
+          onChange={setShowGaps}
+        />
 
         {canEdit ? (
           <>
@@ -2448,15 +2526,17 @@ function PlaceRow({
           자연스럽고, 한 번에 한 곳만 손대는 것이 실제로 하는 일과도 맞습니다.
         */}
         {active ? (
-        <Row gap={Spacing.xs} style={styles.placeActions}>
+        <Row gap={0} style={styles.placeActions}>
           {/* 구글이 모르고 방금 다녀온 사람만 아는 것들이 여기 모입니다. */}
           {place.placeId ? (
-            <IconButton
-              name="message-square"
-              label={tipCount > 0 ? `한 줄 ${tipCount}개 보기` : '한 줄 남기기'}
-              active={tipCount > 0}
-              onPress={onTips}
-            />
+            <View style={styles.placeAction}>
+              <IconButton
+                name="message-square"
+                label={tipCount > 0 ? `한 줄 ${tipCount}개 보기` : '한 줄 남기기'}
+                active={tipCount > 0}
+                onPress={onTips}
+              />
+            </View>
           ) : null}
           {/*
             길찾기와 다릅니다.
@@ -2466,48 +2546,58 @@ function PlaceRow({
             있습니다. 길찾기 단추만 있고 이것이 없어서, 정작 그 가게를 다시
             보려면 직접 검색해야 했습니다.
           */}
-          <IconButton
-            name="info"
-            label={`${place.name} 자세히 보기`}
-            onPress={() =>
-              onLook({
-                name: place.name,
-                lat: place.lat,
-                lng: place.lng,
-                placeId: place.placeId,
-                icon: place.icon,
-              })
-            }
-          />
+          <View style={styles.placeAction}>
+            <IconButton
+              name="info"
+              label={`${place.name} 자세히 보기`}
+              onPress={() =>
+                onLook({
+                  name: place.name,
+                  lat: place.lat,
+                  lng: place.lng,
+                  placeId: place.placeId,
+                  icon: place.icon,
+                })
+              }
+            />
+          </View>
           {/* 실제 안내는 구글 지도에 넘깁니다. 음성 안내도 환승 정보도 그쪽이
               낫고, 어차피 켤 것을 주소 옮겨 적게 만들 이유가 없습니다. */}
-          <IconButton
-            name="navigation"
-            label={`${place.name} 길찾기`}
-            onPress={() =>
-              openDirections(
-                { name: place.name, lat: place.lat, lng: place.lng, placeId: place.placeId },
-                chosen?.mode ?? null,
-              )
-            }
-          />
-          <IconButton
-            name="check"
-            label={visited ? '다녀옴 취소' : '다녀옴으로 표시'}
-            tone="success"
-            active={visited}
-            disabled={busy}
-            onPress={onToggle}
-          />
+          <View style={styles.placeAction}>
+            <IconButton
+              name="navigation"
+              label={`${place.name} 길찾기`}
+              onPress={() =>
+                openDirections(
+                  { name: place.name, lat: place.lat, lng: place.lng, placeId: place.placeId },
+                  chosen?.mode ?? null,
+                )
+              }
+            />
+          </View>
+          <View style={styles.placeAction}>
+            <IconButton
+              name="check"
+              label={visited ? '다녀옴 취소' : '다녀옴으로 표시'}
+              tone="success"
+              active={visited}
+              disabled={busy}
+              onPress={onToggle}
+            />
+          </View>
           {canEdit ? (
             <>
-              <IconButton name="edit-2" label="장소 고치기" onPress={onEdit} />
-              <IconButton
-                name="trash-2"
-                label="장소 지우기"
-                tone="danger"
-                onPress={() => setConfirming(true)}
-              />
+              <View style={styles.placeAction}>
+                <IconButton name="edit-2" label="장소 고치기" onPress={onEdit} />
+              </View>
+              <View style={styles.placeAction}>
+                <IconButton
+                  name="trash-2"
+                  label="장소 지우기"
+                  tone="danger"
+                  onPress={() => setConfirming(true)}
+                />
+              </View>
             </>
           ) : null}
         </Row>
@@ -3594,11 +3684,29 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: Spacing.xs,
   },
+  /*
+    고른 줄의 단추들.
+
+    <h3>동그라미 대여섯이 오른쪽에 몰려 있었습니다</h3>
+
+    <p>줄 오른쪽 아래에 모아 두었더니, 그 자체로는 정돈된 것 같은데 실제로는
+    <b>따로 노는 알갱이 여섯</b>이었습니다. 어디까지가 이 장소에 대한 것인지
+    경계가 없고, 폭이 남으면 오른쪽에 몰려 왼쪽 절반이 비었습니다.
+
+    <p>카드 아래에 한 줄로 깔고 칸을 고르게 나눕니다. 한 덩어리로 읽히고,
+    개수가 넷이든 여섯이든(고칠 수 있는 사람인지에 따라 다릅니다) 줄 모양이
+    안 변합니다. 위쪽과는 선 하나로 가릅니다 — 읽는 곳과 누르는 곳입니다.
+  */
   placeActions: {
-    /* 내용은 왼쪽에서 읽고, 손대는 것은 오른쪽 아래에 모읍니다. */
-    justifyContent: 'flex-end',
-    paddingHorizontal: Spacing.md,
-    paddingBottom: Spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.border,
+  },
+  /* 칸을 고르게 나눠 가집니다. 단추 자체는 제 크기를 지키고 자리만 넓게
+     잡습니다 — 늘어난 동그라미는 단추가 아니라 알약처럼 보입니다. */
+  placeAction: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: Spacing.xs,
   },
 
   /* --------------------------------------------------- 사이사이 이동 */

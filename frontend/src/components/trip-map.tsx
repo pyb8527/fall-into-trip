@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, StyleSheet, View } from 'react-native';
 import MapView, { Circle, Marker, PROVIDER_GOOGLE, Polyline } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -88,6 +88,7 @@ export function TripMap({
   activeId,
   onSelect,
   routes,
+  routesPending = false,
   height = 300,
   chrome = true,
   bleed = false,
@@ -374,7 +375,9 @@ export function TripMap({
           strokeWidth={4}
         />
       ))}
-      {link
+      {/* 묻고 있는 동안에는 점선도 안 그립니다. 점선은 "길을 못 찾았다" 는
+          뜻인데, 찾는 중에 그렇게 말하면 틀린 말입니다. */}
+      {link && !routesPending
         ? hops.map((hop) => (
             <Polyline
               key={`hop-${hop.id}`}
@@ -431,6 +434,14 @@ export function TripMap({
     <>
       <View style={[styles.frame, bleed ? styles.frameBleed : { height }]}>
         {full ? null : body}
+        {/* 지도 위에서 말합니다. 판 안 목록에도 같은 안내가 있지만, 판을
+            내리고 지도를 보는 동안에는 그것이 안 보입니다. */}
+        {routesPending && !full ? (
+          <View style={styles.pending} pointerEvents="none">
+            <ActivityIndicator size="small" color={Colors.textSecondary} />
+            <Caption tone="secondary">길 찾는 중</Caption>
+          </View>
+        ) : null}
         {full || !chrome ? null : (
           <View style={styles.overlay}>
             <IconButton name="maximize" label="전체화면으로 보기" onPress={() => setFull(true)} />
@@ -716,6 +727,20 @@ const styles = StyleSheet.create({
   fullWrap: {
     flex: 1,
     backgroundColor: Colors.abyss,
+  },
+  /* 지도 한가운데 위쪽. 왼쪽 위는 날짜 띠가, 오른쪽 위는 단추들이,
+     아래쪽은 판이 씁니다. 남는 자리가 여기뿐입니다. */
+  pending: {
+    position: 'absolute',
+    top: Spacing.md,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.md,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.surface,
   },
   overlay: {
     position: 'absolute',

@@ -1660,13 +1660,32 @@ export const DragSheet = forwardRef<DragSheetHandle, DragSheetProps>(function Dr
   initial = 1,
   /** 판 맨 위에 늘 보이는 줄. 손잡이 옆에 붙습니다. */
   peek,
+  revealAtLow,
   onHeightChange,
 }, ref) {
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
-  /* 픽셀로 바꿔 둡니다. 화면을 돌리거나 브라우저 창을 줄이면 다시 계산됩니다. */
+  /* 손잡이와 그 옆 줄이 실제로 몇 픽셀인지. 맨 아래 자리를 이것으로 잽니다. */
+  const [headTall, setHeadTall] = useState(0);
+
+  /*
+    픽셀로 바꿔 둡니다. 화면을 돌리거나 브라우저 창을 줄이면 다시 계산됩니다.
+
+    <h3>맨 아래만 화면 비율로 안 잽니다</h3>
+
+    <p>0.28 은 작은 폰에서는 단추 줄을 반쯤 자르고 큰 폰에서는 그 아래
+    일정까지 내보였습니다. 화면 높이와 <b>단추 줄 높이</b>는 아무 상관이
+    없는 값인데 하나로 다른 하나를 재고 있었던 것입니다.
+
+    <p>부르는 쪽이 "내렸을 때 이만큼은 보여야 한다" 를 픽셀로 알려 주면
+    손잡이 높이를 더해 그 자리를 만듭니다. 어느 폰에서나 단추 줄까지
+    딱 보이고 그 아래는 안 보입니다.
+  */
   const stops = snaps.map((r) => Math.round(height * r));
+  if (revealAtLow != null && headTall > 0) {
+    stops[0] = Math.min(headTall + revealAtLow, stops[stops.length - 1]);
+  }
   const [at, setAt] = useState(Math.min(initial, stops.length - 1));
   const atRef = useRef(at);
   atRef.current = at;
@@ -1794,7 +1813,10 @@ export const DragSheet = forwardRef<DragSheetHandle, DragSheetProps>(function Dr
     <Animated.View style={[styles.dragSheet, { height: tall }]}>
       {/* 손잡이와 그 옆 줄까지가 끄는 자리입니다. 손잡이만 잡게 하면
           손가락으로는 잘 안 맞습니다. */}
-      <View {...pan.panHandlers} style={styles.dragHead}>
+      <View
+        {...pan.panHandlers}
+        onLayout={(e) => setHeadTall(e.nativeEvent.layout.height)}
+        style={styles.dragHead}>
         {/* 끄는 것 말고 눌러서도 오갑니다. 끄는 몸짓은 마우스에서 잘 안
             잡히고, 무엇보다 끌 수 있다는 것 자체를 모르는 사람이 있습니다.
             맨 위까지 갔으면 다시 맨 아래로 돌아옵니다. */}
@@ -1845,6 +1867,15 @@ type DragSheetProps = {
   initial?: number;
   /** 판 맨 위에 늘 보이는 줄. 손잡이 옆에 붙습니다. */
   peek?: React.ReactNode;
+  /**
+   * 맨 아래로 내렸을 때 <b>내용에서</b> 몇 픽셀이 보여야 하는지.
+   *
+   * <p>손잡이 높이는 여기에 안 셉니다 — 그건 판이 스스로 재서 더합니다.
+   * 부르는 쪽은 "단추 줄까지" 처럼 제가 아는 것만 재면 됩니다.
+   *
+   * <p>안 주면 지금까지처럼 {@code snaps[0]} 대로 화면 비율을 씁니다.
+   */
+  revealAtLow?: number;
   /**
    * 판이 지금 몇 픽셀을 덮고 있는지.
    *
