@@ -255,6 +255,22 @@ export function TripMap({
   );
   const [size, setSize] = useState({ w: 0, h: 0 });
 
+  /*
+    지도가 다 섰는지.
+
+    <p>안드로이드 지도는 <b>서기 전에 받은 카메라 명령을 조용히 버립니다.</b>
+    실패했다고 말해 주지 않아서, 부른 쪽은 옮겼다고 믿고 지도는 처음 자리에
+    그대로 있습니다.
+
+    <p>처음 들어왔을 때 동선이 판 뒤에 깔려 있던 것이 이것이었습니다. 판에
+    덮인 만큼을 셈에 넣은 맞춤은 지도 크기를 잰 직후에 갔는데, 그때는 아직
+    지도가 서는 중이었습니다. 그래서 덮인 것을 모르던 첫 맞춤만 남았습니다.
+
+    <p>웹은 원래 준비된 뒤에 맞춥니다(구글 지도 JS 가 idle 을 알려 줍니다).
+    그래서 웹만 멀쩡했습니다. 앱도 같은 신호를 기다립니다.
+  */
+  const [ready, setReady] = useState(false);
+
   /**
    * 처음 보여 줄 범위.
    *
@@ -466,14 +482,17 @@ export function TripMap({
   */
   const fitted = useRef('');
   useEffect(() => {
-    const key =
-      shown.map((p) => `${p.id}@${p.lat},${p.lng}`).join('|') + (size.h > 0 ? '#잼' : '#아직');
-    if (key === fitted.current || !map.current) {
+    if (!ready || size.h === 0 || !map.current) {
+      /* 아직 셀 수도 옮길 수도 없습니다. 준비되면 이 효과가 다시 돕니다. */
+      return;
+    }
+    const key = shown.map((p) => `${p.id}@${p.lat},${p.lng}`).join('|');
+    if (key === fitted.current) {
       return;
     }
     fitted.current = key;
     map.current.animateToRegion(frame(region), 350);
-  }, [shown, region, frame, size.h]);
+  }, [shown, region, frame, size.h, ready]);
 
   /* 고른 장소로 옮기면서 들여다볼 만큼 당깁니다. */
   useEffect(() => {
@@ -607,6 +626,7 @@ export function TripMap({
       showsPointsOfInterests={false}
       toolbarEnabled={false}
       moveOnMarkerPress={false}
+      onMapReady={() => setReady(true)}
       onLayout={(e) =>
         setSize({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })
       }
