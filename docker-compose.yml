@@ -66,6 +66,15 @@ services:
       GOOGLE_MAPS_KEY: ${GOOGLE_MAPS_KEY:-}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
 
+      # 앱에서 오는 로그인 토큰의 임자들. 쉼표로 나열합니다.
+      #
+      # 구글은 쪽마다 다른 클라이언트 ID 를 내주고(웹/iOS/안드로이드), 토큰의
+      # aud 에는 받아 간 쪽의 ID 가 박혀 옵니다. 위 GOOGLE_CLIENT_ID 하나만
+      # 보면 앱에서 온 토큰이 전부 거절됩니다.
+      #
+      # 비워 두면 웹 것 하나만 봅니다 - 앱 로그인을 안 켠 서버는 그대로입니다.
+      GOOGLE_AUDIENCES: ${GOOGLE_AUDIENCES:-}
+
       # 서버가 보는 "지금" 과 "오늘".
       #
       # 안 넣으면 컨테이너가 UTC 로 돕니다. 그러면 자바의 LocalDate.now() 가
