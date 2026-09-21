@@ -336,11 +336,29 @@ export function TripMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [panTo?.at]);
 
+  /*
+    옮겨 달라고 해 놓고 아직 못 옮긴 것.
+
+    <p>앱에서는 십자를 누를 때 <b>그제야</b> 위치 권한을 묻습니다. 그래서
+    누른 그 순간에는 내 자리가 아직 없습니다 — 물어보고, 허락받고, 위성이나
+    기지국을 잡기까지 몇 초가 걸립니다.
+
+    <p>그동안 goHere 는 그냥 돌아섰고, 그 한 번은 버려졌습니다. 잠시 뒤 자리가
+    와도 아무도 다시 부르지 않았습니다. 눌렀는데 아무 일도 안 일어나는 것으로
+    보였던 것이 이것입니다.
+
+    <p>그래서 "옮겨 달라" 를 적어 둡니다. 자리가 오면 그때 옮기고 지웁니다.
+  */
+  const wanted = useRef(false);
+
   /** 내가 있는 자리로 지도를 옮깁니다. 어디까지 갔는지 놓쳤을 때 쓰는 단추입니다. */
   const goHere = useCallback(() => {
     if (!map.current || !here) {
+      /* 아직 자리를 모릅니다. 오면 그때 옮깁니다. */
+      wanted.current = true;
       return;
     }
+    wanted.current = false;
     /*
       이미 가까이 보고 있으면 그대로 둡니다. 누를 때마다 당겨지면 답답합니다.
       지금 얼마나 보고 있는지는 마지막으로 손을 뗀 자리(view)가 알려 줍니다.
@@ -370,6 +388,14 @@ export function TripMap({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [goHereAt]);
+
+  /* 기다리던 자리가 왔습니다. 이제 옮깁니다. */
+  useEffect(() => {
+    if (here && wanted.current) {
+      goHere();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [here]);
 
   /** 넣어 둔 곳을 모두 한 화면에. 바깥에서 값을 바꿔 부릅니다. */
   useEffect(() => {
@@ -429,16 +455,25 @@ export function TripMap({
   /*
     장소 묶음이 실제로 바뀌었을 때만 화면을 다시 맞춥니다. 핀을 고르거나
     다녀옴을 켜는 것만으로 다시 맞추면 들여다보던 자리가 매번 튕겨 나갑니다.
+
+    <p><b>잰 뒤에 한 번 더 맞춥니다.</b> 첫 그림에서는 지도 높이를 아직 몰라
+    (size.h 가 0) 판에 덮인 만큼을 셀 수가 없습니다. 그대로 두면 처음 들어왔을
+    때 동선이 판 뒤에 깔려 안 보였습니다 — 정작 제일 보고 싶은 순간입니다.
+
+    <p>그래서 "쟀는지" 를 열쇠에 넣습니다. 0 에서 실제 높이로 바뀌는 그 한 번만
+    다시 맞추고, 그 뒤로는 판을 아무리 끌어도 다시 안 맞춥니다. 끌 때마다
+    맞추면 보던 자리가 손을 따라 계속 달아납니다.
   */
   const fitted = useRef('');
   useEffect(() => {
-    const key = shown.map((p) => `${p.id}@${p.lat},${p.lng}`).join('|');
+    const key =
+      shown.map((p) => `${p.id}@${p.lat},${p.lng}`).join('|') + (size.h > 0 ? '#잼' : '#아직');
     if (key === fitted.current || !map.current) {
       return;
     }
     fitted.current = key;
     map.current.animateToRegion(frame(region), 350);
-  }, [shown, region, frame]);
+  }, [shown, region, frame, size.h]);
 
   /* 고른 장소로 옮기면서 들여다볼 만큼 당깁니다. */
   useEffect(() => {

@@ -1733,7 +1733,21 @@ export const DragSheet = forwardRef<DragSheetHandle, DragSheetProps>(function Dr
     손잡이 높이를 더해 그 자리를 만듭니다. 어느 폰에서나 단추 줄까지
     딱 보이고 그 아래는 안 보입니다.
   */
-  const stops = snaps.map((r) => Math.round(height * r));
+  /*
+    <h3>판이 쓸 수 있는 높이는 화면 높이가 아닙니다</h3>
+
+    <p>아래로는 띠만큼(lift) 띄워 놓았고, 위로는 상태 표시줄을 덮으면 안
+    됩니다. 그런데 자리들은 <b>화면 높이</b>에 비율을 곱해 잡고 있었습니다.
+
+    <p>그래서 맨 위 자리(0.92)가 화면보다 커졌습니다 — 800px 폰이면 판 위쪽이
+    0.08×800 − 90 = −26, 손잡이가 화면 밖으로 나갑니다. 끝까지 올리면 판을
+    다시 내릴 수가 없었습니다. 잡을 것이 화면에 없으니까요.
+
+    <p>쓸 수 있는 만큼을 먼저 빼고 비율을 곱합니다. 이러면 맨 위로 올려도
+    위쪽에 늘 0.08 만큼이 남고, 그 자리에 손잡이가 있습니다.
+  */
+  const room = Math.max(1, height - lift - insets.top);
+  const stops = snaps.map((r) => Math.round(room * r));
   if (revealAtLow != null && headTall > 0) {
     stops[0] = Math.min(headTall + revealAtLow, stops[stops.length - 1]);
   }
