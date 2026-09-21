@@ -19,8 +19,9 @@ import { Badge, Body, Caption, Chip, Icon, IconButton, Row, Subtitle } from '@/u
 /**
  * 지도 (앱).
  *
- * <p>안드로이드는 구글 지도, iOS 는 애플 지도를 씁니다. 웹은 이 파일 대신
- * trip-map.web.tsx 가 잡혀 구글 지도 JS API 로 그립니다.
+ * <p>안드로이드도 iOS 도 구글 지도입니다. 웹은 이 파일 대신 trip-map.web.tsx
+ * 가 잡히는데, 그쪽도 구글 지도입니다 — 셋 다 같은 지도를 다른 SDK 로
+ * 그립니다. 웹 SDK 가 DOM 요소에 그리는 것이라 RN 에서 못 쓸 뿐입니다.
  *
  * <p>핀은 그림 파일이 아니라 화면 요소로 그립니다. 날짜 색과 순번을 그대로
  * 얹을 수 있고, 크기를 바꿔도 뭉개지지 않습니다.
@@ -460,15 +461,16 @@ export function TripMap({
     <MapView
       ref={map}
       style={StyleSheet.absoluteFill}
-      /* 안드로이드는 구글 지도로 통일합니다. 기기마다 다른 지도가 뜨면
-         같은 화면을 설명하기 어렵습니다. iOS 는 애플 지도를 그대로 씁니다. */
+      /* 양쪽 다 구글 지도로 못박습니다. 이 값을 안 주면 iOS 는 애플 지도가
+         뜨는데, 그러면 같은 자리를 두고 지도 셋이 서로 다른 이름과 다른
+         길을 말하게 됩니다. 아래 customMapStyle 도 구글에만 먹습니다. */
       provider={PROVIDER_GOOGLE}
       /* 구글은 기기가 어두운 테마면 지도도 어둡게 칠합니다. 웹에는 그런 동작이
          없어 같은 화면이 둘로 갈립니다. 밝은 쪽으로 못박습니다. 이 값은 지도를
          만들 때 한 번만 읽히므로 첫 그림부터 넘겨야 합니다. */
       userInterfaceStyle="light"
       /* 웹과 같은 값을 씁니다. 둘이 갈리면 같은 여행을 폰과 브라우저에서 볼 때
-         다른 지도가 됩니다. iOS 는 애플 지도라 이 값이 먹지 않습니다. */
+         다른 지도가 됩니다. 위에서 구글로 못박았으므로 iOS 에도 먹습니다. */
       customMapStyle={QUIET_MAP as unknown as never[]}
       initialRegion={region}
       showsPointsOfInterests={false}
