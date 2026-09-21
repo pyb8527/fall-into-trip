@@ -61,6 +61,15 @@ fit:
       # 비워 두면 구글 로그인이 꺼지고 단추도 안 뜹니다.
       client-id: ${GOOGLE_CLIENT_ID:}
 
+      # 앱에서 오는 토큰의 임자들. 쉼표로 나열합니다.
+      #
+      # 구글은 쪽마다 다른 클라이언트 ID 를 내주고(웹/iOS/안드로이드),
+      # ID 토큰에는 받아 간 쪽의 ID 가 박혀 옵니다. 위 client-id 하나만
+      # 보면 앱에서 온 토큰이 전부 거절됩니다.
+      #
+      # 비워 두면 웹 것 하나만 봅니다 - 앱 로그인을 안 켠 서버는 그대로입니다.
+      audiences: ${GOOGLE_AUDIENCES:}
+
 logging:
   level:
     net.weeniebeenie.fit: INFO

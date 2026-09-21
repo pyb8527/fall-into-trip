@@ -1,5 +1,8 @@
 package net.weeniebeenie.fit.support.push;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.weeniebeenie.fit.account.infrastructure.security.AuthPrincipal;
@@ -80,6 +83,8 @@ public class PushService {
     private String contact;
 
     private final RestClient client = RestClient.builder().build();
+    /* 브라우저용 JSON 을 Expo 가 읽는 모양으로 옮겨 담을 때 씁니다. */
+    private final ObjectMapper mapper = new ObjectMapper();
 
     /**
      * 여행마다 사람마다 마지막으로 울린 때.
@@ -122,13 +127,25 @@ public class PushService {
      */
     @Transactional
     public void subscribe(AuthPrincipal me, String endpoint, String p256dh, String auth) {
-        if (endpoint == null || endpoint.isBlank() || p256dh == null || auth == null) {
-            throw ApiException.badRequest("알림을 켤 수 없습니다. 브라우저가 준 값이 비었습니다.");
+        /*
+          앱은 열쇠가 없습니다.
+
+          <p>브라우저는 주소(endpoint)와 열쇠 둘(p256dh·auth)을 줍니다 —
+          우리가 직접 암호화해서 밀어 넣어야 하기 때문입니다. 앱은 Expo 가
+          대신 넘겨 주므로 토큰 한 줄이 전부입니다.
+
+          <p>그 토큰은 생김새로 알아봅니다. 브라우저 주소는 https 로 시작하고
+          앱 토큰은 ExponentPushToken[...] 입니다.
+        */
+        boolean expo = endpoint != null && endpoint.startsWith("ExponentPushToken");
+        if (endpoint == null || endpoint.isBlank() || (!expo && (p256dh == null || auth == null))) {
+            throw ApiException.badRequest("알림을 켤 수 없습니다. 기기가 준 값이 비었습니다.");
         }
 
         PushSubscription found = subs.findByEndpoint(endpoint).orElse(null);
         if (found != null) {
             found.setUserId(me.id());
+            found.setKind(expo ? EXPO : WEB);
             found.setP256dh(p256dh);
             found.setAuth(auth);
             found.setFailedAt(null);
@@ -142,10 +159,17 @@ public class PushService {
         subs.save(PushSubscription.builder()
                 .userId(me.id())
                 .endpoint(endpoint)
+                .kind(expo ? EXPO : WEB)
                 .p256dh(p256dh)
                 .auth(auth)
                 .build());
     }
+
+    /** 브라우저로 가는 것. */
+    private static final String WEB = "web";
+
+    /** 앱으로 가는 것. Expo 가 애플·구글에 대신 넘깁니다. */
+    private static final String EXPO = "expo";
 
     /** 이 기기에서는 그만 받겠다. */
     @Transactional
@@ -216,6 +240,10 @@ public class PushService {
     }
 
     private void send(PushSubscription sub, String secret, String payload) {
+        if (EXPO.equals(sub.getKind())) {
+            sendExpo(sub, payload);
+            return;
+        }
         try {
             URI where = URI.create(sub.getEndpoint());
             String audience = where.getScheme() + "://" + where.getHost();
@@ -296,5 +324,55 @@ public class PushService {
     /** 몸통을 바이트로 보낼 때 쓰는 글자표. 봉한 것은 이미 바이트라 쓰이지 않습니다. */
     static byte[] utf8(String raw) {
         return raw.getBytes(StandardCharsets.UTF_8);
+    }
+
+    /**
+     * 앱으로 보냅니다.
+     *
+     * <h3>우리가 애플·구글에 직접 넣지 않습니다</h3>
+     *
+     * <p>그러려면 APNs 인증서와 FCM 열쇠를 서버가 들고 있어야 하고, 둘의
+     * 규격도 서로 다릅니다. Expo 가 그 둘을 대신 상대해 주므로 우리는
+     * 토큰과 글만 넘깁니다.
+     *
+     * <p>브라우저 쪽과 달리 <b>암호화하지 않습니다.</b> 내용이 Expo 를
+     * 지나갑니다 — 그래서 알림에 담는 것은 "동행자가 일정을 고쳤습니다"
+     * 정도이고, 무엇을 어떻게 고쳤는지는 앱을 열어야 보입니다. 브라우저
+     * 쪽도 같은 것만 담고 있어 둘의 내용이 다르지 않습니다.
+     *
+     * <p>죽은 토큰은 여기서 안 지웁니다. Expo 는 200 을 주면서 본문에
+     * DeviceNotRegistered 를 적어 보내는데, 그것까지 읽으려면 응답을 파야
+     * 합니다. 브라우저 쪽이 404·410 으로 지우는 것과 달리 이쪽은 다음
+     * 청소(오래된 것 지우기)에 맡깁니다.
+     */
+    private void sendExpo(PushSubscription sub, String payload) {
+        try {
+            client.post()
+                    .uri(URI.create("https://exp.host/--/api/v2/push/send"))
+                    .header("Content-Type", "application/json")
+                    .header("Accept", "application/json")
+                    .body(expoBody(sub.getEndpoint(), payload))
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (Exception e) {
+            log.warn("앱 알림을 못 보냈습니다: {}", e.getMessage());
+        }
+    }
+
+    /** 브라우저에 보내던 JSON 을 Expo 가 읽는 모양으로 옮겨 담습니다. */
+    private String expoBody(String token, String payload) {
+        try {
+            JsonNode said = mapper.readTree(payload);
+            ObjectNode out = mapper.createObjectNode();
+            out.put("to", token);
+            out.put("title", said.path("title").asText(""));
+            out.put("body", said.path("body").asText(""));
+            /* 누르면 그 화면으로 갑니다. 앱이 data.url 을 보고 옮겨 갑니다. */
+            ObjectNode data = out.putObject("data");
+            data.put("url", said.path("url").asText("/"));
+            return mapper.writeValueAsString(out);
+        } catch (Exception e) {
+            return "{}";
+        }
     }
 }

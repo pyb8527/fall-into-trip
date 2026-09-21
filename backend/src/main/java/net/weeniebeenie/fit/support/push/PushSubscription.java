@@ -37,11 +37,27 @@ public class PushSubscription {
     private String endpoint;
 
     /** 이 기기의 공개키. 내용을 이 기기만 열 수 있게 봉하는 데 씁니다. */
-    @Column(nullable = false, length = 200)
+    /**
+     * 어느 쪽 기기인지 — {@code web} 또는 {@code expo}.
+     *
+     * <p>보내는 방법이 아예 다릅니다. 브라우저는 우리가 직접 중계 서버에
+     * 암호화해서 밀어 넣고, 앱은 Expo 가 대신 애플·구글에 넘겨 줍니다.
+     * 표는 하나로 둡니다 — "이 사람이 이 기기로 받는다" 는 같은 이야기이고,
+     * 갈래를 보는 것은 보낼 때뿐입니다.
+     */
+    @Column(nullable = false, length = 8)
+    /* @Builder.Default 가 없으면 빌더로 만들 때 이 값이 무시되고 null 이
+       들어갑니다. 그러면 NOT NULL 에 걸려 저장이 통째로 실패합니다. */
+    @Builder.Default
+    private String kind = "web";
+
+    /** 브라우저 열쇠. 앱 토큰에는 없습니다. */
+    @Column(length = 200)
     private String p256dh;
 
     /** 이 기기의 비밀 한 조각. 위와 함께 봉하는 데 씁니다. */
-    @Column(nullable = false, length = 60)
+    /** 브라우저 열쇠. 앱 토큰에는 없습니다. */
+    @Column(length = 60)
     private String auth;
 
     @Column(name = "created_at", nullable = false)

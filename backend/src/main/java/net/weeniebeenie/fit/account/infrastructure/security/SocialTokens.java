@@ -9,6 +9,8 @@ import org.springframework.security.oauth2.jwt.*;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Set;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -41,6 +43,24 @@ public class SocialTokens {
 
     @Value("${fit.social.google.client-id:}")
     private String googleClientId;
+
+    /**
+     * 앱에서 오는 토큰의 임자들.
+     *
+     * <h3>왜 여럿인가</h3>
+     *
+     * <p>구글은 <b>쪽마다 다른 클라이언트 ID</b>를 내줍니다 — 웹 하나,
+     * iOS 하나, 안드로이드 하나. 그리고 ID 토큰의 {@code aud} 에는 그것을
+     * 받아 간 쪽의 ID 가 박혀 옵니다.
+     *
+     * <p>그래서 웹 것 하나만 보고 있으면 앱에서 온 토큰이 전부 거절됩니다.
+     * 남의 앱 토큰을 막으려고 두는 검사인데, 우리 앱까지 막고 있었습니다.
+     *
+     * <p>쉼표로 나열합니다. 안 넣으면 웹 것 하나만 봅니다 — 앱 로그인을
+     * 안 켠 서버에서는 지금까지와 똑같이 돕니다.
+     */
+    @Value("${fit.social.google.audiences:}")
+    private String googleAudiences;
 
     /**
      * 읽어 낸 사람.
@@ -113,8 +133,9 @@ public class SocialTokens {
         decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
                 /* 발급자. 구글은 두 가지 모양을 다 씁니다. */
                 issuedBy("accounts.google.com", "https://accounts.google.com"),
-                /* 우리에게 준 것인가. 이것을 안 보면 남의 앱 토큰으로 들어옵니다. */
-                audience(googleClientId),
+                /* 우리에게 준 것인가. 이것을 안 보면 남의 앱 토큰으로 들어옵니다.
+                   쪽마다 ID 가 다르므로 우리 것들을 모두 셉니다. */
+                audience(ourAudiences()),
                 /* 만료와 시계 오차는 스프링이 기본으로 봅니다. */
                 JwtValidators.createDefault()));
         return decoder;
@@ -127,9 +148,36 @@ public class SocialTokens {
                 : OAuth2TokenValidatorResult.failure();
     }
 
-    private static OAuth2TokenValidator<Jwt> audience(String expected) {
-        return jwt -> jwt.getAudience() != null && jwt.getAudience().contains(expected)
-                ? OAuth2TokenValidatorResult.success()
-                : OAuth2TokenValidatorResult.failure();
+    /**
+     * 우리 것으로 칠 {@code aud} 들. 웹 것은 늘 들어갑니다.
+     *
+     * <p>빈 칸과 겹치는 것은 걸러 냅니다 — 쉼표 사이에 실수로 빈 자리가
+     * 생기면 그것이 <b>아무 토큰이나 통과시키는 구멍</b>이 됩니다.
+     */
+    private Set<String> ourAudiences() {
+        Set<String> out = new LinkedHashSet<>();
+        if (googleClientId != null && !googleClientId.isBlank()) {
+            out.add(googleClientId.trim());
+        }
+        if (googleAudiences != null) {
+            for (String one : googleAudiences.split(",")) {
+                String clean = one.trim();
+                if (!clean.isEmpty()) {
+                    out.add(clean);
+                }
+            }
+        }
+        return out;
+    }
+
+    private static OAuth2TokenValidator<Jwt> audience(Set<String> ours) {
+        return jwt -> {
+            if (ours.isEmpty() || jwt.getAudience() == null) {
+                return OAuth2TokenValidatorResult.failure();
+            }
+            return jwt.getAudience().stream().anyMatch(ours::contains)
+                    ? OAuth2TokenValidatorResult.success()
+                    : OAuth2TokenValidatorResult.failure();
+        };
     }
 }

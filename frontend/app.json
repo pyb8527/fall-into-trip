@@ -41,6 +41,13 @@
         }
       ],
       [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/android-icon-foreground.png",
+          "color": "#0E0E0E"
+        }
+      ],
+      [
         "expo-location",
         {
           "locationAlwaysAndWhenInUsePermission": "지도에서 지금 내 자리를 보여 주고, 원할 때 동행자에게 알리는 데 씁니다.",

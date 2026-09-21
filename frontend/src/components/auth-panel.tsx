@@ -6,6 +6,7 @@ import { ApiError, UNEXPECTED } from '@/api/client';
 import { useAuth } from '@/auth/auth-provider';
 import { Spacing } from '@/constants/theme';
 import { GoogleButton } from '@/components/google-button';
+import { canSignInWithGoogle } from '@/lib/google-signin';
 import { Body, Button, Caption, ErrorNote, Field, Screen, SegmentedTabs, Title } from '@/ui';
 import { LogoLockup } from '@/ui/logo';
 
@@ -213,7 +214,15 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
  */
 function GoogleBlock({ onDone }: { onDone: (credential: string) => void }) {
   const { googleClientId } = useAuth();
-  if (!googleClientId) {
+  /*
+    두 쪽을 다 봅니다.
+
+    <p>서버가 구글을 켰는지({@code googleClientId})와, <b>이 기기가 그 길을
+    갖고 있는지</b>({@code canSignInWithGoogle})는 다른 이야기입니다. 앱은
+    빌드에 제 클라이언트 ID 가 박혀 있어야 하는데, 서버 쪽만 보고 있으면
+    그것이 없는 앱에서 "또는" 만 덩그러니 남습니다.
+  */
+  if (!googleClientId || !canSignInWithGoogle) {
     return null;
   }
   return (
