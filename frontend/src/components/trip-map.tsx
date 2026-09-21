@@ -281,18 +281,56 @@ export function TripMap({
     };
   }, [shown]);
 
+  /**
+   * 아래가 판에 덮인 만큼 카메라를 어긋냅니다.
+   *
+   * <h3>지도에게 시키지 않습니다</h3>
+   *
+   * <p>처음에는 mapPadding 으로 줬습니다. 지도에게 "쓸 수 있는 자리" 를
+   * 알려 주는 값이라 한 줄이면 끝나는 일이었는데, <b>여행 상세에 들어가면
+   * 앱이 꺼졌습니다.</b> 안드로이드 쪽은 지도 객체가 준비되기 전에 padding 이
+   * 들어오면 그대로 넘어집니다. 화면에 들어서자마자 넘기는 값이라 늘 그
+   * 자리였습니다.
+   *
+   * <p>그래서 네이티브에 안 맡기고 여기서 셉니다. 보이는 자리는 위쪽
+   * (높이 - 덮인 만큼)뿐이므로, 두 가지를 합니다 — 담을 것이 그 좁은 자리에
+   * 다 들어가게 <b>조금 물러나고</b>, 가운데가 그 자리의 한가운데에 오게
+   * <b>아래로 내려다봅니다</b>.
+   *
+   * <p>화면 높이를 아직 모르면(첫 그림) 그냥 둡니다. 모르는 채로 세면 엉뚱한
+   * 데를 보게 되고, 어차피 곧 다시 잽니다.
+   */
+  const frame = useCallback(
+    (r: { latitude: number; longitude: number; latitudeDelta: number; longitudeDelta: number }) => {
+      const hide = full ? 0 : bottomInset;
+      if (hide <= 0 || size.h <= 0 || hide >= size.h) {
+        return r;
+      }
+      const grow = size.h / (size.h - hide);
+      const latitudeDelta = r.latitudeDelta * grow;
+      return {
+        ...r,
+        latitudeDelta,
+        /* 화면은 아래로 갈수록 위도가 낮아집니다. 가운데를 덮인 만큼의
+           절반 아래로 옮기면, 담긴 것은 그만큼 위로 올라와 판을 피합니다. */
+        latitude: r.latitude - (hide / 2 / size.h) * latitudeDelta,
+      };
+    },
+    [full, bottomInset, size.h],
+  );
+
   /** 일정에 없는 자리로 옮깁니다. 꽂아 둔 깃발처럼 고를 id 가 없는 것들. */
   useEffect(() => {
     if (!panTo || !map.current) {
       return;
     }
     map.current.animateToRegion(
-      {
+      frame({
         latitude: panTo.lat,
         longitude: panTo.lng,
         latitudeDelta: FOCUS_SPAN,
         longitudeDelta: FOCUS_SPAN,
-      },
+      }),
       300,
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -309,15 +347,15 @@ export function TripMap({
     */
     const span = view && view.dLat < FOCUS_SPAN * 2 ? view.dLat : FOCUS_SPAN;
     map.current.animateToRegion(
-      {
+      frame({
         latitude: here.lat,
         longitude: here.lng,
         latitudeDelta: span,
         longitudeDelta: span,
-      },
+      }),
       350,
     );
-  }, [here, view]);
+  }, [here, view, frame]);
 
   /*
     바깥에서 "내 위치로" 를 눌렀을 때.
@@ -340,7 +378,11 @@ export function TripMap({
     }
     map.current.fitToCoordinates(
       shown.map((p) => ({ latitude: p.lat, longitude: p.lng })),
-      { edgePadding: { top: 60, right: 50, bottom: 60, left: 50 }, animated: true },
+      {
+        /* 이쪽은 여백을 받는 자리가 원래 있습니다. 덮인 만큼을 그냥 더합니다. */
+        edgePadding: { top: 60, right: 50, bottom: 60 + (full ? 0 : bottomInset), left: 50 },
+        animated: true,
+      },
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fitAt]);
@@ -395,8 +437,8 @@ export function TripMap({
       return;
     }
     fitted.current = key;
-    map.current.animateToRegion(region, 350);
-  }, [shown, region]);
+    map.current.animateToRegion(frame(region), 350);
+  }, [shown, region, frame]);
 
   /* 고른 장소로 옮기면서 들여다볼 만큼 당깁니다. */
   useEffect(() => {
@@ -412,26 +454,26 @@ export function TripMap({
       const lats = near.map((p) => p.lat);
       const lngs = near.map((p) => p.lng);
       map.current.animateToRegion(
-        {
+        frame({
           latitude: (Math.min(...lats) + Math.max(...lats)) / 2,
           longitude: (Math.min(...lngs) + Math.max(...lngs)) / 2,
           latitudeDelta: Math.max(FOCUS_SPAN, (Math.max(...lats) - Math.min(...lats)) * 1.8),
           longitudeDelta: Math.max(FOCUS_SPAN, (Math.max(...lngs) - Math.min(...lngs)) * 1.8),
-        },
+        }),
         350,
       );
       return;
     }
     map.current.animateToRegion(
-      {
+      frame({
         latitude: chosen.lat,
         longitude: chosen.lng,
         latitudeDelta: FOCUS_SPAN,
         longitudeDelta: FOCUS_SPAN,
-      },
+      }),
       350,
     );
-  }, [activeId, shown, follow]);
+  }, [activeId, shown, follow, frame]);
 
   /*
     가까이 몰린 별을 하나로 묶습니다.
@@ -493,15 +535,15 @@ export function TripMap({
     const lats = group.members.map((p) => p.lat);
     const lngs = group.members.map((p) => p.lng);
     map.current?.animateToRegion(
-      {
+      frame({
         latitude: (Math.min(...lats) + Math.max(...lats)) / 2,
         longitude: (Math.min(...lngs) + Math.max(...lngs)) / 2,
         latitudeDelta: Math.max((Math.max(...lats) - Math.min(...lats)) * PAD, FOCUS_SPAN),
         longitudeDelta: Math.max((Math.max(...lngs) - Math.min(...lngs)) * PAD, FOCUS_SPAN),
-      },
+      }),
       350,
     );
-  }, []);
+  }, [frame]);
 
   const pick = useCallback(
     (id: string) => {
@@ -530,16 +572,6 @@ export function TripMap({
       showsPointsOfInterests={false}
       toolbarEnabled={false}
       moveOnMarkerPress={false}
-      /*
-        아래가 판에 덮여 있으면 그만큼 비워 둡니다.
-
-        <p>지도에게 "쓸 수 있는 자리" 를 알려 주는 값입니다. 가운데로 옮기는
-        것도 한 화면에 담는 것도 이 안쪽을 기준으로 하므로, 고른 핀이 판 뒤로
-        숨는 일이 없어집니다. 웹처럼 옮긴 뒤 다시 밀어 올리지 않아도 됩니다.
-
-        <p>전체화면에서는 판이 없으니 0 입니다.
-      */
-      mapPadding={{ top: 0, right: 0, bottom: full ? 0 : bottomInset, left: 0 }}
       onLayout={(e) =>
         setSize({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })
       }
