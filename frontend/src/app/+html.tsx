@@ -60,9 +60,88 @@ export default function Document({ children }: PropsWithChildren) {
           body 까지 함께 늘어나 고정해 둔 아래 단추가 밀려 올라갑니다.
         */}
         <ScrollViewStyleReset />
+
+        {/*
+          시작 화면.
+
+          <p>앱에는 expo-splash-screen 이 있는데 웹에는 없습니다. 그래서 웹은
+          꾸러미를 받는 동안 <b>흰 화면</b>이었습니다. 게다가 손글씨 글꼴을
+          받는 동안 ui/hand 가 아무것도 안 그리므로(안 그러면 안드로이드에서
+          글자가 통째로 안 나옵니다), 느린 망에서는 그 흰 화면이 꽤 깁니다.
+          "안 열리는 것" 과 "여는 중" 이 똑같이 보였습니다.
+
+          <p>글자가 아니라 <b>그림</b>을 씁니다. 글자로 쓰면 손글꼴을 기다려야
+          하고, 기다리는 동안 다른 글꼴로 한 번 떴다가 바뀝니다 — 시작 화면이
+          제일 하면 안 되는 일입니다. assets 의 시작 화면 그림을 그대로 씁니다
+          (앱과 같은 그림입니다).
+
+          <p>스타일도 여기 박아 둡니다. 따로 받아야 하는 것이 하나라도 있으면
+          그만큼 늦게 뜨는데, 늦게 뜨는 시작 화면은 있으나 마나입니다.
+        */}
+        <style
+          dangerouslySetInnerHTML={{
+            __html: `
+#fit-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fafafa;
+  transition: opacity .25s ease;
+}
+#fit-splash img { width: 160px; height: auto; }
+#fit-splash.gone { opacity: 0; pointer-events: none; }
+/* 움직임을 줄여 달라고 해 둔 사람에게는 서서히 사라지는 것도 안 합니다. */
+@media (prefers-reduced-motion: reduce) { #fit-splash { transition: none; } }`,
+          }}
+        />
       </head>
       <body>
+        <div id="fit-splash">
+          {/* 화면 읽어 주는 것에는 안 읽힙니다 — 여는 중이라는 것은 아래
+              글자가 말합니다. */}
+          <img src="/splash-icon.png" alt="" aria-hidden="true" />
+        </div>
+
         {children}
+
+        {/*
+          화면이 실제로 그려지면 시작 화면을 걷습니다.
+
+          <p>정해진 시간이 지나면 걷는 것이 아니라 <b>#root 에 무언가
+          들어왔을 때</b> 걷습니다. 시간으로 하면 빠른 망에서는 다 뜬 화면을
+          가리고 있고, 느린 망에서는 흰 화면이 도로 드러납니다.
+
+          <p>혹시 관찰이 안 먹는 브라우저를 위해 8초 뒤에는 그냥 걷습니다.
+          시작 화면이 안 걷히는 것은 앱이 아예 안 열리는 것과 같습니다.
+        */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+(function () {
+  var splash = document.getElementById('fit-splash');
+  if (!splash) return;
+  var done = false;
+  function clear() {
+    if (done) return;
+    done = true;
+    splash.classList.add('gone');
+    setTimeout(function () { splash.remove(); }, 300);
+  }
+  var root = document.getElementById('root');
+  if (root && root.childElementCount > 0) { clear(); return; }
+  if (root && window.MutationObserver) {
+    var watch = new MutationObserver(function () {
+      if (root.childElementCount > 0) { watch.disconnect(); clear(); }
+    });
+    watch.observe(root, { childList: true });
+  }
+  setTimeout(clear, 8000);
+})();`,
+          }}
+        />
 
         {/*
           서비스 워커를 등록합니다.

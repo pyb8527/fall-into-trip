@@ -87,6 +87,60 @@ function ClumpPin({ color, count }: { color: string; count: number }) {
 }
 
 /**
+ * 사람이 서 있는 자리 — 지도에 얹는 것까지.
+ *
+ * <p>나와 동행자가 같은 것을 씁니다. 굽는 법도 다른 핀들과 같습니다.
+ */
+function FaceMark({
+  lat,
+  lng,
+  face,
+  color,
+  title,
+  layer,
+}: {
+  lat: number;
+  lng: number;
+  face: string;
+  color: string;
+  title: string;
+  layer: number;
+}) {
+  /* 얼굴과 색이 바뀔 때만 다시 굽습니다. 자리가 바뀌는 것은 그림이 아니라
+     얹히는 곳이 바뀌는 것이라 다시 구울 일이 아닙니다. */
+  const drawing = useBake([face, color]);
+
+  return (
+    <Marker
+      coordinate={{ latitude: lat, longitude: lng }}
+      anchor={{ x: 0.5, y: 0.5 }}
+      title={title}
+      tracksViewChanges={drawing}
+      zIndex={layer}>
+      <FacePin face={face} color={color} />
+    </Marker>
+  );
+}
+
+/** 잠깐 꽂아 둔 깃발 — 지도에 얹는 것까지. */
+function FlagMark({ lat, lng, title }: { lat: number; lng: number; title: string }) {
+  /* 늘 같은 그림이라 한 번만 굽습니다. */
+  const drawing = useBake([]);
+
+  return (
+    <Marker
+      coordinate={{ latitude: lat, longitude: lng }}
+      /* 깃대 아래 끝이 자리입니다. */
+      anchor={{ x: 0.3, y: 1 }}
+      title={title}
+      tracksViewChanges={drawing}
+      zIndex={700}>
+      <FlagPin color={Colors.warning} />
+    </Marker>
+  );
+}
+
+/**
  * 사람이 서 있는 자리.
  *
  * <p>장소 핀(물방울)과 생김새를 달리합니다. 같은 모양으로 두면 지도만 보고는
@@ -571,7 +625,9 @@ export function TripMap({
         커지는데, 그것이 맞는 말입니다 — 점 하나로 찍으면 지하철 안에서도
         한 자리를 정확히 아는 것처럼 보입니다.
       */}
-      {here ? (
+      {/* 정확도를 모르면(here 가 0 을 줍니다) 원을 안 그립니다. 반지름 0 인
+          원은 "한 자리를 정확히 안다" 는 말이 되는데, 0 은 그 반대입니다. */}
+      {here && here.accuracy > 0 ? (
         <Circle
           center={{ latitude: here.lat, longitude: here.lng }}
           radius={here.accuracy}
@@ -581,41 +637,40 @@ export function TripMap({
         />
       ) : null}
       {here ? (
-        <Marker
-          coordinate={{ latitude: here.lat, longitude: here.lng }}
-          anchor={{ x: 0.5, y: 0.5 }}
+        <FaceMark
+          lat={here.lat}
+          lng={here.lng}
+          face={myFace ?? ''}
+          color={Colors.accentInk}
           title="지금 내 위치"
-          zIndex={999}>
-          <FacePin face={myFace ?? ''} color={Colors.accentInk} />
-        </Marker>
+          layer={999}
+        />
       ) : null}
 
       {/* 동행자. 나와 같은 동그란 판이고 색만 다릅니다. */}
       {(mates ?? []).map((mate) => (
-        <Marker
+        <FaceMark
           key={`mate-${mate.id}`}
-          coordinate={{ latitude: mate.lat, longitude: mate.lng }}
-          anchor={{ x: 0.5, y: 0.5 }}
+          lat={mate.lat}
+          lng={mate.lng}
+          /* 고른 동물, 안 골랐으면 이름 첫 글자. 첫 글자만으로는 "지영" 과
+             "지훈" 이 지도에서 같아 보입니다. */
+          face={mate.face}
+          color={Colors.success}
           title={`${mate.name} 님이 지금 있는 곳`}
-          zIndex={800}>
-          {/* 고른 동물, 안 골랐으면 이름 첫 글자. 첫 글자만으로는 "지영" 과
-              "지훈" 이 지도에서 같아 보입니다. */}
-          <FacePin face={mate.face} color={Colors.success} />
-        </Marker>
+          layer={800}
+        />
       ))}
 
       {/* 잠깐 꽂아 둔 깃발. 꽂는 단추가 깃발이니 지도에도 깃발이 서야
           누른 것과 찍힌 것이 같은 것인 줄 압니다. */}
       {(notes ?? []).map((note) => (
-        <Marker
+        <FlagMark
           key={`note-${note.id}`}
-          coordinate={{ latitude: note.lat, longitude: note.lng }}
-          /* 깃대 아래 끝이 자리입니다. */
-          anchor={{ x: 0.3, y: 1 }}
+          lat={note.lat}
+          lng={note.lng}
           title={note.label ?? '잠깐 꽂아 둔 곳'}
-          zIndex={700}>
-          <FlagPin color={Colors.warning} />
-        </Marker>
+        />
       ))}
 
       {clumps.map((group) => (
@@ -722,6 +777,34 @@ export function TripMap({
 }
 
 /**
+ * 그림을 언제 구울지.
+ *
+ * <p>화면 요소로 만든 핀은 지도에 그림 한 장으로 구워 얹힙니다. 언제 구울지는
+ * {@code tracksViewChanges} 가 정하는데, <b>안 주면 계속 켜진 것이 기본</b>
+ * 입니다. 그러면 매 프레임 다시 굽고, 아직 자리를 못 잡은 첫 프레임에서는
+ * 크기가 0 인 그림을 구우려다 안드로이드가 그대로 죽습니다.
+ *
+ * <p>내 자리·동행자·깃발을 더할 때 이것을 안 줬다가 여행 상세에 들어가면
+ * 앱이 꺼졌습니다. 이 파일의 다른 핀들은 전부 막아 두고 있었는데 새로 더한
+ * 셋만 빠져 있었습니다. 그래서 규칙을 함수 하나로 빼 둡니다 — 다음에 핀을
+ * 더하는 사람이 이것만 부르면 됩니다.
+ *
+ * @param deps 다시 구워야 하는 때. 생김새가 바뀌는 값들을 넘깁니다
+ */
+function useBake(deps: unknown[]) {
+  const [drawing, setDrawing] = useState(true);
+
+  useEffect(() => {
+    setDrawing(true);
+    const timer = setTimeout(() => setDrawing(false), DRAW_MS);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps);
+
+  return drawing;
+}
+
+/**
  * 핀 하나.
  *
  * <p>지도는 화면 요소로 만든 핀을 그림 한 장으로 구워 얹습니다. 언제 구울지는
@@ -742,13 +825,7 @@ function PlacePin({
   shape: 'default' | 'star';
   onPress: (id: string) => void;
 }) {
-  const [drawing, setDrawing] = useState(true);
-
-  useEffect(() => {
-    setDrawing(true);
-    const timer = setTimeout(() => setDrawing(false), DRAW_MS);
-    return () => clearTimeout(timer);
-  }, [active, place.color, place.order, place.detail.visited]);
+  const drawing = useBake([active, place.color, place.order, place.detail.visited]);
 
   return (
     <Marker

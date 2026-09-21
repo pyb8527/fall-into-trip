@@ -2380,27 +2380,22 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: Radius.lg,
     borderTopRightRadius: Radius.lg,
     /*
-      지도 위에 얹히는 판이라 위쪽으로 그림자를 드리웁니다. 실선만 두면
-      지도의 길과 섞여 판의 시작이 보이지 않습니다.
+      지도 위에 얹히는 판이라 판이 어디서 시작하는지가 보여야 합니다.
+      한동안 위쪽으로 그림자를 드리웠습니다.
 
-      <p><b>안드로이드는 위쪽만 고를 수가 없습니다.</b> shadowOffset 은
+      <p><b>그런데 안드로이드는 위쪽만 고를 수가 없습니다.</b> shadowOffset 은
       iOS 전용이고, 안드로이드의 elevation 은 사방으로 같이 뿌립니다.
       그래서 판 아래쪽 그림자가 하단 띠 위에 떨어졌습니다 — 판도 띠도 같은
       색이라 이어진 한 면으로 보여야 하는데 그 사이에 얼룩만 하나 생겼습니다.
 
-      <p>안드로이드에서는 그림자 대신 위쪽에 실선 한 줄을 둡니다. 지도와
-      갈리는 자리는 거기뿐이고, 선 하나면 그 자리를 말하는 데 충분합니다.
-      이 앱은 원래 그림자를 거의 안 쓰기도 합니다.
+      <p>그래서 그림자를 걷고 <b>어디서나</b> 위쪽에 실선 한 줄만 둡니다.
+      한쪽만 고치면 같은 화면이 쪽마다 달라지고, 무엇보다 이 앱은 원래
+      그림자를 거의 안 씁니다 — 판만 혼자 그림자를 지고 있었습니다.
+      지도와 갈리는 자리는 위쪽 한 줄뿐이고, 선 하나면 그 자리를 말하는 데
+      충분합니다.
     */
-    ...Platform.select({
-      android: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.border },
-      default: {
-        shadowColor: '#000000',
-        shadowOpacity: 0.08,
-        shadowRadius: 24,
-        shadowOffset: { width: 0, height: -6 },
-      },
-    }),
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.border,
     /* 지도(안드로이드에서는 제 겉면을 따로 가진 것)보다 위에 서야 합니다. */
     zIndex: 2,
     overflow: 'hidden',
