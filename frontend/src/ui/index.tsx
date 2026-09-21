@@ -556,10 +556,12 @@ const OnFloor = createContext(false);
 
 
 /** 화면의 제목. 한 화면에 하나만. */
+/** 화면의 제목. 한 화면에 하나만. */
 export function Title({ children, tone }: { children: React.ReactNode; tone?: Tone }) {
   return <Text style={[styles.title, tone ? { color: toneColor[tone] } : null]}>{children}</Text>;
 }
 
+/** 카드나 묶음의 제목. */
 /** 카드나 묶음의 제목. */
 export function Subtitle({ children }: { children: React.ReactNode }) {
   return <Text style={styles.subtitle}>{children}</Text>;
@@ -2053,10 +2055,17 @@ export function ErrorNote({ message, onRetry }: { message: string; onRetry?: () 
   );
 }
 
+/**
+ * 아무것도 없을 때.
+ *
+ * <p>앱이 가장 차갑게 느껴지는 순간이 빈 화면입니다. 여느 본문보다 한 단
+ * 크게 적습니다 — 회색 글씨 한 줄이 "없습니다" 라고 말하는 것과, 손으로 적어
+ * 둔 것처럼 보이는 것은 다릅니다.
+ */
 export function Empty({ message }: { message: string }) {
   return (
     <View style={styles.center}>
-      <Body tone="muted">{message}</Body>
+      <Text style={styles.emptyLine}>{message}</Text>
     </View>
   );
 }
@@ -3018,6 +3027,13 @@ const styles = StyleSheet.create({
     ...Type.bodySmall,
     fontWeight: Weight.bold,
     color: Colors.accentSoft,
+  },
+  /* 빈 화면 한 줄. */
+  emptyLine: {
+    ...Type.body,
+    fontWeight: Weight.regular,
+    color: Colors.textSecondary,
+    textAlign: 'center',
   },
   center: {
     alignItems: 'center',

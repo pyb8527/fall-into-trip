@@ -12,11 +12,14 @@ import { Colors, Radius, Type } from '@/constants/theme';
  * 것인지 압니다. 매년 가는 곳이면 이름까지 비슷합니다("오사카", "오사카 2").
  * 색과 그림은 이름을 읽기 전에 눈에 걸립니다.
  *
- * <h3>안 정했으면 아무것도 안 그립니다</h3>
+ * <h3>안 정했으면 자리만 비워 둡니다</h3>
  *
- * <p>비어 있어도 자리를 잡아 두는 방법도 있지만, 그러면 정한 줄과 안 정한
- * 줄이 어긋난 채로 줄지어 섭니다. 아예 안 그리면 지금까지와 똑같은 목록이고,
- * 정한 것만 눈에 걸립니다.
+ * <p>처음에는 아예 안 그렸습니다. 정한 것만 눈에 걸리게 하려던 것인데,
+ * 실제로 목록에 세워 보니 <b>거꾸로였습니다</b> — 표식 없는 줄만 이름이
+ * 왼쪽으로 밀려서, 정한 줄과 안 정한 줄이 어긋난 채로 줄지어 섰습니다.
+ *
+ * <p>자리는 잡되 아무것도 안 그립니다. 줄은 가지런하고, 색과 그림이 있는
+ * 것만 눈에 걸립니다.
  *
  * <p>색만 정했으면 동그란 색, 그림만 정했으면 회색 바탕에 그림, 둘 다면
  * 그 색 바탕에 그림입니다. 흰 그림자 없이도 이모지는 어떤 색 위에서나
@@ -24,7 +27,8 @@ import { Colors, Radius, Type } from '@/constants/theme';
  */
 export function TripMark({ theme, emoji }: { theme: Maybe<string>; emoji: Maybe<string> }) {
   if (!theme && !emoji) {
-    return null;
+    /* 빈 자리. 줄을 맞추는 것 말고 하는 일이 없습니다. */
+    return <View style={styles.blank} />;
   }
   return (
     <View
@@ -51,5 +55,9 @@ const styles = StyleSheet.create({
   },
   emoji: {
     ...Type.bodySmall,
+  },
+  blank: {
+    width: 34,
+    height: 34,
   },
 });

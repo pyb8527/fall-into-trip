@@ -33,9 +33,18 @@
 }
 
 :root {
-  /* 프리텐다드가 도착하기 전까지 쓸 것들. 위에서 아래로 한글이 또렷한 순서. */
+  /*
+    이 앱의 글자.
+
+    <p>맨 앞이 이서윤체입니다. 이 글꼴은 CSS 가 아니라 expo-font 가 붙입니다
+    (ui/hand) — 웹과 앱이 같은 파일 하나를 써야 해서입니다. 도착하기 전에는
+    이 줄의 다음 것(프리텐다드)으로 그려지다가 조용히 갈아 끼워집니다.
+
+    <p>뒤쪽은 프리텐다드마저 못 받았을 때 쓸 것들입니다. 위에서 아래로
+    한글이 또렷한 순서.
+  */
   --font-sans:
-    Pretendard, -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Segoe UI',
+    LeeSeoyun, Pretendard, -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Segoe UI',
     'Malgun Gothic', 'Noto Sans KR', system-ui, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }

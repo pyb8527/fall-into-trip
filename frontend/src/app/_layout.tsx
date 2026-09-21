@@ -6,6 +6,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AuthProvider, useAuth } from '@/auth/auth-provider';
 import { Colors, Fonts, Type, Weight } from '@/constants/theme';
+import { HandFont } from '@/ui/hand';
 import { stackHeader } from '@/ui/nav';
 
 /**
@@ -55,6 +56,10 @@ export default function RootLayout() {
     /* 노치·홈 인디케이터 크기를 화면들이 물어볼 수 있게 가장 바깥에 둡니다. */
     <SafeAreaProvider>
       <AuthProvider>
+        {/* 제목에 쓰는 손글씨를 받아 둡니다. 기다리지는 않습니다 — 제목 하나
+            때문에 첫 화면을 붙들고 있을 이유가 없고, 도착하면 조용히 갈아
+            끼워집니다. */}
+        <HandFont>
         <ThemeProvider value={navigationTheme}>
           <StatusBar style="dark" />
           <SplashGate />
@@ -87,6 +92,7 @@ export default function RootLayout() {
             <Stack.Screen name="admin" options={{ headerShown: false }} />
           </Stack>
         </ThemeProvider>
+        </HandFont>
       </AuthProvider>
     </SafeAreaProvider>
   );

@@ -266,8 +266,8 @@ export type Theme = { readonly [K in ThemeColor]: string };
  * 본뜬 글꼴(Apple SD Gothic Neo)을 쓰므로 차이가 거의 없습니다.
  */
 export const Fonts = Platform.select({
-  ios: { sans: 'system-ui', mono: 'ui-monospace' },
-  default: { sans: 'normal', mono: 'monospace' },
+  ios: { sans: 'LeeSeoyun', mono: 'ui-monospace' },
+  default: { sans: 'LeeSeoyun', mono: 'monospace' },
   web: { sans: 'var(--font-sans)', mono: 'var(--font-mono)' },
 })!;
 
@@ -282,7 +282,16 @@ export const Fonts = Platform.select({
  * 하나만 펼치면 크기·줄높이·글꼴이 한꺼번에 붙습니다. 전에는 Fonts 를
  * 만들어 두고 어디서도 쓰지 않아, 글꼴을 실어도 화면에는 붙지 않았습니다.
  */
-const family = Platform.OS === 'web' ? { fontFamily: Fonts.sans } : {};
+/*
+  이제 앱에도 붙입니다.
+
+  <p>전에는 웹에만 붙였습니다. 앱은 기기 글꼴을 쓰기로 했었고, 등록되지 않은
+  이름을 넘기면 안드로이드가 글자를 아예 안 그릴 수 있어서였습니다.
+
+  <p>지금은 글꼴을 번들에 싣고(assets/fonts) 첫 화면 전에 받아 둡니다
+  (ui/hand). 받아지기 전에는 이 이름이 비어 있으므로 기기 글꼴로 그려집니다.
+*/
+const family = { fontFamily: Fonts.sans };
 
 /**
  * 글자 크기와 줄 높이 — TDS 본 타이포그래피 7단계 그대로입니다.
@@ -295,18 +304,25 @@ const family = Platform.OS === 'web' ? { fontFamily: Fonts.sans } : {};
  */
 export const Type = {
   /*
-    색을 걷어 냈으므로 위계를 글자가 혼자 집니다. 그래서 큰 것은 더
-    크고 더 좁게, 작은 것은 더 조용하게 벌립니다. 단계 사이가 가까우면
+    색을 걷어 냈으므로 위계를 글자가 혼자 집니다. 단계 사이가 가까우면
     무채색 화면에서는 아무 단계도 없는 것처럼 보입니다.
+
+    <h3>자간을 조이지 않습니다</h3>
+
+    <p>여기 숫자들은 프리텐다드에 맞춰 음수로 조여 두었던 것입니다. 반듯한
+    고딕은 글자 폭이 고르게 짜여 있어 조여야 덩어리로 읽히는데, 손글씨는
+    글자마다 폭이 들쭉날쭉해서 조이면 <b>획이 서로 닿습니다.</b>
+
+    <p>굵기도 이제 위계를 안 집니다(Weight 참고). 크기와 색이 집니다.
   */
-  display: { ...family, fontSize: 34, lineHeight: 40, letterSpacing: -1.4 },
-  title: { ...family, fontSize: 26, lineHeight: 33, letterSpacing: -1.0 },
-  heading: { ...family, fontSize: 21, lineHeight: 28, letterSpacing: -0.7 },
-  subheading: { ...family, fontSize: 18, lineHeight: 26, letterSpacing: -0.5 },
+  display: { ...family, fontSize: 34, lineHeight: 40, letterSpacing: 0 },
+  title: { ...family, fontSize: 26, lineHeight: 33, letterSpacing: 0 },
+  heading: { ...family, fontSize: 21, lineHeight: 28, letterSpacing: 0 },
+  subheading: { ...family, fontSize: 18, lineHeight: 26, letterSpacing: 0 },
   /** 본문·입력칸. 16 아래로 내리면 iOS 사파리가 입력할 때 화면을 확대합니다. */
-  body: { ...family, fontSize: 16, lineHeight: 25, letterSpacing: -0.3 },
-  bodySmall: { ...family, fontSize: 14, lineHeight: 21, letterSpacing: -0.2 },
-  caption: { ...family, fontSize: 12, lineHeight: 18, letterSpacing: -0.1 },
+  body: { ...family, fontSize: 16, lineHeight: 25, letterSpacing: 0 },
+  bodySmall: { ...family, fontSize: 14, lineHeight: 21, letterSpacing: 0 },
+  caption: { ...family, fontSize: 12, lineHeight: 18, letterSpacing: 0 },
   /**
    * 구역 이름표.
    *
@@ -317,13 +333,33 @@ export const Type = {
   label: { ...family, fontSize: 11, lineHeight: 16, letterSpacing: 1.4 },
 } as const;
 
+/**
+ * 글자 굵기.
+ *
+ * <h3>전부 400 입니다</h3>
+ *
+ * <p>이서윤체는 <b>1종</b>입니다 — 굵기 파일이 하나뿐입니다. 없는 굵기를
+ * 적어 두면 브라우저와 기기가 <b>합성</b>합니다. 획을 조금 옆으로 밀어 한 번
+ * 더 그리는 방식인데, 반듯한 고딕에서는 그럭저럭 봐줄 만해도 손글씨처럼 획이
+ * 가늘고 굽은 글꼴에서는 획끼리 붙어 <b>먹으로 번진 것처럼</b> 됩니다.
+ * 실제로 첫 판에서 제목이 그렇게 나왔습니다.
+ *
+ * <h3>그러면 위계는 무엇이 지는가</h3>
+ *
+ * <p>여태 굵기가 졌습니다("무채색에서 가장 강한 것을 만들 방법은 굵기뿐").
+ * 이제 <b>크기와 색</b>이 집니다 — 제목은 더 크고, 곁다리는 더 옅습니다.
+ * 그래서 Type 의 단계 사이를 벌려 두었습니다.
+ *
+ * <p>이름은 남겨 둡니다. 화면 이백 군데가 이 이름들을 부르고 있어서, 지우면
+ * 그 자리마다 "무엇으로 바꿀지" 를 다시 정해야 합니다. 나중에 굵기가 여럿인
+ * 글꼴로 갈아탈 일이 생기면 여기 숫자만 되돌리면 됩니다.
+ */
 export const Weight = {
   regular: '400',
-  medium: '500',
-  semibold: '600',
-  bold: '700',
-  /* 무채색에서 "가장 강한 것" 을 만들 방법은 굵기뿐입니다. */
-  heavy: '800',
+  medium: '400',
+  semibold: '400',
+  bold: '400',
+  heavy: '400',
 } as const;
 
 /* ---------------------------------------------------------------- 치수 */
