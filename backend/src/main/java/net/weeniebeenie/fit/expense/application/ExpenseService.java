@@ -356,6 +356,32 @@ public class ExpenseService {
      * <p>고칠 때는 비운 칸을 건드리지 않습니다 — null 은 "손대지 마라" 이고,
      * 빈 문자열이 "지워라" 입니다.
      */
+    /**
+     * 여행마다 얼마나 썼는지.
+     *
+     * <p>가계부 목록 화면이 씁니다. 볼 수 있는 여행만 넘겨받으므로 여기서
+     * 다시 권한을 보지 않습니다 — 부르는 쪽이 이미 걸렀습니다.
+     */
+    @Transactional(readOnly = true)
+    public Map<String, List<Sum>> spentBy(List<String> tripIds) {
+        if (tripIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, List<Sum>> out = new LinkedHashMap<>();
+        for (ExpenseRepository.TripSpend row : expenses.sumByTrip(tripIds)) {
+            out.computeIfAbsent(row.getTripId(), k -> new ArrayList<>())
+                    .add(new Sum(row.getCurrency(),
+                            Currencies.decimals(row.getCurrency()),
+                            row.getTotal(),
+                            row.getItems()));
+        }
+        return out;
+    }
+
+    /** 한 여행에서 한 통화로 쓴 것. */
+    public record Sum(String currency, int decimals, long total, long items) {
+    }
+
     public record Draft(String dayId, String placeId, String payerId, String cat,
                         String name, Integer amount, String currency, String pay,
                         List<String> share, Long version) {

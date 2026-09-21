@@ -1,4 +1,5 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
+import { PathTitle } from '@/ui/nav';
 import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
@@ -175,7 +176,14 @@ export default function Money() {
           <Button label="쓴 돈 적기" onPress={() => setEditing('new')} />
         ) : undefined
       }>
-      <Stack.Screen options={{ title: trip?.trip.title ?? '가계부' }} />
+      <Stack.Screen
+        options={{
+          title: trip?.trip.title ?? '가계부',
+          headerTitle: () => (
+            <PathTitle parent={trip?.trip.title ?? '여행'} title="가계부" />
+          ),
+        }}
+      />
 
       <SegmentedTabs
         items={[

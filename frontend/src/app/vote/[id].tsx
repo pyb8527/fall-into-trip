@@ -1,4 +1,5 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { PathTitle } from '@/ui/nav';
 import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
@@ -96,7 +97,14 @@ export default function Vote() {
           <Button label="가고 싶은 곳 올리기" onPress={() => setAdding(true)} />
         )
       }>
-      <Stack.Screen options={{ title: trip?.trip.title ?? '가고 싶은 곳' }} />
+      <Stack.Screen
+        options={{
+          title: trip?.trip.title ?? '가고 싶은 곳',
+          headerTitle: () => (
+            <PathTitle parent={trip?.trip.title ?? '여행'} title="가고 싶은 곳" />
+          ),
+        }}
+      />
 
       <View style={styles.head}>
         <Title>가고 싶은 곳</Title>

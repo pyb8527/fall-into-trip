@@ -1,4 +1,5 @@
 import { Stack, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
+import { PathTitle } from '@/ui/nav';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -978,6 +979,9 @@ export default function TripScreen() {
       <Stack.Screen
         options={{
           title: data.trip.title,
+          /* 내 여행 › 도쿄 여행. 어느 목록에서 들어온 것인지가 보여야
+             띠에서 「내 여행」에 불이 들어온 까닭도 읽힙니다. */
+          headerTitle: () => <PathTitle parent="내 여행" title={data.trip.title} />,
           /*
             막대를 비쳐 두었더니 여행 이름이 지도 무늬 위에 그냥 얹혀 읽히지
             않았습니다. 지도 위에 떠 있는 동그란 단추와 맨 글자 제목이 나란히

@@ -34,7 +34,9 @@ import {
   Row,
   Screen,
   SearchField,
+  Snack,
   Split,
+  useUndo,
 } from '@/ui';
 import { AppTabs } from '@/ui/tab-bar';
 
@@ -99,6 +101,7 @@ export default function Saved() {
     것이 곧바로 비칩니다.
   */
   const [lookingId, setLookingId] = useState<string | null>(null);
+  const { undo, show: showUndo, hide: hideUndo } = useUndo();
   const [taggingId, setTaggingId] = useState<string | null>(null);
 
   const { data, error, loading, reload, setData } = useAsync<{ places: SavedPlace[] }>(
@@ -191,6 +194,60 @@ export default function Saved() {
     });
   }
 
+  /**
+   * 고른 것들을 보석함에서 뺍니다.
+   *
+   * <p>되돌리기는 <b>같은 내용을 다시 담는 것</b>입니다 — 서버에 되살리는
+   * 길이 없습니다. 번호가 새로 붙고 담은 시각이 지금이 되는데, 보석함은
+   * 번호로 남을 부르는 곳이 아니라 상관없습니다. 어느 글에서 담아 왔는지
+   * 까지 같이 들고 갔다 옵니다.
+   */
+  async function dropPicked() {
+    const targets = all.filter((p) => picked.has(p.id));
+    if (targets.length === 0) {
+      return;
+    }
+    setFailed(null);
+    try {
+      await Promise.all(targets.map((p) => api.delete(`/api/saved/${p.id}`)));
+      setPicked(new Set());
+      reload();
+      showUndo({
+        message:
+          targets.length === 1
+            ? `「${targets[0].name}」 를 뺐습니다.`
+            : `${targets.length}곳을 뺐습니다.`,
+        onUndo: () => restore(targets),
+      });
+    } catch (e) {
+      setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
+    }
+  }
+
+  /** 뺀 것을 같은 내용으로 다시 담습니다. */
+  async function restore(places: SavedPlace[]) {
+    setFailed(null);
+    try {
+      await Promise.all(
+        places.map((p) =>
+          api.post('/api/saved', {
+            name: p.name,
+            lat: p.lat,
+            lng: p.lng,
+            placeId: p.placeId,
+            cat: p.cat,
+            icon: p.icon,
+            note: p.note,
+            fromPost: p.fromPost,
+          }),
+        ),
+      );
+      reload();
+    } catch (e) {
+      setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
+    }
+  }
+
   async function drop(id: string) {
     setFailed(null);
     setLookingId(null);
@@ -243,9 +300,33 @@ export default function Saved() {
   return (
     <Screen
       tabs={<AppTabs />}
+      snack={<Snack undo={undo} onHide={hideUndo} />}
       footer={
         picked.size > 0 ? (
-          <Button label={`${picked.size}곳 일정에 넣기`} onPress={() => setPouring(true)} />
+          <Row gap={Spacing.sm}>
+            <Grow>
+              <Button label={`${picked.size}곳 일정에 넣기`} onPress={() => setPouring(true)} />
+            </Grow>
+            {/*
+              빼는 길이 여기 있어야 합니다.
+
+              <p>빼는 단추가 <b>들여다보는 판 맨 아래</b>에만 있었습니다.
+              줄을 눌러 ⓘ 를 열고, 지도와 영업시간과 메모 칸을 지나 끝까지
+              내려야 나옵니다 — 스무 곳을 정리하려면 스무 번을 그렇게 해야
+              했고, 그래서 사실상 못 빼는 기능이었습니다.
+
+              <p>이미 고르는 몸짓이 있습니다(왼쪽 네모). 고른 것을 일정에
+              넣을 수 있으면 뺄 수도 있어야 합니다. 여러 개를 한 번에
+              거두는 것도 그제야 됩니다.
+
+              <p>미리 묻지 않습니다. 뺀 뒤에 되돌리는 띠가 잠깐 뜹니다.
+            */}
+            <Button
+              label="빼기"
+              variant="secondary"
+              onPress={() => dropPicked()}
+            />
+          </Row>
         ) : undefined
       }>
       {/*

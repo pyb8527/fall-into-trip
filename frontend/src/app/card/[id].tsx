@@ -1,4 +1,5 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
+import { PathTitle } from '@/ui/nav';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
@@ -84,7 +85,12 @@ export default function Card() {
 
   return (
     <Screen tabs={<TripTabs tripId={id} active="card" />}>
-      <Stack.Screen options={{ title: data.trip.title }} />
+      <Stack.Screen
+        options={{
+          title: data.trip.title,
+          headerTitle: () => <PathTitle parent={data.trip.title} title="여행 요약" />,
+        }}
+      />
 
       <SegmentedTabs items={FACES} value={face} onChange={setFace} />
 

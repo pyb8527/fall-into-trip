@@ -43,6 +43,8 @@ export default function AppLayout() {
       <Stack.Screen name="home" options={{ headerShown: false }} />
       <Stack.Screen name="trips" options={stackHeader('내 여행')} />
       <Stack.Screen name="saved" options={stackHeader('보석함')} />
+      {/* 제목을 화면 안에 두므로 막대를 감춥니다 — 홈과 같은 방식입니다. */}
+      <Stack.Screen name="money" options={{ headerShown: false }} />
       <Stack.Screen name="popular" options={stackHeader('여럿이 간 곳')} />
       <Stack.Screen name="news" options={stackHeader('소식')} />
       <Stack.Screen name="settings" options={stackHeader('내 계정')} />

@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
@@ -96,7 +96,15 @@ export default function Community() {
   /* 글자를 칠 때마다 부르면 요청이 쏟아집니다. 확인 버튼으로만 보냅니다. */
   const [typed, setTyped] = useState('');
   const [q, setQ] = useState('');
-  const [region, setRegion] = useState<string | null>(null);
+  /*
+    어디를 보고 있는지.
+
+    <p>주소로 받은 것이 있으면 그것으로 시작합니다. 「여럿이 간 곳」에서
+    지역을 누르면 여기로 보내는데, 받아 읽는 데가 없어서 <b>조건이 안 걸린
+    전체 목록</b>이 떴습니다 — 누른 보람이 없었습니다.
+  */
+  const { region: fromLink } = useLocalSearchParams<{ region?: string }>();
+  const [region, setRegion] = useState<string | null>(fromLink ?? null);
   const [days, setDays] = useState<PostDays | null>(null);
 
   /* 고를 수 있는 지역은 서버가 정합니다. 화면에 따로 적어 두면 언젠가

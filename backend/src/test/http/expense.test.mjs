@@ -327,5 +327,43 @@ T("장소 삭제", r.status === 200, r.data);
 r = await call("GET", `/api/trips/${tripId}/expenses`, { token: A });
 T("지출은 남는다", !!r.data.expenses.find((e) => e.id === ramen), r.data.expenses);
 
+/* --------------------------------------------------------- 가계부 목록
+   아래 갈래 띠의 「가계부」가 여행 목록을 빌려 쓰고 있었습니다. 그래서
+   가계부를 눌렀는데 주소가 /trips 가 되고, 띠는 그것을 보고 「내 여행」에
+   불을 켰습니다.
+
+   가계부만의 목록을 두면서 생긴 자리입니다. 여행마다 따로 묻지 않고 한 번에
+   받아 옵니다 — 마흔 개를 가진 사람에게는 그것이 곧 마흔 번의 왕복입니다. */
+console.log("\n[10] 가계부 목록");
+r = await call("GET", "/api/expenses/summary", { token: A });
+T("불린다", r.status === 200, r.data);
+let sumRow = r.data.trips.find((t) => t.id === tripId);
+T("이 여행이 있다", !!sumRow, r.data.trips.map((t) => t.id));
+T("적은 만큼 센다", sumRow?.items > 0, sumRow);
+T("통화를 안 합친다", Array.isArray(sumRow?.sums), sumRow);
+
+/* 한 건도 안 적은 여행도 냅니다. 오히려 그쪽이 "여기 적어야 하는데" 를
+   떠올리게 하는 자리입니다. */
+r = await call("POST", "/api/trips", { token: A, body: { title: "빈 여행", startIso: "2027-03-01", nights: 1 } });
+const emptyTrip = r.data.trip.id;
+r = await call("GET", "/api/expenses/summary", { token: A });
+const emptyRow = r.data.trips.find((t) => t.id === emptyTrip);
+T("한 건도 없는 여행도 나온다", !!emptyRow, r.data.trips.map((t) => t.title));
+T("합계가 비어 있다", emptyRow?.sums.length === 0 && emptyRow?.items === 0, emptyRow);
+
+/* 여행 표식이 함께 실려 와야 목록에서 색과 그림을 그릴 수 있습니다. */
+r = await call("PATCH", `/api/trips/${emptyTrip}`, { token: A, body: { theme: "#3182f6", emoji: "X" } });
+T("표식을 고친다", r.status === 200, r.data);
+r = await call("GET", "/api/expenses/summary", { token: A });
+const marked = r.data.trips.find((t) => t.id === emptyTrip);
+T("표식이 실려 온다", marked?.theme === "#3182f6" && marked?.emoji === "X", marked);
+r = await call("PATCH", `/api/trips/${emptyTrip}`, { token: A, body: { theme: "#123456" } });
+T("우리 팔레트가 아닌 색은 거절", r.status === 400, r.data);
+
+/* 볼 수 있는 것만 셉니다. */
+r = await call("GET", "/api/expenses/summary", { token: X });
+T("남에게는 내 여행이 안 보인다",
+  !r.data.trips.some((t) => t.id === tripId), r.data.trips.map((t) => t.id));
+
 console.log(`\n결과: ${pass} 통과 / ${fail} 실패`);
 process.exit(fail ? 1 : 0);

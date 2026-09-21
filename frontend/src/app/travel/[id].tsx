@@ -1,4 +1,5 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { PathTitle } from '@/ui/nav';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
@@ -166,6 +167,9 @@ export default function Travel() {
       <Stack.Screen
         options={{
           title: data.trip.title,
+          /* 넷이 모두 여행 이름만 달고 있어서, 지금 보는 것이 일정인지
+             여행 중인지는 화면 안을 봐야 알았습니다. */
+          headerTitle: () => <PathTitle parent={data.trip.title} title="여행 중" />,
           headerRight: () => (
             <Button
               label="일정 전체"

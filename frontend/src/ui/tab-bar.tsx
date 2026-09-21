@@ -1,5 +1,5 @@
 import { usePathname, useRouter } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Colors, Radius, Spacing, TabDock, Tap, Type, Weight } from '@/constants/theme';
@@ -131,7 +131,10 @@ export function AppTabs() {
           label: '가계부',
           icon: 'credit-card',
           active: here.startsWith('/money'),
-          onPress: () => router.push('/(app)/trips?for=money'),
+          /* 여행 목록을 빌려 쓰고 있었습니다. 그래서 가계부를 눌렀는데
+             주소가 /trips 가 되고, 띠는 그것을 보고 「내 여행」에 불을
+             켰습니다. 가계부만의 목록을 둡니다. */
+          onPress: () => router.push('/(app)/money'),
         },
       ]}
     />
@@ -250,7 +253,18 @@ const styles = StyleSheet.create({
     /* 비우라고 알려 준 높이와 실제 높이가 같아야 합니다. 안 맞으면 어떤
        화면은 띠 뒤로 한 줄이 들어가고 어떤 화면은 쓸데없이 떠 있습니다. */
     minHeight: TabDock,
+    /*
+      웹에서는 fixed 입니다.
+
+      <p>absolute 는 <b>부모</b>의 바닥에 붙습니다. 부모가 화면과 꼭 같은
+      높이일 때만 그것이 화면 바닥이고, 폰 브라우저에서는 주소창이 오르내리며
+      그 전제가 깨집니다 — 띠가 바닥에서 한 자락 떠 있었습니다.
+
+      <p>fixed 는 지금 보이는 화면에 붙습니다. 부모가 얼마나 크든 상관없이
+      늘 맨 아래입니다. 앱에는 fixed 가 없으므로 그쪽은 absolute 그대로입니다.
+    */
     position: 'absolute',
+    ...Platform.select({ web: { position: 'fixed' as 'absolute' }, default: {} }),
     left: 0,
     right: 0,
     bottom: 0,

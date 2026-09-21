@@ -74,6 +74,10 @@ export default function RootLayout() {
             <Stack.Screen name="index" options={{ headerShown: false }} />
             <Stack.Screen name="(auth)" options={{ headerShown: false }} />
             <Stack.Screen name="(app)" options={{ headerShown: false }} />
+            {/* 여행에 딸린 화면들은 <b>여행 이름</b>이 부모입니다. 그 이름은
+                여기서 알 수 없으므로 화면이 받아 온 뒤에 스스로 답니다
+                (각 화면의 Stack.Screen). 여기 적는 것은 아직 못 받았을
+                때 잠깐 보일 이름입니다. */}
             <Stack.Screen name="trip/[id]" options={stackHeader('일정')} />
             <Stack.Screen name="travel/[id]" options={stackHeader('여행 중', { toTrip: true })} />
             <Stack.Screen name="vote/[id]" options={stackHeader('가고 싶은 곳', { toTrip: true })} />

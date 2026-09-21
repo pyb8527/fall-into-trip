@@ -1,4 +1,5 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { PathTitle } from '@/ui/nav';
 import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
@@ -66,7 +67,23 @@ export default function Post() {
   const [notice, setNotice] = useState<string | null>(null);
   /** 펼쳐 둔 날. 첫날만 열어 둡니다 — 다 접히면 제목만 늘어선 화면이 됩니다. */
   const [opened, setOpened] = useState<Set<number>>(() => new Set([0]));
-  const [savedNames, setSavedNames] = useState<Set<string>>(new Set());
+  /*
+    내 보석함에 이미 있는 것들. 이름 → 담아 둔 번호.
+
+    <h3>왜 처음에 받아 오는가</h3>
+
+    <p>이 화면에서 담은 것만 기억하고 있었습니다. 그래서 <b>어제 담아 둔
+    곳</b>은 표시가 비어 있었고, 남의 일정을 보면서 "이거 담았던가" 를 알
+    길이 없어 같은 곳을 또 눌렀습니다.
+
+    <p>번호까지 들고 있어야 빼는 것도 됩니다. 이름만으로는 무엇을 빼야
+    하는지 서버에 말할 수 없습니다.
+
+    <p>이름으로 맞춰 봅니다. 사본의 장소에는 우리 보석함 번호가 없고,
+    구글 번호도 좌표만 찍어 넣은 곳에는 없습니다. 같은 글 안에서 이름이
+    겹치는 일은 드뭅니다.
+  */
+  const [savedIds, setSavedIds] = useState<Map<string, string>>(new Map());
   /** 댓글 판을 열어 둔 장소. */
   const [at, setAt] = useState<{ dayIndex: number; placeIndex: number } | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
@@ -146,10 +163,67 @@ export default function Post() {
    * 두 번 담지 않지만, 화면이 그것을 모르면 눌러도 아무 일도 안 일어나는
    * 것처럼 보입니다.
    */
+  /*
+    로그인한 사람의 보석함을 한 번 읽어 둡니다.
+
+    <p>로그인 안 했으면 부르지 않습니다 — 401 이 돌아오고, 그 화면에서는
+    어차피 담을 수도 없습니다.
+  */
+  useEffect(() => {
+    if (!user) {
+      setSavedIds(new Map());
+      return;
+    }
+    let alive = true;
+    api
+      .get<{ places: { id: string; name: string }[] }>('/api/saved')
+      .then((res) => {
+        if (alive) {
+          setSavedIds(new Map(res.places.map((p) => [p.name, p.id])));
+        }
+      })
+      .catch(() => {
+        /* 못 읽어도 화면은 돕니다. 표시가 비어 있을 뿐입니다. */
+      });
+    return () => {
+      alive = false;
+    };
+  }, [user]);
+
+  /**
+   * 담고, 다시 누르면 뺍니다.
+   *
+   * <p>담는 길만 있었습니다. 잘못 누르면 보석함으로 가서 찾아 빼야 했는데,
+   * 그건 한 번 누른 것을 되돌리는 값으로는 너무 비쌉니다.
+   */
+  async function toggleSave(place: ItineraryPlace) {
+    const had = savedIds.get(place.name);
+    if (had) {
+      await unsave(place.name, had);
+      return;
+    }
+    await save(place);
+  }
+
+  async function unsave(name: string, savedId: string) {
+    setFailed(null);
+    try {
+      await api.delete(`/api/saved/${savedId}`);
+      setSavedIds((prev) => {
+        const next = new Map(prev);
+        next.delete(name);
+        return next;
+      });
+      setNotice(`「${name}」 를 보석함에서 뺐습니다.`);
+    } catch (e) {
+      setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
+    }
+  }
+
   async function save(place: ItineraryPlace) {
     setFailed(null);
     try {
-      await api.post('/api/saved', {
+      const res = await api.post<{ place: { id: string } }>('/api/saved', {
         name: place.name,
         lat: place.lat,
         lng: place.lng,
@@ -161,7 +235,7 @@ export default function Post() {
         note: place.note,
         fromPost: id,
       });
-      setSavedNames((prev) => new Set(prev).add(place.name));
+      setSavedIds((prev) => new Map(prev).set(place.name, res.place.id));
       setNotice(`「${place.name}」 를 보석함에 담았습니다.`);
     } catch (e) {
       setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
@@ -280,7 +354,12 @@ export default function Post() {
           </View>
         </Row>
       }>
-      <Stack.Screen options={{ title: data.title }} />
+      <Stack.Screen
+        options={{
+          title: data.title,
+          headerTitle: () => <PathTitle parent="여행 둘러보기" title={data.title} />,
+        }}
+      />
 
       <View style={styles.head}>
         <Title>{data.title}</Title>
@@ -317,8 +396,8 @@ export default function Post() {
               return next;
             })
           }
-          onSave={(place, at) => (user ? save(place) : needLogin('save', `${i}:${at}`))}
-          savedNames={savedNames}
+          onSave={(place, at) => (user ? toggleSave(place) : needLogin('save', `${i}:${at}`))}
+          savedIds={savedIds}
           feedback={data.feedback}
           countAt={(placeIndex) => perPlace.get(`${i}:${placeIndex}`) ?? 0}
           onComment={(placeIndex) => setAt({ dayIndex: i, placeIndex })}
@@ -429,14 +508,14 @@ export default function Post() {
         actions={
           looking ? (
             <Button
-              label={savedNames.has(looking.name) ? '보석함에 담김' : '보석함에 담기'}
+              label={savedIds.has(looking.name) ? '보석함에서 빼기' : '보석함에 담기'}
+              variant={savedIds.has(looking.name) ? 'secondary' : 'primary'}
               compact
-              disabled={savedNames.has(looking.name)}
               onPress={() => {
                 const target = looking;
                 setLooking(null);
                 if (user) {
-                  save(target);
+                  toggleSave(target);
                 } else {
                   needLogin('save', target.name);
                 }
@@ -472,7 +551,7 @@ function DayBlock({
   open,
   onToggle,
   onSave,
-  savedNames,
+  savedIds,
   feedback,
   countAt,
   onComment,
@@ -488,7 +567,8 @@ function DayBlock({
   /** @param at 이 날에서 몇 번째 장소인지. 가입하고 돌아왔을 때 그 자리를 다시 찾는 데 씁니다. */
   onSave: (place: ItineraryPlace, at: number) => void;
   /** 이미 담은 곳. 별을 채워 두면 두 번 누르지 않습니다. */
-  savedNames: Set<string>;
+  /** 보석함에 이미 있는 것들. 이름 → 담아 둔 번호. */
+  savedIds: Map<string, string>;
   /** 댓글을 받는 글인지. 안 열었으면 댓글 단추를 두지 않습니다. */
   feedback: boolean;
   /** 이 장소에 달린 댓글 수. */
@@ -614,11 +694,13 @@ function DayBlock({
             onPress={() => onLook(place)}
           />
           {/* 일정을 통째로 가져오지 않고 이 집만 담을 수 있어야 합니다. */}
+          {/* 담긴 것은 눌러서 뺍니다. 담는 길만 있으면 잘못 누른 뒤에
+              보석함까지 찾아가야 합니다. */}
           <IconButton
             name="bookmark"
-            label={`${place.name} 담기`}
-            tone={savedNames.has(place.name) ? 'accent' : 'default'}
-            active={savedNames.has(place.name)}
+            label={savedIds.has(place.name) ? `${place.name} 빼기` : `${place.name} 담기`}
+            tone={savedIds.has(place.name) ? 'accent' : 'default'}
+            active={savedIds.has(place.name)}
             onPress={() => onSave(place, i)}
           />
         </Row>
