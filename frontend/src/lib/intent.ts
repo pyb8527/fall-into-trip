@@ -1,6 +1,11 @@
 import { createLLMChatSession, download, models } from 'react-native-executorch';
-import type { LLMChatSession } from 'react-native-executorch';
+import type { LLMChatSession, LLMChatTurnResult, LLMModel } from 'react-native-executorch';
 
+import {
+  PROMPT as BOOKING_PROMPT,
+  SHOTS as BOOKING_SHOTS,
+  readBooking,
+} from '@/lib/booking-prompt';
 import { PROMPT, SHOTS, readIntent } from '@/lib/intent-prompt';
 import type { Booking, Intent, IntentState, Progress } from '@/lib/intent-types';
 
@@ -52,6 +57,23 @@ export function modelNote(): string {
 }
 
 let session: LLMChatSession | null = null;
+
+/**
+ * 지금 띄워 둔 세션이 무슨 일을 하도록 차려졌는지.
+ *
+ * <h3>왜 하나만 띄우는가</h3>
+ *
+ * <p>쪼개는 일이 둘입니다 — 찾는 문장("비 올 때 갈 만한 실내")과 예약
+ * 확인서. 시키는 말(system prompt)이 달라서 세션도 따로여야 합니다.
+ *
+ * <p>그런데 둘을 같이 띄워 두면 1.5B 짜리가 폰 메모리에 두 벌 올라갑니다.
+ * 중급 기기에서 그것은 앱이 죽는 길입니다.
+ *
+ * <p>한 번에 하나만 둡니다. 다른 일이 필요하면 내리고 새로 차립니다 —
+ * 예약 붙여넣기는 여행 하나에 한두 번 있는 일이라, 그때 한두 초 더
+ * 걸리는 것이 메모리를 두 배로 쓰는 것보다 낫습니다.
+ */
+let job: 'intent' | 'booking' | null = null;
 let state: IntentState = 'absent';
 
 export function intentState(): IntentState {
@@ -80,25 +102,8 @@ export async function fetchModel(onProgress?: (p: Progress) => void): Promise<bo
     /* 원격 주소가 로컬 경로로 바뀌어 돌아옵니다. 이미 받아 둔 것이면
        네트워크를 타지 않습니다. */
     const local = await download(MODEL, { onProgress });
-    session = await createLLMChatSession(local, {
-      generationConfig: {
-        maxNewTokens: MAX_TOKENS,
-        /* 쪼개는 일에 창의성은 방해입니다. 같은 문장에는 같은 답이
-           나와야 합니다. */
-        temperature: 0,
-      },
-      initialMessages: [{ role: 'system', content: PROMPT }, ...SHOTS],
-      /*
-        중괄호가 닫히면 멈춥니다.
-
-        모델이 JSON 하나를 내놓고도 "이렇게 쪼갰습니다" 하고 말을 잇는 일이
-        있습니다. 뒤를 안 기다리면 그만큼 빨리 끝납니다.
-      */
-      stopRegex: /\}/,
-      /* 매번 새로 시작합니다. 앞의 질의가 다음 답에 스며들면 "아까 그
-         카페 근처" 같은 것을 지어내기 시작합니다. */
-      resetOnTurn: true,
-    });
+    modelPath = local;
+    await sit('intent');
     state = 'ready';
     return true;
   } catch {
@@ -106,6 +111,74 @@ export async function fetchModel(onProgress?: (p: Progress) => void): Promise<bo
     session = null;
     return false;
   }
+}
+
+/**
+ * 받아 둔 모델이 어디 있는지. 두 번째로 차릴 때 다시 안 받습니다.
+ *
+ * <p>{@code download} 가 원격 주소를 로컬 경로로 바꿔 돌려준 것입니다 —
+ * 생김새는 원본과 같고 안의 주소만 바뀌어 있습니다.
+ */
+let modelPath: LLMModel | null = null;
+
+/**
+ * 세션을 그 일에 맞게 차려 둡니다. 이미 그 일이면 아무것도 안 합니다.
+ *
+ * <p>시키는 말과 보기(shots)만 다르고 나머지 설정은 같습니다 — 둘 다
+ * "JSON 하나만 내놓아라" 는 일이라 창의성도 말수도 필요 없습니다.
+ */
+async function sit(want: 'intent' | 'booking') {
+  if (job === want && session) {
+    return;
+  }
+  if (!modelPath) {
+    throw new Error('아직 안 받았습니다');
+  }
+  try {
+    session?.dispose();
+  } catch {
+    /* 이미 내려갔습니다. */
+  }
+  session = null;
+  job = null;
+
+  const [say, shots] =
+    want === 'intent'
+      ? [PROMPT, SHOTS]
+      : [BOOKING_PROMPT, BOOKING_SHOTS];
+
+  session = await createLLMChatSession(modelPath, {
+    generationConfig: {
+      /* 예약은 칸이 다섯이라 한 줄짜리 추천보다 답이 깁니다. */
+      maxNewTokens: want === 'booking' ? BOOKING_TOKENS : MAX_TOKENS,
+      /* 쪼개는 일에 창의성은 방해입니다. 같은 문장에는 같은 답이
+         나와야 합니다. */
+      temperature: 0,
+    },
+    initialMessages: [{ role: 'system', content: say }, ...shots],
+    /*
+      중괄호가 닫히면 멈춥니다.
+
+      모델이 JSON 하나를 내놓고도 "이렇게 쪼갰습니다" 하고 말을 잇는 일이
+      있습니다. 뒤를 안 기다리면 그만큼 빨리 끝납니다.
+    */
+    stopRegex: /\}/,
+    /* 매번 새로 시작합니다. 앞의 질의가 다음 답에 스며들면 "아까 그
+       카페 근처" 같은 것을 지어내기 시작합니다. */
+    resetOnTurn: true,
+  });
+  job = want;
+}
+
+/** 모델이 한 번에 내놓는 말. 예약은 칸이 다섯이라 더 깁니다. */
+const BOOKING_TOKENS = 192;
+
+/** 한 차례에서 모델이 보탠 말만 이어 붙입니다. */
+function saidIn(turn: LLMChatTurnResult) {
+  return turn.messages
+    .filter((m) => m.role === 'assistant')
+    .map((m) => (typeof m.content === 'string' ? m.content : ''))
+    .join('');
 }
 
 /**
@@ -118,14 +191,9 @@ export async function parseIntent(query: string): Promise<Intent | null> {
     return null;
   }
   try {
-    const turn = await session.sendMessage(query);
-    /* 이번 차례에 모델이 보탠 말들. 도구를 쓰지 않으므로 하나뿐이지만,
-       모양은 여럿을 담을 수 있게 되어 있습니다. */
-    const said = turn.messages
-      .filter((m) => m.role === 'assistant')
-      .map((m) => (typeof m.content === 'string' ? m.content : ''))
-      .join('');
-    return readIntent(said);
+    await sit('intent');
+    const turn = await session!.sendMessage(query);
+    return readIntent(saidIn(turn));
   } catch {
     /* 메모리가 모자라거나 중간에 죽었습니다. 이번 한 번을 서버 경로로
        넘깁니다. */
@@ -135,32 +203,32 @@ export async function parseIntent(query: string): Promise<Intent | null> {
 
 /** 모델을 내려놓습니다. 메모리를 꽤 차지하므로 판을 닫을 때 부릅니다. */
 /**
- * 앱에서는 아직 예약 확인서를 못 읽습니다.
+ * 붙여 넣은 예약 확인서를 칸으로 쪼갭니다.
  *
- * <h3>왜 못 하는가</h3>
+ * <p>기기 안에서 합니다. 항공권 번호와 숙소 이름과 묵는 날은 남의 서버가
+ * 알 필요가 없는 것들입니다.
  *
- * <p>세션이 만들어질 때 <b>추천 지시가 물려 있습니다</b>
- * ({@code initialMessages} + {@code resetOnTurn: true}). 거기에 예약
- * 확인서를 넣으면 모델은 그것을 추천 문장으로 읽고 칸 셋을 내놓습니다.
- *
- * <p>고치는 길은 둘입니다. 자리를 하나 더 내거나(폰에서 1GB 짜리 무게를
- * 두 벌 드는 일입니다), 일이 바뀔 때마다 세션을 갈아 끼우거나. 뒤엣것이
- * 맞아 보이는데, 그러면 <b>이미 돌고 있는 추천 경로를 건드리게</b> 됩니다.
- *
- * <h3>왜 지금 안 고치는가</h3>
- *
- * <p>확인할 방법이 없습니다. 이 자리는 EAS 로 구운 앱에서만 돌고, 앱 빌드는
- * 앱 작업을 할 때 한 번에 하기로 했습니다. 못 재 보는 채로 추천 경로에
- * 손대는 것보다, 여기서 <b>안 된다고 분명히 말하는</b> 편이 낫습니다.
- *
- * <p>false 이므로 화면은 단추 자체를 안 냅니다. 서버로 미끄러지는 길은
- * 만들지 않습니다 — 붙여 넣는 글에 이름과 예약번호가 들어 있습니다.
+ * <p>추천과 <b>같은 모델</b>을 씁니다. 시키는 말만 갈아 끼우고 세션을 다시
+ * 차립니다 — 둘을 같이 띄워 두면 1.5B 가 메모리에 두 벌 올라갑니다.
  */
-export const canParseBookingHere = false;
+export const canParseBookingHere = true;
 
 /** 위와 같은 이유로 늘 {@code null} 입니다. 화면이 여기까지 오지 않습니다. */
-export async function parseBooking(_text: string): Promise<Booking | null> {
-  return null;
+export async function parseBooking(text: string): Promise<Booking | null> {
+  if (state !== 'ready') {
+    return null;
+  }
+  try {
+    /* 세션을 예약 쪽으로 바꿔 앉힙니다. 이미 그쪽이면 그냥 넘어갑니다. */
+    await sit('booking');
+    const turn = await session!.sendMessage(text);
+    return readBooking(saidIn(turn));
+  } catch {
+    /* 메모리가 모자라거나 중간에 죽었습니다. 화면은 못 읽은 것으로 보고
+       사람에게 직접 적으라고 합니다 — 이 기능의 값어치는 대신 적어 주는
+       것이지, 못 하면 그냥 원래 하던 대로입니다. */
+    return null;
+  }
 }
 
 export async function dropModel(): Promise<void> {
@@ -170,5 +238,6 @@ export async function dropModel(): Promise<void> {
     /* 이미 내려갔습니다. */
   }
   session = null;
+  job = null;
   state = 'absent';
 }

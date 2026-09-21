@@ -7,6 +7,7 @@ import {
   Animated,
   Image,
   PanResponder,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -844,9 +845,16 @@ export default function TripScreen() {
     <p>그런데 안 눌러도 켜지는 지금은 다릅니다. 일정을 보러 들어왔는데
     첫 장소들을 비추던 지도가 잠시 뒤 혼자 서울 어딘가로 튑니다. 옮기는
     것은 십자를 눌렀을 때만 합니다.
+
+    <h3>앱에서는 안 켭니다</h3>
+
+    <p>브라우저는 거절해도 주소창 왼쪽에서 다시 허용할 수 있습니다. 폰은
+    <b>한 번 거절하면 시스템 설정까지</b> 들어가야 되돌립니다. 그래서 앱에서는
+    십자를 누를 때까지 묻지 않습니다 — 그때는 무엇 때문에 묻는지가 분명하고,
+    거절해도 그 한 번으로 끝나지 않습니다.
   */
   useEffect(() => {
-    if (me.supported && !keptMap) {
+    if (Platform.OS === 'web' && me.supported && !keptMap) {
       me.start();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1175,6 +1183,9 @@ export default function TripScreen() {
             /* 누를 때마다 지도를 내 자리로 옮깁니다. 걷다가 다시 누르는 일이
                잦아서, 두 번째부터는 접기만 하고 안 옮기면 헛눌림이 됩니다. */
             onPress={() => {
+              /* 앱에서는 여기서 처음 묻습니다. 이미 켜 두었으면 아무 일도
+                 안 일어납니다. */
+              me.start();
               setGoHereAt((n) => n + 1);
               setTools((on) => !on);
             }}

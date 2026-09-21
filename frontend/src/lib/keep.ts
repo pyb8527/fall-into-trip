@@ -1,5 +1,6 @@
 import type { TripDetail } from '@/api/types';
 import { ago } from '@/lib/countdown';
+import { keepBox, type Box } from '@/lib/keep-box';
 
 /**
  * 마지막으로 본 일정을 이 기기에 둡니다.
@@ -40,18 +41,13 @@ import { ago } from '@/lib/countdown';
  * 부르고 그대로 버리는 셈입니다.
  */
 export function canKeep() {
-  return box() !== null;
+  return keepBox() !== null;
 }
 
-/** 웹에만 있습니다. 앱에는 localStorage 가 없어 조용히 넘어갑니다. */
-function box(): Storage | null {
-  try {
-    return typeof localStorage === 'undefined' ? null : localStorage;
-  } catch {
-    /* 사파리의 사생활 보호 모드처럼 있는데 못 쓰는 경우가 있습니다. */
-    return null;
-  }
-}
+/*
+  상자는 쪽마다 다릅니다 — 웹은 localStorage, 앱은 expo-sqlite 의 kv-store.
+  생김새를 같게 맞춰 두어 아래 코드는 어느 쪽인지 모릅니다.
+*/
 
 const PREFIX = 'fit.trip.';
 
@@ -74,7 +70,7 @@ function mapKeyOf(userId: string, tripId: string) {
 
 /** 방금 받아 온 일정을 둡니다. 실패해도 조용합니다 — 곁다리 기능입니다. */
 export function keepTrip(userId: string | null, tripId: string, data: TripDetail) {
-  const store = box();
+  const store = keepBox();
   if (!store || !userId) {
     return;
   }
@@ -96,7 +92,7 @@ export function keepTrip(userId: string | null, tripId: string, data: TripDetail
 }
 
 /** 담아 봅니다. 자리가 없으면 false — 던지지 않습니다. */
-function write(store: Storage, key: string, value: string) {
+function write(store: Box, key: string, value: string) {
   try {
     store.setItem(key, value);
     return true;
@@ -110,7 +106,7 @@ export function keptTrip(
   userId: string | null,
   tripId: string,
 ): { at: number; data: TripDetail } | null {
-  const store = box();
+  const store = keepBox();
   if (!store || !userId) {
     return null;
   }
@@ -132,7 +128,7 @@ export function keptTrip(
  * 없으면 아쉬운 정도지만 글자가 없으면 오늘 어디를 가는지 모릅니다.
  */
 export function keepTripMap(userId: string | null, tripId: string, png: string) {
-  const store = box();
+  const store = keepBox();
   if (!store || !userId) {
     return;
   }
@@ -150,7 +146,7 @@ export function keptTripMap(
   userId: string | null,
   tripId: string,
 ): { at: number; png: string } | null {
-  const store = box();
+  const store = keepBox();
   if (!store || !userId) {
     return null;
   }
@@ -169,7 +165,7 @@ export function keptTripMap(
  * 그 폰에 남아 있으면 안 됩니다.
  */
 export function forgetTrips() {
-  const store = box();
+  const store = keepBox();
   if (!store) {
     return;
   }
@@ -196,7 +192,7 @@ export function forgetTrips() {
  * @param prefix 어느 쪽을 치울지. 그림과 일정을 따로 치웁니다 — 자리가
  *               모자랄 때 먼저 놓아야 하는 것은 그림입니다.
  */
-function forgetOld(store: Storage, prefix: string) {
+function forgetOld(store: Box, prefix: string) {
   try {
     const rows: { key: string; at: number }[] = [];
     for (let i = 0; i < store.length; i++) {
