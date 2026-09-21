@@ -10,7 +10,7 @@
 |---|---|
 | 안드로이드 패키지 | `net.weeniebeenie.fit` |
 | iOS 번들 ID | `net.weeniebeenie.fit` |
-| URL scheme | `fit` |
+| URL scheme | `fit`, `net.weeniebeenie.fit` |
 | EAS 프로젝트 | `81e84073-2202-4fb2-9512-ecb87023c4fe` |
 
 **안드로이드 서명 지문 (SHA-1)** — EAS 가 들고 있는 기본 키스토어:
@@ -57,6 +57,21 @@
 같이 넘깁니다 — `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` (값은 `GOOGLE_CLIENT_ID`
 와 같은 것).
 
+### 돌아올 주소가 매니페스트에 있어야 합니다
+
+구글 로그인 창은 끝나면 `net.weeniebeenie.fit:/oauthredirect` 로 앱을
+부릅니다(패키지 이름이 그대로 scheme 입니다). 그 scheme 이 안드로이드
+매니페스트에 없으면 창이 닫히고도 앱으로 안 돌아옵니다.
+
+`app.json` 의 `scheme` 에 패키지 이름을 같이 적어 둡니다:
+
+```json
+"scheme": ["fit", "net.weeniebeenie.fit"]
+```
+
+**매니페스트에 박히는 값이라 OTA 로는 안 들어갑니다.** 고친 뒤 한 번
+빌드해야 합니다.
+
 ### 서버에 iOS·Android ID 를 알려 줘야 합니다
 
 구글은 쪽마다 다른 클라이언트 ID 를 내주고, ID 토큰의 `aud` 에는 **받아 간
@@ -82,6 +97,14 @@ EAS 쪽(`npx eas env:list`):
 | `GOOGLE_MAPS_ANDROID_KEY` | Maps SDK for Android |
 | `EXPO_PUBLIC_GMAPS_KEY` | Maps JavaScript (웹) |
 | `GOOGLE_SERVICES_JSON` | 파이어베이스 설정 파일 |
+| `EXPO_PUBLIC_API_BASE` | 서버 주소 |
+
+> `EXPO_PUBLIC_API_BASE` 는 한동안 `eas.json` 의 빌드 프로필 `env` 안에만
+>있었습니다. 그것은 `eas build` 만 읽습니다 — `eas update` 는 안 읽습니다.
+> 그래서 OTA 로 올린 번들에는 `client.ts` 의 기본값인 `localhost:8080` 이
+> 박혀 나갔습니다. 빌드한 앱은 멀쩡한데 업데이트를 받는 순간 서버를 못 찾는,
+> 찾기 고약한 모양입니다. 지금은 EAS 환경에만 두어 빌드와 업데이트가 같은
+> 값을 봅니다.
 
 서버 쪽(뿌리 `.env`, 커밋 안 됨): `GOOGLE_CLIENT_ID`, `GOOGLE_AUDIENCES`,
 `EXPO_PUBLIC_GMAPS_KEY`.

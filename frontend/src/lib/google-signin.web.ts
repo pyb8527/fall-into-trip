@@ -14,7 +14,12 @@
  */
 export const canSignInWithGoogle = true;
 
-/** 앱에서만 씁니다. 웹은 구글 스크립트가 대신합니다. */
+/**
+ * 앱에서만 씁니다. 웹은 구글 스크립트가 대신합니다.
+ *
+ * <p>모양만 맞춰 둡니다 — [준비됐는지, 받아 온 id_token, 창을 띄우는 함수].
+ * 웹 단추(google-button.web)는 이것을 부르지 않습니다.
+ */
 export function useGoogleIdToken() {
-  return [null, null, async () => {}] as const;
+  return [false, null, async () => {}] as const;
 }

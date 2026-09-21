@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "fit",
+    "scheme": ["fit", "net.weeniebeenie.fit"],
     "userInterfaceStyle": "light",
     "backgroundColor": "#FFFFFF",
     "ios": {

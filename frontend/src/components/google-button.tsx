@@ -24,20 +24,16 @@ import { Press } from '@/ui';
  * 아무 일이 없는 단추를 두는 것보다 없는 편이 낫습니다.
  */
 export function GoogleButton({ onCredential }: { onCredential: (credential: string) => void }) {
-  const [request, response, prompt] = useGoogleIdToken();
+  const [ready, idToken, prompt] = useGoogleIdToken();
 
   useEffect(() => {
-    if (response?.type !== 'success') {
-      return;
+    if (idToken) {
+      onCredential(idToken);
     }
-    const token = response.params?.id_token;
-    if (token) {
-      onCredential(token);
-    }
-    /* onCredential 은 매번 새 함수라 여기 넣으면 응답이 안 바뀌어도 다시
-       돕니다. 우리가 보는 것은 응답 하나입니다. */
+    /* onCredential 은 매번 새 함수라 여기 넣으면 토큰이 안 바뀌어도 다시
+       돕니다. 우리가 보는 것은 토큰 하나입니다. */
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [response]);
+  }, [idToken]);
 
   if (!canSignInWithGoogle) {
     return null;
@@ -46,7 +42,7 @@ export function GoogleButton({ onCredential }: { onCredential: (credential: stri
   return (
     <Press
       onPress={() => prompt()}
-      disabled={!request}
+      disabled={!ready}
       accessibilityLabel="Google로 로그인"
       style={styles.button}>
       <View style={styles.logo}>

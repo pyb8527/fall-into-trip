@@ -10,9 +10,6 @@
       "android": {
         "buildType": "apk"
       },
-      "env": {
-        "EXPO_PUBLIC_API_BASE": "https://fit.weenie-beenie.net"
-      },
       "channel": "development"
     },
     "preview": {
@@ -20,16 +17,10 @@
       "android": {
         "buildType": "apk"
       },
-      "env": {
-        "EXPO_PUBLIC_API_BASE": "https://fit.weenie-beenie.net"
-      },
       "channel": "preview"
     },
     "production": {
       "autoIncrement": true,
-      "env": {
-        "EXPO_PUBLIC_API_BASE": "https://fit.weenie-beenie.net"
-      },
       "channel": "production"
     }
   },

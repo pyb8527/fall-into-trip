@@ -265,6 +265,9 @@ const styles = StyleSheet.create({
     */
     position: 'absolute',
     ...Platform.select({ web: { position: 'fixed' as 'absolute' }, default: {} }),
+    /* 판(dragSheet)과 같은 층에 둡니다. 둘 다 지도보다 위여야 하고, 서로는
+       겹치지 않습니다 — 판이 띠 높이만큼 떠 있기 때문입니다. */
+    zIndex: 2,
     left: 0,
     right: 0,
     bottom: 0,
