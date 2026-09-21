@@ -85,12 +85,62 @@ function ClumpPin({ color, count }: { color: string; count: number }) {
   );
 }
 
+/**
+ * 사람이 서 있는 자리.
+ *
+ * <p>장소 핀(물방울)과 생김새를 달리합니다. 같은 모양으로 두면 지도만 보고는
+ * 일정에 넣어 둔 곳과 지금 누가 서 있는 자리를 구별할 수 없습니다.
+ *
+ * <p>나와 동행자가 같은 판을 씁니다. 색만 다릅니다 — 나만 다른 모양으로 두면
+ * 지도에서 내가 어디 있는지를 다른 규칙으로 찾아야 합니다.
+ */
+function FacePin({ face, color }: { face: string; color: string }) {
+  const r = 30;
+  return (
+    <View
+      style={[
+        styles.chip,
+        {
+          width: r,
+          height: r,
+          borderRadius: r / 2,
+          borderWidth: 3,
+          borderColor: color,
+          backgroundColor: '#FFFFFF',
+        },
+      ]}>
+      <Text style={styles.face}>{face}</Text>
+    </View>
+  );
+}
+
+/**
+ * 잠깐 꽂아 둔 깃발.
+ *
+ * <p>깃대와 깃폭을 네모 둘로 세웁니다. 앱 마커는 화면 요소를 그대로 얹으므로
+ * 그림 파일이 필요 없습니다.
+ */
+function FlagPin({ color }: { color: string }) {
+  return (
+    <View style={styles.flag}>
+      <View style={[styles.flagCloth, { backgroundColor: color }]} />
+      <View style={[styles.flagPole, { backgroundColor: color }]} />
+    </View>
+  );
+}
+
 export type { MapPlace } from '@/components/map-types';
 
-/* here·mates·notes 는 앱에서 아직 채워지지 않습니다. 위치가 있어야 뜻이 있는
-   값들인데 앱 GPS 가 다음 빌드에 열립니다. 위치 권한이 매니페스트에 박히는
-   것이라 다음 빌드 때 열립니다(docs/design.md). 그때 showsUserLocation 을
-   켜면 됩니다. */
+/*
+  내 자리·동행자·깃발은 한동안 앱에서 비어 있었습니다. 위치 권한이 매니페스트에
+  박히는 것이라 GPS 가 열리는 빌드를 기다렸는데, 그 빌드가 나온 뒤에도 이 파일은
+  값을 받지 않은 채였습니다. 그래서 일정 화면은 넘기고 지도는 버리는, 아무도
+  틀렸다고 말해 주지 않는 상태가 이어졌습니다.
+
+  <p>showsUserLocation 은 안 씁니다. 그것은 기기가 그리는 파란 점이라 동행자와
+  생김새가 달라지고, 색도 자리도 우리가 못 정합니다. 나도 동행자와 같은 방식으로
+  그립니다.
+*/
 export function TripMap({
   places: all,
   activeId,
@@ -98,6 +148,10 @@ export function TripMap({
   routes,
   routesPending = false,
   traveler,
+  here,
+  mates,
+  myFace,
+  notes,
   dayFilter = false,
   height = 300,
   chrome = true,
@@ -107,6 +161,8 @@ export function TripMap({
   shape = 'default',
   panTo,
   follow,
+  bottomInset = 0,
+  goHereAt,
 }: TripMapProps) {
   /*
     어느 날만 볼지.
@@ -186,6 +242,41 @@ export function TripMap({
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [panTo?.at]);
+
+  /** 내가 있는 자리로 지도를 옮깁니다. 어디까지 갔는지 놓쳤을 때 쓰는 단추입니다. */
+  const goHere = useCallback(() => {
+    if (!map.current || !here) {
+      return;
+    }
+    /*
+      이미 가까이 보고 있으면 그대로 둡니다. 누를 때마다 당겨지면 답답합니다.
+      지금 얼마나 보고 있는지는 마지막으로 손을 뗀 자리(view)가 알려 줍니다.
+    */
+    const span = view && view.dLat < FOCUS_SPAN * 2 ? view.dLat : FOCUS_SPAN;
+    map.current.animateToRegion(
+      {
+        latitude: here.lat,
+        longitude: here.lng,
+        latitudeDelta: span,
+        longitudeDelta: span,
+      },
+      350,
+    );
+  }, [here, view]);
+
+  /*
+    바깥에서 "내 위치로" 를 눌렀을 때.
+
+    <p>단추가 지도 밖(일정 화면)에도 있습니다. 값이 바뀌기만 하면 움직입니다 —
+    같은 자리에서 두 번 눌러도 두 번 다 가야 하므로 자리가 아니라 "눌렀다" 는
+    것만 넘겨받습니다.
+  */
+  useEffect(() => {
+    if (goHereAt) {
+      goHere();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [goHereAt]);
 
   /** 넣어 둔 곳을 모두 한 화면에. 바깥에서 값을 바꿔 부릅니다. */
   useEffect(() => {
@@ -383,6 +474,16 @@ export function TripMap({
       showsPointsOfInterests={false}
       toolbarEnabled={false}
       moveOnMarkerPress={false}
+      /*
+        아래가 판에 덮여 있으면 그만큼 비워 둡니다.
+
+        <p>지도에게 "쓸 수 있는 자리" 를 알려 주는 값입니다. 가운데로 옮기는
+        것도 한 화면에 담는 것도 이 안쪽을 기준으로 하므로, 고른 핀이 판 뒤로
+        숨는 일이 없어집니다. 웹처럼 옮긴 뒤 다시 밀어 올리지 않아도 됩니다.
+
+        <p>전체화면에서는 판이 없으니 0 입니다.
+      */
+      mapPadding={{ top: 0, right: 0, bottom: full ? 0 : bottomInset, left: 0 }}
       onLayout={(e) =>
         setSize({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })
       }
@@ -461,6 +562,60 @@ export function TripMap({
         ) : null,
       )}
 
+      {/*
+        지금 내가 있는 자리.
+
+        <p>바깥 원은 "이 안쪽 어딘가" 라는 뜻입니다. 실내나 지하에서는 꽤
+        커지는데, 그것이 맞는 말입니다 — 점 하나로 찍으면 지하철 안에서도
+        한 자리를 정확히 아는 것처럼 보입니다.
+      */}
+      {here ? (
+        <Circle
+          center={{ latitude: here.lat, longitude: here.lng }}
+          radius={here.accuracy}
+          strokeColor={`${Colors.accentInk}59`}
+          fillColor={`${Colors.accentInk}14`}
+          strokeWidth={1}
+        />
+      ) : null}
+      {here ? (
+        <Marker
+          coordinate={{ latitude: here.lat, longitude: here.lng }}
+          anchor={{ x: 0.5, y: 0.5 }}
+          title="지금 내 위치"
+          zIndex={999}>
+          <FacePin face={myFace ?? ''} color={Colors.accentInk} />
+        </Marker>
+      ) : null}
+
+      {/* 동행자. 나와 같은 동그란 판이고 색만 다릅니다. */}
+      {(mates ?? []).map((mate) => (
+        <Marker
+          key={`mate-${mate.id}`}
+          coordinate={{ latitude: mate.lat, longitude: mate.lng }}
+          anchor={{ x: 0.5, y: 0.5 }}
+          title={`${mate.name} 님이 지금 있는 곳`}
+          zIndex={800}>
+          {/* 고른 동물, 안 골랐으면 이름 첫 글자. 첫 글자만으로는 "지영" 과
+              "지훈" 이 지도에서 같아 보입니다. */}
+          <FacePin face={mate.face} color={Colors.success} />
+        </Marker>
+      ))}
+
+      {/* 잠깐 꽂아 둔 깃발. 꽂는 단추가 깃발이니 지도에도 깃발이 서야
+          누른 것과 찍힌 것이 같은 것인 줄 압니다. */}
+      {(notes ?? []).map((note) => (
+        <Marker
+          key={`note-${note.id}`}
+          coordinate={{ latitude: note.lat, longitude: note.lng }}
+          /* 깃대 아래 끝이 자리입니다. */
+          anchor={{ x: 0.3, y: 1 }}
+          title={note.label ?? '잠깐 꽂아 둔 곳'}
+          zIndex={700}>
+          <FlagPin color={Colors.warning} />
+        </Marker>
+      ))}
+
       {clumps.map((group) => (
         <Marker
           key={group.key}
@@ -528,6 +683,7 @@ export function TripMap({
         {full ? null : dayRail}
         {full || !chrome ? null : (
           <View style={styles.overlay}>
+            {here ? <IconButton name="crosshair" label="내 위치로" onPress={goHere} /> : null}
             <IconButton name="maximize" label="전체화면으로 보기" onPress={() => setFull(true)} />
           </View>
         )}
@@ -540,6 +696,7 @@ export function TripMap({
             <View style={[styles.fullRail, { top: insets.top + Spacing.md }]}>{dayRail}</View>
           ) : null}
           <View style={[styles.overlay, { top: insets.top + Spacing.md }]}>
+            {here ? <IconButton name="crosshair" label="내 위치로" onPress={goHere} /> : null}
             <IconButton
               name="minimize"
               label="전체화면 닫기"
@@ -854,6 +1011,10 @@ const styles = StyleSheet.create({
     height: Tap.min,
   },
   overlay: {
+    /* 웹과 같은 줄에 같은 차례로 섭니다. 한쪽만 세로로 쌓이면 같은 화면으로
+       안 읽힙니다. */
+    flexDirection: 'row',
+    gap: Spacing.xs,
     position: 'absolute',
     top: Spacing.md,
     right: Spacing.md,
@@ -888,6 +1049,38 @@ const styles = StyleSheet.create({
   pinEmoji: {
     /* 이모지는 글꼴이 제 높이를 갖고 있어, 줄 높이를 두면 아래로 처집니다. */
     lineHeight: undefined,
+  },
+  face: {
+    fontSize: 15,
+    /* 동물 이모지도 이름 첫 글자도 들어옵니다. 줄 높이를 비워 둬야 둘 다
+       동그라미 한가운데에 섭니다. */
+    lineHeight: undefined,
+  },
+  /* 깃대 아래 끝이 자리이므로, 그림의 왼쪽 아래를 기준으로 세웁니다. */
+  flag: {
+    width: 26,
+    height: 32,
+    justifyContent: 'flex-start',
+  },
+  flagPole: {
+    position: 'absolute',
+    left: 6,
+    top: 0,
+    bottom: 0,
+    width: 2.6,
+    borderRadius: 1.3,
+  },
+  flagCloth: {
+    position: 'absolute',
+    left: 8,
+    top: 5,
+    width: 13,
+    height: 11,
+    borderWidth: 1.4,
+    borderColor: '#FFFFFF',
+    /* 오른쪽 귀퉁이를 깎아 깃폭처럼 보이게 합니다. */
+    borderTopRightRadius: 6,
+    borderBottomRightRadius: 6,
   },
   dot: {
     alignItems: 'center',
