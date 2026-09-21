@@ -263,6 +263,15 @@ export const Screen = forwardRef<ScreenHandle, ScreenProps>(function Screen(
   const keyboardUp = useKeyboardUp();
   const scroller = useRef<ScrollView>(null);
 
+  /*
+    갈래 띠가 실제로 먹는 높이.
+
+    <p>띠 몸통(TabDock)에 <b>안전영역까지</b> 더해야 바닥에서 띠 꼭대기까지의
+    높이가 됩니다. 이것을 안 세고 TabDock 만 비워 두었더니, 아래 단추와 띠
+    사이가 여덟 픽셀밖에 안 남아 둘이 붙어 보였습니다.
+  */
+  const dock = tabs && !keyboardUp ? TabDock + Math.max(insets.bottom, Spacing.sm) : 0;
+
   useImperativeHandle(
     ref,
     () => ({
@@ -298,8 +307,7 @@ export const Screen = forwardRef<ScreenHandle, ScreenProps>(function Screen(
               /* 아래 버튼이 있으면 그 높이만큼, 없으면 홈 인디케이터만큼 띄웁니다.
                  갈래 띠까지 있으면 그만큼 더 비웁니다 — 마지막 줄이 띠 뒤로
                  들어가면 아무리 굴려도 안 보입니다. */
-              paddingBottom:
-                (footer ? Spacing.xl : insets.bottom + Spacing.huge) + (tabs ? TabDock : 0),
+              paddingBottom: (footer ? Spacing.xl : insets.bottom + Spacing.huge) + dock,
             },
           ]}
           keyboardShouldPersistTaps="handled"
@@ -335,8 +343,11 @@ export const Screen = forwardRef<ScreenHandle, ScreenProps>(function Screen(
           style={[
             styles.footer,
             {
-              paddingBottom:
-                (keyboardUp ? 0 : insets.bottom) + Spacing.md + (tabs && !keyboardUp ? TabDock : 0),
+              /* 띠가 있으면 띠 <b>전체</b> 높이만큼 띄우고 그 위에 한 칸 더
+                 둡니다. 붙어 있으면 단추와 띠가 한 덩어리로 읽힙니다. */
+              paddingBottom: dock
+                ? dock + Spacing.md
+                : (keyboardUp ? 0 : insets.bottom) + Spacing.md,
             },
           ]}>
           <View style={styles.footerInner}>

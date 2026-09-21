@@ -32,7 +32,6 @@ import {
   Divider,
   ErrorNote,
   Icon,
-  IconButton,
   Loading,
   Press,
   Row,
@@ -610,16 +609,16 @@ function DayBlock({
       {!open
         ? null
         : day.places.map((place, i) => (
-        <Row
+        <View
           key={i}
-          gap={Spacing.md}
           style={[styles.place, activeId === `${index}:${i}` ? styles.placeOn : null]}>
           {/*
             누르면 지도가 그리로 갑니다. 어디쯤인지 모르는 채로 이름만 읽어서는
             가져올지를 정할 수 없습니다.
 
-            누르는 자리는 이름 쪽까지입니다. 옆의 담기·댓글은 따로 눌립니다 —
-            겹쳐 두면 담으려다 지도만 움직입니다.
+            <p>손대는 것들은 <b>줄 아래</b>에 따로 섭니다. 이름 옆에 두었더니
+            긴 가게 이름이 그만큼 잘렸고, 읽는 것과 누르는 것이 한 줄에 끼어
+            어느 쪽도 넉넉하지 않았습니다. 위는 읽는 자리, 아래는 누르는 자리.
           */}
           <Press
             onPress={() => onFocus(i)}
@@ -658,52 +657,37 @@ function DayBlock({
           </View>
           </Press>
 
+          <Row gap={Spacing.xs} style={styles.placeActs}>
           {/*
             말풍선 그림만 두었을 때는 눌러도 아래 목록이 걸러질 뿐이라, 무슨
             일이 일어났는지 보이지 않았습니다. 몇 개 달렸는지를 글자로 적고,
             누르면 그 장소의 댓글만 담긴 판이 올라옵니다.
           */}
           {feedback ? (
-            <Row gap={2}>
-              <IconButton
-                name="message-square"
-                label={
-                  countAt(i) > 0
-                    ? `${place.name} 댓글 ${countAt(i)}개 보기`
-                    : `${place.name}에 댓글 남기기`
-                }
-                tone="accent"
-                active={countAt(i) > 0}
-                onPress={() => onComment(i)}
-              />
-              {countAt(i) > 0 ? (
-                <Caption tone="accent" strong>
-                  {countAt(i)}
-                </Caption>
-              ) : null}
-            </Row>
+            <Button
+              label={countAt(i) > 0 ? `댓글 ${countAt(i)}` : '댓글'}
+              variant="ghost"
+              compact
+              onPress={() => onComment(i)}
+            />
           ) : null}
           {/*
             남의 일정에서 한 곳을 보고 가져올지 정하려면 이름과 메모만으로는
             모자랍니다. 평점이 몇인지 그날 문을 여는지가 있어야 고르는 일이
             됩니다. 장소 찾기에서 쓰는 것과 같은 판을 엽니다.
           */}
-          <IconButton
-            name="info"
-            label={`${place.name} 들여다보기`}
-            onPress={() => onLook(place)}
-          />
+          <Button label="자세히" variant="ghost" compact onPress={() => onLook(place)} />
           {/* 일정을 통째로 가져오지 않고 이 집만 담을 수 있어야 합니다. */}
           {/* 담긴 것은 눌러서 뺍니다. 담는 길만 있으면 잘못 누른 뒤에
               보석함까지 찾아가야 합니다. */}
-          <IconButton
-            name="bookmark"
-            label={savedIds.has(place.name) ? `${place.name} 빼기` : `${place.name} 담기`}
-            tone={savedIds.has(place.name) ? 'accent' : 'default'}
-            active={savedIds.has(place.name)}
+          <Button
+            label={savedIds.has(place.name) ? '보석함에서 빼기' : '보석함에 담기'}
+            variant={savedIds.has(place.name) ? 'secondary' : 'ghost'}
+            compact
             onPress={() => onSave(place, i)}
           />
-        </Row>
+          </Row>
+        </View>
           ))}
     </Card>
   );
@@ -784,11 +768,19 @@ const styles = StyleSheet.create({
     borderRadius: 0,
   },
   place: {
-    alignItems: 'flex-start',
-    flexWrap: 'nowrap',
     borderRadius: Radius.sm,
     borderWidth: 1.5,
     borderColor: 'transparent',
+    overflow: 'hidden',
+  },
+  /* 손대는 자리. 위와 선 하나로 가르고 오른쪽 끝에 모읍니다 — 왼쪽은 위
+     글자들이 시작하는 자리라 비워 둬야 줄이 가지런합니다. */
+  placeActs: {
+    justifyContent: 'flex-end',
+    flexWrap: 'wrap',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.border,
+    paddingHorizontal: Spacing.xs,
   },
   /* 지도에서 켜 둔 줄. 목록과 지도가 같은 곳을 가리킨다는 것이 보여야 합니다. */
   placeOn: {

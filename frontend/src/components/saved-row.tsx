@@ -4,14 +4,7 @@ import type { SavedPlace } from '@/api/types';
 import { iconOf, labelOf } from '@/constants/place-icons';
 import { Colors, Radius, Spacing, Tap } from '@/constants/theme';
 import { savedAgo } from '@/lib/saved';
-import {
-  Body,
-  Caption,
-  Checkbox,
-  IconButton,
-  Mark,
-  Press,
-} from '@/ui';
+import { Body, Button, Caption, Checkbox, Mark, Press } from '@/ui';
 
 /** 그림을 아직 안 고른 곳. 지도에서도 별로 찍힙니다. */
 const STAR = '⭐';
@@ -42,10 +35,20 @@ const STAR = '⭐';
  * 웹에서는 큰 것 안의 작은 것이 함께 눌려, 그림을 바꾸려다 고르기까지
  * 됐습니다.
  *
- * <p>이제 자리가 셋입니다. 줄을 누르면 <b>지도가 그리로 가고</b>, 동그라미를
+ * <p>이제 자리가 셋입니다. 줄을 누르면 <b>지도가 그리로 가고</b>, 「자세히」를
  * 누르면 <b>들여다보고</b>, 네모를 누르면 <b>고릅니다</b>. 길찾기·빼기·그림
  * 바꾸기는 들여다보는 판 안으로 들어갔습니다 — 거기서는 무엇을 하는 것인지
  * 이름이 붙어 있습니다.
+ *
+ * <h3>손대는 것은 줄 아래로</h3>
+ *
+ * <p>동그라미 단추가 이름 <b>옆</b>에 서 있었습니다. 그러면 이름이 그만큼
+ * 좁아져 긴 가게 이름이 잘리고, 좁은 폰에서는 읽는 것과 누르는 것이 한 줄에
+ * 끼어 어느 쪽도 넉넉하지 않습니다.
+ *
+ * <p>아래로 내립니다. 위는 읽는 자리, 아래는 누르는 자리. 선 하나로 가르고
+ * 글자를 답니다 — 그림만 있는 동그라미보다 「자세히」라고 적힌 쪽이 눌러
+ * 보기 전에 압니다.
  *
  * <h3>지도로 보내기와 들여다보기를 갈랐습니다</h3>
  *
@@ -96,7 +99,8 @@ export function SavedRow({
   const about = [kind, said].filter(Boolean).join(' · ');
 
   return (
-    <View style={[styles.row, on ? styles.rowOn : lit ? styles.rowLit : null]}>
+    <View style={[styles.card, on ? styles.rowOn : lit ? styles.rowLit : null]}>
+      <View style={styles.row}>
       <Press
         onPress={onPress ?? onToggle}
         scale={0.99}
@@ -116,10 +120,6 @@ export function SavedRow({
         </View>
       </Press>
 
-      {onLook ? (
-        <IconButton name="info" label={`${place.name} 들여다보기`} onPress={onLook} />
-      ) : null}
-
       {picking ? (
         <Checkbox
           checked={on}
@@ -127,19 +127,44 @@ export function SavedRow({
           label={`${place.name} ${on ? '고르기 취소' : '고르기'}`}
         />
       ) : null}
+      </View>
+
+      {/* 손대는 자리. 위와 선 하나로 가릅니다. */}
+      {onLook ? (
+        <View style={styles.acts}>
+          <Button
+            label="자세히"
+            variant="ghost"
+            compact
+            onPress={onLook}
+          />
+        </View>
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  card: {
     backgroundColor: Colors.surface,
     borderRadius: Radius.md,
     borderWidth: 1.5,
     borderColor: 'transparent',
+    overflow: 'hidden',
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingRight: Spacing.sm,
+  },
+  /* 읽는 자리와 누르는 자리를 선 하나로 가릅니다. 오른쪽 끝에 모읍니다 —
+     왼쪽은 위 글자들이 시작하는 자리라 비워 둬야 줄이 가지런합니다. */
+  acts: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.border,
+    paddingHorizontal: Spacing.xs,
   },
   /* 고른 것. 글자로 적지 않고 바탕으로 말합니다. */
   rowOn: {
