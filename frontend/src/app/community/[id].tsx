@@ -1,7 +1,9 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { PathTitle } from '@/ui/nav';
+import { AppTabs } from '@/ui/tab-bar';
 import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { api, ApiError, query, UNEXPECTED } from '@/api/client';
 import type { ItineraryDay, ItineraryPlace, PostDetail } from '@/api/types';
@@ -19,7 +21,7 @@ import { PostMap } from '@/components/post-map';
 import { SignUpGate } from '@/components/signup-gate';
 import { TripMap } from '@/components/trip-map';
 import { iconOf } from '@/constants/place-icons';
-import { Colors, dayColor, Radius, Spacing } from '@/constants/theme';
+import { Colors, Radius, Spacing, TabDock, dayColor } from '@/constants/theme';
 import { takeComeback, type Comeback, type ComebackDo } from '@/lib/comeback';
 import {
   Badge,
@@ -30,6 +32,7 @@ import {
   Card,
   ConfirmDialog,
   Divider,
+  DragSheet,
   ErrorNote,
   Icon,
   IconButton,
@@ -86,6 +89,18 @@ export default function Post() {
     겹치는 일은 드뭅니다.
   */
   const [savedIds, setSavedIds] = useState<Map<string, string>>(new Map());
+  /*
+    판이 덮고 있는 높이와, 판을 내렸을 때 보여야 할 머리 줄의 높이.
+
+    <p>지도는 덮인 만큼 비켜 담고(bottomInset), 판은 머리 줄까지는 늘
+    보이게 섭니다. 둘 다 재서 씁니다 — 화면 높이로 어림하면 작은 폰에서
+    단추가 반쯤 잘립니다.
+  */
+  const [covered, setCovered] = useState(0);
+  const [headTall, setHeadTall] = useState(0);
+  const insets = useSafeAreaInsets();
+  const dock = Math.max(insets.bottom, Spacing.sm) + TabDock;
+
   /** 댓글 판을 열어 둔 장소. */
   const [at, setAt] = useState<{ dayIndex: number; placeIndex: number } | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
@@ -316,46 +331,25 @@ export default function Post() {
   }
 
   return (
-    <Screen
-      /*
-        지도는 위에 붙여 둡니다.
+    /*
+      지도가 바탕, 글이 그 위의 판.
 
-        아래 일정을 훑는 내내 "여기가 어디쯤인가" 를 봐야 하는데, 함께
-        흘려보내면 장소 하나를 누를 때마다 위로 되감아야 했습니다. 이제
-        누르면 붙어 있는 지도가 그 자리로 갑니다.
-      */
-      header={
-        pins.length > 0 ? (
-          <TripMap
-            places={pins}
-            activeId={activeId}
-            onSelect={setActiveId}
-            /* 닷새치 스무 곳이 한 지도에 얹히면 어느 것이 몇째 날인지는
-               색으로만 남습니다. 날짜를 고르면 그 하루만 봅니다 — 전체화면도
-               같이 걸립니다. */
-            dayFilter
-            height={220}
-          />
-        ) : (
-          <PostMap postId={id} title={data.title} height={160} />
-        )
-      }
-      footer={
-        <Row gap={Spacing.sm}>
-          <Button
-            label={`${data.liked ? '♥' : '♡'} ${data.likeCount}`}
-            variant="secondary"
-            compact
-            onPress={toggleLike}
-          />
-          <View style={styles.grow}>
-            <Button
-              label="내 여행으로 가져오기"
-              onPress={() => (user ? setCopying(true) : needLogin('copy'))}
-            />
-          </View>
-        </Row>
-      }>
+      <h3>왜 바꿨나</h3>
+
+      <p>지도를 화면 위에 220px 로 박아 두고 그 아래로 글과 장소 목록이
+      흘렀습니다. 그런데 남의 일정에서 보려는 것의 절반은 <b>어디를 어떤
+      순서로 돌았나</b>입니다 — 220px 짜리 띠로는 닷새치 동선이 좁쌀만 하게
+      들어갑니다.
+
+      <p>내 여행 상세와 같은 얼개로 둡니다. 지도는 화면 전체를 쓰고, 읽는
+      것들은 끌어 올리는 판에 담습니다. 판을 내리면 동선이 통째로 보이고,
+      올리면 글과 댓글을 읽습니다. 보는 사람이 그때그때 정합니다.
+
+      <p>대신 늘 펼쳐져 있던 단추들은 접었습니다(장소 줄의 댓글·자세히·
+      보석함). 판이 좁아졌으니 <b>지금 고른 한 곳</b>의 것만 냅니다 —
+      내 여행 상세가 이미 같은 규칙입니다.
+    */
+    <View style={styles.stage}>
       <Stack.Screen
         options={{
           title: data.title,
@@ -363,15 +357,60 @@ export default function Post() {
         }}
       />
 
-      <View style={styles.head}>
-        <Title>{data.title}</Title>
+      {/* 지도가 바탕입니다. 판이 그 위에 얹힙니다. */}
+      {pins.length > 0 ? (
+        <TripMap
+          places={pins}
+          activeId={activeId}
+          onSelect={setActiveId}
+          /* 닷새치 스무 곳이 한 지도에 얹히면 어느 것이 몇째 날인지는 색으로만
+             남습니다. 날짜를 고르면 그 하루만 봅니다. */
+          dayFilter
+          bleed
+          /* 판이 덮는 만큼 지도가 알아서 비켜 담습니다. */
+          bottomInset={covered + dock}
+        />
+      ) : (
+        <PostMap postId={id} title={data.title} height={260} />
+      )}
+
+      <DragSheet
+        /* 아래 띠만큼 띄웁니다. 안 띄우면 판이 띠 뒤로 들어갑니다. */
+        lift={dock}
+        /* 내렸을 때 제목 줄과 단추까지는 보여야 합니다. 재서 그만큼 알려
+           줍니다 — 화면 높이로 어림하면 작은 폰에서 단추가 반쯤 잘립니다. */
+        revealAtLow={headTall > 0 ? headTall + Spacing.lg : undefined}
+        onHeightChange={setCovered}
+        peek={
+          <View
+            style={styles.head}
+            onLayout={(e) => setHeadTall(e.nativeEvent.layout.height)}>
+            <Title>{data.title}</Title>
+            <Caption tone="secondary">
+              {data.authorName} · {data.dayCount}일 · {data.placeCount}곳 · 조회{' '}
+              {data.viewCount.toLocaleString()}
+              {data.feedback ? ` · 댓글 ${data.commentCount}` : ''}
+            </Caption>
+            {/* 판을 내려 두어도 이 둘은 누를 수 있어야 합니다. 이 화면에
+                들어온 까닭이 대개 둘 중 하나입니다. */}
+            <Row gap={Spacing.sm}>
+              <Button
+                label={`${data.liked ? '♥' : '♡'} ${data.likeCount}`}
+                variant="secondary"
+                compact
+                onPress={toggleLike}
+              />
+              <View style={styles.grow}>
+                <Button
+                  label="내 여행으로 가져오기"
+                  compact
+                  onPress={() => (user ? setCopying(true) : needLogin('copy'))}
+                />
+              </View>
+            </Row>
+          </View>
+        }>
         {data.summary ? <Body tone="secondary">{data.summary}</Body> : null}
-        <Caption tone="secondary">
-          {data.authorName} · {data.dayCount}일 · {data.placeCount}곳 · 조회{' '}
-          {data.viewCount.toLocaleString()}
-          {data.feedback ? ` · 댓글 ${data.commentCount}` : ''}
-        </Caption>
-      </View>
 
       {notice ? <Body tone="success">{notice}</Body> : null}
       {failed ? <ErrorNote message={failed} /> : null}
@@ -445,6 +484,11 @@ export default function Post() {
           />
         )}
       </Row>
+      </DragSheet>
+
+      {/* 아래 띠. 이 화면은 Screen 이 아니라 지도 위에 판을 얹는 얼개라
+          직접 답니다. */}
+      <AppTabs />
 
       <CopySheet
         visible={copying}
@@ -542,7 +586,7 @@ export default function Post() {
           report('');
         }}
       />
-    </Screen>
+    </View>
   );
 }
 
@@ -674,6 +718,15 @@ function DayBlock({
             (accessibilityLabel)에 몇 개 달렸는지까지 그대로 담고, 댓글이
             있는 곳에는 점을 찍습니다.
           */}
+          {/*
+            고른 줄에서만 펼칩니다.
+
+            <p>장소마다 셋이 늘 서 있으면 판이 단추밭이 됩니다. 이제 판은
+            화면의 절반 남짓이고, 남의 일정에서 한 곳을 손대는 일은 한 번에
+            한 곳입니다. 지도와 목록은 이미 이어져 있어(누르면 핀이 커집니다)
+            고르는 몸짓이 자연스럽습니다 — 내 여행 상세가 같은 규칙입니다.
+          */}
+          {activeId === `${index}:${i}` ? (
           <Row gap={0} style={styles.placeActs}>
             {[
               feedback
@@ -722,6 +775,7 @@ function DayBlock({
                 </View>
               ))}
           </Row>
+          ) : null}
         </View>
           ))}
     </Card>
@@ -788,6 +842,12 @@ function today() {
 
 
 const styles = StyleSheet.create({
+  /* 지도가 바탕입니다. 판이 아직 안 깔린 자리는 지도 색으로 둡니다 —
+     흰 판이 비치면 판이 두 겹인 것처럼 보입니다. */
+  stage: {
+    flex: 1,
+    backgroundColor: Colors.abyss,
+  },
   head: {
     gap: Spacing.xs,
   },
