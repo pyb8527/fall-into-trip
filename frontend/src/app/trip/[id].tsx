@@ -2669,7 +2669,9 @@ function PlaceRow({
                     key: 'tips',
                     name: 'message-square' as IconName,
                     label: tipCount > 0 ? `한 줄 ${tipCount}개 보기` : '한 줄 남기기',
-                    active: tipCount > 0,
+                    /* 남긴 것이 있다는 말은 점이 합니다. active 는 눌러 둔
+                       상태(다녀옴 같은)를 뜻합니다. */
+                    dot: tipCount > 0,
                     onPress: onTips,
                   }
                 : null,

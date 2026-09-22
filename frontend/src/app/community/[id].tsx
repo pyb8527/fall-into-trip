@@ -734,7 +734,10 @@ function DayBlock({
                     key: 'comment',
                     name: 'message-square' as IconName,
                     label: countAt(i) > 0 ? `댓글 ${countAt(i)}개 보기` : '댓글 남기기',
-                    active: countAt(i) > 0,
+                    /* 달린 것이 있다는 말은 점이 합니다. active 는 눌러 둔
+                       상태(보석함에 담김 같은)를 뜻하는데, 댓글이 달린 것은
+                       내가 켜 둔 것이 아닙니다 — 그렇게 쓰면 회색으로 채워져
+                       눌러 놓은 단추처럼 보입니다. */
                     dot: countAt(i) > 0,
                     onPress: () => onComment(i),
                   }
