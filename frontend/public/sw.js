@@ -12,10 +12,22 @@
  *      화면이 계속 뜨면 고친 것이 반영되지 않은 줄 압니다.
  *
  * 그래서 담아 두는 것은 이름에 해시가 붙은 것(_expo)과 글꼴·아이콘뿐입니다.
- * 그것들은 내용이 바뀌면 이름도 바뀌므로 오래 들고 있어도 틀릴 일이 없습니다.
+ *
+ *   3. 그런데 <b>글꼴과 아이콘에는 해시가 없습니다.</b> /fonts/ 와 /icons/ 는
+ *      이름이 고정이라 "내용이 바뀌면 이름도 바뀐다" 는 전제가 안 섭니다.
+ *      캐시 우선으로 두었더니 한 번 담긴 뒤로 영영 안 바뀌었습니다 — 글꼴을
+ *      바꾸고 아이콘을 다시 구워 올려도 이미 다녀간 사람에게는 옛 그림이
+ *      계속 나왔습니다.
+ *
+ *      해시 있는 것(_expo)만 캐시 우선으로 두고, 이름이 고정인 것은 담아 둔
+ *      것을 먼저 내주되 <b>뒤에서 새것을 받아 갈아 끼웁니다.</b> 지금 화면은
+ *      빠르고, 다음에 열면 새것입니다.
  */
 
-const SHELL = 'fit-shell-v1';
+/* 판을 올리면 옛 창고가 통째로 비워집니다(activate). 위의 3번처럼 담는
+   규칙을 고쳤을 때는 올려야 합니다 — 안 올리면 고친 규칙이 이미 담긴
+   것에는 안 먹습니다. */
+const SHELL = 'fit-shell-v2';
 
 /** 이름이 바뀌지 않는 것들. 새로 받아 온 것으로 늘 갈아 끼웁니다. */
 const ALWAYS_FRESH = ['/manifest.json', '/sw.js'];
@@ -38,13 +50,22 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-/** 오래 들고 있어도 되는 것인지. 이름에 해시가 붙어 내용이 바뀌면 이름도 바뀝니다. */
-function keepable(url) {
+/** 이름에 해시가 붙은 것. 내용이 바뀌면 이름도 바뀌므로 오래 들고 있어도 됩니다. */
+function hashed(url) {
+  return url.pathname.startsWith('/_expo/') || url.pathname.startsWith('/assets/');
+}
+
+/**
+ * 이름이 고정인 무거운 것들.
+ *
+ * <p>글꼴과 아이콘입니다. 오래 들고 있고 싶지만 이름이 안 바뀌므로, 담아 둔
+ * 것을 내주면서 뒤에서 새것을 받아 둡니다.
+ */
+function steady(url) {
   return (
-    url.pathname.startsWith('/_expo/') ||
-    url.pathname.startsWith('/assets/') ||
     url.pathname.startsWith('/fonts/') ||
-    url.pathname.startsWith('/icons/')
+    url.pathname.startsWith('/icons/') ||
+    url.pathname === '/splash-icon.png'
   );
 }
 
@@ -69,7 +90,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  if (keepable(url)) {
+  if (hashed(url)) {
     /* 담아 둔 것이 있으면 그것부터. 없으면 받아 와서 담아 둡니다. */
     event.respondWith(
       caches.match(request).then(
@@ -83,6 +104,30 @@ self.addEventListener('fetch', (event) => {
             return res;
           }),
       ),
+    );
+    return;
+  }
+
+  if (steady(url)) {
+    /*
+      담아 둔 것을 내주고, 뒤에서 새것을 받아 갈아 끼웁니다.
+
+      <p>지금 화면은 기다리지 않고, 다음에 열면 새것입니다. 이름이 고정인
+      것들이라 이렇게 하지 않으면 한 번 담긴 뒤로 영영 안 바뀝니다.
+    */
+    event.respondWith(
+      caches.match(request).then((hit) => {
+        const fresh = fetch(request)
+          .then((res) => {
+            if (res.ok) {
+              const copy = res.clone();
+              caches.open(SHELL).then((box) => box.put(request, copy));
+            }
+            return res;
+          })
+          .catch(() => hit);
+        return hit || fresh;
+      }),
     );
     return;
   }
