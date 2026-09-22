@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { Colors, Type } from '@/constants/theme';
+import { Colors, Fonts, Type } from '@/constants/theme';
 
 /**
  * 로고.
@@ -70,6 +70,15 @@ export function LogoLockup({ size = 80 }: { size?: number }) {
 
 const styles = StyleSheet.create({
   wordmark: {
+    /*
+      글꼴을 여기서 직접 댑니다.
+
+      <p>Type 의 단계들은 전부 이것을 물고 있는데(constants/theme), 로고는
+      그중 어느 단계도 안 씁니다 — 크기를 부르는 쪽이 정하기 때문입니다.
+      그래서 앱 전체를 손글씨로 바꿀 때 <b>이 한 자리만 빠졌습니다.</b>
+      이름이 제 글씨가 아닌 채로 화면마다 왼쪽 위에 서 있었습니다.
+    */
+    fontFamily: Fonts.sans,
     /* 붙이지 않고 벌립니다. 반듯한 고딕이던 때는 -1.2 로 조여 한 덩어리로
        만들었는데, 손글씨는 글자마다 폭이 달라서 조이면 F 의 가로획과 I 가
        닿습니다. 살짝 벌려야 세 글자가 따로 서면서도 한 이름으로 읽힙니다. */
