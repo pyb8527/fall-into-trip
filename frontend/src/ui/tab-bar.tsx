@@ -47,7 +47,25 @@ export function TabBar({ items, onBack }: { items: TabItem[]; onBack?: () => voi
       /* 띠 바깥은 그대로 눌립니다. 안 그러면 띠를 감싼 빈 자리가 화면 아래
          전체를 덮어, 그 뒤에 있는 것을 못 누릅니다. */
       pointerEvents="box-none"
-      style={[styles.dock, { paddingBottom: Math.max(insets.bottom, Spacing.sm) }]}>
+      style={[
+        styles.dock,
+        /*
+          높이를 못박습니다.
+
+          <p>minHeight 로 두면 <b>안에 든 것이 더 크면 띠가 그만큼 자랍니다.</b>
+          그런데 판(DragSheet)은 TabDock 이라는 숫자만 믿고 그만큼 떠 있습니다.
+          둘이 어긋나면 판 아래와 띠 위 사이에 틈이 생기고, 그 틈으로 지도가
+          비칩니다.
+
+          <p>높이를 정해 두면 어긋날 수가 없습니다. 안에 든 것이 TabDock 보다
+          커지면 잘리는데, 그때는 TabDock 을 다시 재는 것이 맞습니다 —
+          모르는 채로 틈이 벌어지는 것보다 낫습니다.
+        */
+        {
+          height: TabDock + Math.max(insets.bottom, Spacing.sm),
+          paddingBottom: Math.max(insets.bottom, Spacing.sm),
+        },
+      ]}>
       {onBack ? (
         <Press onPress={onBack} accessibilityLabel="나가기" style={styles.back}>
           <Icon name="chevron-left" size={26} />
@@ -251,9 +269,6 @@ const styles = StyleSheet.create({
   */
   dock: {
     backgroundColor: Colors.background,
-    /* 비우라고 알려 준 높이와 실제 높이가 같아야 합니다. 안 맞으면 어떤
-       화면은 띠 뒤로 한 줄이 들어가고 어떤 화면은 쓸데없이 떠 있습니다. */
-    minHeight: TabDock,
     /*
       웹에서는 fixed 입니다.
 

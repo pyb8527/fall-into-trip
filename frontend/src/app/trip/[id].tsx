@@ -67,6 +67,7 @@ import {
 } from '@/constants/theme';
 import {
   Body,
+  Badge,
   BottomSheet,
   Button,
   Caption,
@@ -651,6 +652,56 @@ export default function TripScreen() {
     },
     [picked],
   );
+
+  /*
+    다시 물은 뒤 무엇이 달라졌는지.
+
+    <h3>바뀌었다고 말해 주지 않았습니다</h3>
+
+    <p>순서를 바꾸거나 장소를 하나 넣으면 구간을 다시 묻습니다. "알아보는
+    중…" 까지는 보이는데, 답이 오고 나면 그냥 숫자가 바뀌어 있습니다. 아홉
+    구간 중 어디가 달라졌는지 보려면 바꾸기 전 화면을 기억하고 있어야 했고,
+    그래서 대개 <b>안 봤습니다.</b>
+
+    <p>직전 답을 들고 있다가 새 답과 견줍니다. 달라진 구간에만 잠깐 표시를
+    답니다 — 계속 붙여 두면 그냥 장식이 되고, 다음에 정말 바뀌었을 때 눈에
+    안 걸립니다.
+
+    <p>처음 열었을 때는 아무것도 안 답니다. 견줄 직전 답이 없으면 전부
+    "바뀐 것" 이 되는데, 그것은 아무 말도 안 하는 것과 같습니다.
+  */
+  const lastGaps = useRef<Map<string, string> | null>(null);
+  const [changedGaps, setChangedGaps] = useState<Set<string>>(() => new Set());
+
+  useEffect(() => {
+    if (!gaps) {
+      return;
+    }
+    const now = new Map<string, string>();
+    for (const gap of gaps) {
+      const option = chosenOf(gap);
+      /* 수단과 분 단위까지만 봅니다. 초가 몇 흔들린 것은 바뀐 것이
+         아닙니다 — 구글이 같은 길을 조금 다르게 재기도 합니다. */
+      now.set(gap.fromId, option ? `${option.mode}:${Math.round(option.seconds / 60)}` : '-');
+    }
+    const before = lastGaps.current;
+    lastGaps.current = now;
+    if (!before) {
+      return;
+    }
+    const diff = new Set<string>();
+    now.forEach((value, key) => {
+      if (before.has(key) && before.get(key) !== value) {
+        diff.add(key);
+      }
+    });
+    if (diff.size === 0) {
+      return;
+    }
+    setChangedGaps(diff);
+    const timer = setTimeout(() => setChangedGaps(new Set()), 6000);
+    return () => clearTimeout(timer);
+  }, [gaps, chosenOf]);
 
   /**
    * 고른 수단의 길만 지도에 그립니다. 셋을 다 그리면 어느 것이 진짜인지 모릅니다.
@@ -1268,6 +1319,7 @@ export default function TripScreen() {
             gaps={gaps}
             gapping={gapping}
             chosenOf={chosenOf}
+            changedGaps={changedGaps}
           />
         }>
         {/*
@@ -1387,6 +1439,7 @@ export default function TripScreen() {
               gapping={gapping}
               gapNote={gapNote}
               chosenOf={chosenOf}
+              changedGaps={changedGaps}
               onPick={(fromId, mode) => setPicked((p) => ({ ...p, [fromId]: mode }))}
               infoOf={infoOf}
               holdRow={holdRow}
@@ -1747,8 +1800,8 @@ function Shortcut({
 }) {
   return (
     <Press onPress={onPress} scale={0.95} accessibilityLabel={label} style={styles.shortcut}>
-      <Icon name={icon} size={26} tone="accent" />
-      <Caption tone="secondary" numberOfLines={2}>
+      <Icon name={icon} size={18} tone="accent" />
+      <Caption tone="secondary" numberOfLines={1}>
         {label}
       </Caption>
     </Press>
@@ -1769,6 +1822,7 @@ function SheetHead({
   gaps,
   gapping,
   chosenOf,
+  changedGaps,
 }: {
   title: string;
   done: number;
@@ -1776,6 +1830,8 @@ function SheetHead({
   gaps: Gap[] | null;
   gapping: boolean;
   chosenOf: (gap: Gap) => GapOption | null;
+  /** 다시 물은 뒤 달라진 구간들. 출발하는 장소의 id 입니다. */
+  changedGaps: Set<string>;
 }) {
   const ratio = total === 0 ? 0 : done / total;
   const moving = (gaps ?? []).reduce((n, g) => n + (chosenOf(g)?.seconds ?? 0), 0);
@@ -1833,6 +1889,7 @@ function DayCard({
   gapping,
   gapNote,
   chosenOf,
+  changedGaps,
   onPick,
   infoOf,
   holdRow,
@@ -1863,6 +1920,8 @@ function DayCard({
   /** 대중교통이 하나도 안 나온 까닭. 없으면 비어 있습니다. */
   gapNote: string | null;
   chosenOf: (gap: Gap) => GapOption | null;
+  /** 다시 물은 뒤 달라진 구간들. 출발하는 장소의 id 입니다. */
+  changedGaps: Set<string>;
   onPick: (fromId: string, mode: TravelMode) => void;
   /** 장소별 영업시간 등. 좌표만 직접 넣은 곳에는 없습니다. */
   infoOf: Map<string, PlaceInfo>;
@@ -2264,6 +2323,7 @@ function DayCard({
                     spent={spentAt.get(place.id) ?? null}
                     touched={touchedOf(place)}
                     chosenOf={chosenOf}
+                    changedGaps={changedGaps}
                     onPick={onPick}
                   />
                 </Animated.View>
@@ -2403,6 +2463,7 @@ function PlaceRow({
   spent,
   touched,
   chosenOf,
+  changedGaps,
   onPick,
 }: {
   place: Place;
@@ -2440,6 +2501,8 @@ function PlaceRow({
   /** 남이 최근에 손댔으면 "지영 님 · 2시간 전". 아니면 비어 있습니다. */
   touched: string | null;
   chosenOf: (gap: Gap) => GapOption | null;
+  /** 다시 물은 뒤 달라진 구간들. 출발하는 장소의 id 입니다. */
+  changedGaps: Set<string>;
   onPick: (fromId: string, mode: TravelMode) => void;
 }) {
   const [confirming, setConfirming] = useState(false);
@@ -2507,7 +2570,19 @@ function PlaceRow({
                 </Body>
               </Row>
               {place.ja || place.en ? <Caption>{place.ja ?? place.en}</Caption> : null}
-              {place.note ? <Caption tone="secondary">{place.note}</Caption> : null}
+              {/*
+                사람이 적어 둔 글.
+
+                <p>아래의 갈래·돈과 같은 캡션으로 두었더니 한 덩어리 회색
+                글씨가 되어, 어디까지가 우리가 만든 값이고 어디부터가 사람이
+                쓴 말인지 안 갈렸습니다. 왼쪽에 선 한 가닥을 세웁니다 —
+                인용처럼 읽힙니다.
+              */}
+              {place.note ? (
+                <View style={styles.noteQuote}>
+                  <Caption tone="secondary">{place.note}</Caption>
+                </View>
+              ) : null}
               {info ? <PlaceHours info={info} at={place.time} /> : null}
               {/* 실수로 두 번 넣었을 수도, 일부러 또 가려는 것일 수도 있습니다.
                   어느 쪽인지는 넣은 사람만 아니까 지우지 않고 알려만 줍니다. */}
@@ -2534,12 +2609,21 @@ function PlaceRow({
                 하루 카드에서 예산을 다룬 것과 같은 규칙입니다.
               */}
               {place.cat || costLabel(place) || spentHere ? (
-                <Row gap={Spacing.sm}>
-                  {place.cat ? <Caption>{place.cat}</Caption> : null}
-                  {costLabel(place) ? <Caption>잡은 것 {costLabel(place)}</Caption> : null}
-                  {spentHere ? (
-                    <Caption strong>쓴 돈 {spentHere}</Caption>
-                  ) : null}
+                /*
+                  적어 둔 값들은 알갱이로 둡니다.
+
+                  <p>전에는 메모와 똑같은 캡션 한 줄이었습니다. 그래서 한
+                  장소에 갈래·잡은 돈·쓴 돈·메모가 다 있으면 회색 글이 네 줄
+                  늘어설 뿐, 무엇이 <b>적어 둔 값</b>이고 무엇이 사람이 쓴
+                  말인지 눈으로 안 갈렸습니다.
+
+                  <p>쓴 돈만 색을 답니다. 잡아 둔 것은 계획이고 쓴 것은
+                  사실이라, 둘 중 하나만 눈에 걸려야 한다면 사실입니다.
+                */
+                <Row gap={Spacing.xs} style={styles.facts}>
+                  {place.cat ? <Badge label={place.cat} /> : null}
+                  {costLabel(place) ? <Badge label={`잡은 것 ${costLabel(place)}`} /> : null}
+                  {spentHere ? <Badge label={`쓴 돈 ${spentHere}`} tone="accent" /> : null}
                 </Row>
               ) : null}
             </View>
@@ -2569,81 +2653,94 @@ function PlaceRow({
           자연스럽고, 한 번에 한 곳만 손대는 것이 실제로 하는 일과도 맞습니다.
         */}
         {active ? (
-        <Row gap={0} style={styles.placeActions}>
-          {/* 구글이 모르고 방금 다녀온 사람만 아는 것들이 여기 모입니다. */}
-          {place.placeId ? (
-            <View style={styles.placeAction}>
-              <IconButton
-                name="message-square"
-                label={tipCount > 0 ? `한 줄 ${tipCount}개 보기` : '한 줄 남기기'}
-                active={tipCount > 0}
-                onPress={onTips}
-              />
-            </View>
-          ) : null}
-          {/*
-            길찾기와 다릅니다.
+          <Row gap={0} style={styles.placeActions}>
+            {[
+              /* 구글이 모르고 방금 다녀온 사람만 아는 것들이 여기 모입니다. */
+              place.placeId
+                ? {
+                    key: 'tips',
+                    name: 'message-square' as IconName,
+                    label: tipCount > 0 ? `한 줄 ${tipCount}개 보기` : '한 줄 남기기',
+                    active: tipCount > 0,
+                    onPress: onTips,
+                  }
+                : null,
+              /*
+                길찾기와 다릅니다.
 
-            길찾기는 "어떻게 가지" 이고 이쪽은 "여기가 어떤 데지" 입니다 —
-            사진, 후기, 메뉴, 거리뷰. 우리가 갖고 있지 않은 것들이 거기 다
-            있습니다. 길찾기 단추만 있고 이것이 없어서, 정작 그 가게를 다시
-            보려면 직접 검색해야 했습니다.
-          */}
-          <View style={styles.placeAction}>
-            <IconButton
-              name="info"
-              label={`${place.name} 자세히 보기`}
-              onPress={() =>
-                onLook({
-                  name: place.name,
-                  lat: place.lat,
-                  lng: place.lng,
-                  placeId: place.placeId,
-                  icon: place.icon,
-                })
-              }
-            />
-          </View>
-          {/* 실제 안내는 구글 지도에 넘깁니다. 음성 안내도 환승 정보도 그쪽이
-              낫고, 어차피 켤 것을 주소 옮겨 적게 만들 이유가 없습니다. */}
-          <View style={styles.placeAction}>
-            <IconButton
-              name="navigation"
-              label={`${place.name} 길찾기`}
-              onPress={() =>
-                openDirections(
-                  { name: place.name, lat: place.lat, lng: place.lng, placeId: place.placeId },
-                  chosen?.mode ?? null,
-                )
-              }
-            />
-          </View>
-          <View style={styles.placeAction}>
-            <IconButton
-              name="check"
-              label={visited ? '다녀옴 취소' : '다녀옴으로 표시'}
-              tone="success"
-              active={visited}
-              disabled={busy}
-              onPress={onToggle}
-            />
-          </View>
-          {canEdit ? (
-            <>
-              <View style={styles.placeAction}>
-                <IconButton name="edit-2" label="장소 고치기" onPress={onEdit} />
-              </View>
-              <View style={styles.placeAction}>
-                <IconButton
-                  name="trash-2"
-                  label="장소 지우기"
-                  tone="danger"
-                  onPress={() => setConfirming(true)}
-                />
-              </View>
-            </>
-          ) : null}
-        </Row>
+                길찾기는 "어떻게 가지" 이고 이쪽은 "여기가 어떤 데지" 입니다 —
+                사진, 후기, 메뉴, 거리뷰. 우리가 갖고 있지 않은 것들이 거기 다
+                있습니다. 길찾기 단추만 있고 이것이 없어서, 정작 그 가게를 다시
+                보려면 직접 검색해야 했습니다.
+              */
+              {
+                key: 'look',
+                name: 'info' as IconName,
+                label: `${place.name} 자세히 보기`,
+                onPress: () =>
+                  onLook({
+                    name: place.name,
+                    lat: place.lat,
+                    lng: place.lng,
+                    placeId: place.placeId,
+                    icon: place.icon,
+                  }),
+              },
+              /* 실제 안내는 구글 지도에 넘깁니다. 음성 안내도 환승 정보도 그쪽이
+                 낫고, 어차피 켤 것을 주소 옮겨 적게 만들 이유가 없습니다. */
+              {
+                key: 'go',
+                name: 'navigation' as IconName,
+                label: `${place.name} 길찾기`,
+                onPress: () =>
+                  openDirections(
+                    { name: place.name, lat: place.lat, lng: place.lng, placeId: place.placeId },
+                    chosen?.mode ?? null,
+                  ),
+              },
+              {
+                key: 'visited',
+                name: 'check' as IconName,
+                label: visited ? '다녀옴 취소' : '다녀옴으로 표시',
+                tone: 'success' as const,
+                active: visited,
+                disabled: busy,
+                onPress: onToggle,
+              },
+              canEdit
+                ? { key: 'edit', name: 'edit-2' as IconName, label: '장소 고치기', onPress: onEdit }
+                : null,
+              canEdit
+                ? {
+                    key: 'drop',
+                    name: 'trash-2' as IconName,
+                    label: '장소 지우기',
+                    tone: 'danger' as const,
+                    onPress: () => setConfirming(true),
+                  }
+                : null,
+            ]
+              .filter((a) => a !== null)
+              .map((a, i) => (
+                /* 칸막이는 첫 칸 빼고 답니다. 어느 것이 첫 칸인지는 사람마다
+                   다릅니다 — 고칠 수 있는 사람인지, 구글이 아는 곳인지에 따라
+                   넷에서 여섯까지 달라집니다. 그래서 세어서 답니다. */
+                <View key={a.key} style={[styles.placeAction, i > 0 && styles.placeActionEdge]}>
+                  <IconButton
+                    /* 바탕을 안 깝니다. 고른 줄은 바탕이 강조색인데 단추만 제
+                       회색 동그라미를 들고 있으면 그 줄만 떨어져 나온 것처럼
+                       보입니다. */
+                    bare
+                    name={a.name}
+                    label={a.label}
+                    tone={a.tone}
+                    active={a.active}
+                    disabled={a.disabled}
+                    onPress={a.onPress}
+                  />
+                </View>
+              ))}
+          </Row>
         ) : null}
 
         <ConfirmDialog
@@ -2667,6 +2764,7 @@ function PlaceRow({
           leaveAt={place.time}
           arriveBy={arriveBy}
           onPick={onPick}
+          justChanged={changedGaps.has(gap.fromId)}
         />
       ) : gapping ? (
         /*
@@ -2781,9 +2879,12 @@ function GapBlock({
   leaveAt,
   arriveBy,
   onPick,
+  justChanged,
 }: {
   gap: Gap;
   chosen: GapOption | null;
+  /** 방금 다시 물어서 달라진 구간인지. 잠깐만 참입니다. */
+  justChanged: boolean;
   /** 이 장소에 적어 둔 시각. */
   leaveAt: string | null;
   /** 다음 장소에 적어 둔 시각. */
@@ -2817,6 +2918,13 @@ function GapBlock({
   return (
     <View style={styles.gap}>
       <View style={styles.gapLine} />
+      {/*
+        방금 달라진 구간.
+
+        <p>잠깐만 답니다. 계속 붙여 두면 그냥 장식이 되고, 다음에 정말
+        바뀌었을 때 눈에 안 걸립니다.
+      */}
+      {justChanged ? <Badge label="이 구간이 바뀌었습니다" tone="accent" /> : null}
       <Row gap={Spacing.xs}>
         {gap.options.map((option) => {
           const on = chosen?.mode === option.mode;
@@ -3613,10 +3721,22 @@ const styles = StyleSheet.create({
        그때마다 줄 모양이 저절로 맞습니다. */
     flex: 1,
     minWidth: 0,
+    /*
+      그림과 글자를 <b>가로로</b> 눕힙니다.
+
+      <p>세로로 쌓으면 칸 높이가 그림 + 글자 + 사이 여백이 됩니다. 이 줄은
+      판을 내렸을 때 <b>늘 보이는 자리</b>라(revealAtLow 가 이 높이를 씁니다)
+      그만큼 지도가 줄어듭니다. 눕히면 한 줄 높이면 됩니다.
+
+      <p>그림도 작게 둡니다. 여기 셋은 화면의 주인공이 아니라 필요할 때
+      찾는 것들이고, 옆에 글자가 늘 붙어 있어 그림 혼자 뜻을 지지 않습니다.
+    */
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: Spacing.xs,
-    paddingVertical: Spacing.md,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.xs,
     borderRadius: Radius.sm,
     /* 바닥이 회색이 되면서 이 칸도 회색이면 사라집니다. 흰 카드로 올려야
        누를 수 있는 것으로 읽힙니다. */
@@ -3672,6 +3792,16 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: 'transparent',
     overflow: 'hidden',
+  },
+  /* 사람이 쓴 글. 왼쪽 선 한 가닥으로 인용처럼 세웁니다. */
+  noteQuote: {
+    borderLeftWidth: 2,
+    borderLeftColor: Colors.border,
+    paddingLeft: Spacing.sm,
+  },
+  /* 알갱이들이 많아지면 접힙니다. 한 줄에 우겨넣으면 글자가 잘립니다. */
+  facts: {
+    flexWrap: 'wrap',
   },
   placeTap: {
     flex: 1,
@@ -3743,12 +3873,28 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: Colors.border,
   },
-  /* 칸을 고르게 나눠 가집니다. 단추 자체는 제 크기를 지키고 자리만 넓게
-     잡습니다 — 늘어난 동그라미는 단추가 아니라 알약처럼 보입니다. */
+  /*
+    칸을 고르게 나눠 가집니다.
+
+    <p>단추는 제 바탕을 안 깝니다(bare). 고른 줄은 바탕이 강조색으로 바뀌는데
+    단추만 제 회색 동그라미를 들고 있으면, 한 카드 안에서 그 줄만 다른 데서
+    떨어져 나온 것처럼 보입니다. 바탕은 카드의 것을 그대로 씁니다.
+
+    <p>대신 칸 사이를 선으로 가릅니다. 바탕이 같아지면 어디까지가 한 단추인지
+    안 보이는데, 손가락으로 누르는 것이라 경계가 보여야 합니다.
+
+    <p>위아래 여백은 거의 안 둡니다. 단추가 이미 제 누름 높이를 갖고 있어서
+    (Tap.min) 여기서 더 얹으면 줄만 두꺼워집니다.
+  */
   placeAction: {
     flex: 1,
     alignItems: 'center',
-    paddingVertical: Spacing.xs,
+    justifyContent: 'center',
+  },
+  /* 첫 칸 빼고 왼쪽에 선. 바깥 테두리가 아니라 칸막이입니다. */
+  placeActionEdge: {
+    borderLeftWidth: StyleSheet.hairlineWidth,
+    borderLeftColor: Colors.border,
   },
 
   /* --------------------------------------------------- 사이사이 이동 */
