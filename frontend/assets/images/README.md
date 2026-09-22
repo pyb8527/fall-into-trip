@@ -9,6 +9,15 @@
 | `android-icon-foreground.png` | 안드로이드 적응형 아이콘 앞면 | 투명 | 흰색 |
 | `splash-icon.png` | 시작 화면 | 투명 | `#0E0E0E` |
 | `favicon.png` | 브라우저 탭 | `#0E0E0E` | 흰색 |
+| `../../public/icons/icon-192.png` | 홈 화면에 설치한 웹 앱 | `#0E0E0E` | 흰색 |
+| `../../public/icons/icon-512.png` | 그 앱의 **시작 화면** | `#0E0E0E` | 흰색 |
+| `../../public/icons/icon-maskable-512.png` | 잘려도 되는 판 | `#0E0E0E` | 흰색 |
+
+> **`public/icons` 를 빠뜨리기 쉽습니다.** 글꼴을 바꾸며 위의 넷만 다시 굽고
+> 이 셋을 옛 디자인으로 두었던 적이 있습니다. 홈 화면에 설치한 웹 앱은 시작
+> 화면을 안드로이드가 **매니페스트의 512 아이콘 + `background_color`** 로
+> 직접 만들기 때문에, 앱 아이콘은 새 글씨인데 시작 화면만 옛 글씨인 상태가
+> 됐습니다. 지금은 한 스크립트가 일곱 개를 다 굽습니다.
 
 바탕색은 `app.json` 이 정합니다 — 안드로이드 적응형은 `adaptiveIcon.backgroundColor`,
 시작 화면은 `expo-splash-screen` 의 `backgroundColor`.
