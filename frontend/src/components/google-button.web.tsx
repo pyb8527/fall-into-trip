@@ -1,7 +1,11 @@
 import { useEffect, useRef } from 'react';
-import { View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { useAuth } from '@/auth/auth-provider';
+import { shellSignIn } from '@/lib/google-signin.web';
+import { inShell } from '@/lib/shell-bridge.web';
+import { Colors, Radius, Spacing, Tap, Type } from '@/constants/theme';
+import { Press } from '@/ui';
 
 /**
  * 구글로 로그인하는 단추 (웹).
@@ -22,6 +26,70 @@ import { useAuth } from '@/auth/auth-provider';
  */
 export function GoogleButton({ onCredential }: { onCredential: (credential: string) => void }) {
   const { googleClientId } = useAuth();
+
+  /*
+    앱 껍데기 안에서는 구글이 그리는 단추를 못 씁니다.
+
+    <p>그 단추는 구글의 스크립트가 제 창 안에서 로그인을 끝내고 토큰을
+    건네주는 방식인데, 웹뷰 안에서는 구글이 그 흐름 자체를 막습니다.
+    우리가 그린 단추를 두고, 누르면 껍데기가 폰의 브라우저를 띄웁니다.
+  */
+  if (inShell) {
+    return <ShellButton onCredential={onCredential} hidden={!googleClientId} />;
+  }
+
+  return <WebButton onCredential={onCredential} googleClientId={googleClientId} />;
+}
+
+/** 껍데기 안에서 쓰는 단추. 생김새는 앱 쪽(google-button.tsx)과 같습니다. */
+function ShellButton({
+  onCredential,
+  hidden,
+}: {
+  onCredential: (credential: string) => void;
+  hidden: boolean;
+}) {
+  if (hidden) {
+    /* 서버가 클라이언트 ID 를 안 내려 줬습니다. 눌러도 아무 일이 없는
+       단추를 두는 것보다 없는 편이 낫습니다. */
+    return null;
+  }
+  return (
+    <Press
+      accessibilityLabel="Google로 로그인"
+      onPress={() => {
+        shellSignIn()
+          .then((token) => {
+            if (token) {
+              onCredential(token);
+            }
+            /* null 이면 사람이 창을 닫은 것입니다. 고장이 아니므로 아무
+               말도 안 합니다. */
+          })
+          .catch(() => {
+            /* 껍데기가 못 했습니다. 비밀번호로 들어오는 길은 그대로
+               있으므로 조용히 넘어갑니다. */
+          });
+      }}
+      style={shellStyles.button}>
+      <View style={shellStyles.logo}>
+        <View style={[shellStyles.quarter, { backgroundColor: '#EA4335' }]} />
+        <View style={[shellStyles.quarter, { backgroundColor: '#4285F4' }]} />
+        <View style={[shellStyles.quarter, { backgroundColor: '#FBBC05' }]} />
+        <View style={[shellStyles.quarter, { backgroundColor: '#34A853' }]} />
+      </View>
+      <Text style={shellStyles.label}>Google로 로그인</Text>
+    </Press>
+  );
+}
+
+function WebButton({
+  onCredential,
+  googleClientId,
+}: {
+  onCredential: (credential: string) => void;
+  googleClientId: string | null | undefined;
+}) {
   const slot = useRef<View | null>(null);
   /* 콜백이 매번 새 함수라도 구글을 다시 초기화하지 않도록 최신 것만 들고
      있습니다. 다시 초기화하면 단추가 깜빡이며 새로 그려집니다. */
@@ -109,3 +177,40 @@ type GoogleIdentity = {
     };
   };
 };
+
+/* 앱 쪽 단추(components/google-button.tsx)와 같은 값입니다. 구글 로고와
+   문구에는 지켜야 할 규칙이 있어서, 흰 바탕 · 회색 테두리 · "Google로
+   로그인" 이라는 가장 기본형을 씁니다. */
+const shellStyles = StyleSheet.create({
+  button: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    alignSelf: 'center',
+    minHeight: Tap.min,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: Radius.sm,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.border,
+    backgroundColor: '#FFFFFF',
+  },
+  /* 로고는 그림 파일이 아니라 네 조각 색으로 흉내 냅니다 — 파일 하나를
+     더 실을 만한 일이 아니고, 이 크기에서는 구별이 안 갑니다. */
+  logo: {
+    width: 18,
+    height: 18,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    borderRadius: 9,
+    overflow: 'hidden',
+  },
+  quarter: {
+    width: 9,
+    height: 9,
+  },
+  label: {
+    ...Type.body,
+    color: Colors.text,
+  },
+});

@@ -1,3 +1,5 @@
+import { askShell, inShell } from '@/lib/shell-bridge.web';
+
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { Here, HereState } from '@/lib/here';
@@ -43,6 +45,22 @@ export function useHere(): HereState {
     }
     setError(null);
     setWatching(true);
+
+    /*
+      앱 껍데기 안에서는 폰이 먼저 허락해야 합니다.
+
+      <p>웹뷰의 geolocation 은 <b>앱에게 위치 권한이 있을 때만</b> 열립니다.
+      없으면 브라우저처럼 창이 뜨는 것이 아니라 그냥 거절이 돌아옵니다 —
+      물어본 적도 없는데 거절당하는 셈입니다.
+
+      <p>그래서 껍데기에게 한 번 받아 달라고 합니다. 답을 기다리지는
+      않습니다 — 허락이 떨어지면 아래 watchPosition 이 곧 자리를 물어
+      오고, 거절하면 그 자리에서 거절 처리가 그대로 돕니다.
+    */
+    if (inShell) {
+      askShell({ kind: 'letMeLocate' }).catch(() => {});
+    }
+
     id.current = navigator.geolocation.watchPosition(
       (pos) => {
         setHere({

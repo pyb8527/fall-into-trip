@@ -1,3 +1,5 @@
+import { askShell, inShell } from '@/lib/shell-bridge.web';
+
 /**
  * 동행자가 고쳤을 때 알려 주기 (웹).
  *
@@ -21,11 +23,22 @@ export type ApiClient = {
   post: <T>(path: string, body: unknown) => Promise<T>;
 };
 
+/*
+  앱 껍데기 안에서는 웹 푸시가 안 됩니다. 웹뷰는 브라우저가 백그라운드에서
+  서비스워커를 깨워 주는 일을 안 합니다. 대신 폰이 FCM·APNs 로 받아서
+  띄우고, 우리는 그 열쇠를 서버에 등록합니다.
+
+  <p>서버는 이미 둘 다 받습니다 — 열쇠 생김새로 가립니다.
+*/
+/** 앱 껍데기에서 받아 둔 열쇠. 껐다 켤 때 같은 것을 서버에서 뺍니다. */
+let shellToken: string | null = null;
+
 export const canNotify =
-  typeof window !== 'undefined' &&
-  'serviceWorker' in navigator &&
-  'PushManager' in window &&
-  'Notification' in window;
+  inShell ||
+  (typeof window !== 'undefined' &&
+    'serviceWorker' in navigator &&
+    'PushManager' in window &&
+    'Notification' in window);
 
 /**
  * 지금 어떤 상태인지.
@@ -38,6 +51,11 @@ export const canNotify =
  * </ul>
  */
 export async function notifyState(): Promise<'off' | 'on' | 'blocked'> {
+  if (inShell) {
+    /* 폰의 허락 상태는 껍데기만 압니다. 스위치를 눌러 봐야 알 수 있어서,
+       여기서는 이 기기에 등록해 둔 열쇠가 있는지로 답합니다. */
+    return shellToken ? 'on' : 'off';
+  }
   if (!canNotify) {
     return 'off';
   }
@@ -51,6 +69,23 @@ export async function notifyState(): Promise<'off' | 'on' | 'blocked'> {
 
 /** 알림을 켭니다. */
 export async function turnOn(api: ApiClient): Promise<'on' | 'blocked' | 'failed'> {
+  if (inShell) {
+    try {
+      const token = (await askShell({ kind: 'notifyOn' })) as string | null;
+      if (!token) {
+        /* 폰에서 거절했습니다. 한 번 거절하면 설정까지 들어가야 되돌립니다. */
+        return 'blocked';
+      }
+      /* 서버에 등록하는 것은 웹이 합니다 — 로그인 상태를 들고 있는 쪽이
+         여기입니다. 껍데기는 열쇠만 만들어 줍니다. */
+      await api.post('/api/push/subscribe', { endpoint: token, p256dh: null, auth: null });
+      shellToken = token;
+      return 'on';
+    } catch {
+      return 'failed';
+    }
+  }
+
   if (!canNotify) {
     return 'failed';
   }
@@ -113,6 +148,15 @@ export async function turnOn(api: ApiClient): Promise<'on' | 'blocked' | 'failed
 
 /** 이 기기에서는 그만 받습니다. */
 export async function turnOff(api: ApiClient): Promise<void> {
+  if (inShell) {
+    if (shellToken) {
+      await api.post('/api/push/unsubscribe', { endpoint: shellToken }).catch(() => {});
+      shellToken = null;
+    }
+    await askShell({ kind: 'notifyOff' }).catch(() => {});
+    return;
+  }
+
   if (!canNotify) {
     return;
   }

@@ -6,7 +6,10 @@ import { BackHandler, Platform, Pressable, StyleSheet, Text, View } from 'react-
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView, type WebViewNavigation } from 'react-native-webview';
 
+import { answer } from '@/shell/answer';
+import { onNotificationTap, tappedToOpen } from '@/shell/push';
 import { SITE, ours } from '@/shell/site';
+import { speak, type Envelope } from '@/shell/talk';
 
 /**
  * 앱 껍데기.
@@ -112,6 +115,59 @@ function Inside() {
     SplashScreen.hideAsync().catch(() => {});
   }, []);
 
+  /** 웹에 한마디 넣습니다. 웹뷰가 아직 없으면 조용히 버립니다. */
+  const say = useCallback((code: string) => {
+    web.current?.injectJavaScript(code);
+  }, []);
+
+  /*
+    웹의 부탁을 받습니다.
+
+    <p>부탁 하나에 답 하나. 실패도 답입니다 — 아무 말도 안 하면 웹은 영영
+    "기다리는 중" 으로 남습니다. 그것이 제일 나쁩니다.
+  */
+  const heard = useCallback(
+    async (raw: string) => {
+      let envelope: Envelope;
+      try {
+        envelope = JSON.parse(raw) as Envelope;
+      } catch {
+        /* 우리 말이 아닙니다. 웹 안의 다른 코드가 postMessage 를 쓸 수도
+           있으므로 조용히 넘깁니다. */
+        return;
+      }
+      if (!envelope?.id || !envelope.ask?.kind) {
+        return;
+      }
+
+      try {
+        const value = await answer(envelope.ask);
+        say(speak({ kind: 'done', id: envelope.id, value }));
+      } catch (e) {
+        say(speak({ kind: 'failed', id: envelope.id, why: (e as Error).message }));
+      }
+    },
+    [say],
+  );
+
+  /*
+    알림을 눌러 들어왔을 때.
+
+    <p>어디로 갈지는 웹이 압니다. 주소만 건네줍니다.
+
+    <p>앱이 꺼져 있었을 때는 듣는 자리가 아직 없으므로 한 번 물어봐야
+    합니다 — 안 물어보면 알림을 눌렀는데 첫 화면이 뜹니다.
+  */
+  useEffect(() => {
+    const go = (url: string) => say(speak({ kind: 'opened', url }));
+    tappedToOpen().then((url) => {
+      if (url) {
+        go(url);
+      }
+    });
+    return onNotificationTap(go);
+  }, [say]);
+
   if (!SITE) {
     /* 빌드에 주소를 안 넣었습니다. 흰 화면으로 두면 앱이 고장 난 것처럼
        보이므로 그렇다고 말합니다. */
@@ -152,6 +208,7 @@ function Inside() {
         onNavigationStateChange={moved}
         onShouldStartLoadWithRequest={goingTo}
         onLoadEnd={shown}
+        onMessage={(e) => heard(e.nativeEvent.data)}
         onError={(e) => {
           setBroken(e.nativeEvent.description || '인터넷에 닿지 못했습니다.');
           shown();

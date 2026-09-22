@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AuthProvider, useAuth } from '@/auth/auth-provider';
+import { listenForShellOpen } from '@/lib/shell-open.web';
 import { Colors, Fonts, Type, Weight } from '@/constants/theme';
 import { HandFont } from '@/ui/hand';
 import { stackHeader } from '@/ui/nav';
@@ -52,6 +53,14 @@ const navigationTheme: NavTheme = {
 };
 
 export default function RootLayout() {
+  /*
+    알림을 눌러 들어왔을 때 그 화면을 엽니다.
+
+    <p>알림은 폰이 받지만(앱 껍데기) 어느 화면인지는 웹만 압니다. 껍데기가
+    주소를 건네면 여기서 엽니다. 브라우저에서는 아무 일도 안 합니다.
+  */
+  useEffect(() => listenForShellOpen(), []);
+
   return (
     /* 노치·홈 인디케이터 크기를 화면들이 물어볼 수 있게 가장 바깥에 둡니다. */
     <SafeAreaProvider>

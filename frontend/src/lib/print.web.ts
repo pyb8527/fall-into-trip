@@ -21,9 +21,23 @@ import { paper } from '@/lib/print-paper';
  * 시작한 일인데도 브라우저에 따라 막힙니다. 보이지 않는 iframe 을 하나
  * 만들어 그 안에서 인쇄하면 그럴 일이 없습니다.
  */
+import { askShell, inShell } from '@/lib/shell-bridge.web';
+
 export const canPrint = true;
 
 export function printItinerary(trip: TripDetail): void {
+  /*
+    앱 껍데기 안에는 창을 띄워 인쇄하는 길이 없습니다. 만든 종이를 그대로
+    넘겨 폰의 인쇄 화면에 올립니다 — 종이에 나오는 모양은 같습니다.
+  */
+  if (inShell) {
+    askShell({ kind: 'print', html: paper(trip) }).catch(() => {
+      /* 껍데기가 못 했거나 사람이 닫았습니다. 아래 iframe 길은 웹뷰에서
+         빈 종이가 나오므로 여기서 멈춥니다. */
+    });
+    return;
+  }
+
   const frame = document.createElement('iframe');
   /* 화면 밖으로 밀어 둡니다. display:none 으로 두면 브라우저에 따라 안이
      그려지지 않아 빈 종이가 나옵니다. */
