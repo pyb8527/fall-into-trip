@@ -887,9 +887,10 @@ const styles = StyleSheet.create({
     borderLeftColor: Colors.border,
   },
   /* 지도에서 켜 둔 줄. 목록과 지도가 같은 곳을 가리킨다는 것이 보여야 합니다. */
+  /* 테두리만으로 말합니다. 바탕까지 갈면 고른 것이 아니라 다른 종류의
+     것처럼 보입니다 — 내 여행 상세와 같은 규칙입니다. */
   placeOn: {
     borderColor: Colors.accent,
-    backgroundColor: Colors.accentSoft,
   },
   placeTap: {
     flex: 1,

@@ -2519,10 +2519,18 @@ function PlaceRow({
       <View
         style={[
           styles.place,
-          {
-            backgroundColor: active ? Colors.accentSoft : Colors.surfaceRaised,
-            opacity: busy ? 0.6 : 1,
-          },
+          { opacity: busy ? 0.6 : 1 },
+          /*
+            고른 줄은 <b>테두리만</b>으로 말합니다.
+
+            <p>바탕까지 연한 강조색으로 갈았습니다. 그런데 목록은 회색 바닥에
+            흰 카드가 늘어선 것이라, 한 장만 색이 바뀌면 그 줄이 고른 것이
+            아니라 <b>다른 종류의 것</b>처럼 보입니다. 안에 든 글자들도 바탕이
+            바뀌면서 같이 떠 보입니다.
+
+            <p>테두리 한 겹이면 충분합니다. 종이는 그대로 두고 "지금 이것" 만
+            표시합니다.
+          */
           active && { borderColor: Colors.accent },
         ]}>
         {/*
@@ -3790,7 +3798,10 @@ const styles = StyleSheet.create({
   place: {
     borderRadius: Radius.sm,
     borderWidth: 1.5,
+    /* 고르지 않았을 때도 자리는 차지합니다. 안 그러면 고르는 순간 줄이
+       3픽셀 넓어지며 목록이 덜컥합니다. */
     borderColor: 'transparent',
+    backgroundColor: Colors.surfaceRaised,
     overflow: 'hidden',
   },
   /* 사람이 쓴 글. 왼쪽 선 한 가닥으로 인용처럼 세웁니다. */
