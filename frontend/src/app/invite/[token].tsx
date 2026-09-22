@@ -55,7 +55,7 @@ export default function InviteScreen() {
       <Stack.Screen options={{ headerShown: false }} />
 
       <View style={styles.brand}>
-        <LogoLockup size={64} />
+        <LogoLockup size={83} />
       </View>
 
       {loading ? <Loading /> : null}

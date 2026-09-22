@@ -40,7 +40,7 @@ export default function Settings() {
           {user?.mark ? (
             <Body style={styles.markEmoji}>{markOf(user.mark)}</Body>
           ) : (
-            <LogoMark size={22} />
+            <LogoMark size={29} />
           )}
           <View style={styles.identity}>
             <Row gap={Spacing.sm}>

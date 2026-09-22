@@ -49,7 +49,7 @@ export function TabBar({ items, onBack }: { items: TabItem[]; onBack?: () => voi
       style={[styles.dock, { paddingBottom: Math.max(insets.bottom, Spacing.sm) }]}>
       {onBack ? (
         <Press onPress={onBack} accessibilityLabel="나가기" style={styles.back}>
-          <Icon name="chevron-left" size={20} />
+          <Icon name="chevron-left" size={26} />
         </Press>
       ) : null}
 
@@ -63,7 +63,7 @@ export function TabBar({ items, onBack }: { items: TabItem[]; onBack?: () => voi
             scale={0.94}
             style={styles.tab}>
             <View>
-              <Icon name={item.icon} size={21} tone={item.active ? 'default' : 'muted'} />
+              <Icon name={item.icon} size={27} tone={item.active ? 'default' : 'muted'} />
               {item.dot ? <View style={styles.dot} /> : null}
             </View>
             {/*
@@ -305,7 +305,11 @@ const styles = StyleSheet.create({
   },
   label: {
     ...Type.caption,
-    fontSize: 11,
+    /* 캡션(15)보다 한 눈금 작게. 다섯 칸이 나란히 서는 자리라 "가고 싶은 곳"
+       같은 긴 이름이 잘리지 않아야 합니다. 줄 높이도 같이 줄입니다 —
+       캡션의 것을 그대로 쓰면 글자 위아래로 빈자리가 남아 띠만 두꺼워집니다. */
+    fontSize: 14,
+    lineHeight: 18,
     color: Colors.textMuted,
   },
   /* 켜진 것은 색이 아니라 굵기로 말합니다. 다섯 중 하나에만 색을 칠하면

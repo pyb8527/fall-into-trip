@@ -95,7 +95,7 @@ export default function Welcome() {
         </>
       }>
       <View style={styles.brand}>
-        <LogoLockup size={88} />
+        <LogoLockup size={114} />
       </View>
 
       <Title>여행은 짜는 동안이 제일 깁니다</Title>

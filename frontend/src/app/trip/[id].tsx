@@ -1688,7 +1688,7 @@ function TripMarkPicker({ trip, onChanged }: { trip: Trip; onChanged: () => void
           disabled={busy}
           accessibilityLabel="색 없이"
           style={[styles.swatch, styles.swatchNone, !trip.theme ? styles.swatchOn : null]}>
-          <Icon name="minus" size={14} tone="muted" />
+          <Icon name="minus" size={18} tone="muted" />
         </Press>
         {DayColors.map((color) => (
           <Press
@@ -1747,7 +1747,7 @@ function Shortcut({
 }) {
   return (
     <Press onPress={onPress} scale={0.95} accessibilityLabel={label} style={styles.shortcut}>
-      <Icon name={icon} size={20} tone="accent" />
+      <Icon name={icon} size={26} tone="accent" />
       <Caption tone="secondary" numberOfLines={2}>
         {label}
       </Caption>
@@ -2038,7 +2038,7 @@ function DayCard({
           style={styles.dayTap}>
           <Row gap={Spacing.md} style={styles.dayTitle}>
             <Subtitle>{day.date || day.label}</Subtitle>
-            <Icon name={folded ? 'chevron-down' : 'chevron-up'} size={16} tone="muted" />
+            <Icon name={folded ? 'chevron-down' : 'chevron-up'} size={21} tone="muted" />
           </Row>
         </Pressable>
 
@@ -2105,7 +2105,7 @@ function DayCard({
                   scale={0.995}
                   accessibilityLabel={`${day.stay.name} 숙소 고치기`}>
                   <Row gap={Spacing.xs} style={styles.stayRow}>
-                    <Icon name="home" size={14} tone="accent" />
+                    <Icon name="home" size={18} tone="accent" />
                     <Body small strong numberOfLines={1}>
                       {day.stay.name}
                     </Body>
@@ -2127,7 +2127,7 @@ function DayCard({
 
               {day.flight ? (
                 <Row gap={Spacing.xs} style={styles.stayRow}>
-                  <Icon name="navigation" size={14} tone="muted" />
+                  <Icon name="navigation" size={18} tone="muted" />
                   <Caption tone="secondary" numberOfLines={1}>
                     {day.flight}
                   </Caption>
@@ -2544,7 +2544,7 @@ function PlaceRow({
               ) : null}
             </View>
 
-            {visited ? <Icon name="check" size={18} tone="success" /> : null}
+            {visited ? <Icon name="check" size={23} tone="success" /> : null}
           </View>
         </Pressable>
 
@@ -2750,7 +2750,7 @@ function DragHandle({
       accessibilityRole="adjustable"
       accessibilityLabel="끌어서 순서 옮기기"
       style={[styles.grip, dragging ? styles.gripOn : null]}>
-      <Icon name="menu" size={18} tone={dragging ? 'accent' : 'muted'} />
+      <Icon name="menu" size={23} tone={dragging ? 'accent' : 'muted'} />
     </View>
   );
 }
@@ -3255,7 +3255,7 @@ function StaySheet({
       footer={<Button label="저장" onPress={() => save()} busy={busy} />}>
       {name ? (
         <Row gap={Spacing.sm} style={styles.stayRow}>
-          <Icon name="home" size={16} tone="accent" />
+          <Icon name="home" size={21} tone="accent" />
           <Body strong numberOfLines={1}>
             {name}
           </Body>

@@ -191,7 +191,7 @@ export default function Home() {
     <Screen safeTop tabs={<AppTabs />}>
       <View style={styles.head}>
         <Split>
-          <LogoMark size={26} />
+          <LogoMark size={34} />
           {/* 오른쪽 위에 둘입니다.
 
               소식을 메뉴 카드로 만들면 넷이 다섯이 되어 2열 배치가
@@ -339,7 +339,7 @@ export default function Home() {
                         }
                       />
                     ) : (
-                      <Icon name="chevron-right" size={16} tone="muted" />
+                      <Icon name="chevron-right" size={21} tone="muted" />
                     )}
                   </Split>
                 </Press>

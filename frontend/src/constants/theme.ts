@@ -239,7 +239,7 @@ export const Lift = {
  * 잰 뒤 다시 그려야 해서 화면이 덜컥합니다. 띠 높이는 내용에 따라 변하지
  * 않으므로(그림 하나와 작은 글자 하나) 값으로 둡니다.
  */
-export const TabDock = 62;
+export const TabDock = 82;
 
 export const Motion = {
   tap: 110,
@@ -314,15 +314,25 @@ export const Type = {
     글자마다 폭이 들쭉날쭉해서 조이면 <b>획이 서로 닿습니다.</b>
 
     <p>굵기도 이제 위계를 안 집니다(Weight 참고). 크기와 색이 집니다.
+
+    <h3>한 번 더 키웠습니다</h3>
+
+    <p>본문이 16 이었습니다. 웹에서는 읽을 만했는데 폰에서 팔을 뻗은 거리로
+    보면 작았고, 무엇보다 <b>굵기가 하나뿐인 글꼴에서 크기가 위계를 거의
+    혼자 집니다.</b> 단계 사이가 좁으면 제목과 본문이 같은 말처럼 보입니다.
+
+    <p>그래서 전 단계를 1.3배쯤 올렸습니다. 여백(Spacing)은 그만큼 안
+    올립니다 — 글자와 같은 비로 밀면 한 화면에 드는 것이 확 줄어서, 큰
+    글씨가 시원한 것이 아니라 <b>휑한</b> 것이 됩니다.
   */
-  display: { ...family, fontSize: 34, lineHeight: 40, letterSpacing: 0 },
-  title: { ...family, fontSize: 26, lineHeight: 33, letterSpacing: 0 },
-  heading: { ...family, fontSize: 21, lineHeight: 28, letterSpacing: 0 },
-  subheading: { ...family, fontSize: 18, lineHeight: 26, letterSpacing: 0 },
+  display: { ...family, fontSize: 44, lineHeight: 52, letterSpacing: 0 },
+  title: { ...family, fontSize: 34, lineHeight: 43, letterSpacing: 0 },
+  heading: { ...family, fontSize: 27, lineHeight: 36, letterSpacing: 0 },
+  subheading: { ...family, fontSize: 23, lineHeight: 32, letterSpacing: 0 },
   /** 본문·입력칸. 16 아래로 내리면 iOS 사파리가 입력할 때 화면을 확대합니다. */
-  body: { ...family, fontSize: 16, lineHeight: 25, letterSpacing: 0 },
-  bodySmall: { ...family, fontSize: 14, lineHeight: 21, letterSpacing: 0 },
-  caption: { ...family, fontSize: 12, lineHeight: 18, letterSpacing: 0 },
+  body: { ...family, fontSize: 20, lineHeight: 30, letterSpacing: 0 },
+  bodySmall: { ...family, fontSize: 18, lineHeight: 27, letterSpacing: 0 },
+  caption: { ...family, fontSize: 15, lineHeight: 22, letterSpacing: 0 },
   /**
    * 구역 이름표.
    *
@@ -330,7 +340,7 @@ export const Type = {
    * 대문자는 읽으라고 있는 것이 아니라 <b>여기서부터 다른 이야기</b>
    * 라는 표시라, 화면에 글자가 늘어도 눈이 걸리지 않습니다.
    */
-  label: { ...family, fontSize: 11, lineHeight: 16, letterSpacing: 1.4 },
+  label: { ...family, fontSize: 14, lineHeight: 20, letterSpacing: 1.6 },
 } as const;
 
 /**
@@ -366,14 +376,14 @@ export const Weight = {
 
 /** 4의 배수로만 씁니다. 사이사이 값을 끼워 넣으면 금세 어긋납니다. */
 export const Spacing = {
-  xs: 4,
-  sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 20,
-  xxl: 24,
-  xxxl: 32,
-  huge: 40,
+  xs: 6,
+  sm: 10,
+  md: 14,
+  lg: 20,
+  xl: 24,
+  xxl: 28,
+  xxxl: 38,
+  huge: 48,
 } as const;
 
 /**
@@ -400,11 +410,11 @@ export const Spacing = {
 export const Radius = {
   none: 0,
   /** 칸 안에 드는 작은 것 — 타일, 체크, 아이콘 단추. */
-  sm: 10,
+  sm: 12,
   /** 단추와 줄. */
-  md: 14,
+  md: 17,
   /** 카드와 판. 회색 바닥 위에 놓이는 큰 덩어리입니다. */
-  lg: 20,
+  lg: 24,
   /** 지도 핀, 도장, 그리고 알약 모양 칩. */
   full: 999,
 } as const;
@@ -422,12 +432,17 @@ export const Radius = {
  * 애플도 "보이는 크기와 누르는 넓이는 다를 수 있다" 고 씁니다.
  */
 export const Tap = {
-  min: 44,
+  /*
+    44 는 손가락이 빗나가지 않는 <b>최소</b>입니다. 글자를 키운 만큼 줄도
+    같이 높아져야 하므로 그 위로 올려 잡습니다 — 44 짜리 줄에 20px 글자를
+    넣으면 글자가 줄을 꽉 채워 답답합니다.
+  */
+  min: 52,
   /** 화면의 주 동작. 넉넉히 둡니다. */
-  control: 52,
+  control: 62,
   /** 줄 안에 들어가는 작은 버튼의 보이는 높이. */
-  compact: 36,
-  /** compact 를 44 로 채우기 위한 여유. (36 + 4*2 = 44) */
+  compact: 44,
+  /** compact 를 min 으로 채우기 위한 여유. (44 + 4*2 = 52) */
   compactSlop: 4,
 } as const;
 
@@ -437,7 +452,7 @@ export const Tap = {
  * 카드 안쪽 간격(Spacing.md)보다 훨씬 넓어야 "이건 다른 이야기" 로 읽힙니다.
  * 4의 배수 눈금에서는 한 칸이 없어 따로 이름을 붙여 둡니다.
  */
-export const ScreenGap = 36;
+export const ScreenGap = 44;
 
 /**
  * 화면 좌우 여백.
@@ -451,5 +466,8 @@ export const Gutter = 20;
  * 넓은 화면에서 글줄이 지나치게 길어지지 않게 잡아 둡니다.
  *
  * 태블릿·웹에서 한 줄이 길어지면 눈이 다음 줄 첫 글자를 잃습니다.
+ *
+ * <p>글자를 키운 만큼 이 폭도 넓혔습니다. 폭을 그대로 두면 한 줄에 드는
+ * 글자 수가 줄어, 넓은 화면에서 글이 좁은 기둥처럼 흐릅니다.
  */
-export const MaxContentWidth = 560;
+export const MaxContentWidth = 680;

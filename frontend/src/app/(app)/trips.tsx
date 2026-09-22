@@ -175,7 +175,7 @@ export default function Trips() {
                 scale={0.96}
                 accessibilityLabel={`${folder.name} 폴더 열기`}
                 style={styles.folder}>
-                <Icon name="folder" size={28} tone="accent" />
+                <Icon name="folder" size={36} tone="accent" />
                 <Body small strong numberOfLines={1}>
                   {folder.name}
                 </Body>

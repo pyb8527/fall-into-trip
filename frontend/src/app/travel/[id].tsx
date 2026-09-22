@@ -641,7 +641,7 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   markIcon: {
-    fontSize: 34,
+    fontSize: 44,
     lineHeight: 42,
   },
   markDate: {

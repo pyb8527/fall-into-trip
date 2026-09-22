@@ -1038,7 +1038,7 @@ export function Checkbox({
       accessibilityState={{ selected: checked }}
       style={styles.checkTap}>
       <View style={[styles.check, checked ? styles.checkOn : null]}>
-        {checked ? <Icon name="check" size={15} tone="inverse" /> : null}
+        {checked ? <Icon name="check" size={20} tone="inverse" /> : null}
       </View>
     </Press>
   );
@@ -1168,7 +1168,7 @@ export function FilterChip({
       scale={0.93}
       style={styles.filterChip}>
       <Text style={styles.filterChipLabel}>{label}</Text>
-      <Icon name="x" size={13} tone="brand" />
+      <Icon name="x" size={17} tone="brand" />
     </Press>
   );
 }
@@ -1389,7 +1389,10 @@ export type IconName =
 
 export function Icon({
   name,
-  size = 18,
+  /* 본문(20)보다 조금 큽니다. 글자 옆에 설 때 같은 무게로 보이려면 그림은
+     글자보다 조금 커야 합니다 — 글자는 위아래 여백을 제 안에 갖고 있고
+     그림은 테두리까지가 전부이기 때문입니다. */
+  size = 23,
   tone = 'default',
 }: {
   name: IconName;
@@ -2218,7 +2221,7 @@ export function Snack({ undo, onHide }: { undo: UndoNote | null; onHide: () => v
         </Press>
       ) : (
         <Press onPress={onHide} accessibilityLabel="닫기" style={styles.snackAction}>
-          <Feather name="x" size={16} color={Colors.surface} />
+          <Feather name="x" size={21} color={Colors.surface} />
         </Press>
       )}
     </Animated.View>
@@ -2690,8 +2693,8 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   mark: {
-    width: 34,
-    height: 34,
+    width: 44,
+    height: 44,
     borderRadius: Radius.sm,
     alignItems: 'center',
     justifyContent: 'center',

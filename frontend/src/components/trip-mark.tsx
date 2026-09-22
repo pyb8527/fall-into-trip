@@ -46,8 +46,8 @@ const styles = StyleSheet.create({
   /* 갈래 표식(Mark)과 같은 크기입니다. 한 목록에 둘이 같이 설 일은 없지만,
      화면을 옮겨 다닐 때 같은 자리에 같은 크기가 서야 눈이 안 흔들립니다. */
   tile: {
-    width: 34,
-    height: 34,
+    width: 44,
+    height: 44,
     borderRadius: Radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
@@ -57,7 +57,7 @@ const styles = StyleSheet.create({
     ...Type.bodySmall,
   },
   blank: {
-    width: 34,
-    height: 34,
+    width: 44,
+    height: 44,
   },
 });

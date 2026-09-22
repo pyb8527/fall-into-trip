@@ -594,7 +594,7 @@ function DayBlock({
           <Subtitle>{day.shortName || day.label || `${index + 1}일차`}</Subtitle>
           <Badge label={`${day.places.length}곳`} tone="muted" />
           <View style={styles.grow} />
-          <Icon name={open ? 'chevron-up' : 'chevron-down'} size={20} tone="muted" />
+          <Icon name={open ? 'chevron-up' : 'chevron-down'} size={26} tone="muted" />
         </Row>
       </Press>
 

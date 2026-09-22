@@ -59,7 +59,7 @@ export default function Setup() {
       safeTop
       footer={<Button label="운영자 만들기" onPress={submit} busy={busy} />}>
       <View style={styles.head}>
-        <LogoMark size={34} />
+        <LogoMark size={44} />
         <Title>최초 설치</Title>
         <Body tone="secondary">
           이 서버에는 아직 운영자가 없습니다. 첫 운영자 계정을 만들어 주세요.

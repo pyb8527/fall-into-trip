@@ -45,7 +45,7 @@ export default function Entry() {
 function Splash() {
   return (
     <View style={styles.splash}>
-      <LogoLockup size={80} />
+      <LogoLockup size={104} />
       <ActivityIndicator color={Colors.textDisabled} />
     </View>
   );

@@ -132,7 +132,7 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
     */
     <Screen safeTop>
       <View style={styles.brand}>
-        <LogoLockup size={80} />
+        <LogoLockup size={104} />
       </View>
 
       <SegmentedTabs items={TABS} value={mode} onChange={switchTo} />
