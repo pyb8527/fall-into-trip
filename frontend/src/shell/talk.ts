@@ -37,7 +37,17 @@ export type Ask =
   /** 이 주소를 나눠 주세요. 답: 'sent' | 'copied' | 'failed' */
   | { kind: 'share'; url: string; title: string }
   /** 위치를 쓸 수 있게 해 주세요. 답: 허락받았는지 */
-  | { kind: 'letMeLocate' };
+  | { kind: 'letMeLocate' }
+  /**
+   * 첫 화면을 다 그렸습니다. 시작 화면을 내려 주세요.
+   *
+   * <p>껍데기는 웹이 언제 <b>보이게</b> 됐는지 모릅니다. 웹뷰가 알려 주는
+   * onLoadEnd 는 문서와 딸린 것들을 다 받은 때라, 그때는 이미 화면이 뜬
+   * 뒤입니다 — 그 사이에 웹이 준비한 시작 화면은 볼 틈이 없습니다.
+   *
+   * <p>그래서 웹이 말합니다. 화면을 그린 쪽이 그린 때를 압니다.
+   */
+  | { kind: 'painted' };
 
 /** 껍데기가 웹에게 돌려주는 말. */
 export type Tell =

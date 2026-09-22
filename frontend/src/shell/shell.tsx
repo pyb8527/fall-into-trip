@@ -44,10 +44,12 @@ SplashScreen.preventAutoHideAsync().catch(() => {
  * 표시가 없으면 지금까지처럼 브라우저의 것을 씁니다 — 그래서 이 값이
  * 없어도 웹은 그대로 돕니다.
  */
-const TELL = `
-  window.FIT_SHELL = ${JSON.stringify({ version: 1, os: Platform.OS })};
-  true;
-`;
+function tell(insets: { top: number; bottom: number; left: number; right: number }) {
+  return `
+    window.FIT_SHELL = ${JSON.stringify({ version: 1, os: Platform.OS, insets })};
+    true;
+  `;
+}
 
 export function Shell() {
   return (
@@ -140,6 +142,13 @@ function Inside() {
         return;
       }
 
+      if (envelope.ask.kind === 'painted') {
+        /* 웹이 제 시작 화면을 띄웠습니다. 이제 우리 것을 내려도 이어집니다.
+           답은 안 보냅니다 — 웹이 기다리지 않는 말입니다. */
+        shown();
+        return;
+      }
+
       try {
         const value = await answer(envelope.ask);
         say(speak({ kind: 'done', id: envelope.id, value }));
@@ -147,7 +156,7 @@ function Inside() {
         say(speak({ kind: 'failed', id: envelope.id, why: (e as Error).message }));
       }
     },
-    [say],
+    [say, shown],
   );
 
   /*
@@ -195,7 +204,17 @@ function Inside() {
   return (
     /* 위쪽은 상태 표시줄만큼 비웁니다. 아래는 웹이 제 안에서 씁니다 —
        하단 띠가 화면 맨 아래에 붙어야 하기 때문입니다. */
-    <View style={[styles.fill, { paddingTop: insets.top }]}>
+    /*
+      웹뷰를 화면 끝까지 폅니다.
+
+      <p>전에는 여기서 상태표시줄만큼 내려 놓았습니다. 그러면 그 자리가 빈
+      띠로 남습니다 — 웹의 머리글이 제 여백 안에서 흡수할 수 있는데 그
+      기회를 뺏은 셈입니다. 아래쪽 제스처 바는 아예 아무도 안 챙겼습니다.
+
+      <p>이제 숫자만 건네고(tell) 여백은 웹이 씁니다. 안전영역을 쓰는 자리가
+      한 군데가 됩니다.
+    */
+    <View style={styles.fill}>
       <StatusBar style="dark" />
       <WebView
         key={attempt}
@@ -204,9 +223,12 @@ function Inside() {
         style={styles.fill}
         /* 웹이 칠하기 전까지 흰 판이 아니라 우리 바탕색입니다. */
         containerStyle={styles.fill}
-        injectedJavaScriptBeforeContentLoaded={TELL}
+        injectedJavaScriptBeforeContentLoaded={tell(insets)}
         onNavigationStateChange={moved}
         onShouldStartLoadWithRequest={goingTo}
+        /* 웹이 painted 를 안 보내는 경우(옛 웹이 배포돼 있거나 스크립트가
+           깨졌을 때)의 보험입니다. 시작 화면이 안 걷히는 것은 앱이 아예
+           안 열리는 것과 같습니다. */
         onLoadEnd={shown}
         onMessage={(e) => heard(e.nativeEvent.data)}
         onError={(e) => {

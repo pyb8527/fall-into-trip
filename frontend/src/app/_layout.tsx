@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AuthProvider, useAuth } from '@/auth/auth-provider';
+import { ShellInsets } from '@/lib/shell-insets.web';
 import { listenForShellOpen } from '@/lib/shell-open.web';
 import { Colors, Fonts, Type, Weight } from '@/constants/theme';
 import { HandFont } from '@/ui/hand';
@@ -64,6 +65,9 @@ export default function RootLayout() {
   return (
     /* 노치·홈 인디케이터 크기를 화면들이 물어볼 수 있게 가장 바깥에 둡니다. */
     <SafeAreaProvider>
+      {/* 앱 껍데기 안이면 폰이 아는 안전영역으로 갈아 끼웁니다. 브라우저면
+          그냥 지나갑니다. */}
+      <ShellInsets>
       <AuthProvider>
         {/* 제목에 쓰는 손글씨를 받아 둡니다. 기다리지는 않습니다 — 제목 하나
             때문에 첫 화면을 붙들고 있을 이유가 없고, 도착하면 조용히 갈아
@@ -103,6 +107,7 @@ export default function RootLayout() {
         </ThemeProvider>
         </HandFont>
       </AuthProvider>
+      </ShellInsets>
     </SafeAreaProvider>
   );
 }

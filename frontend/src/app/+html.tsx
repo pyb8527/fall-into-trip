@@ -123,6 +123,22 @@ export default function Document({ children }: PropsWithChildren) {
 (function () {
   var splash = document.getElementById('fit-splash');
   if (!splash) return;
+
+  /*
+    앱 껍데기에게 "이제 보인다" 고 알립니다.
+
+    껍데기의 시작 화면은 웹뷰가 다 받았다고 할 때(onLoadEnd) 내려가는데,
+    그때는 이미 화면이 뜬 뒤라 이 시작 화면을 볼 틈이 없습니다. 이 줄이
+    그려진 지금이 넘겨받기 좋은 때입니다 — 같은 글자가 같은 자리에 있어
+    이어지는 것처럼 보입니다.
+  */
+  if (window.ReactNativeWebView) {
+    try {
+      window.ReactNativeWebView.postMessage(
+        JSON.stringify({ id: 'painted', ask: { kind: 'painted' } })
+      );
+    } catch (e) {}
+  }
   var done = false;
   function clear() {
     if (done) return;
