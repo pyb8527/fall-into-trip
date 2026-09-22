@@ -451,38 +451,57 @@ export function TripMap({
     return () => observer.disconnect();
   }, [ready]);
 
-  /* 브라우저가 알려 주는 전체화면 상태를 따라갑니다. ESC 로 빠져나가는 것도
-     여기로 들어옵니다. 크기가 바뀌었으니 지도에 다시 재라고 알려 줍니다. */
-  useEffect(() => {
-    const onChange = () => {
-      const isFull = document.fullscreenElement === wrap.current;
-      setFull(isFull);
-      if (!isFull) {
+  /*
+    전체화면은 <b>페이지 안에서</b> 폅니다.
+
+    <h3>브라우저의 전체화면을 쓰다 앱에서 죽었습니다</h3>
+
+    <p>{@code requestFullscreen()} 을 썼습니다. 브라우저에서는 잘 됐는데,
+    앱 껍데기(웹뷰) 안에서는 <b>아무 일도 안 일어납니다.</b> 그 기능은 웹뷰를
+    띄운 앱이 따로 받아 줘야 열리는 것이고, 안 받아 주면 조용히 거절됩니다 —
+    단추는 눌리는데 화면은 그대로입니다.
+
+    <p>그래서 브라우저에게 안 맡기고 우리가 폅니다. 화면을 덮는 자리로
+    옮겨 놓기만 하면 되고, 어디서 열든(브라우저·앱·홈 화면에 설치한 것)
+    똑같이 됩니다. 권한도, 사용자에게 뜨는 안내도 없습니다.
+  */
+  const toggleFull = useCallback(() => {
+    setFull((on) => {
+      if (on) {
         setSheetId(null);
       }
-      if (map.current) {
-        const center = map.current.getCenter();
-        gmaps().event.trigger(map.current, 'resize');
-        if (center) {
-          map.current.setCenter(center);
-        }
-      }
-    };
-    document.addEventListener('fullscreenchange', onChange);
-    return () => document.removeEventListener('fullscreenchange', onChange);
+      return !on;
+    });
   }, []);
 
-  const toggleFull = useCallback(() => {
-    if (document.fullscreenElement) {
-      document.exitFullscreen().catch(() => {
-        /* 브라우저가 거절하면 그대로 둡니다. */
-      });
-    } else {
-      wrap.current?.requestFullscreen().catch(() => {
-        /* 전체화면을 막아 둔 환경이면 그냥 지금 크기로 씁니다. */
-      });
+  /* 펴고 접을 때 크기가 바뀝니다. 구글 지도는 제가 얼마나 큰지를 스스로
+     다시 재지 않으므로 알려 줘야 합니다 — 안 알려 주면 반쪽만 그려집니다. */
+  useEffect(() => {
+    if (!ready || !map.current) {
+      return;
     }
-  }, []);
+    const center = map.current.getCenter();
+    gmaps().event.trigger(map.current, 'resize');
+    if (center) {
+      map.current.setCenter(center);
+    }
+  }, [full, ready]);
+
+  /* 펴 두었을 때 ESC 로도 닫습니다. 브라우저 전체화면에서는 공짜로 되던
+     것이라, 없으면 빠져나가는 길이 단추 하나뿐이 됩니다. */
+  useEffect(() => {
+    if (!full) {
+      return;
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setFull(false);
+        setSheetId(null);
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [full]);
 
   /* 장소가 바뀌면 마커·원·동선을 통째로 다시 만듭니다. 몇십 개 수준이라
      하나씩 맞춰 고치는 것보다 지우고 다시 그리는 편이 단순하고 안전합니다. */
@@ -1042,7 +1061,10 @@ export function TripMap({
     <div
       ref={wrap}
       style={{
-        position: 'relative',
+        /* 펼치면 화면을 덮습니다. fixed 라 부모가 얼마나 크든 상관없고,
+           스크롤을 내려 둔 채 눌러도 보이는 화면을 그대로 채웁니다. */
+        position: full ? 'fixed' : 'relative',
+        ...(full ? { inset: 0, zIndex: 9999 } : null),
         width: '100%',
         height: full || bleed ? '100%' : height,
         borderRadius: full || bleed ? 0 : Radius.lg,

@@ -32,6 +32,8 @@ import {
   Divider,
   ErrorNote,
   Icon,
+  IconButton,
+  type IconName,
   Loading,
   Press,
   Row,
@@ -658,35 +660,67 @@ function DayBlock({
           </View>
           </Press>
 
-          <Row gap={Spacing.xs} style={styles.placeActs}>
           {/*
-            말풍선 그림만 두었을 때는 눌러도 아래 목록이 걸러질 뿐이라, 무슨
-            일이 일어났는지 보이지 않았습니다. 몇 개 달렸는지를 글자로 적고,
-            누르면 그 장소의 댓글만 담긴 판이 올라옵니다.
+            내 여행 상세와 같은 모양으로 둡니다.
+
+            <h3>글자 단추 셋이 오른쪽에 몰려 있었습니다</h3>
+
+            <p>"댓글 3 · 자세히 · 보석함에 담기" 가 줄 오른쪽에 모여 있었고,
+            폭이 남으면 왼쪽 절반이 비었습니다. 같은 일을 하는 줄이 내 여행
+            상세에서는 칸을 고르게 나눈 그림 단추인데, 남의 일정에서만 글자
+            단추였습니다 — 같은 앱에서 같은 일을 두 모양으로 하고 있었습니다.
+
+            <p>그림으로 바꾸면서 글자를 잃지는 않습니다. 눌러 주는 이름
+            (accessibilityLabel)에 몇 개 달렸는지까지 그대로 담고, 댓글이
+            있는 곳에는 점을 찍습니다.
           */}
-          {feedback ? (
-            <Button
-              label={countAt(i) > 0 ? `댓글 ${countAt(i)}` : '댓글'}
-              variant="ghost"
-              compact
-              onPress={() => onComment(i)}
-            />
-          ) : null}
-          {/*
-            남의 일정에서 한 곳을 보고 가져올지 정하려면 이름과 메모만으로는
-            모자랍니다. 평점이 몇인지 그날 문을 여는지가 있어야 고르는 일이
-            됩니다. 장소 찾기에서 쓰는 것과 같은 판을 엽니다.
-          */}
-          <Button label="자세히" variant="ghost" compact onPress={() => onLook(place)} />
-          {/* 일정을 통째로 가져오지 않고 이 집만 담을 수 있어야 합니다. */}
-          {/* 담긴 것은 눌러서 뺍니다. 담는 길만 있으면 잘못 누른 뒤에
-              보석함까지 찾아가야 합니다. */}
-          <Button
-            label={savedIds.has(place.name) ? UNKEEP : KEEP}
-            variant={savedIds.has(place.name) ? 'secondary' : 'ghost'}
-            compact
-            onPress={() => onSave(place, i)}
-          />
+          <Row gap={0} style={styles.placeActs}>
+            {[
+              feedback
+                ? {
+                    key: 'comment',
+                    name: 'message-square' as IconName,
+                    label: countAt(i) > 0 ? `댓글 ${countAt(i)}개 보기` : '댓글 남기기',
+                    active: countAt(i) > 0,
+                    dot: countAt(i) > 0,
+                    onPress: () => onComment(i),
+                  }
+                : null,
+              /*
+                남의 일정에서 한 곳을 보고 가져올지 정하려면 이름과 메모만으로는
+                모자랍니다. 평점이 몇인지 그날 문을 여는지가 있어야 고르는 일이
+                됩니다. 장소 찾기에서 쓰는 것과 같은 판을 엽니다.
+              */
+              {
+                key: 'look',
+                name: 'info' as IconName,
+                label: `${place.name} 자세히 보기`,
+                onPress: () => onLook(place),
+              },
+              /* 일정을 통째로 가져오지 않고 이 집만 담을 수 있어야 합니다.
+                 담긴 것은 눌러서 뺍니다 — 담는 길만 있으면 잘못 누른 뒤에
+                 보석함까지 찾아가야 합니다. */
+              {
+                key: 'keep',
+                name: 'bookmark' as IconName,
+                label: savedIds.has(place.name) ? UNKEEP : KEEP,
+                active: savedIds.has(place.name),
+                onPress: () => onSave(place, i),
+              },
+            ]
+              .filter((a) => a !== null)
+              .map((a, at) => (
+                <View key={a.key} style={[styles.placeAct, at > 0 && styles.placeActEdge]}>
+                  <IconButton
+                    bare
+                    name={a.name}
+                    label={a.label}
+                    active={a.active}
+                    dot={a.dot}
+                    onPress={a.onPress}
+                  />
+                </View>
+              ))}
           </Row>
         </View>
           ))}
@@ -776,12 +810,21 @@ const styles = StyleSheet.create({
   },
   /* 손대는 자리. 위와 선 하나로 가르고 오른쪽 끝에 모읍니다 — 왼쪽은 위
      글자들이 시작하는 자리라 비워 둬야 줄이 가지런합니다. */
+  /* 줄 아래에 한 줄로 깔고 칸을 고르게 나눕니다. 위쪽과는 선 하나로
+     가릅니다 — 읽는 곳과 누르는 곳입니다. */
   placeActs: {
-    justifyContent: 'flex-end',
-    flexWrap: 'wrap',
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: Colors.border,
-    paddingHorizontal: Spacing.xs,
+  },
+  placeAct: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  /* 첫 칸 빼고 왼쪽에 칸막이. 댓글을 안 받는 글에서는 둘뿐이라 세어서 답니다. */
+  placeActEdge: {
+    borderLeftWidth: StyleSheet.hairlineWidth,
+    borderLeftColor: Colors.border,
   },
   /* 지도에서 켜 둔 줄. 목록과 지도가 같은 곳을 가리킨다는 것이 보여야 합니다. */
   placeOn: {
