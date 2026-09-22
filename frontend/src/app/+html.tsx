@@ -146,11 +146,34 @@ export default function Document({ children }: PropsWithChildren) {
     splash.classList.add('gone');
     setTimeout(function () { splash.remove(); }, 300);
   }
+
+  /*
+    손글씨가 올 때까지도 기다립니다.
+
+    화면이 붙었다고 곧바로 걷으면, 글꼴이 아직 안 온 동안 첫 글자들이
+    대체 글꼴로 한 번 그려졌다가 바뀝니다. 스플래시 다음의 로딩 화면만
+    다른 글씨체로 나오던 것이 이것입니다.
+
+    글꼴은 화면 코드가 받아 옵니다(ui/hand). 여기서는 받아졌는지만 봅니다.
+    3초까지만 기다립니다 — 망이 느리다고 시작 화면을 붙들고 있는 것이,
+    글씨체 한 번 바뀌는 것보다 나쁩니다.
+  */
+  var waited = 0;
+  function ready() {
+    if (!document.fonts || !document.fonts.check) return true;
+    try { return document.fonts.check('1em LeeSeoyun'); } catch (e) { return true; }
+  }
+  function whenReady() {
+    if (ready() || waited >= 3000) { clear(); return; }
+    waited += 100;
+    setTimeout(whenReady, 100);
+  }
+
   var root = document.getElementById('root');
-  if (root && root.childElementCount > 0) { clear(); return; }
+  if (root && root.childElementCount > 0) { whenReady(); return; }
   if (root && window.MutationObserver) {
     var watch = new MutationObserver(function () {
-      if (root.childElementCount > 0) { watch.disconnect(); clear(); }
+      if (root.childElementCount > 0) { watch.disconnect(); whenReady(); }
     });
     watch.observe(root, { childList: true });
   }
