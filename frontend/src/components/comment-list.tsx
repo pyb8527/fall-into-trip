@@ -4,7 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import { api, ApiError, UNEXPECTED } from '@/api/client';
 import type { Comment, Itinerary } from '@/api/types';
 import { useAuth } from '@/auth/auth-provider';
-import { Spacing } from '@/constants/theme';
+import { Colors, Radius, Spacing } from '@/constants/theme';
 import {
   Badge,
   Body,
@@ -179,8 +179,13 @@ export function CommentList({
         const where = at ? null : whereOf(comment);
         return (
           <View key={comment.id} style={styles.item}>
-            {where ? <Badge label={where} tone="muted" /> : null}
-            <Body>{comment.text}</Body>
+            {/*
+              누가 말하는지를 먼저 답니다.
+
+              <p>전에는 글이 먼저고 이름이 아래였습니다. 한둘일 때는 읽혔는데
+              여남은 개가 이어지면 어느 이름이 위의 글 것인지 아래 글 것인지
+              헷갈립니다 — 이름이 두 글 사이에 끼어 있기 때문입니다.
+            */}
             <Split>
               <Caption tone="secondary">
                 {comment.authorName} · {comment.createdAt.slice(0, 10)}
@@ -190,13 +195,21 @@ export function CommentList({
                   name="trash-2"
                   label="내가 쓴 댓글 지우기"
                   tone="danger"
+                  bare
                   disabled={busy}
                   onPress={() => run(() => api.delete(`/api/comments/${comment.id}`))}
                 />
               ) : user ? (
-                <Button label="신고" variant="ghost" compact onPress={() => setReporting(comment)} />
+                <IconButton
+                  name="flag"
+                  label="이 댓글 신고"
+                  bare
+                  onPress={() => setReporting(comment)}
+                />
               ) : null}
             </Split>
+            {where ? <Badge label={where} tone="muted" /> : null}
+            <Body>{comment.text}</Body>
           </View>
         );
       })}
@@ -280,9 +293,25 @@ export function PlaceComments({
 
 const styles = StyleSheet.create({
   wrap: {
-    gap: Spacing.md,
+    gap: Spacing.sm,
   },
+  /*
+    댓글 하나가 종이 한 장입니다.
+
+    <h3>바닥 위에 글자만 흐르고 있었습니다</h3>
+
+    <p>{@code gap} 만 두고 아무 바탕도 안 깔았습니다. 한둘일 때는 그것으로
+    됐는데, 여남은 개가 이어지면 <b>어디서 한 사람 말이 끝나는지</b>가
+    없어집니다. 특히 남의 일정 화면이 판 위로 올라가면서 바닥이 회색이 되어
+    글자만 남았습니다.
+
+    <p>이 앱은 회색 바닥에 흰 카드를 얹어 층을 만듭니다. 댓글도 그 규칙을
+    따릅니다 — 한 장에 한 사람 말.
+  */
   item: {
     gap: Spacing.xs,
+    padding: Spacing.md,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.surface,
   },
 });
