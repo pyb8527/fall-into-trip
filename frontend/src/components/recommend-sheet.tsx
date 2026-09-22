@@ -16,6 +16,7 @@ import type { IntentState } from '@/lib/intent-types';
 import { canParseHere, fetchModel, intentState, modelNote, parseIntent } from '@/lib/intent';
 import { readableMeters } from '@/lib/geo';
 import { Colors, Radius, Spacing } from '@/constants/theme';
+import { HERE } from '@/constants/words';
 import {
   Badge,
   Body,
@@ -341,7 +342,7 @@ export function RecommendSheet({
             />
             {here ? (
               <Chip
-                label="지금 내 자리"
+                label={HERE}
                 selected={from === 'here'}
                 onPress={() => {
                   setFrom(from === 'here' ? null : 'here');

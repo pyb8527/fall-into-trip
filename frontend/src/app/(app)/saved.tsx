@@ -39,6 +39,7 @@ import {
   useUndo,
 } from '@/ui';
 import { AppTabs } from '@/ui/tab-bar';
+import { KEEP, UNKEEP } from '@/constants/words';
 
 /**
  * 보석함.
@@ -490,7 +491,7 @@ export default function Saved() {
         구해 오는</b> 일이라 한자리에 있는 것이 맞고, 화면에 늘 펼쳐 둘
         이유는 없습니다.
       */}
-      <BottomSheet visible={keeping} title="보석함에 담기" onClose={() => setKeeping(false)}>
+      <BottomSheet visible={keeping} title={KEEP} onClose={() => setKeeping(false)}>
         <Caption tone="secondary">
           담아 두면 일정을 아직 안 만들었어도 됩니다. 나중에 아무 날에나 꺼내 넣습니다.
         </Caption>
@@ -562,7 +563,7 @@ export default function Saved() {
                 }}
               />
               <ConfirmButton
-                label="보석함에서 빼기"
+                label={UNKEEP}
                 confirmLabel="뺍니다"
                 onConfirm={() => drop(looking.id)}
               />

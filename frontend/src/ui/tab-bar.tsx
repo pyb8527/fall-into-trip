@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Colors, Radius, Spacing, TabDock, Tap, Type, Weight } from '@/constants/theme';
 import { Icon, type IconName, Press } from '@/ui';
+import { WANT } from '@/constants/words';
 
 /**
  * 화면 아래에 늘 붙어 있는 띠.
@@ -211,7 +212,7 @@ export function TripTabs({
         },
         {
           key: 'vote',
-          label: '가고 싶은 곳',
+          label: WANT,
           icon: 'thumbs-up',
           active: active === 'vote',
           onPress: active === 'vote' ? () => {} : go('/vote/[id]'),

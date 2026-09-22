@@ -195,22 +195,78 @@ export const DayColors = [
 export const dayColor = (index: number) => DayColors[index % DayColors.length];
 
 /**
- * 떠 있는 것 — 이제 뜨지 않습니다.
+ * 떠 있는 정도.
  *
- * <p>흰 카드가 옅은 그림자로 떠 있던 것을 걷었습니다. 카드가 서넛만
- * 놓여도 화면 전체가 부옇게 뜨고, 그 상태에서는 무엇을 먼저 봐야 할지
- * 눈이 고르지 못합니다.
+ * <h3>안 띄우기로 해 놓고 여섯 군데가 각자 띄우고 있었습니다</h3>
  *
- * <p>층은 선 한 가닥과 여백이 나눕니다. 이름은 남겨 둡니다 — 쓰는 자리가
- * 여럿이라 지우면 그만큼 고칠 데가 늘고, 언젠가 한 곳에서만 다시
- * 띄우고 싶을 때 여기만 고치면 됩니다.
+ * <p>흰 카드가 옅은 그림자로 떠 있던 것을 걷고, 층은 선 한 가닥과 여백이
+ * 나누기로 했습니다. 그 결정을 {@code Lift} 라는 이름으로 여기 적어 뒀는데,
+ * <b>그것을 실제로 쓰는 자리는 한 곳도 없었습니다.</b> 대신 여섯 군데가
+ * 각자 그림자를 적었고, 네 가지 다른 조합이 됐습니다.
+ *
+ * <p>그래서 어제 판의 그림자 하나 고치는 데 오래 걸렸습니다. 어디가 무엇과
+ * 같은 층인지 알 수가 없었습니다.
+ *
+ * <h3>쪽마다 무엇이 먹는지가 다릅니다</h3>
+ *
+ * <p>{@code shadowOffset} 으로 방향을 고르는 것은 <b>iOS 와 웹에서만</b>
+ * 먹습니다. 안드로이드의 {@code elevation} 은 사방으로 뿌리고, 그림자를
+ * 그리는 동시에 그 뷰를 제 레이어에 올립니다. 그래서 여기 둘을 같이 적어
+ * 둡니다 — 한쪽만 적으면 다른 쪽에서 조용히 안 뜹니다.
+ *
+ * <p>{@code shadowOpacity} 를 빼먹으면 iOS·웹에서는 <b>아무것도 안
+ * 보입니다.</b> 기본값이 0 이라서입니다. 지도 핀 둘이 실제로 그 상태였습니다 —
+ * 색과 반경까지 적어 두고 그림자는 한 번도 안 그려졌습니다.
  */
-export const Lift = {
-  shadowColor: '#000000',
-  shadowOpacity: 0,
-  shadowRadius: 0,
-  shadowOffset: { width: 0, height: 0 },
-  elevation: 0,
+export const Elevation = {
+  /** 안 띄웁니다. 층은 선과 여백이 나눕니다. */
+  none: {
+    shadowColor: '#000000',
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 0,
+  },
+  /** 바닥에 놓인 것이 살짝 들린 정도 — 도장, 작은 표식. */
+  stamp: {
+    shadowColor: '#000000',
+    shadowOpacity: 0.18,
+    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 2,
+  },
+  /** 화면 위에 떠 있는 것 — 지도 위 단추처럼 바탕과 확실히 떨어져야 하는 것. */
+  float: {
+    shadowColor: '#000000',
+    shadowOpacity: 0.16,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+  },
+  /**
+   * 지도 위의 핀.
+   *
+   * <p>지도는 바탕이 잡다해서 테두리만으로는 핀이 안 떨어집니다. 이 앱에서
+   * 그림자를 쓰는 몇 안 되는 자리입니다.
+   */
+  pin: {
+    shadowColor: '#000000',
+    shadowOpacity: 0.22,
+    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+  },
+  /**
+   * 그림자는 안 그리되 제 레이어에는 올립니다.
+   *
+   * <p>안드로이드에서만 뜻이 있습니다. 지도는 제 겉면을 따로 가진 것이라,
+   * 레이어 없는 뷰가 그 위에서 높이를 바꾸면 지나간 자리가 제때 안 지워져
+   * 깜빡이고 잔상이 남습니다. elevation 은 두고 그림자 색만 비웁니다.
+   *
+   * <p>그림자 색이 먹는 것은 안드로이드 9(API 28)부터입니다. 그 아래에서는
+   * 옅은 그림자가 남는데, 안 보이는 것과 깜빡이는 것 중에는 이쪽이 낫습니다.
+   */
+  layerOnly: { elevation: 12, shadowColor: 'transparent' },
 } as const;
 
 /**

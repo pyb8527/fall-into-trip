@@ -33,6 +33,7 @@ import {
   Title,
 } from '@/ui';
 import { TripTabs } from '@/ui/tab-bar';
+import { WANT } from '@/constants/words';
 
 /**
  * 가고 싶은 곳 고르기.
@@ -99,7 +100,7 @@ export default function Vote() {
       }>
       <Stack.Screen
         options={{
-          title: trip?.trip.title ?? '가고 싶은 곳',
+          title: trip?.trip.title ?? WANT,
           headerTitle: () => (
             <PathTitle parent={trip?.trip.title ?? '여행'} title="가고 싶은 곳" />
           ),

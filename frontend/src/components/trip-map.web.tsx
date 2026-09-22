@@ -2,10 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import type { MapPlace, TripMapProps } from '@/components/map-types';
+import { CLUMP_PX, EDGE, FOCUS_ZOOM } from '@/components/map-tune';
 import { gmaps, hasMaps, loadMaps } from '@/lib/gmaps.web';
 import { QUIET_MAP } from '@/lib/map-style';
 import { Colors, Radius, Spacing, Tap } from '@/constants/theme';
 import { Badge, Body, Caption, Chip, IconButton, Row, Subtitle } from '@/ui';
+import { HERE, NOTE_PIN } from '@/constants/words';
 
 /**
  * 지도 (웹).
@@ -29,7 +31,6 @@ export type { MapPlace } from '@/components/map-types';
  * 골목과 건물 이름이 보이기 시작하는 눈금입니다. 이미 이보다 더 당겨 놓았다면
  * 건드리지 않습니다 — 들여다보던 것을 뒤로 물리면 성가십니다.
  */
-const FOCUS_ZOOM = 16;
 
 /**
  * 핀 그림.
@@ -532,7 +533,7 @@ export function TripMap({
       position: at,
       map: map.current,
       zIndex: 999,
-      title: '지금 내 위치',
+      title: HERE,
       /* 나도 동행자와 같은 방식으로 그립니다. 나만 점으로 두면 지도에서
          내가 어디 있는지를 다른 규칙으로 찾아야 합니다. */
       icon: personIcon(Colors.accentInk),
@@ -723,10 +724,8 @@ export function TripMap({
       /* 아래를 판이 덮고 있으면 그만큼 여백을 더 줍니다. 안 그러면 아래쪽
          핀들이 판 뒤로 들어갑니다. */
       map.current.fitBounds(bounds, {
-        top: 48,
-        right: 40,
-        bottom: 40 + bottomInset,
-        left: 40,
+        ...EDGE,
+        bottom: EDGE.bottom + bottomInset,
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -778,7 +777,7 @@ export function TripMap({
         new g.Marker({
           position: { lat: note.lat, lng: note.lng },
           map: map.current,
-          title: note.label ?? '잠깐 꽂아 둔 곳',
+          title: note.label ?? NOTE_PIN,
           zIndex: 700,
           /* 꽂는 단추가 깃발인데 지도에는 네모가 찍히고 있었습니다. 누른
              것과 찍힌 것이 다르면 그것이 그것인 줄 알 수가 없습니다. */
@@ -840,7 +839,7 @@ export function TripMap({
     /* 구글의 좌표계는 배율 0 에서 256픽셀입니다. 지금 배율만큼 곱하면 화면
        위의 거리가 됩니다. */
     const scale = 2 ** zoom;
-    const cell = 46;
+    const cell = CLUMP_PX;
 
     const bins = new Map<string, MapPlace[]>();
     shown.forEach((p) => {
@@ -1029,10 +1028,8 @@ export function TripMap({
     const bounds = new g.LatLngBounds();
     shown.forEach((p) => bounds.extend({ lat: p.lat, lng: p.lng }));
     map.current.fitBounds(bounds, {
-      top: 48,
-      right: 40,
-      bottom: 40 + bottomInset,
-      left: 40,
+      ...EDGE,
+      bottom: EDGE.bottom + bottomInset,
     });
     /* 다음에 또 부르면 다시 맞춰야 하므로, 이 자리를 기억해 두지 않습니다. */
     fitted.current = '';

@@ -36,7 +36,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Colors,
   Gutter,
-  Lift,
+  Elevation,
   MaxContentWidth,
   Motion,
   Radius,
@@ -2167,7 +2167,7 @@ export type UndoNote = {
 /**
  * 화면 아래에 잠깐 떠 있는 띠.
  *
- * <p>바닥이 어둡습니다. 이 앱은 그림자를 안 쓰기로 했는데(Lift 참고), 흰
+ * <p>바닥이 어둡습니다. 이 앱은 그림자를 거의 안 쓰는데(Elevation 참고), 흰
  * 카드들 위에 흰 띠를 띄우면 어디까지가 띠인지 안 보입니다. 색을 뒤집는
  * 것이 그림자 없이 "위에 떠 있다" 를 말하는 가장 조용한 방법입니다.
  */
@@ -2431,10 +2431,7 @@ const styles = StyleSheet.create({
       (이 앱은 8.0 까지 받습니다)에서는 옅은 그림자가 남는데, 안 보이는 것과
       깜빡이는 것 중에는 이쪽이 낫습니다.
     */
-    ...Platform.select({
-      android: { elevation: 12, shadowColor: 'transparent' },
-      default: {},
-    }),
+    ...(Platform.OS === 'android' ? Elevation.layerOnly : null),
     /* 지도(안드로이드에서는 제 겉면을 따로 가진 것)보다 위에 서야 합니다. */
     zIndex: 2,
     overflow: 'hidden',
@@ -2607,11 +2604,7 @@ const styles = StyleSheet.create({
      건물 위에서는 실선만으로 가장자리가 안 보입니다. */
   buttonOnMap: {
     borderRadius: Radius.full,
-    shadowColor: '#000000',
-    shadowOpacity: 0.16,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
+    ...Elevation.float,
   },
   /* 주 동작은 뜨지 않습니다. 검정 채움 자체가 화면에서 가장 강한 것이라
      그림자를 더 얹을 이유가 없습니다. */
@@ -2686,11 +2679,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     /* 켜졌을 때 강조색 위에서, 꺼졌을 때 회색 위에서 둘 다 떠 보여야
        합니다. 옅은 그림자 하나로 충분합니다. */
-    shadowColor: '#000000',
-    shadowOpacity: 0.18,
-    shadowRadius: 2,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 2,
+    ...Elevation.stamp,
   },
   mark: {
     width: 44,
@@ -2799,8 +2788,7 @@ const styles = StyleSheet.create({
      생김새로도 읽혀야 합니다 — 떠 있지 않으면 손이 가지 않습니다. */
   menuCardSoon: {
     backgroundColor: 'transparent',
-    shadowOpacity: 0,
-    elevation: 0,
+    ...Elevation.none,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: Colors.border,
   },
@@ -2946,11 +2934,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.full,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: Colors.border,
-    shadowColor: '#000000',
-    shadowOpacity: 0.16,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
+    ...Elevation.float,
   },
 
   dialogBackdrop: {

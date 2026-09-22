@@ -40,6 +40,7 @@ import {
   Title,
 } from '@/ui';
 import { DateField } from '@/ui/date-field';
+import { KEEP, UNKEEP } from '@/constants/words';
 
 /**
  * 올라온 일정 한 편.
@@ -507,7 +508,7 @@ export default function Post() {
         actions={
           looking ? (
             <Button
-              label={savedIds.has(looking.name) ? '보석함에서 빼기' : '보석함에 담기'}
+              label={savedIds.has(looking.name) ? UNKEEP : KEEP}
               variant={savedIds.has(looking.name) ? 'secondary' : 'primary'}
               compact
               onPress={() => {
@@ -681,7 +682,7 @@ function DayBlock({
           {/* 담긴 것은 눌러서 뺍니다. 담는 길만 있으면 잘못 누른 뒤에
               보석함까지 찾아가야 합니다. */}
           <Button
-            label={savedIds.has(place.name) ? '보석함에서 빼기' : '보석함에 담기'}
+            label={savedIds.has(place.name) ? UNKEEP : KEEP}
             variant={savedIds.has(place.name) ? 'secondary' : 'ghost'}
             compact
             onPress={() => onSave(place, i)}

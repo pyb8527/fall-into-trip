@@ -10,6 +10,7 @@ import { listenForShellOpen } from '@/lib/shell-open.web';
 import { Colors, Fonts, Type, Weight } from '@/constants/theme';
 import { HandFont } from '@/ui/hand';
 import { stackHeader } from '@/ui/nav';
+import { WANT } from '@/constants/words';
 
 /**
  * 앱 전체를 감싸는 껍데기.
@@ -98,7 +99,7 @@ export default function RootLayout() {
                 때 잠깐 보일 이름입니다. */}
             <Stack.Screen name="trip/[id]" options={stackHeader('일정')} />
             <Stack.Screen name="travel/[id]" options={stackHeader('여행 중', { toTrip: true })} />
-            <Stack.Screen name="vote/[id]" options={stackHeader('가고 싶은 곳', { toTrip: true })} />
+            <Stack.Screen name="vote/[id]" options={stackHeader(WANT, { toTrip: true })} />
             <Stack.Screen name="card/[id]" options={stackHeader('여행 카드', { toTrip: true })} />
             <Stack.Screen name="money/[id]" options={stackHeader('가계부', { toTrip: true })} />
             <Stack.Screen name="community" options={{ headerShown: false }} />

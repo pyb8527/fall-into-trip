@@ -13,10 +13,12 @@ import {
 import MapView, { Circle, Marker, PROVIDER_GOOGLE, Polyline } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { CLUMP_PX, DRAW_MS, EDGE, FOCUS_SPAN, PAD } from '@/components/map-tune';
 import type { MapPlace, TripMapProps } from '@/components/map-types';
 import { QUIET_MAP } from '@/lib/map-style';
-import { Colors, Radius, Spacing, Tap } from '@/constants/theme';
+import { Colors, Elevation, Radius, Spacing, Tap } from '@/constants/theme';
 import { Badge, Body, Caption, Chip, Icon, IconButton, Row, Subtitle } from '@/ui';
+import { HERE, NOTE_PIN } from '@/constants/words';
 
 /**
  * 지도 (앱).
@@ -29,20 +31,6 @@ import { Badge, Body, Caption, Chip, Icon, IconButton, Row, Subtitle } from '@/u
  * 얹을 수 있고, 크기를 바꿔도 뭉개지지 않습니다.
  */
 
-/** 장소 하나를 고를 때 들여다볼 만큼. 웹 쪽 FOCUS_ZOOM 과 같은 눈금입니다. */
-const FOCUS_SPAN = 0.006;
-
-/** 여러 곳을 한 화면에 담을 때 가장자리에 두는 여유. */
-const PAD = 1.35;
-
-/**
- * 한 화면에 담을 때 가장자리에 두는 여백.
- *
- * <p>웹 쪽 fitBounds 에 주는 것과 같은 값입니다. 둘이 갈리면 같은 여행을
- * 폰과 브라우저에서 볼 때 다르게 잡힙니다.
- */
-const EDGE = { top: 48, right: 40, bottom: 40, left: 40 };
-
 /**
  * 여백을 이 기기의 눈금으로 바꿉니다.
  *
@@ -54,6 +42,9 @@ const EDGE = { top: 48, right: 40, bottom: 40, left: 40 };
  *
  * <p>판에 덮인 만큼을 여백으로 넘겼는데도 동선이 판 뒤에 깔려 있던 것이
  * 이것이었습니다. 값은 갔는데 3분의 1만 먹었습니다.
+ *
+ * <p>여백 자체(EDGE)는 웹과 나눠 씁니다(map-tune). 여기서 하는 것은 이
+ * 기기의 눈금으로 바꾸는 일뿐입니다.
  */
 function edge(bottomExtra: number) {
   const scale = Platform.OS === 'android' ? PixelRatio.get() : 1;
@@ -64,22 +55,6 @@ function edge(bottomExtra: number) {
     left: Math.round(EDGE.left * scale),
   };
 }
-
-/**
- * 핀을 그림으로 굽는 동안 열어 두는 시간.
- *
- * 글꼴이 늦게 잡히는 기기까지 여유를 두되, 이 시간 동안은 핀마다 매 프레임
- * 다시 구우므로 길게 잡으면 지도가 무거워집니다.
- */
-const DRAW_MS = 400;
-
-/**
- * 별을 묶는 간격(화면 픽셀).
- *
- * 별 하나가 21픽셀이라 이보다 좁으면 서로 겹칩니다. 조금 넉넉하게 잡아야
- * 스쳐 지나가듯 붙은 것까지 묶입니다.
- */
-const CLUMP_PX = 46;
 
 /** 한자리에 몰려 하나로 묶인 별. */
 type Clump = {
@@ -774,7 +749,7 @@ export function TripMap({
           lng={here.lng}
           face={myFace ?? ''}
           color={Colors.accentInk}
-          title="지금 내 위치"
+          title={HERE}
           layer={999}
         />
       ) : null}
@@ -801,7 +776,7 @@ export function TripMap({
           key={`note-${note.id}`}
           lat={note.lat}
           lng={note.lng}
-          title={note.label ?? '잠깐 꽂아 둔 곳'}
+          title={note.label ?? NOTE_PIN}
         />
       ))}
 
@@ -1018,8 +993,9 @@ function Pin({
             borderWidth: active ? 3 : 2.4,
             borderColor: place.color,
             backgroundColor: '#FFFFFF',
-            elevation: active ? 6 : 3,
-            shadowOpacity: active ? 0.32 : 0.2,
+            /* 고른 것만 한 뼘 더 띄웁니다. 나머지는 핀의 기본값
+               (Elevation.pin)을 그대로 씁니다. */
+            ...(active ? { elevation: 6, shadowOpacity: 0.32 } : null),
           },
         ]}>
         {/* 앱에서는 아직 선으로 그린 별을 못 씁니다 — SVG 를 쓰려면 앱을
@@ -1052,8 +1028,9 @@ function Pin({
             borderWidth: active ? 3 : 2.4,
             borderColor: place.color,
             backgroundColor: visited ? place.color : '#FFFFFF',
-            elevation: active ? 6 : 3,
-            shadowOpacity: active ? 0.32 : 0.2,
+            /* 고른 것만 한 뼘 더 띄웁니다. 나머지는 핀의 기본값
+               (Elevation.pin)을 그대로 씁니다. */
+            ...(active ? { elevation: 6, shadowOpacity: 0.32 } : null),
           },
         ]}>
         <Body style={[styles.pinEmoji, { fontSize: active ? 20 : 17 }]}>{place.emoji}</Body>
@@ -1083,8 +1060,9 @@ function Pin({
             backgroundColor: place.color,
             borderWidth: border,
             /* 고른 것을 조금 더 띄웁니다. */
-            elevation: active ? 6 : 3,
-            shadowOpacity: active ? 0.32 : 0.2,
+            /* 고른 것만 한 뼘 더 띄웁니다. 나머지는 핀의 기본값
+               (Elevation.pin)을 그대로 씁니다. */
+            ...(active ? { elevation: 6, shadowOpacity: 0.32 } : null),
           },
         ]}
       />
@@ -1237,9 +1215,7 @@ const styles = StyleSheet.create({
     borderColor: '#FFFFFF',
     /* 남겨 둔 귀퉁이가 아래를 향하도록 돌립니다. */
     transform: [{ rotate: '45deg' }],
-    shadowColor: '#191F28',
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 3,
+    ...Elevation.pin,
   },
   /* 돌아간 방울 위에 얹는, 돌아가지 않는 층. */
   pinFace: {
@@ -1253,9 +1229,7 @@ const styles = StyleSheet.create({
   chip: {
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 3,
+    ...Elevation.pin,
   },
   pinEmoji: {
     /* 이모지는 글꼴이 제 높이를 갖고 있어, 줄 높이를 두면 아래로 처집니다. */

@@ -14,6 +14,7 @@ import {
   type SortBy,
 } from '@/components/sort-bar';
 import { Body, Button, Caption, Divider, Field, IconButton, Loading, Row } from '@/ui';
+import { KEEP, KEPT } from '@/constants/words';
 
 /**
  * 이름으로 장소 찾기.
@@ -121,7 +122,7 @@ export function PlaceSearch({ onPick, here }: PlaceSearchProps) {
                 }}
               />
               <Button
-                label={kept.has(looking.name) ? '보석함에 담김' : '보석함에 담기'}
+                label={kept.has(looking.name) ? KEPT : KEEP}
                 variant="secondary"
                 compact
                 disabled={kept.has(looking.name)}
@@ -166,7 +167,7 @@ export function PlaceSearch({ onPick, here }: PlaceSearchProps) {
                 {/* 지금 넣지 않고 나중에 쓰려고 담아만 둘 수도 있습니다. */}
                 <IconButton
                   name="bookmark"
-                  label={`${r.name} 보석함에 담기`}
+                  label={`${r.name} ${KEEP}`}
                   tone={kept.has(r.name) ? 'accent' : 'default'}
                   active={kept.has(r.name)}
                   onPress={() => keep(r)}
