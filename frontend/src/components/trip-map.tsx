@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
+  PixelRatio,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -32,6 +34,36 @@ const FOCUS_SPAN = 0.006;
 
 /** 여러 곳을 한 화면에 담을 때 가장자리에 두는 여유. */
 const PAD = 1.35;
+
+/**
+ * 한 화면에 담을 때 가장자리에 두는 여백.
+ *
+ * <p>웹 쪽 fitBounds 에 주는 것과 같은 값입니다. 둘이 갈리면 같은 여행을
+ * 폰과 브라우저에서 볼 때 다르게 잡힙니다.
+ */
+const EDGE = { top: 48, right: 40, bottom: 40, left: 40 };
+
+/**
+ * 여백을 이 기기의 눈금으로 바꿉니다.
+ *
+ * <h3>안드로이드만 단위가 다릅니다</h3>
+ *
+ * <p>edgePadding 은 iOS 에서는 화면 단위(dp)로 읽는데 <b>안드로이드에서는
+ * 물리 픽셀</b>로 읽습니다. 밀도 3인 폰에 250 을 주면 실제로는 83 만큼만
+ * 비웁니다.
+ *
+ * <p>판에 덮인 만큼을 여백으로 넘겼는데도 동선이 판 뒤에 깔려 있던 것이
+ * 이것이었습니다. 값은 갔는데 3분의 1만 먹었습니다.
+ */
+function edge(bottomExtra: number) {
+  const scale = Platform.OS === 'android' ? PixelRatio.get() : 1;
+  return {
+    top: Math.round(EDGE.top * scale),
+    right: Math.round(EDGE.right * scale),
+    bottom: Math.round((EDGE.bottom + bottomExtra) * scale),
+    left: Math.round(EDGE.left * scale),
+  };
+}
 
 /**
  * 핀을 그림으로 굽는 동안 열어 두는 시간.
@@ -420,11 +452,7 @@ export function TripMap({
     }
     map.current.fitToCoordinates(
       shown.map((p) => ({ latitude: p.lat, longitude: p.lng })),
-      {
-        /* 이쪽은 여백을 받는 자리가 원래 있습니다. 덮인 만큼을 그냥 더합니다. */
-        edgePadding: { top: 60, right: 50, bottom: 60 + (full ? 0 : bottomInset), left: 50 },
-        animated: true,
-      },
+      { edgePadding: edge(full ? 0 : bottomInset), animated: true },
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fitAt]);
@@ -482,8 +510,8 @@ export function TripMap({
   */
   const fitted = useRef('');
   useEffect(() => {
-    if (!ready || size.h === 0 || !map.current) {
-      /* 아직 셀 수도 옮길 수도 없습니다. 준비되면 이 효과가 다시 돕니다. */
+    if (!ready || !map.current) {
+      /* 아직 못 옮깁니다. 지도가 서면 이 효과가 다시 돕니다. */
       return;
     }
     const key = shown.map((p) => `${p.id}@${p.lat},${p.lng}`).join('|');
@@ -491,8 +519,25 @@ export function TripMap({
       return;
     }
     fitted.current = key;
+
+    /* 웹과 같은 갈림길, 같은 여백입니다(trip-map.web 의 fitBounds). */
+    const core = shown.filter((p) => p.fit);
+    const target = core.length >= 2 ? core : shown;
+
+    if (target.length > 1) {
+      /* 여백은 지도에게 줍니다. 판에 덮인 만큼을 아래에 더하면 지도가
+         남은 자리 안에 알아서 담습니다 — 카메라를 직접 어긋내는 것보다
+         정확하고, 웹이 하는 것과 같습니다. */
+      map.current.fitToCoordinates(
+        target.map((p) => ({ latitude: p.lat, longitude: p.lng })),
+        { edgePadding: edge(full ? 0 : bottomInset), animated: true },
+      );
+      return;
+    }
+    /* 한 곳뿐이면 담을 것이 없습니다. 그 자리로 옮기고 들여다봅니다 —
+       여백을 줄 데가 없으니 이때만 카메라를 어긋냅니다. */
     map.current.animateToRegion(frame(region), 350);
-  }, [shown, region, frame, size.h, ready]);
+  }, [shown, region, frame, ready, full, bottomInset]);
 
   /* 고른 장소로 옮기면서 들여다볼 만큼 당깁니다. */
   useEffect(() => {

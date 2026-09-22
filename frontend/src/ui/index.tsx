@@ -2410,6 +2410,28 @@ const styles = StyleSheet.create({
     */
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: Colors.border,
+    /*
+      <h3>그림자는 걷되 레이어는 남깁니다</h3>
+
+      <p>안드로이드의 elevation 은 두 가지를 같이 합니다 — 그림자를 그리고,
+      그 뷰를 <b>제 레이어에 올립니다.</b> 그림자가 싫어서 elevation 을 아예
+      뺐더니 레이어까지 같이 없어졌습니다.
+
+      <p>그러자 판을 끌 때 깜빡이고 잔상이 남았습니다. 지도는 제 겉면을 따로
+      가진 것이라, 레이어 없는 뷰가 그 위에서 높이를 바꾸면 지나간 자리가
+      제때 안 지워집니다.
+
+      <p>elevation 은 두고 그림자 색만 비웁니다. 레이어는 그대로 있고 그림자는
+      안 보입니다. 판이 어디서 시작하는지는 위쪽 실선 한 줄이 말합니다.
+
+      <p>그림자 색이 먹는 것은 안드로이드 9(API 28)부터입니다. 그 아래
+      (이 앱은 8.0 까지 받습니다)에서는 옅은 그림자가 남는데, 안 보이는 것과
+      깜빡이는 것 중에는 이쪽이 낫습니다.
+    */
+    ...Platform.select({
+      android: { elevation: 12, shadowColor: 'transparent' },
+      default: {},
+    }),
     /* 지도(안드로이드에서는 제 겉면을 따로 가진 것)보다 위에 서야 합니다. */
     zIndex: 2,
     overflow: 'hidden',
