@@ -69,6 +69,8 @@ public class PostService {
     private final PostLikeRepository likes;
     private final PostViewRepository views;
     private final PostReportRepository reports;
+    /* 장소를 빼면 그 장소에 달린 댓글도 함께 움직여야 합니다. */
+    private final PostCommentRepository comments;
 
     private final TripRepository trips;
     private final DayRepository days;
@@ -135,13 +137,31 @@ public class PostService {
         root.put("title", title);
 
         ArrayNode dayNodes = root.putArray("days");
+        /*
+          번호와 색은 글에서 다시 첫날부터 셉니다.
+
+          <p>사흘짜리 여행의 3일차만 올리면 보는 사람에게도 "Day 3" 이라고
+          적혀 있었습니다. 남의 여행에서 몇째 날이었는지는 <b>보는 사람이
+          알 바가 아닙니다</b> — 그 사람에게는 하루짜리 글이고, 하루짜리
+          글의 첫날은 1일차입니다.
+
+          <p>색도 같습니다. 색은 날 번호를 따라 도는 것이라, 3일차만 올리면
+          하나뿐인 날이 팔레트의 세 번째 색으로 그려졌습니다. 1일차라고
+          적힌 날이 1일차 색이 아니었습니다.
+
+          <p>날 이름은 서버가 짓는 "Day N" 뿐입니다. 고치는 화면이 없어서
+          저장된 값이 늘 그것입니다 — 날에 이름을 붙이는 화면이 생기면
+          여기부터 다시 봐야 합니다.
+        */
+        int at = 0;
         for (Day day : dayList) {
             ObjectNode d = dayNodes.addObject();
-            d.put("label", day.getLabel());
+            d.put("label", DayLabels.labelOf(at));
             d.put("shortName", day.getShortName());
             d.put("theme", day.getTheme());
-            d.put("color", day.getColor());
+            d.put("color", DayLabels.colorOf(at));
             d.put("budget", day.getBudget());
+            at++;
 
             ArrayNode placeNodes = d.putArray("places");
             for (Place p : placeList) {
@@ -438,7 +458,11 @@ public class PostService {
                     .date(DayLabels.display(date))
                     .iso(date)
                     .theme(text(d, "theme"))
-                    .color(text(d, "color") == null ? DayLabels.colorOf(index) : text(d, "color"))
+                    /* 색도 번호를 따라갑니다. 글의 색을 그대로 가져오면
+                       닷새 중 둘만 골라 왔을 때 "Day 2" 가 팔레트의 다섯 번째
+                       색으로 그려집니다 — 번호는 다시 셌는데 색은 안 셌으니
+                       둘이 어긋납니다. */
+                    .color(DayLabels.colorOf(index))
                     .budget(text(d, "budget"))
                     .build());
 
@@ -471,6 +495,207 @@ public class PostService {
 
         audit.log(me.id(), "post.copy", post.getId(), Map.of("trip", trip.getId()));
         return trip;
+    }
+
+    /* ---------------------------------------------------------- 고치기 */
+
+    /**
+     * 내 글인지 확인하고 가져옵니다.
+     *
+     * <p>내리는 것은 운영자도 할 수 있지만(신고 처리), 고치는 것은 글쓴이만
+     * 합니다. 남의 글 내용을 운영자가 손보기 시작하면 그 글이 누구 말인지
+     * 알 수 없게 됩니다.
+     */
+    private TripPost mine(AuthPrincipal me, String postId) {
+        TripPost post = posts.findById(postId)
+                .orElseThrow(() -> ApiException.notFound("글을 찾을 수 없습니다."));
+        if (!post.getAuthorId().equals(me.id())) {
+            throw ApiException.forbidden("내 글만 고칠 수 있습니다.");
+        }
+        return post;
+    }
+
+    /**
+     * 제목·소개·지역·태그를 고칩니다.
+     *
+     * <p>null 은 "그대로 두기" 고 빈 값은 "지우기" 입니다. 화면이 고치는 칸만
+     * 보내면 나머지는 건드리지 않습니다.
+     *
+     * @param feedback 조언을 받을지. 껐다 켤 수 있어야 합니다 — 올릴 때는
+     *                 받겠다고 했다가 댓글이 버거워지는 경우가 있습니다
+     */
+    @Transactional
+    public TripPost edit(AuthPrincipal me, String postId, String title, String summary,
+                         String region, List<String> tags, Boolean feedback) {
+        TripPost post = mine(me, postId);
+
+        if (title != null && !title.isBlank()) {
+            post.setTitle(title.trim());
+            /*
+              제목은 사본에도 한 벌 들어 있습니다.
+
+              <p>가져가는 사람의 여행 이름이 사본의 제목에서 옵니다. 겉만
+              고치면 목록에는 새 제목이 뜨는데 가져가면 옛 제목의 여행이
+              생깁니다.
+            */
+            JsonNode snap = snapshotOf(post);
+            if (snap.isObject()) {
+                ((ObjectNode) snap).put("title", post.getTitle());
+                post.setSnapshot(write(snap));
+            }
+        }
+        if (summary != null) {
+            post.setSummary(summary.isBlank() ? null : summary.trim());
+        }
+        if (region != null) {
+            post.setRegion(known(region));
+        }
+        if (tags != null) {
+            post.setTags(cleanTags(tags));
+        }
+        if (feedback != null) {
+            post.setFeedback(feedback);
+        }
+
+        audit.log(me.id(), "post.edit", postId);
+        return posts.save(post);
+    }
+
+    /**
+     * 올린 글에서 장소 하나를 뺍니다.
+     *
+     * <h3>왜 내리고 다시 올리면 안 되는가</h3>
+     *
+     * <p>고치는 길이 「내리고 다시 올리기」 뿐이었습니다. 그런데 내리면
+     * <b>추천과 조회수와 댓글이 함께 사라집니다.</b> 가운데 한 곳을 잘못
+     * 적었다는 이유로 그동안 받은 것을 다 버리게 되니, 대개는 틀린 채로
+     * 두게 됩니다.
+     *
+     * <p>사본을 원본 여행과 다시 맞추는 것이 아닙니다 — 사본 자체를
+     * 고칩니다. 원본이 어떻게 되든 글은 그대로라는 규칙은 그대로입니다.
+     *
+     * <h3>댓글도 따라 움직입니다</h3>
+     *
+     * <p>댓글은 장소를 <b>번호로</b> 가리킵니다(몇째 날 몇째 곳). 그래서
+     * 가운데를 빼면 뒤에 달린 댓글이 한 칸씩 밀려 엉뚱한 장소에 붙습니다 —
+     * 어제 「여기 줄 길어요」 라고 적어 둔 것이 다음 집 밑으로 옮겨 갑니다.
+     *
+     * @param dayAt   몇째 날인지(0부터)
+     * @param placeAt 그 날의 몇째 곳인지(0부터)
+     */
+    @Transactional
+    public TripPost dropPlace(AuthPrincipal me, String postId, int dayAt, int placeAt) {
+        TripPost post = mine(me, postId);
+
+        JsonNode root = snapshotOf(post);
+        if (!root.isObject() || !root.path("days").isArray()) {
+            throw ApiException.badRequest("일정을 읽지 못했습니다.");
+        }
+        ArrayNode dayNodes = (ArrayNode) root.path("days");
+        if (dayAt < 0 || dayAt >= dayNodes.size()) {
+            throw ApiException.notFound("그런 날이 없습니다.");
+        }
+        JsonNode day = dayNodes.get(dayAt);
+        if (!day.path("places").isArray()) {
+            throw ApiException.badRequest("일정을 읽지 못했습니다.");
+        }
+        ArrayNode placeNodes = (ArrayNode) day.path("places");
+        if (placeAt < 0 || placeAt >= placeNodes.size()) {
+            throw ApiException.notFound("그런 장소가 없습니다.");
+        }
+
+        placeNodes.remove(placeAt);
+
+        /* 마지막 곳을 뺐으면 그 날도 없어집니다. 곳이 하나도 없는 날을
+           남겨 두면 보는 사람은 빈 날을 한 번 넘겨야 합니다. */
+        boolean dayGone = placeNodes.isEmpty();
+        if (dayGone) {
+            dayNodes.remove(dayAt);
+        }
+
+        int placeCount = 0;
+        for (JsonNode d : dayNodes) {
+            placeCount += d.path("places").size();
+        }
+        /* 장소가 없는 글은 올릴 수도 없습니다(publish 참고). 빼다가 그렇게
+           되는 길도 막습니다 — 그때 하려던 일은 고치기가 아니라 내리기입니다. */
+        if (placeCount == 0) {
+            throw ApiException.badRequest("마지막 장소는 뺄 수 없습니다. 글을 내려 주세요.");
+        }
+
+        /* 날이 하나 없어졌으면 번호와 색을 다시 셉니다 — 올릴 때와 같은
+           규칙입니다(snapshotOf 참고). */
+        if (dayGone) {
+            int at = 0;
+            for (JsonNode d : dayNodes) {
+                ((ObjectNode) d).put("label", DayLabels.labelOf(at));
+                ((ObjectNode) d).put("color", DayLabels.colorOf(at));
+                at++;
+            }
+        }
+
+        post.setSnapshot(write(root));
+        post.setDayCount(dayNodes.size());
+        post.setPlaceCount(placeCount);
+
+        shiftComments(postId, dayAt, placeAt, dayGone);
+
+        audit.log(me.id(), "post.drop", postId, Map.of("day", dayAt, "place", placeAt));
+        return posts.save(post);
+    }
+
+    /**
+     * 장소가 빠진 자리에 맞춰 댓글의 번호를 옮깁니다.
+     *
+     * <p>빠진 곳에 달려 있던 것은 지웁니다. 가리킬 곳이 없어졌는데 남겨 두면
+     * 어디에도 안 붙은 채 개수만 세어집니다.
+     *
+     * <p>감춰진 댓글도 함께 옮깁니다. 운영자가 나중에 풀었을 때 엉뚱한 곳에
+     * 붙어 있으면 그것이 더 나쁩니다.
+     */
+    private void shiftComments(String postId, int dayAt, int placeAt, boolean dayGone) {
+        List<PostComment> all = comments.findAllByPostId(postId);
+        List<PostComment> gone = new ArrayList<>();
+        List<PostComment> moved = new ArrayList<>();
+
+        for (PostComment c : all) {
+            Integer d = c.getDayIndex();
+            Integer p = c.getPlaceIndex();
+            /* 글 전체에 달린 것은 장소를 가리키지 않습니다. 건드릴 것이 없습니다. */
+            if (d == null || p == null) {
+                continue;
+            }
+            if (d != dayAt) {
+                if (dayGone && d > dayAt) {
+                    c.setDayIndex(d - 1);
+                    moved.add(c);
+                }
+                continue;
+            }
+            if (dayGone || p == placeAt) {
+                gone.add(c);
+            } else if (p > placeAt) {
+                c.setPlaceIndex(p - 1);
+                moved.add(c);
+            }
+        }
+
+        if (!gone.isEmpty()) {
+            comments.deleteAll(gone);
+        }
+        if (!moved.isEmpty()) {
+            comments.saveAll(moved);
+        }
+    }
+
+    /** 사본을 다시 문자열로. 읽을 때와 짝입니다(snapshotOf 참고). */
+    private String write(JsonNode snap) {
+        try {
+            return mapper.writeValueAsString(snap);
+        } catch (Exception e) {
+            throw new ApiException(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR,
+                    "일정을 담지 못했습니다.");
+        }
     }
 
     /* --------------------------------------------------------- 내리기·신고 */

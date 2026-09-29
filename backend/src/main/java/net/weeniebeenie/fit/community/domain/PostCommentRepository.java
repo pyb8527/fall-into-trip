@@ -11,6 +11,14 @@ public interface PostCommentRepository extends JpaRepository<PostComment, String
 
     List<PostComment> findAllByPostIdAndHiddenFalseOrderByCreatedAtAsc(String postId);
 
+    /**
+     * 감춰진 것까지 전부.
+     *
+     * <p>장소를 뺄 때 댓글의 번호를 함께 옮기는 데 씁니다. 감춰진 것을 빼놓고
+     * 옮기면, 운영자가 나중에 풀었을 때 그것만 엉뚱한 장소에 붙습니다.
+     */
+    List<PostComment> findAllByPostId(String postId);
+
     long countByPostIdAndHiddenFalse(String postId);
 
     long countByUserIdAndPostId(String userId, String postId);

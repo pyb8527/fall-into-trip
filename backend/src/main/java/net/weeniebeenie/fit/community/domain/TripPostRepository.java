@@ -45,8 +45,13 @@ public interface TripPostRepository extends JpaRepository<TripPost, String> {
      * 바꿔 놓고 봅니다. NULL 은 LIKE 에서 참도 거짓도 아니라 그 줄이 통째로
      * 빠집니다.
      *
-     * <p>글자는 제목과 소개에서만 찾습니다. 일정 안쪽(장소 이름)까지 뒤지려면
+     * <p>글자는 제목·소개·태그에서 찾습니다. 일정 안쪽(장소 이름)까지 뒤지려면
      * jsonb 를 훑어야 하는데, 그건 인덱스가 안 먹어 글이 늘수록 느려집니다.
+     *
+     * <p>태그를 글자로도 찾는 까닭은, 고를 수 있게 내주는 태그가 <b>많이 쓰인
+     * 것</b>뿐이라서입니다. 한두 번 쓰인 태그는 목록에 없으니 판에서는 고를 수
+     * 없고, 그러면 그 태그를 단 글은 아무도 못 찾습니다. 태그를 잇고 한 줄로
+     * 보므로 "온천" 을 치면 제목에 없어도 태그에 있으면 걸립니다.
      *
      * <p>태그는 <b>하나만</b> 받습니다. 여럿을 받으면 "그중 아무거나" 인지
      * "전부 다" 인지를 화면이 정해 줘야 하는데, 둘러보기에서 좁히는 일은
@@ -63,7 +68,8 @@ public interface TripPostRepository extends JpaRepository<TripPost, String> {
              AND p.dayCount >= :minDays
              AND p.dayCount <= :maxDays
              AND (LOWER(p.title) LIKE :pattern
-                  OR LOWER(COALESCE(p.summary, '')) LIKE :pattern)
+                  OR LOWER(COALESCE(p.summary, '')) LIKE :pattern
+                  OR LOWER(FUNCTION('array_to_string', p.tags, ' ')) LIKE :pattern)
            """)
     Page<TripPost> search(@Param("region") String region,
                           @Param("tag") String tag,
@@ -97,7 +103,8 @@ public interface TripPostRepository extends JpaRepository<TripPost, String> {
              AND p.day_count >= :minDays
              AND p.day_count <= :maxDays
              AND (LOWER(p.title) LIKE :pattern
-                  OR LOWER(COALESCE(p.summary, '')) LIKE :pattern)
+                  OR LOWER(COALESCE(p.summary, '')) LIKE :pattern
+                  OR LOWER(array_to_string(p.tags, ' ')) LIKE :pattern)
            ORDER BY (p.like_count + 1)
                     / POWER(EXTRACT(EPOCH FROM (now() - p.created_at)) / 3600 + 2, 1.5) DESC,
                     p.created_at DESC
@@ -110,7 +117,8 @@ public interface TripPostRepository extends JpaRepository<TripPost, String> {
              AND p.day_count >= :minDays
              AND p.day_count <= :maxDays
              AND (LOWER(p.title) LIKE :pattern
-                  OR LOWER(COALESCE(p.summary, '')) LIKE :pattern)
+                  OR LOWER(COALESCE(p.summary, '')) LIKE :pattern
+                  OR LOWER(array_to_string(p.tags, ' ')) LIKE :pattern)
            """,
            nativeQuery = true)
     Page<TripPost> findHot(@Param("region") String region,

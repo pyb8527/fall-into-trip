@@ -44,7 +44,8 @@ public class PostController {
      *               없는 것을 보내도 됩니다 — 사람이 직접 적는 것이라 목록이
      *               늘 뒤따라옵니다
      * @param days   기간. "1"(당일), "2-4"(1~3박), "5"(그 이상)
-     * @param q      제목과 소개에서 찾을 글자
+     * @param q      제목·소개·태그에서 찾을 글자. 태그 목록에 안 뜨는 태그도
+     *               이 길로는 찾힙니다 — 목록에는 많이 쓰인 것만 오릅니다
      */
     @GetMapping
     public Map<String, Object> list(@CurrentUser AuthPrincipal me,
@@ -126,6 +127,11 @@ public class PostController {
         out.put("id", post.getId());
         out.put("title", post.getTitle());
         out.put("summary", post.getSummary());
+        /* 목록 카드에는 실려 있는데 상세에는 없었습니다. 그래서 글을 열면
+           어느 지역, 무슨 태그로 올린 글인지가 사라졌고, 고치는 판에 지금
+           값을 채워 넣을 수도 없었습니다. */
+        out.put("region", post.getRegion());
+        out.put("tags", post.getTags());
         out.put("authorName", posts.authorNameOf(post));
         out.put("dayCount", post.getDayCount());
         out.put("placeCount", post.getPlaceCount());
@@ -167,6 +173,38 @@ public class PostController {
         return Map.of("ok", true);
     }
 
+    /**
+     * 올린 글의 겉을 고칩니다.
+     *
+     * <p>안 보낸 칸은 그대로입니다. 빈 문자열은 지우기입니다.
+     */
+    @PatchMapping("/{postId}")
+    public Map<String, Object> edit(@CurrentUser AuthPrincipal me,
+                                    @PathVariable String postId,
+                                    @RequestBody EditRequest req) {
+        TripPost post = posts.edit(me, postId, req.title(), req.summary(),
+                req.region(), req.tags(), req.feedback());
+        return Map.of("ok", true, "postId", post.getId());
+    }
+
+    /**
+     * 올린 글에서 장소 하나를 뺍니다.
+     *
+     * <p>가운데 한 곳이 틀렸다는 이유로 글을 내리면 추천과 댓글이 함께
+     * 사라집니다. 그 값이 너무 커서 대개 틀린 채로 두게 됩니다.
+     *
+     * @param dayAt   몇째 날(0부터)
+     * @param placeAt 그 날의 몇째 곳(0부터)
+     */
+    @DeleteMapping("/{postId}/days/{dayAt}/places/{placeAt}")
+    public Map<String, Object> dropPlace(@CurrentUser AuthPrincipal me,
+                                         @PathVariable String postId,
+                                         @PathVariable int dayAt,
+                                         @PathVariable int placeAt) {
+        TripPost post = posts.dropPlace(me, postId, dayAt, placeAt);
+        return Map.of("ok", true, "dayCount", post.getDayCount(), "placeCount", post.getPlaceCount());
+    }
+
     @DeleteMapping("/{postId}")
     public Map<String, Object> remove(@CurrentUser AuthPrincipal me, @PathVariable String postId) {
         posts.remove(me, postId);
@@ -182,5 +220,15 @@ public class PostController {
     }
 
     public record ReportRequest(String reason) {
+    }
+
+    /**
+     * 고칠 칸. 보내지 않은 것은 그대로 둡니다.
+     *
+     * <p>일정 자체(날과 장소)는 여기로 고치지 않습니다. 사본을 통째로 다시
+     * 쓰게 하면 그건 고치기가 아니라 다시 올리기입니다.
+     */
+    public record EditRequest(String title, String summary, String region,
+                              java.util.List<String> tags, Boolean feedback) {
     }
 }
