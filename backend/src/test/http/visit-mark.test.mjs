@@ -105,12 +105,16 @@ console.log("\n[7] 너무 긴 한 줄은 거절");
 r = await call("PUT", `/api/visits/${placeId}`, { token: me, body: { note: "가".repeat(201) } });
 T("거절", r.status === 400, r.data);
 
-console.log("\n[8] 도장을 빼면 남긴 것도 함께 간다");
+console.log("\n[8] 도장을 빼도 남긴 것은 그대로다");
 r = await call("DELETE", `/api/visits/${placeId}`, { token: me });
 T("뺐다", r.status === 200, r.data);
 r = await call("GET", `/api/trip?trip=${tripId}`, { token: me });
 T("다녀온 곳에서 빠짐", !r.data.visited.includes(placeId), r.data.visited);
-T("남긴 것도 없음", (r.data.marks ?? []).length === 0, r.data.marks);
+/* 도장은 다시 누르면 그만이고 사진은 다시 찍을 수 없습니다. */
+T("남긴 것은 남아 있음", (r.data.marks ?? []).some((m) => m.placeId === placeId), r.data.marks);
+r = await call("PUT", `/api/visits/${placeId}`, { token: me });
+r = await call("GET", `/api/trip?trip=${tripId}`, { token: me });
+T("다시 찍으면 제자리로", r.data.visited.includes(placeId), r.data.visited);
 
 console.log(`\n결과: ${pass} 통과 / ${fail} 실패`);
 process.exit(fail > 0 ? 1 : 0);

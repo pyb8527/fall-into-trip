@@ -58,13 +58,19 @@ public class VisitController {
      * <p>같이 간 사람 누구나 뺄 수 있습니다. 찍은 사람만 뺄 수 있게 두면 그
      * 사람이 앱을 안 열면 영영 찍힌 채로 남습니다.
      *
-     * <p>내가 남긴 것도 함께 갑니다 — 도장이 없는데 그 자리의 감상만 남아
-     * 있으면 어디에도 안 붙습니다. 남이 남긴 것은 그대로 둡니다.
+     * <h3>남긴 것은 안 건드립니다</h3>
+     *
+     * <p>한동안 남긴 것도 함께 지웠습니다. "도장이 없는데 감상만 남아 있으면
+     * 어디에도 안 붙는다" 는 생각이었는데, 그 값이 너무 큽니다 — <b>손가락이
+     * 스쳐 도장이 풀리면 그 자리에서 찍은 사진이 되돌릴 수 없이 사라집니다.</b>
+     * 도장은 다시 누르면 그만이고 사진은 다시 찍을 수 없습니다.
+     *
+     * <p>도장 없이 남은 감상은 그대로 둡니다. 다시 찍으면 제자리로 돌아오고,
+     * 지우고 싶으면 남기는 판에서 빼면 됩니다.
      */
     @DeleteMapping("/{placeId}")
     public Map<String, Object> unmark(@CurrentUser AuthPrincipal me, @PathVariable String placeId) {
         visits.unstamp(me, placeId);
-        visits.unmark(me, placeId);
         return Map.of("ok", true, "visited", false);
     }
 }

@@ -2887,52 +2887,29 @@ function PlaceRow({
                 글에서 보는 것이 같은 것이라 다르게 그릴 이유가 없습니다.
               */}
               {/*
-                고른 줄에서만 사진을 펼칩니다.
+                사진은 늘 크게.
 
-                <p>56픽셀 네모로는 무엇이 찍혔는지 알 수 없습니다. 그렇다고
-                스무 곳짜리 날에서 줄마다 큰 사진을 펼치면 일정을 훑을 수가
-                없습니다 — 여기는 짜는 자리이기도 합니다.
+                <p>한동안 고른 줄에서만 펼쳤습니다. 목록이 길어지는 것을 걱정해서
+                였는데, 44픽셀 네모로는 무엇이 찍혔는지 알 수가 없어서 <b>사진이
+                있으나 없으나 같았습니다.</b> 그럴 바에는 안 넣는 것과 다르지
+                않습니다.
 
-                <p>이 파일이 이미 쓰는 규칙을 따릅니다. 손대는 단추도 고른
-                줄에서만 펼칩니다 — 한 번에 한 곳을 보는 것이 실제로 하는
-                일과 맞습니다.
-
-                <p>남의 여행기를 읽는 자리(둘러보기 상세)는 다릅니다. 거기는
-                읽는 것이 전부라 늘 크게 냅니다.
+                <p>다녀온 뒤에 이 화면을 여는 까닭이 그 사진입니다. 짤 때는
+                애초에 남긴 것이 없으니 길어질 일도 없습니다 — 길어지는 것은
+                다녀온 뒤뿐이고, 그때는 그것을 보러 옵니다.
               */}
-              {(trace ?? []).map((one, at) =>
-                active ? (
-                  <View key={at} style={styles.traceOpen}>
-                    <Row gap={Spacing.xs}>
-                      {/* 내 것에는 이름을 안 답니다 — 내가 쓴 것을 나에게
-                          이름 붙여 보여 줄 이유가 없습니다. */}
-                      {one.mine ? null : <Caption tone="secondary">{one.authorName}</Caption>}
-                      {one.stars ? (
-                        <Caption tone="brand">{'★'.repeat(one.stars)}</Caption>
-                      ) : null}
-                    </Row>
-                    {one.photoId ? <OurPhoto id={one.photoId} height={200} /> : null}
-                    {one.note ? <Body small>{one.note}</Body> : null}
-                  </View>
-                ) : (
-                  <Row key={at} gap={Spacing.sm} style={styles.traceRow}>
-                    {one.photoId ? <OurPhoto id={one.photoId} height={44} width={44} /> : null}
-                    <View style={styles.placeText}>
-                      <Row gap={Spacing.xs}>
-                        {one.mine ? null : <Caption tone="secondary">{one.authorName}</Caption>}
-                        {one.stars ? (
-                          <Caption tone="brand">{'★'.repeat(one.stars)}</Caption>
-                        ) : null}
-                      </Row>
-                      {one.note ? (
-                        <Body small numberOfLines={1}>
-                          {one.note}
-                        </Body>
-                      ) : null}
-                    </View>
+              {(trace ?? []).map((one, at) => (
+                <View key={at} style={styles.traceOpen}>
+                  <Row gap={Spacing.xs}>
+                    {/* 내 것에는 이름을 안 답니다 — 내가 쓴 것을 나에게 이름
+                        붙여 보여 줄 이유가 없습니다. */}
+                    {one.mine ? null : <Caption tone="secondary">{one.authorName}</Caption>}
+                    {one.stars ? <Caption tone="brand">{'★'.repeat(one.stars)}</Caption> : null}
                   </Row>
-                ),
-              )}
+                  {one.photoId ? <OurPhoto id={one.photoId} height={220} /> : null}
+                  {one.note ? <Body small>{one.note}</Body> : null}
+                </View>
+              ))}
 
               {info ? <PlaceHours info={info} at={place.time} /> : null}
               {/* 실수로 두 번 넣었을 수도, 일부러 또 가려는 것일 수도 있습니다.
@@ -4317,12 +4294,7 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: Spacing.xs,
   },
-  /* 안 고른 줄. 사진과 글이 나란히 서서 한 줄만 먹습니다. */
-  traceRow: {
-    alignItems: 'center',
-    paddingTop: 2,
-  },
-  /* 고른 줄. 사진이 제 폭을 다 씁니다. */
+  /* 다녀와서 남긴 것. 사진이 제 폭을 다 씁니다. */
   traceOpen: {
     gap: Spacing.xs,
     paddingTop: Spacing.xs,

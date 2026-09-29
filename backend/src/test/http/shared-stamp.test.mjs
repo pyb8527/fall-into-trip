@@ -105,11 +105,12 @@ T("유정이 뺐다", r.status === 200, r.data);
 r = await call("GET", `/api/trip?trip=${tripId}`, { token: host });
 T("지영에게도 빠졌다", !r.data.visited.includes(placeId), r.data.visited);
 
-console.log("\n[5] 뺀 사람 것만 사라진다");
-/* 도장을 잘못 눌렀다고 남의 사진까지 사라지면 되돌릴 수 없는 일이 됩니다. */
+console.log("\n[5] 도장을 빼도 남긴 것은 그대로다");
+/* 손가락이 스쳐 도장이 풀렸다고 그 자리에서 찍은 사진이 사라지면 되돌릴 수
+   없습니다. 도장은 다시 누르면 그만이고 사진은 다시 찍을 수 없습니다. */
 const left = (r.data.marks ?? []).filter((m) => m.placeId === placeId);
-T("지영이 남긴 것은 남아 있다", left.some((m) => m.note === "국물이 진해요"), left);
-T("유정이 남긴 것은 갔다", !left.some((m) => m.note === "줄이 길었어요"), left);
+T("지영이 남긴 것이 남아 있다", left.some((m) => m.note === "국물이 진해요"), left);
+T("유정이 남긴 것도 남아 있다", left.some((m) => m.note === "줄이 길었어요"), left);
 
 console.log("\n[6] 다시 찍으면 다시 같이 찍힌다");
 r = await call("PUT", `/api/visits/${placeId}`, { token: mate });
