@@ -18,7 +18,14 @@ import { TripThumb } from '@/components/trip-thumb';
 import { iconOf, labelOf } from '@/constants/place-icons';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import type { Countdown } from '@/lib/countdown';
-import { countdownIsNear, countdownLabel, countdownOf, formatSpan, todayIso } from '@/lib/countdown';
+import {
+  countdownIsNear,
+  countdownLabel,
+  countdownOf,
+  daysBetween,
+  formatSpan,
+  todayIso,
+} from '@/lib/countdown';
 import {
   Badge,
   Body,
@@ -118,6 +125,54 @@ export default function Home() {
   }, [mine]);
 
   /*
+    갓 다녀온 여행.
+
+    <p>countdownOf 는 끝난 여행에 null 을 줍니다 — 남은 날을 세는 것이라
+    그렇습니다. 그래서 next 에는 잡히지 않는데, 돌아온 다음 날 홈을 열면
+    할 말이 있습니다.
+
+    <p>사흘까지만 봅니다. 그 뒤에는 여행이 아니라 지난 일입니다.
+  */
+  const justBack = useMemo(() => {
+    const today = todayIso();
+    const rows = (mine?.trips ?? [])
+      .map((trip) => ({ trip, end: trip.endIso ?? trip.startIso }))
+      .filter((row) => row.end !== null && row.end < today && daysBetween(row.end, today) <= 3);
+    rows.sort((a, b) => (b.end ?? '').localeCompare(a.end ?? ''));
+    return rows[0]?.trip ?? null;
+  }, [mine]);
+
+  /*
+    무슨 말로 맞이할지.
+
+    <h3>늘 같은 말이었습니다</h3>
+
+    <p>「○○ 님, 어디로 떠나 볼까요?」 한 줄이 언제나 맨 위에 있었습니다.
+    그런데 이 말은 <b>여행이 하나도 없는 사람</b>에게만 맞습니다. 모레 도쿄로
+    떠나는 사람에게도, 지금 오사카 한복판에 서 있는 사람에게도 어디로 떠나
+    보겠냐고 묻고 있었으니 화면이 내 사정을 모르는 셈이었습니다.
+
+    <p>홈은 이미 그 사정을 다 알고 있습니다 — 가장 가까운 여행이 무엇이고
+    며칠 남았는지, 지금 길 위인지, 어제 돌아왔는지. 인사말이 그것을 말합니다.
+  */
+  const hello = useMemo(() => {
+    if (next) {
+      if (next.at.kind === 'going') {
+        const nth = next.trip.startIso ? daysBetween(next.trip.startIso, todayIso()) + 1 : 1;
+        return `${next.trip.title} ${nth}일째예요`;
+      }
+      if (next.at.kind === 'tomorrow') {
+        return `내일 ${next.trip.title} 떠나요`;
+      }
+      return `${next.trip.title}, ${next.at.days}일 남았어요`;
+    }
+    if (justBack) {
+      return `${justBack.title} 어땠어요?`;
+    }
+    return null;
+  }, [next, justBack]);
+
+  /*
     길 위에 있으면 오늘이 어떻게 돼 가는지.
 
     <p>여행 중일 때만 한 번 더 부릅니다. 목록(`/api/trips`)에는 장소가 없고,
@@ -215,23 +270,24 @@ export default function Home() {
             />
           </Row>
         </Split>
-        {/* 이름을 강조색으로 떼어 놓습니다. 한 덩어리로 두면 인사말이 그냥
-            문장 하나로 흘러갑니다.
+        {/*
+          여행이 있으면 그 여행 이야기를, 없으면 이름을 부릅니다.
 
-            tone="accent" 를 쓰고 있었는데 그 이름은 화면 마흔 군데에서
-            "가장 강한 것"(=검정)을 뜻하도록 되돌려 둔 자리라, 코랄로 떼어
-            놓겠다고 적어 놓고 정작 검정으로 그려지고 있었습니다.
-
-            색만 다르고 크기는 같습니다. 작게 두었더니 정작 사람 이름이
-            인사말보다 작아 곁다리처럼 보였습니다. */}
+          <p>이름에 코랄을 얹고 있었습니다. 그런데 이 앱에서 코랄은 <b>지금
+          눌러야 할 것</b>을 뜻하는 색이라, 아무것도 안 눌러도 되는 사람
+          이름이 화면에서 가장 강한 것이 되어 있었습니다. 굵기로 떼어 놓으면
+          충분합니다.
+        */}
         <Title>
-          {user?.name ? (
-            <>
-              <Title tone="brand">{user.name}</Title>
-              {' 님, 어디로 떠나 볼까요?'}
-            </>
-          ) : (
-            '어디로 떠나 볼까요?'
+          {hello ?? (
+            user?.name ? (
+              <>
+                <Title>{user.name}</Title>
+                {' 님, 어디로 떠나 볼까요?'}
+              </>
+            ) : (
+              '어디로 떠나 볼까요?'
+            )
           )}
         </Title>
       </View>
@@ -404,9 +460,14 @@ export default function Home() {
       {shared && shared.posts.length > 0 ? (
         <View style={styles.section}>
           <Split align="baseline">
-            <Subtitle>다양한 경험들</Subtitle>
+            {/* 「다양한 경험들」 은 무엇이 들어 있는지 말하지 않습니다.
+                여기 있는 것은 남이 짜 둔 여행이고, 보는 사람이 여기서 얻는
+                것은 <b>내 여행의 밑그림</b>입니다. */}
+            <Subtitle>여행 아이디어</Subtitle>
+            {/* 「둘러보기」 는 아래 띠의 탭 이름과 같아서, 구역을 넘기는
+                것인지 탭을 옮기는 것인지 알 수 없었습니다. */}
             <Button
-              label="둘러보기"
+              label="더보기 ›"
               variant="ghost"
               compact
               onPress={() => router.push('/community')}
@@ -464,7 +525,9 @@ export default function Home() {
       */}
       {top && top.places.length > 0 ? (
         <View style={styles.section}>
-          <Subtitle>지금 핫플레이스</Subtitle>
+          {/* 「핫플레이스」 는 장소를 세는 말이고, 여기 있는 것은 여럿이
+              다녀온 <b>여행지</b>입니다. 누르면 그 곳을 담습니다. */}
+          <Subtitle>지금 뜨는 여행지</Subtitle>
           <Card style={styles.listCard}>
             {top.places.slice(0, 5).map((place, i) => (
               <View key={place.key}>
@@ -515,6 +578,9 @@ function FirstSteps() {
     <Rise order={5}>
       <Card>
         <Subtitle>어디서 시작할까요?</Subtitle>
+        <Caption tone="secondary">
+          날짜와 도시만 정하면 나머지는 다니면서 채워도 돼요.
+        </Caption>
 
         <Row gap={Spacing.sm} style={styles.steps}>
           <View style={styles.grow}>
