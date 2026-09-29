@@ -43,13 +43,16 @@ public class TripQueryService {
                    사람 것까지 옵니다 — 누가 남겼는지는 줄에 붙어 옵니다. */
                 visits.visitedPlaceIds(trip.getId()),
                 visits.marksOf(trip.getId()),
+                visits.photosOfTrip(trip.getId()),
                 access.roleOf(trip.getId(), me.id()));
     }
 
     public record TripDetail(Trip trip, List<Day> days, Map<String, List<Place>> placesByDay,
                              List<String> visitedPlaceIds,
-                             /** 도장에 남긴 사진·별점·한 줄. 남긴 것이 있는 곳만 옵니다. */
+                             /** 도장에 남긴 별점·한 줄. */
                              List<net.weeniebeenie.fit.trip.domain.Visit> marks,
+                             /** 장소마다 붙인 사진들. 사람·장소·차례가 함께 옵니다. */
+                             List<net.weeniebeenie.fit.trip.domain.VisitPhoto> photos,
                              TripRole myRole) {
     }
 }

@@ -443,9 +443,16 @@ function PlaceCard({
           accessibilityLabel={mark ? `${place.name} 에 남긴 것 고치기` : `${place.name} 에 사진과 한 줄 남기기`}>
           {mark ? (
             <Row gap={Spacing.sm} style={styles.markRow}>
-              <OurPhoto id={mark.photoId} height={56} width={56} />
+              <OurPhoto id={mark.photoIds[0]} height={56} width={56} />
               <Grow gap={2}>
-                {mark.stars ? <Caption tone="brand">{'★'.repeat(mark.stars)}</Caption> : null}
+                <Row gap={Spacing.xs}>
+                  {mark.stars ? <Caption tone="brand">{'★'.repeat(mark.stars)}</Caption> : null}
+                  {/* 이 자리는 작아서 첫 장만 섭니다. 몇 장이 더 있는지를
+                      안 적으면 나머지는 없는 것이 됩니다. */}
+                  {mark.photoIds.length > 1 ? (
+                    <Caption tone="secondary">사진 {mark.photoIds.length}장</Caption>
+                  ) : null}
+                </Row>
                 {mark.note ? (
                   <Body small numberOfLines={2}>
                     {mark.note}

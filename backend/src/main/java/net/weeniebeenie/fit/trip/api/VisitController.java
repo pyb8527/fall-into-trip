@@ -33,11 +33,11 @@ public class VisitController {
            찍혔으면 찍고 나서 붙입니다. */
         visits.stamp(me, placeId);
         Visit got = visits.mark(me, placeId, req == null ? null
-                : new VisitService.Mark(req.photoId(), req.stars(), req.note()));
+                : new VisitService.Mark(req.photoIds(), req.stars(), req.note()));
         Map<String, Object> out = new java.util.HashMap<>();
         out.put("ok", true);
         out.put("visited", true);
-        out.put("photoId", got.getPhotoId());
+        out.put("photoIds", visits.photosOf(me.id(), placeId));
         out.put("stars", got.getStars());
         out.put("note", got.getNote());
         return out;
@@ -49,7 +49,11 @@ public class VisitController {
      * <p>안 보낸 칸은 그대로 둡니다. 빈 문자열이나 0 은 지우기입니다 — 매긴
      * 별을 지우는 길이 없으면 잘못 누른 것을 되돌릴 수 없습니다.
      */
-    public record MarkRequest(String photoId, Integer stars, String note) {
+    /**
+     * @param photoIds 이 장소에 붙일 사진들. 보내 온 목록이 곧 그 장소의
+     *                 사진입니다 — 빠진 것은 뗍니다. 안 보내면 그대로 둡니다
+     */
+    public record MarkRequest(java.util.List<String> photoIds, Integer stars, String note) {
     }
 
     /**

@@ -74,13 +74,13 @@ T("지영에게도 그대로", r.data.visited.includes(placeId), r.data.visited)
 console.log("\n[3] 남긴 것은 사람마다, 서로 보인다");
 const hostShot = await upload(host);
 r = await call("PUT", `/api/visits/${placeId}`, {
-  token: host, body: { photoId: hostShot, stars: 5, note: "국물이 진해요" },
+  token: host, body: { photoIds: [hostShot], stars: 5, note: "국물이 진해요" },
 });
 T("지영이 남김", r.status === 200, r.data);
 
 const mateShot = await upload(mate);
 r = await call("PUT", `/api/visits/${placeId}`, {
-  token: mate, body: { photoId: mateShot, stars: 3, note: "줄이 길었어요" },
+  token: mate, body: { photoIds: [mateShot], stars: 3, note: "줄이 길었어요" },
 });
 T("유정도 남김", r.status === 200, r.data);
 
@@ -97,6 +97,11 @@ T("내 것이 무엇인지 안다",
   marks.find((m) => m.authorName === "지영")?.mine === true
   && marks.find((m) => m.authorName === "유정")?.mine === false,
   marks.map((m) => [m.authorName, m.mine]));
+/* 사진도 사람마다입니다. 한 곳에 둘이 붙어도 서로의 것이 섞이면 안 됩니다. */
+T("사진도 사람마다",
+  marks.find((m) => m.authorName === "지영")?.photoIds?.[0] === hostShot
+  && marks.find((m) => m.authorName === "유정")?.photoIds?.[0] === mateShot,
+  marks.map((m) => [m.authorName, m.photoIds]));
 
 console.log("\n[4] 동행자도 도장을 뺄 수 있다");
 /* 찍은 사람만 뺄 수 있게 두면 그 사람이 앱을 안 열면 영영 찍힌 채로 남습니다. */

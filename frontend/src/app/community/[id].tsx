@@ -17,6 +17,7 @@ import {
 } from '@/components/comment-list';
 import type { MapPlace } from '@/components/map-types';
 import { OurPhoto } from '@/components/our-photo';
+import { PhotoStrip } from '@/components/photo-strip';
 import { PlaceDetailSheet } from '@/components/place-detail-sheet';
 import { PostFields, type PostShape } from '@/components/post-fields';
 import { formatNights } from '@/lib/countdown';
@@ -906,7 +907,7 @@ function DayBlock({
               <p>한 줄도 자르지 않습니다. 두 줄에서 끊어 놓고 "더 보기" 도
               없으면, 쓴 사람은 썼는데 읽는 사람은 못 읽습니다.
             */}
-            {place.photo ? <OurPhoto id={place.photo} height={220} style={styles.shot} /> : null}
+            <PhotoStrip ids={place.photos} height={220} style={styles.shot} />
             {place.stars || place.review ? (
               <View style={styles.said}>
                 {place.stars ? (

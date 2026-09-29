@@ -68,44 +68,90 @@ const photoId = await upload(me);
 T("사진 올림", !!photoId, photoId);
 
 r = await call("PUT", `/api/visits/${placeId}`, {
-  token: me, body: { photoId, stars: 5, note: "국물이 진해요" },
+  token: me, body: { photoIds: [photoId], stars: 5, note: "국물이 진해요" },
 });
-T("보태짐", r.status === 200 && r.data.photoId === photoId, r.data);
+T("보태짐", r.status === 200 && r.data.photoIds?.[0] === photoId, r.data);
 T("별점", r.data.stars === 5, r.data);
 T("한 줄", r.data.note === "국물이 진해요", r.data);
 
 r = await call("GET", `/api/trip?trip=${tripId}`, { token: me });
 const mark = (r.data.marks ?? []).find((m) => m.placeId === placeId);
 T("여행 상세에 실린다", !!mark, r.data.marks);
-T("사진이 실린다", mark?.photoId === photoId, mark);
+T("사진이 실린다", mark?.photoIds?.[0] === photoId, mark);
 T("한 줄도 실린다", mark?.note === "국물이 진해요", mark);
 
 console.log("\n[4] 안 보낸 칸은 그대로");
 r = await call("PUT", `/api/visits/${placeId}`, { token: me, body: { note: "줄이 길어요" } });
 T("한 줄만 바뀐다", r.data.note === "줄이 길어요", r.data);
-T("사진은 그대로", r.data.photoId === photoId, r.data);
+T("사진은 그대로", r.data.photoIds?.[0] === photoId, r.data);
 T("별점도 그대로", r.data.stars === 5, r.data);
 
-console.log("\n[5] 빈 값은 지우기");
-r = await call("PUT", `/api/visits/${placeId}`, { token: me, body: { stars: 0, photoId: "" } });
+console.log("\n[5] 여러 장 — 보낸 목록이 곧 그 장소의 사진");
+const two = await upload(me);
+const three = await upload(me);
+r = await call("PUT", `/api/visits/${placeId}`, {
+  token: me, body: { photoIds: [photoId, two, three] },
+});
+T("세 장 붙는다", r.data.photoIds?.length === 3, r.data.photoIds);
+/* 고른 차례가 그대로 서야 그날의 흐름이 보입니다. */
+T("고른 차례대로",
+  JSON.stringify(r.data.photoIds) === JSON.stringify([photoId, two, three]),
+  r.data.photoIds);
+
+r = await call("PUT", `/api/visits/${placeId}`, { token: me, body: { photoIds: [three, photoId] } });
+T("빠진 것은 떨어진다",
+  JSON.stringify(r.data.photoIds) === JSON.stringify([three, photoId]),
+  r.data.photoIds);
+
+r = await call("GET", `/api/trip?trip=${tripId}`, { token: me });
+const many = (r.data.marks ?? []).find((m) => m.placeId === placeId);
+T("여행 상세에도 차례대로",
+  JSON.stringify(many?.photoIds) === JSON.stringify([three, photoId]),
+  many?.photoIds);
+
+console.log("\n[6] 다섯 장까지");
+const more = [];
+for (let i = 0; i < 4; i++) more.push(await upload(me));
+r = await call("PUT", `/api/visits/${placeId}`, {
+  token: me, body: { photoIds: [three, photoId, ...more] },
+});
+T("여섯 장은 거절", r.status === 400, r.data);
+r = await call("GET", `/api/trip?trip=${tripId}`, { token: me });
+const kept = (r.data.marks ?? []).find((m) => m.placeId === placeId);
+T("거절되면 아무것도 안 바뀐다",
+  JSON.stringify(kept?.photoIds) === JSON.stringify([three, photoId]),
+  kept?.photoIds);
+
+r = await call("PUT", `/api/visits/${placeId}`, {
+  token: me, body: { photoIds: [three, photoId, more[0], more[1], more[2]] },
+});
+T("다섯 장은 들어간다", r.status === 200 && r.data.photoIds?.length === 5, r.data);
+
+console.log("\n[7] 빈 목록은 다 빼기");
+r = await call("PUT", `/api/visits/${placeId}`, { token: me, body: { stars: 0, photoIds: [] } });
 T("별점 지워짐", (r.data.stars ?? null) === null, r.data);
-T("사진 떨어짐", (r.data.photoId ?? null) === null, r.data);
+T("사진 다 떨어짐", (r.data.photoIds ?? []).length === 0, r.data);
 T("한 줄은 남음", r.data.note === "줄이 길어요", r.data);
 
-console.log("\n[6] 남의 사진은 못 붙인다");
+console.log("\n[8] 남의 사진은 못 붙인다");
 r = await call("POST", "/api/auth/register", {
   body: { email: `other-${stamp}@test.com`, name: "남", password: "pw-12345678" },
 });
 const other = r.data.accessToken;
 const hers = await upload(other);
-r = await call("PUT", `/api/visits/${placeId}`, { token: me, body: { photoId: hers } });
+r = await call("PUT", `/api/visits/${placeId}`, { token: me, body: { photoIds: [photoId, hers] } });
 T("거절", r.status === 400, r.data);
+r = await call("GET", `/api/trip?trip=${tripId}`, { token: me });
+const after = (r.data.marks ?? []).find((m) => m.placeId === placeId);
+/* 한 장이라도 남의 것이면 아무것도 안 바꿉니다 — 반만 바뀐 자리가 남으면
+   화면과 서버가 서로 다른 것을 들고 있게 됩니다. */
+T("내 것까지 같이 거절된다", (after?.photoIds ?? []).length === 0, after?.photoIds);
 
-console.log("\n[7] 너무 긴 한 줄은 거절");
+console.log("\n[9] 너무 긴 한 줄은 거절");
 r = await call("PUT", `/api/visits/${placeId}`, { token: me, body: { note: "가".repeat(201) } });
 T("거절", r.status === 400, r.data);
 
-console.log("\n[8] 도장을 빼도 남긴 것은 그대로다");
+console.log("\n[10] 도장을 빼도 남긴 것은 그대로다");
 r = await call("DELETE", `/api/visits/${placeId}`, { token: me });
 T("뺐다", r.status === 200, r.data);
 r = await call("GET", `/api/trip?trip=${tripId}`, { token: me });
@@ -115,6 +161,40 @@ T("남긴 것은 남아 있음", (r.data.marks ?? []).some((m) => m.placeId === 
 r = await call("PUT", `/api/visits/${placeId}`, { token: me });
 r = await call("GET", `/api/trip?trip=${tripId}`, { token: me });
 T("다시 찍으면 제자리로", r.data.visited.includes(placeId), r.data.visited);
+
+console.log("\n[11] 사진을 지우면 붙어 있던 자리에서도 떨어진다");
+const doomed = await upload(me);
+r = await call("PUT", `/api/visits/${placeId}`, { token: me, body: { photoIds: [doomed] } });
+T("붙였다", r.data.photoIds?.[0] === doomed, r.data);
+
+r = await call("DELETE", `/api/photos/${doomed}`, { token: me });
+T("지웠다", r.status === 200 && r.data.gone === true, r.data);
+r = await call("GET", `/api/photos/${doomed}`);
+T("파일도 없어짐", r.status === 404, r.status);
+
+r = await call("GET", `/api/trip?trip=${tripId}`, { token: me });
+const gone = (r.data.marks ?? []).find((m) => m.placeId === placeId);
+/* 없는 번호가 남아 있으면 그 자리는 화면에서 깨진 네모가 됩니다. */
+T("깨진 자리가 안 남는다", (gone?.photoIds ?? []).length === 0, gone?.photoIds);
+
+console.log("\n[12] 올린 글에 실린 사진은 안 지웁니다");
+const inPost = await upload(me);
+r = await call("PUT", `/api/visits/${placeId}`, { token: me, body: { photoIds: [inPost] } });
+r = await call("POST", `/api/trips/${tripId}/publish`, { token: me, body: { title: "오사카 하루" } });
+const postId = r.data.postId;
+T("올렸다", r.status === 200 && !!postId, r.data);
+
+r = await call("DELETE", `/api/photos/${inPost}`, { token: me });
+T("지우라 했다", r.status === 200, r.data);
+/* 글은 올릴 때 뜬 사본이라 파일을 지우면 남이 보던 여행기에 깨진 자리가
+   생깁니다. 그래서 떼기만 합니다. */
+T("파일은 안 지웠다고 알려 준다", r.data.gone === false, r.data);
+r = await call("GET", `/api/photos/${inPost}`);
+T("글에서는 그대로 보인다", r.status === 200, r.status);
+
+r = await call("GET", `/api/trip?trip=${tripId}`, { token: me });
+const detached = (r.data.marks ?? []).find((m) => m.placeId === placeId);
+T("내 여행에서는 떨어졌다", (detached?.photoIds ?? []).length === 0, detached?.photoIds);
 
 console.log(`\n결과: ${pass} 통과 / ${fail} 실패`);
 process.exit(fail > 0 ? 1 : 0);

@@ -6,7 +6,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { api, API_BASE } from '@/api/client';
 import type { Books, Companion, PlaceMark, TripDetail } from '@/api/types';
 import { useAsync } from '@/api/use-async';
-import { OurPhoto } from '@/components/our-photo';
+import { PhotoStrip } from '@/components/photo-strip';
 import { PublishForm } from '@/components/publish-form';
 import { TripMap } from '@/components/trip-map';
 import { Colors, dayColor, Radius, Spacing } from '@/constants/theme';
@@ -218,7 +218,7 @@ function Album({ trip }: { trip: TripDetail }) {
                 {mark.mine ? null : <Caption tone="secondary">{mark.authorName}</Caption>}
                 {mark.stars ? <Caption tone="brand">{'★'.repeat(mark.stars)}</Caption> : null}
               </Row>
-              {mark.photoId ? <OurPhoto id={mark.photoId} height={220} /> : null}
+              <PhotoStrip ids={mark.photoIds} height={220} />
               {mark.note ? <Body>{mark.note}</Body> : null}
             </View>
           ))}

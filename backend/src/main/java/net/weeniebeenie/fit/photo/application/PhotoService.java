@@ -7,6 +7,8 @@ import net.weeniebeenie.fit.photo.domain.Photo;
 import net.weeniebeenie.fit.photo.domain.PhotoRepository;
 import net.weeniebeenie.fit.shared.error.ApiException;
 import net.weeniebeenie.fit.support.audit.AuditService;
+import net.weeniebeenie.fit.community.domain.TripPost;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -65,6 +67,10 @@ public class PhotoService {
 
     private final PhotoRepository photos;
     private final PhotoStore store;
+    /* 지울 때 붙어 있던 자리에서 뗍니다. */
+    private final net.weeniebeenie.fit.trip.domain.VisitPhotoRepository visitPhotos;
+    /* 올린 글에 실려 있는지 봅니다. */
+    private final net.weeniebeenie.fit.community.domain.TripPostRepository posts;
     private final AuditService audit;
 
     @Transactional
@@ -99,16 +105,62 @@ public class PhotoService {
         return store.get(id);
     }
 
+    /**
+     * 사진 한 장을 지웁니다.
+     *
+     * <h3>올린 글에 실려 있으면 안 지웁니다</h3>
+     *
+     * <p>글은 올릴 때 뜬 사본이고, 사본 안에는 사진 번호가 그대로 박혀 있습니다.
+     * 여기서 파일을 지우면 <b>남이 보던 여행기에 깨진 자리가 생깁니다</b> — 그
+     * 사람은 왜 그런지 알 수도, 되돌릴 수도 없습니다.
+     *
+     * <p>그때는 붙어 있던 자리에서 떼기만 합니다. 내 여행에서는 사라지고 올린
+     * 글에는 남습니다 — 올린 것은 그때 내놓기로 한 것이니 그대로 두는 편이
+     * 맞습니다. 글에서도 지우려면 글을 내리거나 표지를 바꾸면 됩니다.
+     *
+     * @return 파일까지 지웠으면 true, 떼기만 했으면 false
+     */
     @Transactional
-    public void drop(AuthPrincipal me, String id) {
+    public boolean drop(AuthPrincipal me, String id) {
         Photo row = photos.findById(id)
                 .orElseThrow(() -> ApiException.notFound("그런 사진이 없어요."));
         if (!row.getOwnerId().equals(me.id())) {
             throw ApiException.forbidden("내가 올린 사진만 지울 수 있어요.");
         }
+
+        /* 붙어 있던 자리에서 뗍니다. 이것은 어느 쪽이든 합니다. */
+        visitPhotos.deleteAll(visitPhotos.findAllByPhotoId(id));
+
+        if (inAnyPost(me.id(), id)) {
+            audit.log(me.id(), "photo.detach", id);
+            return false;
+        }
+
         photos.delete(row);
         store.drop(id);
         audit.log(me.id(), "photo.drop", id);
+        return true;
+    }
+
+    /**
+     * 내가 올린 글 어딘가에 이 사진이 실려 있는지.
+     *
+     * <p>표지와 사본 안을 봅니다. 한 사람이 올릴 수 있는 글이 서른이라
+     * 훑어도 됩니다 — 사진 하나를 지울 때 한 번 하는 일입니다.
+     */
+    private boolean inAnyPost(String ownerId, String photoId) {
+        for (TripPost post : posts.findAllByAuthorIdOrderByCreatedAtDesc(
+                ownerId, Pageable.unpaged())) {
+            if (photoId.equals(post.getCoverPhotoId())) {
+                return true;
+            }
+            /* 사본은 글자입니다. 번호가 그 안에 있는지만 봅니다 — 열여섯
+               글자짜리 난수라 우연히 걸릴 값이 아닙니다. */
+            if (post.getSnapshot() != null && post.getSnapshot().contains(photoId)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

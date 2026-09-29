@@ -187,7 +187,8 @@ export type TripDetail = {
  */
 export type PlaceMark = {
   placeId: string;
-  photoId: Maybe<string>;
+  /** 붙인 사진들. 고른 차례대로 옵니다. 한 곳에 다섯 장까지입니다. */
+  photoIds: string[];
   stars: Maybe<number>;
   note: Maybe<string>;
   /** 누가 남겼는지. 한 곳에 여럿이 붙으면 이름이 없으면 누구 말인지 모릅니다. */
@@ -477,7 +478,7 @@ export type ItineraryPlace = {
    *
    * <p>가져올 때는 안 따라갑니다 — 남의 감상이지 일정이 아닙니다.
    */
-  photo?: Maybe<string>;
+  photos?: Maybe<string[]>;
   stars?: Maybe<number>;
   review?: Maybe<string>;
 };

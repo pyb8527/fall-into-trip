@@ -44,7 +44,7 @@ import { faceOf } from '@/constants/user-marks';
 import { feelDone, feelGrab, feelTick } from '@/lib/feel';
 import { SAME_SPOT, metersBetween, readableMeters } from '@/lib/geo';
 import type { Found } from '@/components/map-types';
-import { OurPhoto } from '@/components/our-photo';
+import { PhotoStrip } from '@/components/photo-strip';
 import { PlaceDetailSheet } from '@/components/place-detail-sheet';
 import { PlaceSearch } from '@/components/place-search';
 import { RecommendSheet } from '@/components/recommend-sheet';
@@ -2906,7 +2906,7 @@ function PlaceRow({
                     {one.mine ? null : <Caption tone="secondary">{one.authorName}</Caption>}
                     {one.stars ? <Caption tone="brand">{'★'.repeat(one.stars)}</Caption> : null}
                   </Row>
-                  {one.photoId ? <OurPhoto id={one.photoId} height={220} /> : null}
+                  <PhotoStrip ids={one.photoIds} height={220} />
                   {one.note ? <Body small>{one.note}</Body> : null}
                 </View>
               ))}

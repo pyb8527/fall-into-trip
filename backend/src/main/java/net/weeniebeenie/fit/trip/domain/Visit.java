@@ -33,10 +33,6 @@ public class Visit {
     @Column(name = "visited_at", nullable = false)
     private Instant visitedAt = Instant.now();
 
-    /** 그 자리에서 찍은 사진 한 장. 사진이 지워지면 여기만 비고 도장은 남습니다. */
-    @Column(name = "photo_id", length = 16)
-    private String photoId;
-
     /** 몇 점이었는지. 1~5, 안 매기면 비어 있습니다. */
     private Short stars;
 

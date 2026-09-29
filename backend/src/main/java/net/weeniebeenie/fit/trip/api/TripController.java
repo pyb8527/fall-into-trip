@@ -15,6 +15,7 @@ import net.weeniebeenie.fit.trip.domain.Trip;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.ArrayList;
 import java.util.Map;
 
 @RestController
@@ -170,13 +171,24 @@ public class TripController {
           감상이 붙었을 때 누구 말인지 알 수 없습니다. 사진은 여행의 것이
           아니라 그 사람의 것입니다.
         */
+        /* 장소+사람 → 붙인 사진들. 한 번에 읽어 두고 줄마다 꺼내 씁니다. */
+        Map<String, List<String>> shots = new java.util.HashMap<>();
+        for (var vp : d.photos()) {
+            shots.computeIfAbsent(vp.getUserId() + ":" + vp.getPlaceId(), k -> new ArrayList<>())
+                    .add(vp.getPhotoId());
+        }
+
         Map<String, String> who = new java.util.HashMap<>();
         List<Map<String, Object>> marks = d.marks().stream()
-                .filter(v -> v.getPhotoId() != null || v.getStars() != null || v.getNote() != null)
                 .map(v -> {
+                    String key = v.getId().getUserId() + ":" + v.getId().getPlaceId();
+                    List<String> mine = shots.getOrDefault(key, List.of());
+                    if (mine.isEmpty() && v.getStars() == null && v.getNote() == null) {
+                        return null;
+                    }
                     Map<String, Object> one = new java.util.HashMap<>();
                     one.put("placeId", v.getId().getPlaceId());
-                    one.put("photoId", v.getPhotoId());
+                    one.put("photoIds", mine);
                     one.put("stars", v.getStars());
                     one.put("note", v.getNote());
                     one.put("mine", v.getId().getUserId().equals(me.id()));
@@ -184,6 +196,7 @@ public class TripController {
                             id -> users.findById(id).map(u -> u.getName()).orElse("알 수 없음")));
                     return one;
                 })
+                .filter(java.util.Objects::nonNull)
                 .toList();
 
         return Map.of(

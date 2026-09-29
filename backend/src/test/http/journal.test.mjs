@@ -56,9 +56,9 @@ const placeId = r.data.place.id;
 console.log("\n[2] 그 자리에서 도장에 남긴다");
 const shot = await upload(me);
 r = await call("PUT", `/api/visits/${placeId}`, {
-  token: me, body: { photoId: shot, stars: 4, note: "국물이 진해요" },
+  token: me, body: { photoIds: [shot], stars: 4, note: "국물이 진해요" },
 });
-T("남겼다", r.status === 200 && r.data.photoId === shot, r.data);
+T("남겼다", r.status === 200 && r.data.photoIds?.[0] === shot, r.data);
 
 console.log("\n[3] 올리면 그 자취가 따라간다");
 const cover = await upload(me);
@@ -72,7 +72,7 @@ r = await call("GET", `/api/posts/${postId}`);
 T("표지가 실린다", r.data.coverPhotoId === cover, r.data.coverPhotoId);
 T("안 정하면 둘러보기", r.data.visibility === "LISTED", r.data.visibility);
 let place = r.data.itinerary.days[0].places[0];
-T("사진이 따라갔다", place.photo === shot, place);
+T("사진이 따라갔다", place.photos?.[0] === shot, place);
 T("별점도", place.stars === 4, place);
 T("한 줄도", place.review === "국물이 진해요", place);
 

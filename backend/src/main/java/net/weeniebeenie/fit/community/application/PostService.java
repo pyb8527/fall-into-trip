@@ -79,7 +79,7 @@ public class PostService {
     private final TripAccessPolicy access;
     private final UserRepository users;
 
-    private final VisitRepository visits;
+    private final net.weeniebeenie.fit.trip.application.VisitService visits;
     private final net.weeniebeenie.fit.photo.domain.PhotoRepository photos;
 
     private final AuditService audit;
@@ -159,11 +159,12 @@ public class PostService {
         }
         Set<String> want = placeList.stream().map(Place::getId).collect(Collectors.toSet());
         Map<String, Visit> out = new java.util.HashMap<>();
-        for (Visit v : visits.findAllByIdUserId(me.id())) {
+        for (Visit v : visits.marksOfUser(me.id())) {
             if (!want.contains(v.getId().getPlaceId())) {
                 continue;
             }
-            if (v.getPhotoId() != null || v.getStars() != null || v.getNote() != null) {
+            if (v.getStars() != null || v.getNote() != null
+                    || !visits.photosOf(me.id(), v.getId().getPlaceId()).isEmpty()) {
                 out.put(v.getId().getPlaceId(), v);
             }
         }
@@ -242,7 +243,11 @@ public class PostService {
                 */
                 Visit mark = marks.get(p.getId());
                 if (mark != null) {
-                    n.put("photo", mark.getPhotoId());
+                    /* 사진은 여러 장입니다. 사본에도 차례대로 담습니다. */
+                    ArrayNode shots = n.putArray("photos");
+                    for (String id : visits.photosOf(mark.getId().getUserId(), p.getId())) {
+                        shots.add(id);
+                    }
                     n.put("stars", mark.getStars() == null ? null : mark.getStars().intValue());
                     n.put("review", mark.getNote());
                 }

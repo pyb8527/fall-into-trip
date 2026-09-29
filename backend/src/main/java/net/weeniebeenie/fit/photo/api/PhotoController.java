@@ -78,9 +78,16 @@ public class PhotoController {
                 .body(body);
     }
 
+    /**
+     * 한 장 지우기.
+     *
+     * <p>올린 글에 실려 있으면 파일은 두고 붙어 있던 자리에서 떼기만 합니다 —
+     * 지우면 남이 보던 여행기에 깨진 자리가 생깁니다. 그 경우 {@code gone} 이
+     * false 로 옵니다.
+     */
     @DeleteMapping("/api/photos/{id}")
     public Map<String, Object> drop(@CurrentUser AuthPrincipal me, @PathVariable String id) {
-        photos.drop(me, id);
-        return Map.of("ok", true);
+        boolean gone = photos.drop(me, id);
+        return Map.of("ok", true, "gone", gone);
     }
 }

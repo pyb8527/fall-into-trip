@@ -21,7 +21,11 @@ import java.util.List;
 @RequiredArgsConstructor
 public class VisitService {
 
+    /** 한 곳에 붙일 수 있는 사진 수. 다섯이면 그 자리를 말하기에 넉넉합니다. */
+    private static final int MAX_PHOTOS = 5;
+
     private final VisitRepository visits;
+    private final VisitPhotoRepository visitPhotos;
     private final PhotoRepository photos;
     private final PlaceRepository places;
     private final DayRepository days;
@@ -100,8 +104,8 @@ public class VisitService {
         Visit row = visits.findById(id).orElseGet(() -> visits.save(new Visit(me.id(), placeId)));
 
         if (mark != null) {
-            if (mark.photoId() != null) {
-                row.setPhotoId(mark.photoId().isBlank() ? null : mine(me, mark.photoId()));
+            if (mark.photoIds() != null) {
+                setPhotos(me, placeId, mark.photoIds());
             }
             if (mark.stars() != null) {
                 /* 0 은 "안 매김" 입니다. 별 다섯 개짜리 칸에서 하나도 안 누른
@@ -133,14 +137,67 @@ public class VisitService {
                 .orElseThrow(() -> ApiException.badRequest("그런 사진이 없어요."));
     }
 
-    /** 도장에 함께 남기는 것들. null 은 "그대로 두기", 빈 값은 "지우기". */
-    public record Mark(String photoId, Integer stars, String note) {
+    /**
+     * 사진을 통째로 맞춥니다.
+     *
+     * <p>보내 온 목록이 곧 그 장소의 사진입니다 — 빠진 것은 뗍니다. 하나씩
+     * 붙이고 떼는 길을 따로 두면 화면이 지금 몇 장인지를 저마다 세게 되고,
+     * 그러면 다섯 장 한도가 새기 시작합니다.
+     *
+     * <p>뗀 사진 자체는 여기서 안 지웁니다. 지우는 것은 따로 부릅니다 —
+     * 뗀 것과 지운 것은 다른 일이고, 올린 글에 실려 있으면 지우면 안 됩니다.
+     */
+    private void setPhotos(AuthPrincipal me, String placeId, List<String> want) {
+        List<String> clean = want.stream()
+                .filter(id -> id != null && !id.isBlank())
+                .distinct()
+                .toList();
+        if (clean.size() > MAX_PHOTOS) {
+            throw ApiException.badRequest("사진은 한 곳에 " + MAX_PHOTOS + "장까지 붙일 수 있어요.");
+        }
+        /* 내 것인지 먼저 다 봅니다. 하나라도 남의 것이면 아무것도 안 바꿉니다 —
+           반만 바뀐 상태가 남으면 화면과 서버가 다른 것을 들고 있게 됩니다. */
+        for (String id : clean) {
+            mine(me, id);
+        }
+        visitPhotos.deleteAllByUserIdAndPlaceId(me.id(), placeId);
+        /* 지우고 바로 넣으면 같은 트랜잭션 안에서 넣기가 먼저 갈 수 있습니다.
+           여기서 한 번 밀어 두면 차례가 지켜집니다. */
+        visitPhotos.flush();
+        for (int at = 0; at < clean.size(); at++) {
+            visitPhotos.save(new VisitPhoto(me.id(), placeId, clean.get(at), at));
+        }
+    }
+
+    /** 이 사람이 남긴 것 전부. 글을 올릴 때 씁니다. */
+    @Transactional(readOnly = true)
+    public List<Visit> marksOfUser(String userId) {
+        return visits.findAllByIdUserId(userId);
+    }
+
+    /** 이 장소에 내가 붙인 사진들. */
+    @Transactional(readOnly = true)
+    public List<String> photosOf(String userId, String placeId) {
+        return visitPhotos.findAllByUserIdAndPlaceIdOrderBySortAsc(userId, placeId).stream()
+                .map(VisitPhoto::getPhotoId)
+                .toList();
+    }
+
+    /** 이 여행에 붙은 사진 전부. 장소+사람 → 사진들. */
+    @Transactional(readOnly = true)
+    public List<VisitPhoto> photosOfTrip(String tripId) {
+        return visitPhotos.findAllOfTrip(tripId);
+    }
+
+    /** 도장에 함께 남기는 것들. null 은 "그대로 두기", 빈 목록은 "다 떼기". */
+    public record Mark(List<String> photoIds, Integer stars, String note) {
     }
 
     /** 내가 남긴 것을 지웁니다. 도장은 그대로입니다. */
     @Transactional
     public void unmark(AuthPrincipal me, String placeId) {
         requireReadable(me, placeId);
+        visitPhotos.deleteAllByUserIdAndPlaceId(me.id(), placeId);
         visits.deleteById(new VisitId(me.id(), placeId));
     }
 
