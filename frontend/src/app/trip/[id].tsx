@@ -11,6 +11,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Text,
   View,
 } from 'react-native';
 
@@ -64,6 +65,7 @@ import {
   Spacing,
   TabDock,
   Tap,
+  Type,
 } from '@/constants/theme';
 import {
   Body,
@@ -1116,24 +1118,24 @@ export default function TripScreen() {
             늘 자리를 차지했습니다.
 
             <p>그렇다고 여섯을 다 그림으로 상단에 세우면 폰 머리줄에 아무것도
-            안 읽힙니다. 자주 쓰는 둘만 세우고 나머지는 점 세 개 안으로
+            안 읽힙니다. 동행자 하나만 세우고 나머지는 점 세 개 안으로
             넣습니다.
 
-            <p>이동 시간이 밖에 서는 것은 <b>유일하게 켜짐/꺼짐이 있는 것</b>
-            이기 때문입니다. 상태가 있는 것은 상태가 보여야 합니다 — 판 안에
-            숨겨 두면 지금 켜져 있는지 열어 봐야 압니다.
+            <p>이동 시간도 한동안 여기 시계 그림으로 세웠는데, <b>켜짐/꺼짐이
+            있는 것을 그림 하나로 숨긴 셈</b>이었습니다. 머리줄의 옅은 채움
+            으로는 지금 켜져 있는지 알 수가 없습니다. 그것은 아래
+            「이 화면에서 하는 일」 줄로 내렸습니다 — 거기가 원래 이 화면에서
+            켜고 끄는 것들이 서는 자리입니다.
           */
           headerRight: () => (
             <Row gap={Spacing.xs}>
-              <IconButton
-                name="clock"
-                label={showGaps ? '이동 시간 숨기기' : '이동 시간 보기'}
-                active={showGaps}
-                bare
-                onPress={() => setShowGaps((on) => !on)}
-              />
               <IconButton name="users" label="동행자" bare onPress={() => setCompanions(true)} />
-              <IconButton name="more-horizontal" label="이 여행 다루기" bare onPress={() => setMore(true)} />
+              <IconButton
+                name="more-horizontal"
+                label="이 여행 다루기"
+                bare
+                onPress={() => setMore(true)}
+              />
             </Row>
           ),
         }}
@@ -1488,6 +1490,22 @@ export default function TripScreen() {
             {mine ? (
               <Shortcut icon="upload" label="글 올리기" onPress={() => setPublishing(true)} />
             ) : null}
+            {/*
+              이것만 켜고 끄는 것입니다.
+
+              <p>나머지 셋은 누르면 판이 하나 열리고 끝인데, 이것은 <b>켠
+              채로 남습니다.</b> 그래서 켜졌는지가 보여야 합니다 — 켜면 바탕이
+              물들고 글자에 색이 듭니다.
+
+              <p>끄면 길찾기를 아예 안 부릅니다. 화면만 가리는 것이 아니라
+              사 오지 않는 것이라, 기본은 꺼짐입니다.
+            */}
+            <Shortcut
+              icon="clock"
+              label="이동 시간"
+              active={showGaps}
+              onPress={() => setShowGaps((on) => !on)}
+            />
         </Row>
 
         {days.length === 0 ? <Empty message="아직 날짜가 없습니다." /> : null}
@@ -1886,18 +1904,33 @@ function TripMarkPicker({ trip, onChanged }: { trip: Trip; onChanged: () => void
 function Shortcut({
   icon,
   label,
+  active,
   onPress,
 }: {
   icon: IconName;
   label: string;
+  /**
+   * 켜고 끄는 것이면 지금 켜졌는지.
+   *
+   * <p>안 주면 그냥 누르는 것입니다 — 눌러서 판을 하나 열고 끝나는
+   * 것들에는 켜짐이 없습니다.
+   */
+  active?: boolean;
   onPress: () => void;
 }) {
   return (
-    <Press onPress={onPress} scale={0.95} accessibilityLabel={label} style={styles.shortcut}>
-      <Icon name={icon} size={18} tone="accent" />
-      <Caption tone="secondary" numberOfLines={1}>
+    <Press
+      onPress={onPress}
+      scale={0.95}
+      accessibilityLabel={label}
+      accessibilityState={active === undefined ? undefined : { selected: active }}
+      style={[styles.shortcut, active ? styles.shortcutOn : null]}>
+      <Icon name={icon} size={18} tone={active === false ? 'muted' : 'accent'} />
+      <Text
+        style={[styles.shortcutLabel, active ? styles.shortcutLabelOn : null]}
+        numberOfLines={1}>
         {label}
-      </Caption>
+      </Text>
     </Press>
   );
 }
@@ -3826,25 +3859,47 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     /*
-      그림과 글자를 <b>가로로</b> 눕힙니다.
+      그림 위에 글자.
 
-      <p>세로로 쌓으면 칸 높이가 그림 + 글자 + 사이 여백이 됩니다. 이 줄은
-      판을 내렸을 때 <b>늘 보이는 자리</b>라(revealAtLow 가 이 높이를 씁니다)
-      그만큼 지도가 줄어듭니다. 눕히면 한 줄 높이면 됩니다.
+      <p>한동안 가로로 눕혀 두었습니다. 칸이 셋일 때는 그것이 낮아서
+      좋았는데, 이동 시간이 더해져 <b>넷</b>이 되자 한 칸에 63픽셀만
+      남습니다 — 그림 18에 여백까지 빼면 글자 자리가 39픽셀이라 "글 올리기"
+      가 잘립니다.
 
-      <p>그림도 작게 둡니다. 여기 셋은 화면의 주인공이 아니라 필요할 때
-      찾는 것들이고, 옆에 글자가 늘 붙어 있어 그림 혼자 뜻을 지지 않습니다.
+      <p>세로로 쌓으면 글자가 칸 폭을 다 씁니다. 그만큼 높아지지만, 이 줄은
+      판을 내렸을 때 늘 보이는 자리라(revealAtLow 가 이 높이를 씁니다)
+      글자를 작게 두어 메웁니다.
     */
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: Spacing.xs,
+    gap: 2,
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.xs,
     borderRadius: Radius.sm,
+    /* 꺼진 것도 테두리 자리를 잡아 둡니다. 안 그러면 켜는 순간 칸이
+       넓어지며 줄이 덜컥합니다. */
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'transparent',
     /* 바닥이 회색이 되면서 이 칸도 회색이면 사라집니다. 흰 카드로 올려야
        누를 수 있는 것으로 읽힙니다. */
     backgroundColor: Colors.surface,
+  },
+  /* 캡션(15)보다 두 눈금 작게. 네 칸이 나란히 서는 자리라 "글 올리기" 같은
+     이름이 잘리지 않아야 합니다. */
+  shortcutLabel: {
+    ...Type.caption,
+    fontSize: 13,
+    lineHeight: 17,
+    color: Colors.textSecondary,
+  },
+  shortcutLabelOn: {
+    color: Colors.accentInk,
+  },
+  /* 켜진 것. 나머지 셋은 늘 흰 카드라, 하나만 물들면 그것이 켜진 것으로
+     읽힙니다. */
+  shortcutOn: {
+    backgroundColor: Colors.accentSoft,
+    borderColor: Colors.accent,
   },
   live: {
     gap: Spacing.sm,
