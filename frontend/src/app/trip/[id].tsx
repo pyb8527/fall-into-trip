@@ -2255,16 +2255,28 @@ function DayCard({
   const done = day.places.filter((p) => visited.has(p.id)).length;
   const color = day.color || dayColor(index);
 
+  /*
+    며칠째이고 무슨 날인지.
+
+    <p>날짜만 적고 있었습니다("10.08(목)"). 그런데 일정을 짜면서 세는 단위는
+    <b>며칠째</b>입니다 — "2일차에 뭐 넣기로 했지" 라고 생각하지 "10월 9일에" 라고
+    생각하지 않습니다. 게다가 지도의 날짜 띠와 장소 노드는 이미 Day 번호로
+    묶여 있는데 머리줄만 날짜였습니다.
+
+    <p>날짜를 안 잡은 여행에는 날짜가 없습니다. 그때는 번호만 섭니다.
+  */
+  const title = day.date ? `${day.label} · ${day.date}` : day.label;
+
   return (
     <Card style={[styles.dayBand, { borderLeftColor: color }]}>
       <Split align="start" gap={Spacing.md}>
         <Pressable
           onPress={() => setFolded((v) => !v)}
           accessibilityRole="button"
-          accessibilityLabel={`${day.date || day.label} ${folded ? '펴기' : '접기'}`}
+          accessibilityLabel={`${title} ${folded ? '펴기' : '접기'}`}
           style={styles.dayTap}>
           <Row gap={Spacing.md} style={styles.dayTitle}>
-            <Subtitle>{day.date || day.label}</Subtitle>
+            <Subtitle>{title}</Subtitle>
             <Icon name={folded ? 'chevron-down' : 'chevron-up'} size={21} tone="muted" />
           </Row>
         </Pressable>
@@ -2459,6 +2471,7 @@ function DayCard({
                     }
                     onLook={onLook}
                     tipCount={place.placeId ? (tipCounts[place.placeId] ?? 0) : 0}
+                    last={i === order.length - 1}
                     dragging={from === i}
                     index={i}
                     onDragStart={(at) => {
@@ -2628,6 +2641,7 @@ function PlaceRow({
   alsoOn,
   onLook,
   tipCount,
+  last,
   dragging,
   index,
   onDragStart,
@@ -2661,6 +2675,8 @@ function PlaceRow({
   onLook: (place: Place, mode: TravelMode | null) => void;
   /** 이 곳에 달린 한 줄의 개수. 판을 열기 전에는 점으로만 알립니다. */
   tipCount: number;
+  /** 이 날의 마지막 줄인지. 세로선을 여기서 끊습니다. */
+  last: boolean;
   /** 지금 이 줄을 끌고 있는지. 끌고 있는 동안에는 조금 들어 올립니다. */
   dragging: boolean;
   index: number;
@@ -2700,7 +2716,66 @@ function PlaceRow({
     : null;
 
   return (
-    <View>
+    <View style={styles.stop}>
+      {/*
+        시각은 제 열에 섭니다.
+
+        <p>전에는 이름 앞에 붙어 있었습니다. 그래서 시각을 적은 줄과 안 적은
+        줄이 섞이면 이름이 저마다 다른 자리에서 시작했고, <b>몇 시에 무엇을
+        하는지를 세로로 훑을 수가 없었습니다.</b> 열을 따로 두면 시각이 한
+        줄로 서고, 안 적은 줄은 그 자리가 비어 있어 그것대로 읽힙니다.
+      */}
+      <View style={styles.when}>
+        {place.time ? (
+          <Caption strong tone={visited ? 'muted' : 'default'}>
+            {place.time}
+          </Caption>
+        ) : null}
+      </View>
+
+      {/*
+        하루를 잇는 선.
+
+        <p>날짜 카드 안에 장소마다 또 상자가 있었습니다. 회색 바탕 위 흰 카드,
+        그 안에 또 회색 카드 — 세 겹이라 어디까지가 한 장소인지보다 상자가 먼저
+        보였습니다.
+
+        <p>상자를 걷고 선 한 가닥으로 잇습니다. 하루가 <b>따로 떨어진 칸들</b>이
+        아니라 <b>이어진 동선</b>으로 읽힙니다. 노드의 번호는 지도의 번호와 같은
+        번호입니다.
+
+        <p>선은 이동 시간 구간까지 이어집니다 — 그 구간이 곧 두 장소 사이이기
+        때문입니다.
+      */}
+      <View style={styles.rail}>
+        <View style={[styles.railLine, { backgroundColor: color }, order === 1 && styles.railOff]} />
+        <View
+          style={[
+            styles.node,
+            { backgroundColor: color },
+            active && styles.nodeOn,
+          ]}>
+          {/* 날짜 색 여덟은 흰 글씨를 얹어도 읽히도록 고른 것입니다
+              (DayLabels 참고). inverse 가 그 흰 글씨입니다. */}
+          {visited ? (
+            <Icon name="check" size={13} tone="inverse" />
+          ) : (
+            <Caption strong tone="inverse">
+              {order}
+            </Caption>
+          )}
+        </View>
+        <View
+          style={[
+            styles.railLine,
+            styles.railGrow,
+            { backgroundColor: color },
+            last && styles.railOff,
+          ]}
+        />
+      </View>
+
+      <View style={styles.stopBody}>
       <View
         style={[
           styles.place,
@@ -2739,29 +2814,10 @@ function PlaceRow({
               남은 것은 테두리 스물여덟 개뿐이었습니다. 걷어 냅니다. 자리
               너비는 그대로 두어 이름들이 한 줄로 섭니다.
             */}
-            {/*
-              번호는 언제나 있습니다.
-
-              <p>그림이 있으면 그림을, 없으면 번호를 찍고 있었습니다. 그래서
-              그림을 고른 장소는 <b>그 날 몇 번째인지가 화면 어디에도 없었습니다</b> —
-              지도도 같은 규칙이었기 때문입니다.
-
-              <p>번호는 이 자리가 맡고, 그림은 이름 옆으로 갑니다. 지도의 번호와
-              같은 번호라 둘이 눈으로 이어집니다.
-            */}
-            <View style={styles.order}>
-              <Caption tone={visited ? 'muted' : 'default'} strong>
-                {order}
-              </Caption>
-            </View>
-
             <View style={styles.placeText}>
+              {/* 번호는 왼쪽 세로선의 노드가, 시각은 그 왼쪽 열이 맡습니다.
+                  여기 남는 것은 그림과 이름입니다. */}
               <Row gap={Spacing.sm}>
-                {place.time ? (
-                  <Body small strong tone="accent">
-                    {place.time}
-                  </Body>
-                ) : null}
                 {emoji ? (
                   <Body small style={styles.orderEmoji}>
                     {emoji}
@@ -2830,7 +2886,6 @@ function PlaceRow({
               ) : null}
             </View>
 
-            {visited ? <Icon name="check" size={23} tone="success" /> : null}
           </View>
         </Pressable>
 
@@ -3009,6 +3064,7 @@ function PlaceRow({
           <Caption tone="muted">이동 시간을 알아보는 중…</Caption>
         </Row>
       ) : null}
+      </View>
     </View>
   );
 }
@@ -4036,7 +4092,63 @@ const styles = StyleSheet.create({
   },
 
   places: {
-    gap: Spacing.xs,
+    /* 줄 사이를 띄우지 않습니다. 띄우면 세로선이 그만큼 끊깁니다 — 줄 안의
+       여백이 그 몫을 합니다. */
+    gap: 0,
+  },
+  /* 한 정거장. 시각 열 · 세로선 · 몸통 셋이 나란히 섭니다. */
+  stop: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+  },
+  /*
+    시각 열.
+
+    <p>폭을 고정합니다. 내용만큼 잡으면 "09:30" 과 "9:30" 에서 이름이 서로 다른
+    자리에서 시작합니다. 위 여백은 몸통의 첫 줄 높이에 맞춰, 시각이 이름과
+    나란히 보이게 합니다.
+  */
+  when: {
+    width: 54,
+    alignItems: 'flex-end',
+    paddingTop: Spacing.lg,
+    paddingRight: Spacing.xs,
+  },
+  /* 세로선이 지나는 열. 노드가 가운데에 섭니다. */
+  rail: {
+    width: 26,
+    alignItems: 'center',
+  },
+  railLine: {
+    width: 2,
+    /* 노드 한가운데가 몸통 첫 줄에 오도록 잡은 높이입니다. */
+    height: 22,
+    opacity: 0.35,
+  },
+  railGrow: {
+    flex: 1,
+    height: undefined,
+  },
+  /* 첫 줄 위와 마지막 줄 아래에는 이어 갈 것이 없습니다. */
+  railOff: {
+    opacity: 0,
+  },
+  node: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  /* 고른 줄의 노드는 테두리 한 겹으로 커집니다. 지도에서 고른 핀이 커지는
+     것과 같은 말입니다. */
+  nodeOn: {
+    borderWidth: 3,
+    borderColor: Colors.accent,
+  },
+  stopBody: {
+    flex: 1,
+    paddingBottom: Spacing.sm,
   },
   place: {
     borderRadius: Radius.sm,
@@ -4044,7 +4156,14 @@ const styles = StyleSheet.create({
     /* 고르지 않았을 때도 자리는 차지합니다. 안 그러면 고르는 순간 줄이
        3픽셀 넓어지며 목록이 덜컥합니다. */
     borderColor: 'transparent',
-    backgroundColor: Colors.surfaceRaised,
+    /*
+      상자를 걷었습니다.
+
+      <p>회색 바탕 위 흰 날짜 카드, 그 안에 또 회색 장소 카드로 세 겹이었습니다.
+      상자가 겹치면 어디까지가 한 장소인지보다 상자가 먼저 보입니다. 이제 왼쪽
+      세로선이 그 일을 하므로 바탕은 비웁니다.
+    */
+    backgroundColor: 'transparent',
     overflow: 'hidden',
   },
   /* 사람이 쓴 글. 왼쪽 선 한 가닥으로 인용처럼 세웁니다. */
@@ -4096,11 +4215,6 @@ const styles = StyleSheet.create({
   },
   gripOn: {
     backgroundColor: Colors.accentSoft,
-  },
-  order: {
-    width: 24,
-    alignItems: 'center',
-    marginTop: 3,
   },
   orderEmoji: {
     /* 이모지는 글꼴이 제 높이를 갖고 있어, 줄 높이를 두면 아래로 처집니다. */
