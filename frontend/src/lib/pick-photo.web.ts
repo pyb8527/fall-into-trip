@@ -1,7 +1,7 @@
 import { api } from '@/api/client';
 
 /**
- * 사진 한 장 고르기 (웹).
+ * 사진 고르기 (웹).
  *
  * <h3>보내기 전에 줄입니다</h3>
  *
@@ -30,32 +30,79 @@ const QUALITY = 0.85;
 /**
  * 사진을 고르고 올립니다.
  *
- * @return 올라간 사진의 번호. 고르다 말면 null
+ * <h3>한 번에 여러 장</h3>
+ *
+ * <p>한 장씩만 고르게 하면 다섯 장을 넣는 데 창을 다섯 번 열어야 합니다.
+ * 한 자리에서 찍은 사진은 대개 보관함에서 나란히 붙어 있으므로, 거기서
+ * 한꺼번에 고르는 것이 손이 훨씬 덜 갑니다.
+ *
+ * <h3>남은 자리만큼만</h3>
+ *
+ * <p>고르는 창은 몇 장까지인지를 모릅니다 — 브라우저에 그런 제한이
+ * 없습니다. 열 장을 골라도 막을 길이 없으니 <b>받은 뒤에</b> 앞에서부터
+ * 남은 자리만큼만 올립니다. 넘긴 것은 올리지도 않습니다 — 올려 놓고
+ * 안 쓰면 그 사람 몫만 축냅니다.
+ *
+ * <h3>하나가 실패해도 나머지는 남깁니다</h3>
+ *
+ * <p>다섯 장 중 넷이 올라가고 하나가 깨졌을 때 통째로 버리면, 이미 올라간
+ * 넷도 다시 골라야 합니다. 올라간 것은 돌려주고 못 올린 것만 말합니다.
+ *
+ * @param room 넣을 수 있는 자리 수. 이보다 많이 골라도 여기까지만 올립니다
+ * @return 올라간 사진의 번호들. 고르다 말면 빈 배열
  */
-export async function pickAndUpload(): Promise<string | null> {
-  const file = await pick();
-  if (!file) {
-    return null;
+export async function pickAndUpload(room = 1): Promise<Pick> {
+  const files = await pick(room > 1);
+  if (files.length === 0) {
+    return { ids: [], skipped: 0, failed: 0 };
   }
-  const small = await shrink(file);
-  const form = new FormData();
-  form.append('file', small, 'photo.jpg');
-  const got = await api.upload<{ id: string }>('/api/photos', form);
-  return got.id;
+
+  const taking = files.slice(0, Math.max(1, room));
+  const ids: string[] = [];
+  let failed = 0;
+  /* 한 장씩 차례로 올립니다. 한꺼번에 밀어 넣으면 로밍이 느린 데서
+     서로의 대역을 나눠 먹어 다 같이 느려집니다 — 길 위에서 도장을
+     찍는 자리가 바로 그런 데입니다. */
+  for (const file of taking) {
+    try {
+      const small = await shrink(file);
+      const form = new FormData();
+      form.append('file', small, 'photo.jpg');
+      const got = await api.upload<{ id: string }>('/api/photos', form);
+      ids.push(got.id);
+    } catch {
+      failed += 1;
+    }
+  }
+  return { ids, skipped: files.length - taking.length, failed };
 }
 
+/** 고른 결과. 못 넣은 것이 왜 안 들어갔는지를 화면이 말해 줘야 합니다. */
+export type Pick = {
+  /** 올라간 사진의 번호들. */
+  ids: string[];
+  /** 자리가 모자라 안 올린 장 수. */
+  skipped: number;
+  /** 올리다 깨진 장 수. */
+  failed: number;
+};
+
 /**
- * 파일 하나 고르기.
+ * 파일 고르기.
  *
  * <p>capture 를 안 답니다. 달면 카메라가 바로 열리는데, 그러면 이미 찍어 둔
  * 사진을 고를 수가 없습니다. 안 달면 기기가 「사진 보관함 / 사진 찍기」를
  * 함께 물어봅니다.
+ *
+ * <p>여러 장을 받을 때만 multiple 을 답니다. 한 장짜리 자리(여행기 표지)
+ * 에까지 달면 여러 장을 고를 수 있는 것처럼 보여 놓고 하나만 씁니다.
  */
-function pick(): Promise<File | null> {
+function pick(many: boolean): Promise<File[]> {
   return new Promise((done) => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
+    input.multiple = many;
     input.style.display = 'none';
 
     /*
@@ -66,18 +113,18 @@ function pick(): Promise<File | null> {
       그것을 기다리는 화면이 계속 바쁜 상태로 남습니다.
     */
     let settled = false;
-    const finish = (file: File | null) => {
+    const finish = (files: File[]) => {
       if (settled) {
         return;
       }
       settled = true;
       input.remove();
-      done(file);
+      done(files);
     };
 
-    input.addEventListener('change', () => finish(input.files?.[0] ?? null));
-    input.addEventListener('cancel', () => finish(null));
-    window.addEventListener('focus', () => setTimeout(() => finish(null), 800), { once: true });
+    input.addEventListener('change', () => finish(Array.from(input.files ?? [])));
+    input.addEventListener('cancel', () => finish([]));
+    window.addEventListener('focus', () => setTimeout(() => finish([]), 800), { once: true });
 
     document.body.appendChild(input);
     input.click();

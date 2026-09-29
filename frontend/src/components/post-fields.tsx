@@ -122,9 +122,13 @@ export function PostFields({
     setFailed(null);
     setPicking(true);
     try {
-      const got = await pickAndUpload();
-      if (got) {
-        set('coverPhotoId', got);
+      /* 표지는 한 장입니다 — 여러 장 고르는 창을 열어 놓고 하나만 쓰면
+         고른 사람은 나머지가 어디로 갔는지 모릅니다. */
+      const got = await pickAndUpload(1);
+      if (got.ids[0]) {
+        set('coverPhotoId', got.ids[0]);
+      } else if (got.failed > 0) {
+        setFailed('사진을 올리지 못했어요. 다시 해 보세요.');
       }
     } catch (e) {
       setFailed(e instanceof ApiError ? e.message : '사진을 올리지 못했어요.');

@@ -69,17 +69,28 @@ export function MarkSheet({
   }, [place?.id]);
 
   async function choose() {
-    if (photoIds.length >= MAX_PHOTOS) {
+    const room = MAX_PHOTOS - photoIds.length;
+    if (room <= 0) {
       return;
     }
     setFailed(null);
     setPicking(true);
     try {
-      const got = await pickAndUpload();
-      /* 고르는 사이에 다른 장이 붙었을 수 있습니다. 그때의 수가 아니라
-         지금의 수로 다시 봅니다. */
-      if (got) {
-        setPhotoIds((was) => (was.length >= MAX_PHOTOS || was.includes(got) ? was : [...was, got]));
+      const got = await pickAndUpload(room);
+      if (got.ids.length > 0) {
+        /* 고르는 사이에 다른 장이 붙었을 수 있습니다. 그때의 자리가 아니라
+           지금의 자리로 다시 잘라 넣습니다. */
+        setPhotoIds((was) => [
+          ...was,
+          ...got.ids.filter((id) => !was.includes(id)).slice(0, MAX_PHOTOS - was.length),
+        ]);
+      }
+      /* 왜 덜 들어갔는지를 말해 줍니다. 아무 말 없이 몇 장만 붙어 있으면
+         나머지가 어디로 갔는지 알 수가 없습니다. */
+      if (got.failed > 0) {
+        setFailed(`${got.failed}장은 올리지 못했어요. 다시 해 보세요.`);
+      } else if (got.skipped > 0) {
+        setFailed(`사진은 한 곳에 ${MAX_PHOTOS}장까지라 ${got.skipped}장은 안 넣었어요.`);
       }
     } catch (e) {
       setFailed(e instanceof ApiError ? e.message : '사진을 올리지 못했어요.');
@@ -153,7 +164,11 @@ export function MarkSheet({
       ))}
       {photoIds.length < MAX_PHOTOS ? (
         <Button
-          label={photoIds.length === 0 ? '사진 고르기' : `사진 더 넣기 (${photoIds.length}/${MAX_PHOTOS})`}
+          label={
+            photoIds.length === 0
+              ? `사진 고르기 (${MAX_PHOTOS}장까지)`
+              : `사진 더 넣기 (${photoIds.length}/${MAX_PHOTOS})`
+          }
           variant="secondary"
           compact
           busy={picking}
