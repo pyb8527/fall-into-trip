@@ -897,6 +897,93 @@ export function Button({
  * <p>고른 칩은 옅은 물을 깔고 글씨만 강조색으로 둡니다. 눈에는 충분히
  * 걸리고, 색을 가득 쓰는 자리는 화면에 하나만 남습니다.
  */
+/**
+ * 여럿 중 하나를 고르는 단추.
+ *
+ * <h3>칩을 늘어놓는 것이 화면을 다 먹었습니다</h3>
+ *
+ * <p>고를 것이 열댓이면 칩이 두세 줄로 접혀 화면 위쪽을 통째로 차지합니다.
+ * 그런데 고르는 일은 <b>가끔 한 번</b>이고 나머지 시간에는 고른 결과를
+ * 봅니다 — 자리를 늘 차지하는 쪽과 반대입니다.
+ *
+ * <p>한 칸으로 접습니다. 지금 무엇을 고른 상태인지는 그 칸이 말하고,
+ * 누르면 판이 올라와 전부 보여 줍니다. 두 줄이 한 칸이 됩니다.
+ *
+ * <p>칩을 아주 없애지는 않습니다. 셋 이하로 고정된 것(예: 전체/내 것/동행)은
+ * 칩이 낫습니다 — 한 번에 다 보이고 한 번에 눌립니다.
+ */
+export function Picker<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+  allLabel = '전체',
+}: {
+  /** 무엇을 고르는 것인지. 칸에 "갈래 · 카페" 처럼 붙습니다. */
+  label: string;
+  /** 지금 고른 것. null 이면 안 고른 것입니다. */
+  value: T | null;
+  options: { value: T; label: string; hint?: string }[];
+  onChange: (next: T | null) => void;
+  /** 안 고른 상태에 적을 말. */
+  allLabel?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const picked = options.find((o) => o.value === value) ?? null;
+
+  return (
+    <>
+      <Press
+        onPress={() => setOpen(true)}
+        accessibilityLabel={`${label} 고르기. 지금 ${picked?.label ?? allLabel}`}
+        hitSlop={Tap.compactSlop}
+        scale={0.96}
+        style={[
+          styles.chip,
+          {
+            backgroundColor: picked ? Colors.accentSoft : Colors.surface,
+            borderColor: picked ? Colors.accent : Colors.border,
+          },
+        ]}>
+        <Text style={[styles.chipLabel, picked ? { color: Colors.accentInk } : null]}>
+          {label} · {picked?.label ?? allLabel}
+        </Text>
+        <Feather
+          name="chevron-down"
+          size={16}
+          color={picked ? Colors.accentInk : Colors.textSecondary}
+        />
+      </Press>
+
+      <BottomSheet visible={open} title={label} onClose={() => setOpen(false)}>
+        {/* 안 고른 상태로 돌아가는 길을 맨 위에 둡니다. 고른 뒤에 되돌리는
+            것은 자주 있는 일인데, 목록 끝까지 내려가서 찾게 할 일이
+            아닙니다. */}
+        <ListRow
+          title={allLabel}
+          right={value === null ? <Icon name="check" tone="accent" /> : undefined}
+          onPress={() => {
+            onChange(null);
+            setOpen(false);
+          }}
+        />
+        {options.map((option) => (
+          <ListRow
+            key={option.value}
+            title={option.label}
+            subtitle={option.hint}
+            right={value === option.value ? <Icon name="check" tone="accent" /> : undefined}
+            onPress={() => {
+              onChange(option.value);
+              setOpen(false);
+            }}
+          />
+        ))}
+      </BottomSheet>
+    </>
+  );
+}
+
 export function Chip({
   label,
   selected,
@@ -1476,10 +1563,21 @@ export function IconButton({
         styles.iconButton,
         onMap && styles.iconButtonOnMap,
         {
-          backgroundColor: active
-            ? toneSoft[tone]
-            : bare
-              ? 'transparent'
+          /*
+            켜진 것을 <b>바탕이 아니라 그림</b>으로 말합니다.
+
+            <p>bare 는 "칩을 두지 않는다" 는 뜻인데, 켜지는 순간 칩이
+            생기고 있었습니다. 보석함에 담으면 단추 뒤에 회색 네모가
+            돋아나는 식이라, 담겼다는 것보다 <b>네모가 생겼다</b>는 것이
+            먼저 보였습니다.
+
+            <p>bare 일 때는 켜져도 바탕을 안 깝니다. 아래에서 그림에 색이
+            드는 것이 그 말을 합니다.
+          */
+          backgroundColor: bare
+            ? 'transparent'
+            : active
+              ? toneSoft[tone]
               : onMap
                 ? Colors.surface
                 : Colors.fill,

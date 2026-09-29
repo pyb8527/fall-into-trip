@@ -1,6 +1,7 @@
 package net.weeniebeenie.fit.community.api;
 
 import lombok.RequiredArgsConstructor;
+import net.weeniebeenie.fit.community.application.PostService;
 import net.weeniebeenie.fit.community.domain.PopularRepository;
 import net.weeniebeenie.fit.trip.domain.PlaceKind;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -56,14 +57,19 @@ public class PopularController {
     }
 
     /**
-     * @param kind 갈래로 거를 때. 모르는 이름은 안 거른 것으로 봅니다 —
-     *             화면에서 넘어온 값을 그대로 쿼리에 넣지 않습니다.
+     * @param kind   갈래로 거를 때. 모르는 이름은 안 거른 것으로 봅니다 —
+     *               화면에서 넘어온 값을 그대로 쿼리에 넣지 않습니다.
+     * @param region 지역으로 거를 때. 같은 규칙입니다. 갈래만으로 거르면
+     *               "카페" 를 눌렀을 때 도쿄와 제주가 한 목록에 섞여 나오는데,
+     *               정작 보는 사람은 대개 갈 곳을 하나 정해 두고 봅니다
      */
     @GetMapping("/api/popular/places")
-    public Map<String, Object> places(@RequestParam(required = false) String kind) {
+    public Map<String, Object> places(@RequestParam(required = false) String kind,
+                                      @RequestParam(required = false) String region) {
         String clean = PlaceKind.clean(kind);
+        String where = known(region);
         List<Map<String, Object>> out = new ArrayList<>();
-        for (Object[] r : popular.places(clean, LIMIT)) {
+        for (Object[] r : popular.places(clean, where, LIMIT)) {
             Map<String, Object> one = new java.util.LinkedHashMap<>();
             one.put("key", r[0]);
             one.put("name", r[1]);
@@ -75,7 +81,21 @@ public class PopularController {
             one.put("likes", num(r[7]));
             out.add(one);
         }
-        return Map.of("places", out, "kind", clean == null ? "" : clean);
+        return Map.of(
+                "places", out,
+                "kind", clean == null ? "" : clean,
+                "region", where == null ? "" : where);
+    }
+
+    /**
+     * 아는 지역인지.
+     *
+     * <p>PostService 가 글을 올릴 때 쓰는 것과 같은 목록입니다. 화면에서
+     * 넘어온 값을 그대로 쿼리에 넣지 않습니다 — 모르는 이름은 안 거른
+     * 것으로 봅니다.
+     */
+    private static String known(String region) {
+        return region != null && PostService.REGIONS.contains(region) ? region : null;
     }
 
     /** 글에 실제로 쓰인 갈래만. 누를 수 있는 것과 없는 것을 가릅니다. */

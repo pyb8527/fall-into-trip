@@ -1,8 +1,8 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { api } from '@/api/client';
+import { api, ApiError, UNEXPECTED } from '@/api/client';
 import type { Folder, TripSummary } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
@@ -19,6 +19,7 @@ import {
   Caption,
   Empty,
   ErrorNote,
+  Field,
   Icon,
   IconButton,
   ListRow,
@@ -46,6 +47,16 @@ import { AppTabs } from '@/ui/tab-bar';
  *       사람에게는 안 보입니다.</li>
  * </ul>
  */
+/**
+ * 아직 폴더에 안 넣은 것들.
+ *
+ * <p>서버에 있는 폴더가 아니라 <b>화면에서만 쓰는 이름</b>입니다. 폴더에
+ * 넣은 것과 안 넣은 것을 같은 모양으로 늘어놓기 위한 것이라, 서버에 빈
+ * 폴더를 하나 만들어 두는 것보다 이쪽이 맞습니다 — 그러면 지울 수도
+ * 이름을 바꿀 수도 있는 것이 되어 버립니다.
+ */
+const LOOSE = { id: '', name: '아직 안 넣음', tripCount: 0 } as const;
+
 type Group = 'when' | 'folder';
 
 const GROUPS: { value: Group; label: string }[] = [
@@ -116,6 +127,16 @@ export default function Trips() {
   /** 어느 폴더에도 안 넣은 것. 폴더별로 볼 때 아래에 따로 모읍니다. */
   const loose = useMemo(() => trips.filter((t) => !t.folderId), [trips]);
 
+  /** 그 폴더에 든 여행들. 미분류(LOOSE)면 아직 아무 데도 안 넣은 것들입니다. */
+  const inFolder = useCallback(
+    (folder: { id: string }): TripSummary[] =>
+      folder.id === LOOSE.id ? loose : trips.filter((t) => t.folderId === folder.id),
+    [trips, loose],
+  );
+
+  /** 새 폴더 이름을 받는 판. */
+  const [naming, setNaming] = useState(false);
+
   return (
     <Screen
       safeTop
@@ -163,10 +184,6 @@ export default function Trips() {
       */}
       {group === 'folder' ? (
         <>
-          {folders.length === 0 ? (
-            <Empty message="아직 폴더가 없습니다. 폴더별로 볼 때 여행 오른쪽의 폴더 단추로 만듭니다." />
-          ) : null}
-
           <Row gap={Spacing.sm} style={styles.shelf}>
             {folders.map((folder) => (
               <Press
@@ -182,25 +199,50 @@ export default function Trips() {
                 <Caption tone="muted">{folder.tripCount}개</Caption>
               </Press>
             ))}
-          </Row>
 
-          {loose.length > 0 ? (
-            <View style={styles.section}>
-              <Split align="baseline">
-                <Subtitle>폴더 없음</Subtitle>
-                <Caption tone="secondary">{loose.length}</Caption>
-              </Split>
-              {loose.map((trip) => (
-                <TripRow
-                  key={trip.id}
-                  trip={trip}
-                  mine={trip.ownerId === user?.id}
-                  onOpen={() => open(trip.id)}
-                  onFolder={() => setPlacing(trip)}
-                />
-              ))}
-            </View>
-          ) : null}
+            {/*
+              미분류도 폴더 한 칸으로 냅니다.
+
+              <p>전에는 폴더 선반 <b>아래에</b> "폴더 없음" 이라는 목록으로
+              길게 늘어놓았습니다. 그러면 폴더를 셋 만들어 놓고도 정작 화면의
+              대부분은 안 넣은 여행들이 차지합니다 — 정리한 보람이 없습니다.
+
+              <p>같은 칸으로 둡니다. 폴더에 넣는 것과 안 넣는 것은 <b>같은
+              종류의 자리</b>이고, 누르면 그 안이 열리는 것도 같습니다.
+            */}
+            {loose.length > 0 ? (
+              <Press
+                onPress={() => setOpened(LOOSE)}
+                scale={0.96}
+                accessibilityLabel="아직 안 넣은 여행 보기"
+                style={styles.folder}>
+                <Icon name="folder" size={36} tone="muted" />
+                <Body small strong numberOfLines={1}>
+                  {LOOSE.name}
+                </Body>
+                <Caption tone="muted">{loose.length}개</Caption>
+              </Press>
+            ) : null}
+
+            {/*
+              새 폴더.
+
+              <p>전에는 폴더를 만드는 길이 <b>여행 줄의 폴더 단추 안에만</b>
+              있었습니다. 그래서 폴더를 먼저 만들어 두고 나중에 넣는 순서로는
+              시작할 수가 없었고, 빈 화면의 안내도 "여행 오른쪽의 폴더 단추로
+              만듭니다" 라고 길을 설명해야 했습니다.
+            */}
+            <Press
+              onPress={() => setNaming(true)}
+              scale={0.96}
+              accessibilityLabel="새 폴더 만들기"
+              style={[styles.folder, styles.folderNew]}>
+              <Icon name="plus" size={36} tone="muted" />
+              <Body small strong numberOfLines={1}>
+                새 폴더
+              </Body>
+            </Press>
+          </Row>
         </>
       ) : null}
 
@@ -217,6 +259,7 @@ export default function Trips() {
               trip={trip}
               mine={trip.ownerId === user?.id}
               onOpen={() => open(trip.id)}
+              onFolder={() => setPlacing(trip)}
             />
           ))}
         </View>
@@ -235,12 +278,10 @@ export default function Trips() {
           자리로 그대로 돌아옵니다. */}
       {opened ? (
         <BottomSheet visible title={opened.name} onClose={() => setOpened(null)}>
-          {trips.filter((t) => t.folderId === opened.id).length === 0 ? (
+          {inFolder(opened).length === 0 ? (
             <Empty message="이 폴더는 아직 비어 있습니다." />
           ) : null}
-          {trips
-            .filter((t) => t.folderId === opened.id)
-            .map((trip) => (
+          {inFolder(opened).map((trip) => (
               <TripRow
                 key={trip.id}
                 trip={trip}
@@ -257,6 +298,17 @@ export default function Trips() {
             ))}
         </BottomSheet>
       ) : null}
+
+      {/* 폴더만 하나 만들어 두는 자리. 여행을 고르지 않고도 시작할 수
+          있어야 합니다. */}
+      <NewFolderSheet
+        visible={naming}
+        onClose={() => setNaming(false)}
+        onMade={() => {
+          setNaming(false);
+          reloadFolders();
+        }}
+      />
 
       {placing ? (
         <FolderSheet
@@ -281,6 +333,62 @@ export default function Trips() {
  * <p>"내 여행" 표는 달지 않습니다. 대개가 내 여행이라 거의 모든 줄에 같은 표가
  * 붙어 아무것도 구별해 주지 못했습니다. 남의 여행에 끼어 있는 것만 표시합니다.
  */
+/**
+ * 폴더 하나 만들기.
+ *
+ * <p>폴더를 만드는 길이 <b>여행 줄의 단추 안에만</b> 있었습니다(FolderSheet).
+ * 그래서 "폴더부터 만들어 두고 나중에 넣는" 순서로는 시작할 수가 없었고,
+ * 빈 화면의 안내도 길을 설명해야 했습니다 — 안내가 길을 설명하고 있으면
+ * 대개 길이 잘못 난 것입니다.
+ */
+function NewFolderSheet({
+  visible,
+  onClose,
+  onMade,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onMade: () => void;
+}) {
+  const [name, setName] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
+
+  async function make() {
+    const clean = name.trim();
+    if (!clean || busy) {
+      return;
+    }
+    setBusy(true);
+    setFailed(null);
+    try {
+      await api.post('/api/folders', { name: clean });
+      setName('');
+      onMade();
+    } catch (e) {
+      setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <BottomSheet visible={visible} title="새 폴더" onClose={onClose}>
+      <Caption tone="secondary">폴더는 나에게만 보입니다. 같이 간 사람은 자기 식대로 정리합니다.</Caption>
+      {failed ? <ErrorNote message={failed} /> : null}
+      <Field
+        label="이름"
+        value={name}
+        onChangeText={setName}
+        placeholder="제주 갈 때마다"
+        returnKeyType="done"
+        onSubmitEditing={make}
+      />
+      <Button label="만들기" busy={busy} disabled={!name.trim()} onPress={make} />
+    </BottomSheet>
+  );
+}
+
 function TripRow({
   trip,
   mine,
@@ -309,11 +417,24 @@ function TripRow({
           onPress={onOpen}
         />
       </View>
-      {/* 일정순으로 볼 때는 폴더를 다루는 자리가 아닙니다. 줄마다 폴더
-          단추가 서 있으면 무엇을 하는 화면인지 흐려지고, 이름이 그만큼
-          좁아집니다. 폴더별로 볼 때만 냅니다. */}
+      {/*
+        줄마다 답니다.
+
+        <p>폴더별로 볼 때만 냈었습니다. 그런데 "이 여행 폴더에 넣어야지" 는
+        대개 <b>여행을 보다가</b> 드는 생각이라, 그때마다 보기를 폴더별로
+        바꿔야 했습니다. 정리하려고 보기를 바꾸는 것이 아니라 정리하다 보니
+        폴더별로 가는 것이 순서입니다.
+
+        <p>폴더 그림 대신 점 세 개입니다. 폴더 그림은 "이미 폴더에 들어
+        있다" 로도 읽혀서, 안 넣은 여행 옆에 서 있으면 헷갈립니다.
+      */}
       {onFolder ? (
-        <IconButton name="folder" label={`${trip.title} 폴더에 넣기`} onPress={onFolder} />
+        <IconButton
+          name="more-horizontal"
+          label={`${trip.title} 폴더에 넣기`}
+          bare
+          onPress={onFolder}
+        />
       ) : null}
     </Row>
   );
@@ -390,6 +511,14 @@ const styles = StyleSheet.create({
   /* 폴더를 늘어놓는 선반. 좁은 폰에서는 두 칸, 넓으면 더 들어갑니다. */
   shelf: {
     alignItems: 'stretch',
+  },
+  /* 새 폴더는 채우지 않습니다. 이미 있는 폴더들과 같은 무게로 서 있으면
+     그중 하나로 읽힙니다. */
+  folderNew: {
+    backgroundColor: 'transparent',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.border,
+    borderStyle: 'dashed',
   },
   folder: {
     flexGrow: 1,

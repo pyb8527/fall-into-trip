@@ -12,12 +12,12 @@ import {
   Body,
   Caption,
   Card,
-  Chip,
   Empty,
   ErrorNote,
   Grow,
   Loading,
   Mark,
+  Picker,
   Press,
   Row,
   Screen,
@@ -57,6 +57,14 @@ export default function Popular() {
   const [tab, setTab] = useState<Tab>('places');
   /** 갈래로 거르고 있는 것. 비우면 전부. */
   const [kind, setKind] = useState<string | null>(null);
+  /*
+    지역으로도 거릅니다.
+
+    <p>갈래만으로 거르면 "카페" 를 눌렀을 때 도쿄와 제주가 한 목록에 섞여
+    나옵니다. 정작 보는 사람은 대개 <b>갈 곳을 하나 정해 두고</b> 봅니다.
+  */
+  const [region, setRegion] = useState<string | null>(null);
+
   /** 들여다보는 중인 곳. */
   const [looking, setLooking] = useState<Looked | null>(null);
 
@@ -73,8 +81,8 @@ export default function Popular() {
     error: placeError,
     reload: reloadPlaces,
   } = useAsync<{ places: PopularPlace[] }>(
-    (signal) => api.get(`/api/popular/places${query({ kind })}`, signal),
-    [kind],
+    (signal) => api.get(`/api/popular/places${query({ kind, region })}`, signal),
+    [kind, region],
   );
 
   const {
@@ -98,20 +106,42 @@ export default function Popular() {
             셉니다.
           </Caption>
 
-          {/* 갈래가 둘 이상일 때만 냅니다. 하나뿐이면 누를 것이 없습니다. */}
-          {(kinds?.kinds.length ?? 0) > 1 ? (
-            <Row gap={Spacing.xs} style={styles.chips}>
-              <Chip label="전체" selected={kind === null} onPress={() => setKind(null)} />
-              {kinds?.kinds.map((k) => (
-                <Chip
-                  key={k.kind}
-                  label={`${iconOf(k.kind)} ${labelOf(k.kind)}`}
-                  selected={kind === k.kind}
-                  onPress={() => setKind(kind === k.kind ? null : k.kind)}
-                />
-              ))}
-            </Row>
-          ) : null}
+          {/*
+            고르는 칸 둘.
+
+            <p>갈래를 칩으로 늘어놓고 있었습니다. 열댓 개가 두세 줄로 접혀
+            화면 위쪽을 통째로 먹었는데, 고르는 일은 가끔 한 번이고 나머지
+            시간에는 고른 결과를 봅니다.
+
+            <p>한 줄로 접습니다. 그러면서 남은 자리에 지역을 하나 더
+            들입니다 — 전에는 칩만으로도 꽉 차 둘째 조건을 놓을 데가
+            없었습니다.
+          */}
+          <Row gap={Spacing.xs} style={styles.chips}>
+            {(kinds?.kinds.length ?? 0) > 1 ? (
+              <Picker
+                label="갈래"
+                value={kind}
+                onChange={setKind}
+                options={(kinds?.kinds ?? []).map((k) => ({
+                  value: k.kind,
+                  label: `${iconOf(k.kind)} ${labelOf(k.kind)}`,
+                }))}
+              />
+            ) : null}
+            {(regions?.regions.length ?? 0) > 1 ? (
+              <Picker
+                label="지역"
+                value={region}
+                onChange={setRegion}
+                options={(regions?.regions ?? []).map((r) => ({
+                  value: r.region,
+                  label: r.region,
+                  hint: `일정 ${r.posts}개`,
+                }))}
+              />
+            ) : null}
+          </Row>
 
           {loadingPlaces && !places ? <Loading /> : null}
           {placeError ? <ErrorNote message={placeError} onRetry={reloadPlaces} /> : null}

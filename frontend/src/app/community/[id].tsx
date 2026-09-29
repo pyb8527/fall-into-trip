@@ -33,6 +33,8 @@ import {
   ConfirmDialog,
   Divider,
   DragSheet,
+  Snack,
+  useUndo,
   ErrorNote,
   Icon,
   IconButton,
@@ -70,6 +72,7 @@ export default function Post() {
   const [reporting, setReporting] = useState(false);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const { undo, show: showUndo, hide: hideUndo } = useUndo();
   /** 펼쳐 둔 날. 첫날만 열어 둡니다 — 다 접히면 제목만 늘어선 화면이 됩니다. */
   const [opened, setOpened] = useState<Set<number>>(() => new Set([0]));
   /*
@@ -253,7 +256,22 @@ export default function Post() {
         fromPost: id,
       });
       setSavedIds((prev) => new Map(prev).set(place.name, res.place.id));
-      setNotice(`「${place.name}」 를 보석함에 담았습니다.`);
+      /*
+        담은 다음이 더 중요합니다.
+
+        <p>전에는 판 안에 "담았습니다" 한 줄이 떴습니다. 그런데 판을 내려
+        두고 지도를 보다가 담으면 그 줄이 안 보이고, 무엇보다 <b>담아서
+        뭘 하려던 것인지</b>는 아직 남아 있습니다 — 대개 내 일정에 넣으려던
+        것입니다.
+
+        <p>떠 있는 띠로 알리고 보석함으로 가는 길을 함께 냅니다. 안 누르면
+        잠시 뒤 사라지므로 하던 일을 막지 않습니다.
+      */
+      showUndo({
+        message: `「${place.name}」 를 보석함에 담았습니다. 일정에 추가하러 가실까요?`,
+        label: '보석함으로',
+        onUndo: () => router.push('/(app)/saved'),
+      });
     } catch (e) {
       setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
     }
@@ -489,6 +507,12 @@ export default function Post() {
       {/* 아래 띠. 이 화면은 Screen 이 아니라 지도 위에 판을 얹는 얼개라
           직접 답니다. */}
       <AppTabs />
+
+      {/* 떠 있는 띠도 직접 얹습니다. 아래 띠보다 위에 서야 가려지지
+          않습니다. */}
+      <View pointerEvents="box-none" style={[styles.snackRail, { bottom: dock + Spacing.md }]}>
+        <Snack undo={undo} onHide={hideUndo} />
+      </View>
 
       <CopySheet
         visible={copying}
@@ -760,7 +784,10 @@ function DayBlock({
                 key: 'keep',
                 name: 'bookmark' as IconName,
                 label: savedIds.has(place.name) ? UNKEEP : KEEP,
+                /* 담긴 것은 그림에 색이 듭니다. 회색 네모가 돋아나는 것보다
+                   담겼다는 말에 가깝습니다. */
                 active: savedIds.has(place.name),
+                tone: 'accent' as const,
                 onPress: () => onSave(place, i),
               },
             ]
@@ -772,6 +799,7 @@ function DayBlock({
                     name={a.name}
                     label={a.label}
                     active={a.active}
+                    tone={a.tone}
                     dot={a.dot}
                     onPress={a.onPress}
                   />
@@ -847,6 +875,12 @@ function today() {
 const styles = StyleSheet.create({
   /* 지도가 바탕입니다. 판이 아직 안 깔린 자리는 지도 색으로 둡니다 —
      흰 판이 비치면 판이 두 겹인 것처럼 보입니다. */
+  /* 떠 있는 띠가 서는 자리. 하단 띠 위로 올립니다. */
+  snackRail: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+  },
   stage: {
     flex: 1,
     backgroundColor: Colors.abyss,

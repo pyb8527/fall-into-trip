@@ -72,12 +72,15 @@ public interface PopularRepository extends JpaRepository<TripPost, String> {
                WHERE p.hidden = false
                  AND pl->>'name' IS NOT NULL
                  AND (:kind IS NULL OR pl->>'icon' = :kind)
+                 AND (:region IS NULL OR p.region = :region)
            ) one
            GROUP BY key
            ORDER BY posts DESC, likes DESC, name ASC
            LIMIT :limit
            """, nativeQuery = true)
-    List<Object[]> places(@Param("kind") String kind, @Param("limit") int limit);
+    List<Object[]> places(@Param("kind") String kind,
+                          @Param("region") String region,
+                          @Param("limit") int limit);
 
     /**
      * 올라온 글에 실제로 쓰인 갈래만.
