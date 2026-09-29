@@ -386,7 +386,21 @@ export default function TripScreen() {
     <p>이 화면을 보는 동안만 기억합니다. 렌터카로 도는 날이나 이미 아는
     동네에서 잠깐 걷어 두는 것이지, 계정에 새겨 둘 만한 일이 아닙니다.
   */
-  const [showGaps, setShowGaps] = useState(true);
+  /*
+    이동 시간을 볼지.
+
+    <p>기본은 <b>끔</b>입니다. 켜면 장소 사이마다 "걸어서 12분 · 택시 6분"
+    줄이 들어가 목록 길이가 두 배가 되고, 렌터카로 도는 여행이나 이미 익숙한
+    동네에서는 볼 일이 없습니다.
+
+    <p>그리고 끄면 길찾기를 <b>아예 안 부릅니다.</b> 화면만 가리는 것이
+    아니라 사 오지 않는 것입니다 — 구간마다 수단마다 구글에 묻는 호출이라
+    요금이 붙습니다. 늘 켜 두는 기본값이 그대로 요금이 됩니다.
+  */
+  const [showGaps, setShowGaps] = useState(false);
+
+  /** 자주 안 쓰는 것들을 모아 둔 판. 상단 점 세 개로 엽니다. */
+  const [more, setMore] = useState(false);
   const [goHereAt, setGoHereAt] = useState(0);
   /** 십자 옆에 위치 공유·깃발을 펼쳐 두었는지. */
   const [tools, setTools] = useState(false);
@@ -1091,8 +1105,36 @@ export default function TripScreen() {
               ),
           /* 길 위에서 가장 자주 여는 하나만 둡니다. 나머지는 판 안에 글자로
              있습니다 — 그림만 늘어놓으면 눌러 보기 전에는 뜻을 모릅니다. */
+          /*
+            상단 오른쪽.
+
+            <h3>왜 셋만인가</h3>
+
+            <p>판 맨 아래에 글자 단추가 여섯 줄로 쌓여 있었습니다 — 이동 시간,
+            표식, 새 여행, 인쇄, 엑셀, 지우기. 일정을 보려고 판을 올렸다가
+            끝까지 굴리면 나오는 자리라, 찾으려면 굴려야 하고 안 찾을 때는
+            늘 자리를 차지했습니다.
+
+            <p>그렇다고 여섯을 다 그림으로 상단에 세우면 폰 머리줄에 아무것도
+            안 읽힙니다. 자주 쓰는 둘만 세우고 나머지는 점 세 개 안으로
+            넣습니다.
+
+            <p>이동 시간이 밖에 서는 것은 <b>유일하게 켜짐/꺼짐이 있는 것</b>
+            이기 때문입니다. 상태가 있는 것은 상태가 보여야 합니다 — 판 안에
+            숨겨 두면 지금 켜져 있는지 열어 봐야 압니다.
+          */
           headerRight: () => (
-            <IconButton name="users" label="동행자" bare onPress={() => setCompanions(true)} />
+            <Row gap={Spacing.xs}>
+              <IconButton
+                name="clock"
+                label={showGaps ? '이동 시간 숨기기' : '이동 시간 보기'}
+                active={showGaps}
+                bare
+                onPress={() => setShowGaps((on) => !on)}
+              />
+              <IconButton name="users" label="동행자" bare onPress={() => setCompanions(true)} />
+              <IconButton name="more-horizontal" label="이 여행 다루기" bare onPress={() => setMore(true)} />
+            </Row>
           ),
         }}
       />
@@ -1484,85 +1526,6 @@ export default function TripScreen() {
           ) : null,
         )}
 
-        <Divider />
-        {/*
-          장소 사이마다 "걸어서 12분 · 택시 6분" 줄이 들어갑니다. 쓸모 있는
-          값이지만 목록 길이를 두 배로 만들고, 렌터카로 도는 여행이나 이미
-          익숙한 동네에서는 볼 일이 없습니다.
-
-          <p>끄면 길찾기를 아예 안 부릅니다. 여기서 끄는 것이 화면만 가리는
-          것이 아니라 <b>사 오지 않는 것</b>입니다 — 구간마다 수단마다 구글에
-          묻는 호출이라 요금이 붙습니다.
-        */}
-        <Switch
-          label="이동 시간 보기"
-          hint="장소 사이에 걸어서·택시·대중교통 시간을 답니다."
-          value={showGaps}
-          onChange={setShowGaps}
-        />
-
-        {canEdit ? (
-          <>
-            <Divider />
-            <TripMarkPicker trip={data.trip} onChanged={refresh} />
-          </>
-        ) : null}
-
-        {/*
-          같은 데를 또 가는 일은 흔합니다. 매년 가는 곳, 이번엔 다른 사람과
-          가는 곳. 그때마다 스무 곳을 다시 찾아 넣게 하면 그 자체가 일입니다.
-
-          동행자로 들어온 여행도 뜹니다 — 함께 짠 것을 내 것으로 하나 떠 두는
-          것은 자연스러운 일입니다.
-        */}
-        <Divider />
-        <Button
-          label="이 일정으로 새 여행 만들기"
-          variant="secondary"
-          onPress={() => setCloning(true)}
-        />
-
-        {/*
-          종이로 한 장.
-
-          길에서 배터리가 나가도, 데이터가 안 터지는 지하철에서도 보입니다.
-          숙소에 붙여 두면 동행자가 저마다 폰을 꺼내지 않아도 됩니다.
-
-          앱에서는 아직 못 하는 일이라 단추 자체를 내지 않습니다 — 눌러서
-          안 되는 것을 보여 주느니 없는 편이 낫습니다.
-        */}
-        {canPrint ? (
-          <Button
-            label="일정 한 장 인쇄"
-            variant="secondary"
-            onPress={() => printItinerary(data)}
-          />
-        ) : null}
-
-        {/*
-          엑셀로 빼 가기.
-
-          <p>인쇄와 나란히 두지만 쓰임이 다릅니다. 종이는 <b>읽는 것</b>이고
-          이쪽은 <b>고치려는 것</b>입니다 — 정산을 다시 셈해 보거나, 회사에
-          낼 양식에 옮겨 붙이거나, 다음 여행의 밑그림으로 씁니다.
-
-          <p>굽는 라이브러리는 누를 때 받습니다. 그래서 처음 한 번은 잠깐
-          걸리는데, 그동안 단추가 도는 것을 보여 줍니다.
-        */}
-        <Button
-          label="엑셀로 받기"
-          variant="secondary"
-          busy={booking}
-          onPress={takeBook}
-        />
-
-        {/* 되돌릴 수 없는 일이라 맨 아래, 손이 잘 닿지 않는 자리에 둡니다. */}
-        {mine ? (
-          <>
-            <Divider />
-            <Button label="여행 지우기" variant="danger" onPress={() => setDropping(true)} />
-          </>
-        ) : null}
       </DragSheet>
 
       <RecommendSheet
@@ -1649,6 +1612,90 @@ export default function TripScreen() {
             ) : null}
           </Row>
         ))}
+      </BottomSheet>
+
+      {/*
+        자주 안 쓰는 것들.
+
+        <p>판 맨 아래에 글자 단추로 쌓여 있던 것들입니다. 일정을 보려고 판을
+        올렸다가 끝까지 굴려야 나오는 자리라, 찾으려면 굴려야 하고 안 찾을
+        때는 늘 자리를 차지했습니다.
+
+        <p>여기서는 <b>하는 일 순서</b>로 놓습니다 — 꺼내 가는 것(인쇄·엑셀),
+        본떠 만드는 것, 이 여행 자체를 손대는 것(표식·지우기). 지우기는 맨
+        아래, 선 하나 건너에 둡니다.
+      */}
+      <BottomSheet visible={more} title="이 여행 다루기" onClose={() => setMore(false)}>
+        {/*
+          종이로 한 장.
+
+          길에서 배터리가 나가도, 데이터가 안 터지는 지하철에서도 보입니다.
+          숙소에 붙여 두면 동행자가 저마다 폰을 꺼내지 않아도 됩니다.
+        */}
+        {canPrint ? (
+          <ListRow
+            left={<Icon name="printer" tone="secondary" />}
+            title="일정 한 장 인쇄"
+            subtitle="종이로 뽑아 두면 배터리가 나가도 보입니다."
+            onPress={() => {
+              setMore(false);
+              printItinerary(data);
+            }}
+          />
+        ) : null}
+
+        {/*
+          엑셀로 빼 가기.
+
+          <p>인쇄와 나란히 두지만 쓰임이 다릅니다. 종이는 <b>읽는 것</b>이고
+          이쪽은 <b>고치려는 것</b>입니다 — 정산을 다시 셈해 보거나, 회사에
+          낼 양식에 옮겨 붙이거나, 다음 여행의 밑그림으로 씁니다.
+        */}
+        <ListRow
+          left={<Icon name="download" tone="secondary" />}
+          title="엑셀로 받기"
+          subtitle={booking ? '만드는 중…' : '일정과 가계부를 표로 뺍니다.'}
+          onPress={takeBook}
+        />
+
+        {/*
+          같은 데를 또 가는 일은 흔합니다. 매년 가는 곳, 이번엔 다른 사람과
+          가는 곳. 그때마다 스무 곳을 다시 찾아 넣게 하면 그 자체가 일입니다.
+
+          동행자로 들어온 여행도 뜹니다 — 함께 짠 것을 내 것으로 하나 떠 두는
+          것은 자연스러운 일입니다.
+        */}
+        <ListRow
+          left={<Icon name="copy" tone="secondary" />}
+          title="이 일정으로 새 여행 만들기"
+          subtitle="장소는 그대로 오고 날짜만 새로 잡습니다."
+          onPress={() => {
+            setMore(false);
+            setCloning(true);
+          }}
+        />
+
+        {canEdit ? (
+          <>
+            <Divider />
+            <TripMarkPicker trip={data.trip} onChanged={refresh} />
+          </>
+        ) : null}
+
+        {/* 되돌릴 수 없는 일이라 맨 아래, 손이 잘 닿지 않는 자리에 둡니다. */}
+        {mine ? (
+          <>
+            <Divider />
+            <Button
+              label="여행 지우기"
+              variant="danger"
+              onPress={() => {
+                setMore(false);
+                setDropping(true);
+              }}
+            />
+          </>
+        ) : null}
       </BottomSheet>
 
       <CompanionsSheet
