@@ -35,6 +35,19 @@ USER fit
 WORKDIR /app
 COPY --from=build --chown=fit:fit /app.jar /app/app.jar
 
+# 사진이 놓일 자리.
+#
+# 여기서 미리 만들어 두는 까닭이 있습니다. 도커는 이름만 붙인 볼륨을 처음
+# 붙일 때 이미지의 같은 자리에서 <b>임자까지</b> 가져갑니다. 안 만들어 두면
+# 볼륨 자리가 root 것으로 생기고, 이 컨테이너는 fit 으로 도니 한 글자도
+# 못 씁니다 — 폴더는 멀쩡히 있는데 사진만 안 올라갑니다.
+#
+# 자리를 직접 고른 경우(PHOTOS_DIR_HOST)는 이것이 안 먹습니다. 그때는 그
+# 폴더의 임자를 직접 맞춰야 합니다 — .env.example 에 적어 두었습니다.
+USER root
+RUN mkdir -p /var/lib/fit/photos && chown -R fit:fit /var/lib/fit
+USER fit
+
 EXPOSE 8080
 
 # 컨테이너에 준 메모리에 맞춰 힙을 잡습니다. 고정값으로 두면 메모리를 늘려도
