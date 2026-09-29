@@ -159,51 +159,60 @@ public class TripController {
                 .toList();
 
         /*
-          도장에 남긴 것.
+          그 자리에 남긴 것.
 
-          <p>아무것도 안 남긴 도장은 빼고 보냅니다 — 대개 그냥 찍고 지나가므로,
+          <h3>한 장소에 하나입니다</h3>
+
+          <p>사람마다 따로 보냈었습니다. 그래서 셋이 간 여행의 한 장소에 세
+          덩어리가 나란히 섰고, 누가 썼는지를 줄마다 이름표로 갈라 줘야
+          했습니다. 지금은 여행의 것이라 이름표가 필요 없습니다 — 멤버면
+          누구나 같은 것을 고칩니다.
+
+          <p>아무것도 안 남긴 자리는 빼고 보냅니다. 대개 그냥 찍고 지나가므로,
           다 실으면 장소 수만큼 빈 줄이 오갑니다.
-        */
-        /*
-          누가 남겼는지도 함께 보냅니다.
 
-          <p>같이 간 사람 것까지 오므로, 이름이 없으면 한 장소에 두 사람의
-          감상이 붙었을 때 누구 말인지 알 수 없습니다. 사진은 여행의 것이
-          아니라 그 사람의 것입니다.
+          <h3>같은 가게라도 칸이 다르면 다른 기록입니다</h3>
+
+          <p>여기 열쇠는 일정의 <b>칸</b>(Place.id)이지 가게(Place.placeId)가
+          아닙니다. 같은 가게를 1일차와 3일차에 넣으면 줄이 둘이고, 기록도
+          둘입니다 — 다른 날 다른 시간에 간 것은 다른 일입니다.
         */
-        /* 장소+사람 → 붙인 사진들. 한 번에 읽어 두고 줄마다 꺼내 씁니다. */
+        /* 장소 → 붙인 사진들. 한 번에 읽어 두고 줄마다 꺼내 씁니다. */
         Map<String, List<String>> shots = new java.util.HashMap<>();
-        for (var vp : d.photos()) {
-            shots.computeIfAbsent(vp.getUserId() + ":" + vp.getPlaceId(), k -> new ArrayList<>())
-                    .add(vp.getPhotoId());
+        Map<String, List<String>> refs = new java.util.HashMap<>();
+        for (var pp : d.photos()) {
+            Map<String, List<String>> into =
+                    pp.getKind() == net.weeniebeenie.fit.trip.domain.PhotoKind.RECORD ? shots : refs;
+            into.computeIfAbsent(pp.getPlaceId(), k -> new ArrayList<>()).add(pp.getPhotoId());
         }
 
-        Map<String, String> who = new java.util.HashMap<>();
-        List<Map<String, Object>> marks = d.marks().stream()
-                .map(v -> {
-                    String key = v.getId().getUserId() + ":" + v.getId().getPlaceId();
-                    List<String> mine = shots.getOrDefault(key, List.of());
-                    if (mine.isEmpty() && v.getStars() == null && v.getNote() == null) {
-                        return null;
-                    }
+        List<Map<String, Object>> marks = new ArrayList<>();
+        List<Map<String, Object>> aids = new ArrayList<>();
+        for (List<net.weeniebeenie.fit.trip.domain.Place> onDay : d.placesByDay().values()) {
+            for (net.weeniebeenie.fit.trip.domain.Place p : onDay) {
+                List<String> kept = shots.getOrDefault(p.getId(), List.of());
+                if (!kept.isEmpty() || p.getStars() != null || p.getReview() != null) {
                     Map<String, Object> one = new java.util.HashMap<>();
-                    one.put("placeId", v.getId().getPlaceId());
-                    one.put("photoIds", mine);
-                    one.put("stars", v.getStars());
-                    one.put("note", v.getNote());
-                    one.put("mine", v.getId().getUserId().equals(me.id()));
-                    one.put("authorName", who.computeIfAbsent(v.getId().getUserId(),
-                            id -> users.findById(id).map(u -> u.getName()).orElse("알 수 없음")));
-                    return one;
-                })
-                .filter(java.util.Objects::nonNull)
-                .toList();
+                    one.put("placeId", p.getId());
+                    one.put("photoIds", kept);
+                    one.put("stars", p.getStars());
+                    one.put("note", p.getReview());
+                    marks.add(one);
+                }
+                List<String> chosen = refs.getOrDefault(p.getId(), List.of());
+                if (!chosen.isEmpty()) {
+                    aids.add(Map.of("placeId", p.getId(), "photoIds", chosen));
+                }
+            }
+        }
 
         return Map.of(
                 "trip", TripView.of(d.trip()),
                 "days", days,
                 "visited", d.visitedPlaceIds(),
                 "marks", marks,
+                /* 다니면서 볼 사진. 여행기에는 안 실리므로 기록과 갈라 보냅니다. */
+                "refs", aids,
                 "myRole", d.myRole() == null ? "NONE" : d.myRole().name());
     }
 }

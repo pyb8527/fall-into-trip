@@ -46,6 +46,7 @@ import { SAME_SPOT, metersBetween, readableMeters } from '@/lib/geo';
 import type { Found } from '@/components/map-types';
 import { PhotoStrip } from '@/components/photo-strip';
 import { PlaceDetailSheet } from '@/components/place-detail-sheet';
+import { RefSheet } from '@/components/ref-sheet';
 import { PlaceSearch } from '@/components/place-search';
 import { RecommendSheet } from '@/components/recommend-sheet';
 import { ago, todayIso } from '@/lib/countdown';
@@ -455,6 +456,8 @@ export default function TripScreen() {
     알던 것이라 판까지 함께 넘깁니다.
   */
   const [looking, setLooking] = useState<{ place: Place; mode: TravelMode | null } | null>(null);
+  /* 다니면서 볼 사진을 넣어 두는 판. */
+  const [stashing, setStashing] = useState<Place | null>(null);
   const [cloning, setCloning] = useState(false);
   const [planted, setPlanted] = useState(0);
   /** 꽂은 자리에 이미 깃발을 꽂아 두고 있던 동행자. 없으면 null. */
@@ -487,16 +490,23 @@ export default function TripScreen() {
     이쪽은 "무엇을 남겼는가" 입니다.
   */
   const traceOf = useMemo(() => {
-    /* 한 장소에 같이 간 사람 수만큼 붙을 수 있습니다 — 도장은 하나지만
-       감상은 사람마다입니다. */
-    const by = new Map<string, PlaceMark[]>();
+    /* 장소 칸마다 하나입니다. 기록은 여행의 것이라 같이 간 사람 수만큼
+       붙지 않습니다 — 멤버면 누구나 같은 것을 고칩니다.
+
+       열쇠는 일정의 칸이지 가게가 아닙니다. 같은 가게를 1일차와 3일차에
+       넣으면 줄이 둘이고 기록도 둘입니다. */
+    const by = new Map<string, PlaceMark>();
     for (const m of data?.marks ?? []) {
-      const list = by.get(m.placeId);
-      list ? list.push(m) : by.set(m.placeId, [m]);
+      by.set(m.placeId, m);
     }
-    /* 내 것을 맨 앞에. 내가 남긴 것을 찾으려고 훑게 하지 않습니다. */
-    for (const list of by.values()) {
-      list.sort((a, b) => Number(b.mine) - Number(a.mine));
+    return by;
+  }, [data]);
+
+  /** 다니면서 볼 사진. 여행기에는 안 실립니다. */
+  const refsOf = useMemo(() => {
+    const by = new Map<string, string[]>();
+    for (const r of data?.refs ?? []) {
+      by.set(r.placeId, r.photoIds);
     }
     return by;
   }, [data]);
@@ -1571,6 +1581,8 @@ export default function TripScreen() {
               twiceIn={twiceIn}
               tipCounts={tipCounts}
               traceOf={traceOf}
+              refsOf={refsOf}
+              onRefs={(place) => setStashing(place)}
               spent={spentByDay.get(day.id) ?? null}
               spentAt={spentByPlace}
               touchedOf={touchedOf}
@@ -1606,6 +1618,16 @@ export default function TripScreen() {
         here={me.here}
         onClose={() => setAsking(false)}
         onChanged={refresh}
+      />
+
+      <RefSheet
+        place={stashing}
+        now={stashing ? refsOf.get(stashing.id) : undefined}
+        onClose={() => setStashing(null)}
+        onSaved={() => {
+          setStashing(null);
+          refresh();
+        }}
       />
 
       <PlaceDetailSheet
@@ -2092,6 +2114,8 @@ function DayCard({
   twiceIn,
   tipCounts,
   traceOf,
+  refsOf,
+  onRefs,
   spent,
   spentAt,
   touchedOf,
@@ -2129,7 +2153,10 @@ function DayCard({
   /** 구글 번호별 최근 팁 수. 줄에서는 점으로만 알립니다. */
   tipCounts: Record<string, number>;
   /** 장소 번호 → 다녀와서 남긴 것들. 같이 간 사람 것까지 옵니다. */
-  traceOf: Map<string, PlaceMark[]>;
+  traceOf: Map<string, PlaceMark>;
+  /** 다니면서 볼 사진. 장소 칸마다. */
+  refsOf: Map<string, string[]>;
+  onRefs: (place: Place) => void;
   /** 이 날 실제로 쓴 돈. 통화마다 하나씩. 아직 안 적었으면 비어 있습니다. */
   spent: Map<string, { sum: number; decimals: number }> | null;
   /** 장소마다 거기서 쓴 돈. 여행 전체 것이라 줄마다 꺼내 씁니다. */
@@ -2503,6 +2530,8 @@ function DayCard({
                     onLook={onLook}
                     tipCount={place.placeId ? (tipCounts[place.placeId] ?? 0) : 0}
                     trace={traceOf.get(place.id)}
+                    refs={refsOf.get(place.id)}
+                    onRefs={() => onRefs(place)}
                     last={i === order.length - 1}
                     dragging={from === i}
                     index={i}
@@ -2674,6 +2703,8 @@ function PlaceRow({
   onLook,
   tipCount,
   trace,
+  refs,
+  onRefs,
   last,
   dragging,
   index,
@@ -2709,7 +2740,10 @@ function PlaceRow({
   /** 이 곳에 달린 한 줄의 개수. 판을 열기 전에는 점으로만 알립니다. */
   tipCount: number;
   /** 다녀와서 남긴 것들. 안 남겼으면 비어 있습니다. */
-  trace?: PlaceMark[];
+  trace?: PlaceMark;
+  refs?: string[];
+  /** 챙겨 두기 판을 엽니다. */
+  onRefs: () => void;
   /** 이 날의 마지막 줄인지. 세로선을 여기서 끊습니다. */
   last: boolean;
   /** 지금 이 줄을 끌고 있는지. 끌고 있는 동안에는 조금 들어 올립니다. */
@@ -2964,18 +2998,30 @@ function PlaceRow({
           <p>짤 때는 애초에 남긴 것이 없으니 아무것도 안 붙습니다. 길어지는
           것은 다녀온 뒤뿐이고, 그때는 그것을 보러 옵니다.
         */}
-        {(trace ?? []).map((one, at) => (
-          <View key={at} style={styles.traceOpen}>
-            <Row gap={Spacing.xs}>
-              {/* 내 것에는 이름을 안 답니다 — 내가 쓴 것을 나에게 이름
-                  붙여 보여 줄 이유가 없습니다. */}
-              {one.mine ? null : <Caption tone="secondary">{one.authorName}</Caption>}
-              {one.stars ? <Caption tone="brand">{'★'.repeat(one.stars)}</Caption> : null}
-            </Row>
-            <PhotoStrip ids={one.photoIds} height={220} />
-            {one.note ? <Body small>{one.note}</Body> : null}
+        {trace ? (
+          <View style={styles.traceOpen}>
+            <PhotoStrip ids={trace.photoIds} height={220} />
+            {trace.note ? <Body small>{trace.note}</Body> : null}
+            {trace.stars ? <Caption tone="brand">{'★'.repeat(trace.stars)}</Caption> : null}
           </View>
-        ))}
+        ) : null}
+
+        {/*
+          다니면서 볼 사진.
+
+          <p>메뉴판, 예매 화면, 가는 길 지도 같은 것입니다. 기록과 <b>갈라
+          놓습니다</b> — 섞어 두면 어느 것이 그날 찍은 것이고 어느 것이 챙겨
+          둔 것인지 안 갈리고, 무엇보다 여행기에 예매 QR 이 실립니다.
+
+          <p>작게 둡니다. 이건 필요할 때 펴 보는 것이지 들여다보는 것이
+          아닙니다 — 눌러서 크게 보는 길은 그대로 있습니다.
+        */}
+        {refs && refs.length > 0 ? (
+          <View style={styles.refOpen}>
+            <Caption tone="muted">챙겨 둔 것</Caption>
+            <PhotoStrip ids={refs} height={120} />
+          </View>
+        ) : null}
 
         {/*
           손대는 단추는 고른 줄에서만 펼칩니다.
@@ -3069,6 +3115,30 @@ function PlaceRow({
             onPress={() => {
               setFolded(false);
               onEdit();
+            }}
+          />
+
+          {/*
+            챙겨 두기.
+
+            <p>다니면서 볼 사진입니다 — 메뉴판, 예매 화면, 가는 길 지도.
+            여행기에는 안 실립니다.
+
+            <p>여기 두는 까닭은 일정을 <b>짜면서</b> 하는 일이기 때문입니다.
+            여행 피드는 다니면서 꺼내 보는 자리이고, 넣어 두는 것은 그
+            전입니다.
+          */}
+          <ListRow
+            left={<Icon name="image" tone="secondary" />}
+            title="챙겨 두기"
+            subtitle={
+              refs && refs.length > 0
+                ? `메뉴판·예매 화면 같은 것. 지금 ${refs.length}장 있어요.`
+                : '메뉴판·예매 화면처럼 다니면서 볼 사진을 넣어 둬요.'
+            }
+            onPress={() => {
+              setFolded(false);
+              onRefs();
             }}
           />
 
@@ -4309,6 +4379,12 @@ const styles = StyleSheet.create({
     불편하지만 사진은 넓을수록 잘 보입니다.
   */
   traceOpen: {
+    gap: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
+    paddingBottom: Spacing.sm,
+  },
+  /* 챙겨 둔 것. 기록보다 한 칸 뒤로 물립니다. */
+  refOpen: {
     gap: Spacing.xs,
     paddingHorizontal: Spacing.sm,
     paddingBottom: Spacing.sm,

@@ -67,8 +67,8 @@ public class PhotoService {
 
     private final PhotoRepository photos;
     private final PhotoStore store;
-    /* 지울 때 붙어 있던 자리에서 뗍니다. */
-    private final net.weeniebeenie.fit.trip.domain.VisitPhotoRepository visitPhotos;
+    /* 지울 때 붙어 있던 자리에서 뗍니다. 기록이든 참고든 같습니다. */
+    private final net.weeniebeenie.fit.trip.domain.PlacePhotoRepository placePhotos;
     /* 올린 글에 실려 있는지 봅니다. */
     private final net.weeniebeenie.fit.community.domain.TripPostRepository posts;
     private final AuditService audit;
@@ -129,7 +129,7 @@ public class PhotoService {
         }
 
         /* 붙어 있던 자리에서 뗍니다. 이것은 어느 쪽이든 합니다. */
-        visitPhotos.deleteAll(visitPhotos.findAllByPhotoId(id));
+        placePhotos.deleteAll(placePhotos.findAllByPhotoId(id));
 
         if (inAnyPost(me.id(), id)) {
             audit.log(me.id(), "photo.detach", id);

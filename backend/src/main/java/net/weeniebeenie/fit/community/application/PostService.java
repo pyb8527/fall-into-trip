@@ -13,6 +13,7 @@ import net.weeniebeenie.fit.community.domain.*;
 import net.weeniebeenie.fit.shared.error.ApiException;
 import net.weeniebeenie.fit.support.audit.AuditService;
 import net.weeniebeenie.fit.trip.domain.*;
+import net.weeniebeenie.fit.trip.domain.PhotoKind;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -130,7 +131,7 @@ public class PostService {
                   <p>올린 사람 것만 봅니다. 같이 간 사람이 각자 찍은 도장은
                   그 사람 것이고, 남의 감상을 내 글에 실을 일이 아닙니다.
                 */
-                .snapshot(snapshotOf(clean, dayList, placeList, marksOf(me, placeList)))
+                .snapshot(snapshotOf(clean, dayList, placeList))
                 .dayCount(dayList.size())
                 .placeCount(placeList.size())
                 .feedback(feedback)
@@ -147,32 +148,7 @@ public class PostService {
      * (updatedBy), 동행자가 누구인지는 그 여행을 같이 간 사람들의 것이지
      * 일정의 일부가 아닙니다. 남이 복제해 갈 때 따라가면 안 됩니다.
      */
-    /**
-     * 올린 사람이 그 장소들에 찍어 둔 도장.
-     *
-     * <p>장소 번호 → 도장. 아무것도 안 남긴 도장은 뺍니다 — 사본에 빈 칸만
-     * 늘어납니다.
-     */
-    private Map<String, Visit> marksOf(AuthPrincipal me, List<Place> placeList) {
-        if (placeList.isEmpty()) {
-            return Map.of();
-        }
-        Set<String> want = placeList.stream().map(Place::getId).collect(Collectors.toSet());
-        Map<String, Visit> out = new java.util.HashMap<>();
-        for (Visit v : visits.marksOfUser(me.id())) {
-            if (!want.contains(v.getId().getPlaceId())) {
-                continue;
-            }
-            if (v.getStars() != null || v.getNote() != null
-                    || !visits.photosOf(me.id(), v.getId().getPlaceId()).isEmpty()) {
-                out.put(v.getId().getPlaceId(), v);
-            }
-        }
-        return out;
-    }
-
-    private String snapshotOf(String title, List<Day> dayList, List<Place> placeList,
-                              Map<String, Visit> marks) {
+    private String snapshotOf(String title, List<Day> dayList, List<Place> placeList) {
         ObjectNode root = mapper.createObjectNode();
         root.put("title", title);
 
@@ -241,15 +217,23 @@ public class PostService {
                   그 사진도 함께 공개되는 셈이라, 올릴 때 무엇이 함께 가는지
                   화면이 보여 주어야 합니다.
                 */
-                Visit mark = marks.get(p.getId());
-                if (mark != null) {
+                /*
+                  기록 사진만 담습니다.
+
+                  <p>같은 장소에 「다니면서 볼 사진」(REFERENCE)도 붙어
+                  있습니다 — 메뉴판, 예매 화면, 가는 길 지도. 그건 다니려고
+                  넣어 둔 것이지 남에게 보이려고 넣은 것이 아니라, 여기
+                  따라가면 <b>남의 여행기에 내 예매 QR 이 실립니다.</b>
+                */
+                List<String> shotIds = visits.photosOf(p.getId(), PhotoKind.RECORD);
+                if (!shotIds.isEmpty() || p.getStars() != null || p.getReview() != null) {
                     /* 사진은 여러 장입니다. 사본에도 차례대로 담습니다. */
                     ArrayNode shots = n.putArray("photos");
-                    for (String id : visits.photosOf(mark.getId().getUserId(), p.getId())) {
+                    for (String id : shotIds) {
                         shots.add(id);
                     }
-                    n.put("stars", mark.getStars() == null ? null : mark.getStars().intValue());
-                    n.put("review", mark.getNote());
+                    n.put("stars", p.getStars() == null ? null : p.getStars().intValue());
+                    n.put("review", p.getReview());
                 }
             }
         }

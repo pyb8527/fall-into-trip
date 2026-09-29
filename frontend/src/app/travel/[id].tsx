@@ -22,7 +22,7 @@ import type {
 } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { MarkSheet } from '@/components/mark-sheet';
-import { OurPhoto } from '@/components/our-photo';
+import { PhotoStrip } from '@/components/photo-strip';
 import { iconOf } from '@/constants/place-icons';
 import { Colors, dayColor, Gutter, Motion, Radius, Spacing } from '@/constants/theme';
 import { feelTick } from '@/lib/feel';
@@ -48,7 +48,16 @@ import {
 import { TripTabs } from '@/ui/tab-bar';
 
 /**
- * 여행 중에 보는 화면 — 스탬프첩.
+ * 여행 피드 — 사진과 글로 그날을 남기는 자리.
+ *
+ * <h3>도장첩이었습니다</h3>
+ *
+ * <p>가운데에 132픽셀짜리 도장이 놓이고 사진은 56픽셀 네모로 그 아래
+ * 곁다리로 붙어 있었습니다. 그래서 이 화면에서 하는 일은 <b>체크</b>였고,
+ * 남기는 것은 체크를 마무리하는 곁일이었습니다. 대개 아무도 안 남겼습니다.
+ *
+ * <p>뒤집습니다. 사진과 글이 본문이고 도장은 「갔다 왔다」는 표시입니다 —
+ * 표시는 작아도 제 일을 하지만, 남긴 것은 작으면 없는 것과 같습니다.
  *
  * <h3>왜 도장인가</h3>
  *
@@ -122,11 +131,20 @@ export default function Travel() {
     [route],
   );
   const infoOf = useMemo(() => new Map((info ?? []).map((i) => [i.id, i])), [info]);
-  /* 장소 번호 → 그 자리에서 남긴 것. 남긴 것이 있는 곳만 옵니다. */
-  /* 고치는 판에는 내 것만 넣습니다 — 남이 남긴 것을 내가 고칠 수는
-     없습니다. 보는 것은 여행 상세와 요약이 맡습니다. */
+  /* 장소 칸 → 그 자리에 남긴 것. 남긴 것이 있는 곳만 옵니다.
+
+     내 것만 거르지 않습니다 — 기록은 여행의 것이라 멤버면 누구나 같은
+     것을 고칩니다. 거르면 남이 올린 사진이 화면에서 사라지고, 그 상태로
+     저장하면 서버에서도 떨어집니다. */
   const markOf = useMemo(
-    () => new Map((data?.marks ?? []).filter((m) => m.mine).map((m) => [m.placeId, m])),
+    () => new Map((data?.marks ?? []).map((m) => [m.placeId, m])),
+    [data],
+  );
+
+  /* 다니면서 볼 사진. 이 화면이 바로 「다니면서」라 여기에 꼭 있어야
+     합니다 — 메뉴판을 일정 화면에만 두면 가게 앞에서 못 꺼냅니다. */
+  const refsOf = useMemo(
+    () => new Map((data?.refs ?? []).map((r) => [r.placeId, r.photoIds])),
     [data],
   );
 
@@ -202,7 +220,7 @@ export default function Travel() {
           title: data.trip.title,
           /* 넷이 모두 여행 이름만 달고 있어서, 지금 보는 것이 일정인지
              여행 중인지는 화면 안을 봐야 알았습니다. */
-          headerTitle: () => <PathTitle parent={data.trip.title} title="여행 중" />,
+          headerTitle: () => <PathTitle parent={data.trip.title} title="여행 피드" />,
           headerRight: () => (
             <Button
               label="일정 전체"
@@ -283,6 +301,7 @@ export default function Travel() {
                 stampedOn={day?.iso ?? null}
                 visited={visited.has(place.id)}
                 mark={markOf.get(place.id)}
+                refs={refsOf.get(place.id)}
                 onMark={() => setMarking(place)}
                 info={infoOf.get(place.id)}
                 next={legAfter.get(place.id)}
@@ -363,6 +382,7 @@ function PlaceCard({
   stampedOn,
   visited,
   mark,
+  refs,
   onMark,
   info,
   next,
@@ -375,8 +395,10 @@ function PlaceCard({
   /** 도장에 찍힐 날짜(YYYY-MM-DD). */
   stampedOn: string | null;
   visited: boolean;
-  /** 그 자리에서 남긴 것. 없으면 안 남긴 것입니다. */
+  /** 그 자리에 남긴 것. 없으면 아직 안 남긴 것입니다. */
   mark?: PlaceMark;
+  /** 다니면서 보려고 챙겨 둔 사진. */
+  refs?: string[];
   /** 남기는 판을 엽니다. */
   onMark: () => void;
   info?: PlaceInfo;
@@ -414,9 +436,67 @@ function PlaceCard({
         </Caption>
       ) : null}
 
+      {/* 가기 전에 적어 둔 메모. 아래의 글과 다릅니다 — 그쪽은 다녀와서
+          남기는 말입니다. */}
       {place.note ? <Body tone="secondary">{place.note}</Body> : null}
 
-      {/* 종이의 한가운데. 여기가 이 화면의 주인공입니다. */}
+      {/*
+        다니면서 볼 사진.
+
+        <p>메뉴판, 예매 화면, 가는 길 지도. 여기가 바로 「다니면서」라 이
+        화면에 꼭 있어야 합니다 — 일정 화면에만 두면 가게 앞에서 못 꺼냅니다.
+
+        <p>남긴 것보다 <b>위</b>입니다. 이건 들어가기 전에 보는 것이고 아래는
+        나온 뒤에 남기는 것이라, 그 순서대로 놓습니다.
+      */}
+      {refs && refs.length > 0 ? (
+        <View style={styles.refs}>
+          <Caption tone="muted">챙겨 둔 것</Caption>
+          <PhotoStrip ids={refs} height={140} />
+        </View>
+      ) : null}
+
+      {/*
+        본문 — 사진과 글.
+
+        <p>도장 아래에 56픽셀 네모로 붙어 있었습니다. 그 크기로는 무엇이
+        찍혔는지 알 수가 없어서 사진이 있으나 없으나 같았고, 그래서 이 화면은
+        체크하는 자리로 읽혔습니다.
+
+        <p>도장을 안 찍었어도 냅니다. 전에는 찍은 뒤에만 열렸는데, 남기는
+        것이 곧 갔다 왔다는 말입니다 — 올리면 도장은 서버가 함께 찍습니다.
+      */}
+      <Press
+        onPress={onMark}
+        scale={0.99}
+        accessibilityLabel={
+          mark ? `${place.name} 에 남긴 것 고치기` : `${place.name} 에 사진과 글 남기기`
+        }>
+        {mark ? (
+          <View style={styles.feed}>
+            <PhotoStrip ids={mark.photoIds} height={260} />
+            {mark.note ? <Body>{mark.note}</Body> : null}
+            {mark.stars ? <Caption tone="brand">{'★'.repeat(mark.stars)}</Caption> : null}
+          </View>
+        ) : (
+          /* 빈 자리도 자리를 차지합니다. 한 줄짜리 글씨로 두면 무엇을 하는
+             자리인지가 안 보이고, 그러면 아무도 안 누릅니다. */
+          <View style={styles.empty}>
+            <Caption tone="secondary" strong>
+              ＋ 사진과 글 남기기
+            </Caption>
+            <Caption tone="muted">같이 간 사람 모두에게 보여요</Caption>
+          </View>
+        )}
+      </Press>
+
+      {/*
+        도장.
+
+        <p>132픽셀로 카드 한가운데에 있었습니다. 이 화면의 주인공이던 시절의
+        크기인데, 지금 주인공은 위의 사진과 글입니다. 「갔다 왔다」는 표시는
+        작아도 제 일을 합니다.
+      */}
       <Stamp
         place={place}
         order={order}
@@ -425,48 +505,6 @@ function PlaceCard({
         stamped={visited}
         onPress={onToggle}
       />
-
-      {/*
-        그 자리에서 남긴 것.
-
-        <p>찍은 뒤에만 냅니다. 안 찍은 곳에 "사진 남기기" 가 서 있으면 도장을
-        찍지 않고도 남길 수 있는 것처럼 보이는데, 남기는 것은 도장에 붙는
-        일입니다.
-
-        <p>남긴 것이 있으면 그것을 보여 주고, 없으면 남기라고 합니다. 둘 다
-        눌러서 고칩니다.
-      */}
-      {visited ? (
-        <Press
-          onPress={onMark}
-          scale={0.99}
-          accessibilityLabel={mark ? `${place.name} 에 남긴 것 고치기` : `${place.name} 에 사진과 한 줄 남기기`}>
-          {mark ? (
-            <Row gap={Spacing.sm} style={styles.markRow}>
-              <OurPhoto id={mark.photoIds[0]} height={56} width={56} />
-              <Grow gap={2}>
-                <Row gap={Spacing.xs}>
-                  {mark.stars ? <Caption tone="brand">{'★'.repeat(mark.stars)}</Caption> : null}
-                  {/* 이 자리는 작아서 첫 장만 섭니다. 몇 장이 더 있는지를
-                      안 적으면 나머지는 없는 것이 됩니다. */}
-                  {mark.photoIds.length > 1 ? (
-                    <Caption tone="secondary">사진 {mark.photoIds.length}장</Caption>
-                  ) : null}
-                </Row>
-                {mark.note ? (
-                  <Body small numberOfLines={2}>
-                    {mark.note}
-                  </Body>
-                ) : (
-                  <Caption tone="secondary">한 줄 남기기</Caption>
-                )}
-              </Grow>
-            </Row>
-          ) : (
-            <Caption tone="secondary">＋ 사진과 한 줄 남기기</Caption>
-          )}
-        </Press>
-      ) : null}
 
       <Button
         label="길찾기"
@@ -663,12 +701,37 @@ function withInk(color: string) {
   return `${color}14`;
 }
 
-const STAMP = 132;
+/**
+ * 도장 크기.
+ *
+ * <p>132였습니다. 카드 한가운데에서 이 화면의 주인공이던 시절의 크기입니다.
+ * 지금 주인공은 사진과 글이라, 알아볼 만한 크기까지만 남깁니다 — 아예 빼면
+ * 「갔다 왔다」를 누를 자리가 없어집니다.
+ */
+const STAMP = 72;
 
 const styles = StyleSheet.create({
   head: {
     gap: Spacing.sm,
     paddingBottom: Spacing.md,
+  },
+  /* 본문. 사진과 글이 한 덩어리로 읽히게 붙여 둡니다. */
+  feed: {
+    gap: Spacing.xs,
+  },
+  /* 아직 안 남긴 자리. 무엇을 하는 자리인지 보이게 자리를 차지합니다. */
+  empty: {
+    gap: 2,
+    alignItems: 'center',
+    paddingVertical: Spacing.lg,
+    borderRadius: Radius.sm,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: Colors.border,
+  },
+  /* 챙겨 둔 것. 본문보다 한 칸 뒤로 물립니다. */
+  refs: {
+    gap: Spacing.xs,
   },
   book: {
     flexWrap: 'wrap',

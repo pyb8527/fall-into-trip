@@ -133,7 +133,7 @@ T("별점 지워짐", (r.data.stars ?? null) === null, r.data);
 T("사진 다 떨어짐", (r.data.photoIds ?? []).length === 0, r.data);
 T("한 줄은 남음", r.data.note === "줄이 길어요", r.data);
 
-console.log("\n[8] 남의 사진은 못 붙인다");
+console.log("\n[8] 이 여행과 상관없는 사진은 못 붙인다");
 r = await call("POST", "/api/auth/register", {
   body: { email: `other-${stamp}@test.com`, name: "남", password: "pw-12345678" },
 });

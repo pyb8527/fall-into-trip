@@ -1543,7 +1543,9 @@ export type IconName =
   /** 파일로 받기. 엑셀처럼 기기에 내려받는 것들 */
   | 'download'
   /** 이 일정을 본떠 새로 만들기 */
-  | 'copy';
+  | 'copy'
+  /** 사진. 다니면서 볼 것을 챙겨 두는 자리에 씁니다 */
+  | 'image';
 
 export function Icon({
   name,

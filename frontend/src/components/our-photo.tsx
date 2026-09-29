@@ -52,6 +52,18 @@ const styles = StyleSheet.create({
     /* 받아 오는 동안 비어 있는 자리. 흰 바탕에 흰 자리를 두면 그림이 뜰 때
        화면이 덜컥합니다. */
     backgroundColor: Colors.fill,
+    /*
+      테두리 한 겹.
+
+      <p>흰 카드 위에 밝은 사진을 놓으면 어디까지가 사진인지 안 보입니다 —
+      하늘이나 눈밭이 찍힌 장은 종이에 녹아 버려서, 사진이 있는지조차
+      모르고 지나갑니다.
+
+      <p>선은 가장 얇은 것으로 둡니다. 굵게 두르면 사진이 액자에 갇혀
+      보이고, 목록에 여러 장이 서면 선이 먼저 눈에 들어옵니다.
+    */
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.border,
   },
   photo: {
     width: '100%',

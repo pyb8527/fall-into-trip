@@ -71,37 +71,54 @@ T("유정에게도 찍혀 있다", r.data.visited.includes(placeId), r.data.visi
 r = await call("GET", `/api/trip?trip=${tripId}`, { token: host });
 T("지영에게도 그대로", r.data.visited.includes(placeId), r.data.visited);
 
-console.log("\n[3] 남긴 것은 사람마다, 서로 보인다");
+console.log("\n[3] 기록도 여행의 것이다 — 한 곳에 하나");
 const hostShot = await upload(host);
 r = await call("PUT", `/api/visits/${placeId}`, {
   token: host, body: { photoIds: [hostShot], stars: 5, note: "국물이 진해요" },
 });
 T("지영이 남김", r.status === 200, r.data);
 
+r = await call("GET", `/api/trip?trip=${tripId}`, { token: mate });
+T("유정에게도 보인다",
+  (r.data.marks ?? []).filter((m) => m.placeId === placeId)[0]?.note === "국물이 진해요",
+  r.data.marks);
+
+/*
+  동행자가 남의 사진을 그대로 두고 글만 고칩니다.
+
+  이것이 되어야 기록이 여행의 것입니다. 붙일 수 있는 사진을 "내가 올린 것"
+  으로만 보면, 이 한 번에 지영이 올린 사진이 통째로 떨어집니다.
+*/
+r = await call("PUT", `/api/visits/${placeId}`, {
+  token: mate, body: { photoIds: [hostShot], note: "줄이 길었어요" },
+});
+T("유정이 고침", r.status === 200, r.data);
+T("남의 사진이 안 떨어진다", r.data.photoIds?.[0] === hostShot, r.data);
+T("안 보낸 별점은 그대로", r.data.stars === 5, r.data);
+
+/* 동행자가 제 사진을 보탭니다. */
 const mateShot = await upload(mate);
 r = await call("PUT", `/api/visits/${placeId}`, {
-  token: mate, body: { photoIds: [mateShot], stars: 3, note: "줄이 길었어요" },
+  token: mate, body: { photoIds: [hostShot, mateShot] },
 });
-T("유정도 남김", r.status === 200, r.data);
+T("둘의 사진이 한 자리에 선다",
+  JSON.stringify(r.data.photoIds) === JSON.stringify([hostShot, mateShot]),
+  r.data.photoIds);
 
 r = await call("GET", `/api/trip?trip=${tripId}`, { token: host });
 const marks = (r.data.marks ?? []).filter((m) => m.placeId === placeId);
-T("한 곳에 둘이 붙는다", marks.length === 2, marks);
-T("서로 덮어쓰지 않는다",
-  marks.some((m) => m.note === "국물이 진해요") && marks.some((m) => m.note === "줄이 길었어요"),
-  marks.map((m) => m.note));
-T("누가 남겼는지 온다",
-  marks.some((m) => m.authorName === "지영") && marks.some((m) => m.authorName === "유정"),
-  marks.map((m) => m.authorName));
-T("내 것이 무엇인지 안다",
-  marks.find((m) => m.authorName === "지영")?.mine === true
-  && marks.find((m) => m.authorName === "유정")?.mine === false,
-  marks.map((m) => [m.authorName, m.mine]));
-/* 사진도 사람마다입니다. 한 곳에 둘이 붙어도 서로의 것이 섞이면 안 됩니다. */
-T("사진도 사람마다",
-  marks.find((m) => m.authorName === "지영")?.photoIds?.[0] === hostShot
-  && marks.find((m) => m.authorName === "유정")?.photoIds?.[0] === mateShot,
-  marks.map((m) => [m.authorName, m.photoIds]));
+T("한 곳에 하나로 남는다", marks.length === 1, marks);
+T("덮어쓴 것이 보인다", marks[0]?.note === "줄이 길었어요", marks[0]);
+
+/* 남의 사진을 뺄 수도 있어야 합니다 — 멤버면 누구나 고칩니다. */
+r = await call("PUT", `/api/visits/${placeId}`, { token: mate, body: { photoIds: [mateShot] } });
+T("남의 사진을 뺄 수도 있다",
+  JSON.stringify(r.data.photoIds) === JSON.stringify([mateShot]),
+  r.data.photoIds);
+r = await call("PUT", `/api/visits/${placeId}`, {
+  token: host, body: { photoIds: [hostShot, mateShot] },
+});
+T("되돌려 놓는 것도 된다", r.data.photoIds?.length === 2, r.data.photoIds);
 
 console.log("\n[4] 동행자도 도장을 뺄 수 있다");
 /* 찍은 사람만 뺄 수 있게 두면 그 사람이 앱을 안 열면 영영 찍힌 채로 남습니다. */
@@ -114,8 +131,9 @@ console.log("\n[5] 도장을 빼도 남긴 것은 그대로다");
 /* 손가락이 스쳐 도장이 풀렸다고 그 자리에서 찍은 사진이 사라지면 되돌릴 수
    없습니다. 도장은 다시 누르면 그만이고 사진은 다시 찍을 수 없습니다. */
 const left = (r.data.marks ?? []).filter((m) => m.placeId === placeId);
-T("지영이 남긴 것이 남아 있다", left.some((m) => m.note === "국물이 진해요"), left);
-T("유정이 남긴 것도 남아 있다", left.some((m) => m.note === "줄이 길었어요"), left);
+T("남긴 것이 한 덩어리로 남아 있다", left.length === 1, left);
+T("글도 사진도 그대로",
+  left[0]?.note === "줄이 길었어요" && left[0]?.photoIds?.length === 2, left[0]);
 
 console.log("\n[6] 다시 찍으면 다시 같이 찍힌다");
 r = await call("PUT", `/api/visits/${placeId}`, { token: mate });
@@ -129,6 +147,25 @@ r = await call("POST", "/api/auth/register", {
 const stranger = r.data.accessToken;
 r = await call("PUT", `/api/visits/${placeId}`, { token: stranger });
 T("거절", r.status === 403 || r.status === 404, r.status);
+
+console.log("\n[8] 챙겨 둔 사진은 여행기에 안 실린다");
+const menu = await upload(host);
+r = await call("PUT", `/api/visits/${placeId}/refs`, { token: host, body: { photoIds: [menu] } });
+T("챙겨 뒀다", r.status === 200 && r.data.photoIds?.[0] === menu, r.data);
+
+r = await call("GET", `/api/trip?trip=${tripId}`, { token: mate });
+const refs = (r.data.refs ?? []).filter((x) => x.placeId === placeId);
+T("동행자에게도 보인다", refs[0]?.photoIds?.[0] === menu, r.data.refs);
+/* 기록과 섞이면 여행기에 예매 QR 이 실립니다. */
+T("기록에는 안 섞인다",
+  !((r.data.marks ?? []).find((m) => m.placeId === placeId)?.photoIds ?? []).includes(menu),
+  r.data.marks);
+
+r = await call("POST", `/api/trips/${tripId}/publish`, { token: host, body: { title: "같이 간 여행" } });
+T("올렸다", r.status === 200, r.data);
+r = await call("GET", `/api/posts/${r.data.postId}`);
+const shown = r.data.itinerary.days.flatMap((d) => d.places).flatMap((p) => p.photos ?? []);
+T("여행기에는 기록만 실린다", !shown.includes(menu) && shown.includes(hostShot), shown);
 
 console.log(`\n결과: ${pass} 통과 / ${fail} 실패`);
 process.exit(fail > 0 ? 1 : 0);
