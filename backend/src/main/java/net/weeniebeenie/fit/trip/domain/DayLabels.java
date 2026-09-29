@@ -55,7 +55,7 @@ public final class DayLabels {
                 return known;
             }
         }
-        throw ApiException.badRequest("고를 수 없는 색입니다.");
+        throw ApiException.badRequest("고를 수 없는 색이에요.");
     }
 
     public static final String[] COLORS = {
@@ -75,7 +75,7 @@ public final class DayLabels {
         try {
             return LocalDate.parse(iso.trim());
         } catch (DateTimeParseException e) {
-            throw ApiException.badRequest("날짜가 올바르지 않습니다. (YYYY-MM-DD)");
+            throw ApiException.badRequest("날짜가 올바르지 않아요. (YYYY-MM-DD)");
         }
     }
 

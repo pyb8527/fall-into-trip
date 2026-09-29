@@ -45,7 +45,7 @@ public class MemberService {
     @Transactional(readOnly = true)
     public List<Companion> listOf(AuthPrincipal me, String tripId) {
         access.requireCanRead(tripId, me.id());
-        Trip trip = trips.findById(tripId).orElseThrow(() -> ApiException.notFound("여행을 찾을 수 없습니다."));
+        Trip trip = trips.findById(tripId).orElseThrow(() -> ApiException.notFound("여행을 찾을 수 없어요."));
 
         return members.findAllByIdTripId(tripId).stream()
                 .map(m -> users.findById(m.getUserId())
@@ -103,7 +103,7 @@ public class MemberService {
     public InvitePreview peek(String rawToken) {
         TripInvite invite = usable(rawToken);
         Trip trip = trips.findById(invite.getTripId())
-                .orElseThrow(() -> ApiException.notFound("여행을 찾을 수 없습니다."));
+                .orElseThrow(() -> ApiException.notFound("여행을 찾을 수 없어요."));
         String ownerName = users.findById(trip.getOwnerId()).map(User::getName).orElse(null);
         return new InvitePreview(trip.getTitle(), ownerName, invite.getRole(), invite.getExpiresAt());
     }
@@ -133,7 +133,7 @@ public class MemberService {
     @Transactional
     public void revokeInvite(AuthPrincipal me, String inviteId) {
         TripInvite invite = invites.findById(inviteId)
-                .orElseThrow(() -> ApiException.notFound("초대를 찾을 수 없습니다."));
+                .orElseThrow(() -> ApiException.notFound("초대를 찾을 수 없어요."));
         access.requireOwner(invite.getTripId(), me.id());
         invite.revoke();
         audit.log(me.id(), "invite.revoke", invite.getId());
@@ -144,10 +144,10 @@ public class MemberService {
     public void remove(AuthPrincipal me, String tripId, String userId) {
         Trip trip = access.requireOwner(tripId, me.id());
         if (trip.getOwnerId().equals(userId)) {
-            throw ApiException.badRequest("여행을 만든 사람은 내보낼 수 없습니다.");
+            throw ApiException.badRequest("여행을 만든 사람은 내보낼 수 없어요.");
         }
         members.findByIdTripIdAndIdUserId(tripId, userId)
-                .orElseThrow(() -> ApiException.notFound("동행자가 아닙니다."));
+                .orElseThrow(() -> ApiException.notFound("동행자가 아니에요."));
         members.deleteByIdTripIdAndIdUserId(tripId, userId);
         audit.log(me.id(), "member.remove", userId, Map.of("trip", tripId));
     }
@@ -156,9 +156,9 @@ public class MemberService {
     @Transactional
     public void leave(AuthPrincipal me, String tripId) {
         Trip trip = trips.findById(tripId)
-                .orElseThrow(() -> ApiException.notFound("여행을 찾을 수 없습니다."));
+                .orElseThrow(() -> ApiException.notFound("여행을 찾을 수 없어요."));
         if (trip.getOwnerId().equals(me.id())) {
-            throw ApiException.badRequest("여행을 만든 사람은 나갈 수 없습니다. 여행을 지워 주세요.");
+            throw ApiException.badRequest("여행을 만든 사람은 나갈 수 없어요. 여행을 지워 주세요.");
         }
         access.requireCanRead(tripId, me.id());
         members.deleteByIdTripIdAndIdUserId(tripId, me.id());
@@ -167,12 +167,12 @@ public class MemberService {
 
     private TripInvite usable(String rawToken) {
         if (rawToken == null || rawToken.isBlank()) {
-            throw ApiException.notFound("초대 링크가 올바르지 않습니다.");
+            throw ApiException.notFound("초대 링크가 올바르지 않아요.");
         }
         TripInvite invite = invites.findByTokenHash(sha256(rawToken))
-                .orElseThrow(() -> ApiException.notFound("초대 링크가 올바르지 않습니다."));
+                .orElseThrow(() -> ApiException.notFound("초대 링크가 올바르지 않아요."));
         if (!invite.isUsable(Instant.now())) {
-            throw ApiException.badRequest("만료되었거나 이미 다 쓴 초대 링크입니다.");
+            throw ApiException.badRequest("만료되었거나 이미 다 쓴 초대 링크예요.");
         }
         return invite;
     }
@@ -182,7 +182,7 @@ public class MemberService {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
                     .digest(raw.getBytes(StandardCharsets.UTF_8)));
         } catch (Exception e) {
-            throw new IllegalStateException("초대 토큰을 처리하지 못했습니다.", e);
+            throw new IllegalStateException("초대 토큰을 처리하지 못했어요.", e);
         }
     }
 

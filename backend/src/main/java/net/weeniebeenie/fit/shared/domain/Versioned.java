@@ -20,7 +20,7 @@ public final class Versioned {
 
     public static void check(Long seen, long actual) {
         if (seen != null && seen.longValue() != actual) {
-            throw ApiException.conflict("다른 사람이 먼저 고쳤습니다. 새로 불러온 뒤 다시 저장해 주세요.");
+            throw ApiException.conflict("다른 사람이 먼저 고쳤어요. 새로 불러온 뒤 다시 저장해 주세요.");
         }
     }
 }

@@ -126,18 +126,18 @@ public class TipService {
     @Transactional
     public PlaceTip add(AuthPrincipal me, String placeId, String text) {
         if (placeId == null || placeId.isBlank()) {
-            throw ApiException.badRequest("어느 장소인지 알 수 없습니다.");
+            throw ApiException.badRequest("어느 장소인지 알 수 없어요.");
         }
         String clean = text == null ? "" : text.trim();
         if (clean.isEmpty()) {
             throw ApiException.badRequest("남길 말을 적어 주세요.");
         }
         if (clean.length() > MAX_LENGTH) {
-            throw ApiException.badRequest("한 줄 팁은 " + MAX_LENGTH + "자까지입니다.");
+            throw ApiException.badRequest("한 줄 팁은 " + MAX_LENGTH + "자까지예요.");
         }
         if (tips.countByUserIdAndPlaceIdAndCreatedAtAfter(
                 me.id(), placeId, Instant.now().minus(Duration.ofDays(1))) >= MAX_PER_DAY) {
-            throw ApiException.badRequest("같은 곳에는 하루 " + MAX_PER_DAY + "번까지 남길 수 있습니다.");
+            throw ApiException.badRequest("같은 곳에는 하루 " + MAX_PER_DAY + "번까지 남길 수 있어요.");
         }
 
         PlaceTip tip = tips.save(PlaceTip.builder()
@@ -152,10 +152,10 @@ public class TipService {
     @Transactional
     public void remove(AuthPrincipal me, String tipId) {
         PlaceTip tip = tips.findById(tipId)
-                .orElseThrow(() -> ApiException.notFound("팁을 찾을 수 없습니다."));
+                .orElseThrow(() -> ApiException.notFound("팁을 찾을 수 없어요."));
         boolean mine = tip.getUserId().equals(me.id());
         if (!mine && me.role() != Role.ADMIN) {
-            throw ApiException.forbidden("내가 남긴 것만 지울 수 있습니다.");
+            throw ApiException.forbidden("내가 남긴 것만 지울 수 있어요.");
         }
         tips.delete(tip);
         audit.log(me.id(), mine ? "tip.remove" : "tip.remove.admin", tipId);
@@ -171,12 +171,12 @@ public class TipService {
     @Transactional
     public void report(AuthPrincipal me, String tipId, String reason) {
         PlaceTip tip = tips.findById(tipId)
-                .orElseThrow(() -> ApiException.notFound("팁을 찾을 수 없습니다."));
+                .orElseThrow(() -> ApiException.notFound("팁을 찾을 수 없어요."));
         if (tip.getUserId().equals(me.id())) {
-            throw ApiException.badRequest("내가 남긴 것은 신고할 수 없습니다.");
+            throw ApiException.badRequest("내가 남긴 것은 신고할 수 없어요.");
         }
         if (reports.existsByTipIdAndUserId(tipId, me.id())) {
-            throw ApiException.badRequest("이미 신고했습니다.");
+            throw ApiException.badRequest("이미 신고했어요.");
         }
         reports.save(new TipReport(tipId, me.id(),
                 reason == null || reason.isBlank() ? null : reason.trim()));
@@ -201,7 +201,7 @@ public class TipService {
     @Transactional
     public void setHidden(AuthPrincipal me, String tipId, boolean hidden) {
         PlaceTip tip = tips.findById(tipId)
-                .orElseThrow(() -> ApiException.notFound("팁을 찾을 수 없습니다."));
+                .orElseThrow(() -> ApiException.notFound("팁을 찾을 수 없어요."));
         tip.setHidden(hidden);
         audit.log(me.id(), hidden ? "tip.hide" : "tip.unhide", tipId);
     }

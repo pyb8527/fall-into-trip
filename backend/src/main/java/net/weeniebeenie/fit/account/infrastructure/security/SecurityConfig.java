@@ -113,13 +113,13 @@ public class SecurityConfig {
                             res.setStatus(401);
                             res.setContentType(MediaType.APPLICATION_JSON_VALUE);
                             res.setCharacterEncoding("UTF-8");
-                            res.getWriter().write("{\"error\":\"로그인이 필요합니다.\"}");
+                            res.getWriter().write("{\"error\":\"로그인이 필요해요.\"}");
                         })
                         .accessDeniedHandler((req, res, ex) -> {
                             res.setStatus(403);
                             res.setContentType(MediaType.APPLICATION_JSON_VALUE);
                             res.setCharacterEncoding("UTF-8");
-                            res.getWriter().write("{\"error\":\"권한이 없습니다.\"}");
+                            res.getWriter().write("{\"error\":\"권한이 없어요.\"}");
                         }))
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 

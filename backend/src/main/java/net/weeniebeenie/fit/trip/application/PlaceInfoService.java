@@ -167,7 +167,7 @@ public class PlaceInfoService {
     */
     public List<Info> ofDay(AuthPrincipal me, String dayId) {
         Day day = days.findById(dayId)
-                .orElseThrow(() -> ApiException.notFound("날짜를 찾을 수 없습니다."));
+                .orElseThrow(() -> ApiException.notFound("날짜를 찾을 수 없어요."));
         access.requireCanRead(day.getTripId(), me.id());
 
         if (!enabled()) {
@@ -288,12 +288,12 @@ public class PlaceInfoService {
             /* 왜 거절했는지는 본문에 적혀 있습니다. 이것을 버리면 콘솔에서
                이 API 를 안 켠 것인지 알 길이 없습니다. */
             String why = e.getResponseBodyAsString();
-            log.warn("장소 정보가 거절됐습니다 ({}): {}", e.getStatusCode(),
+            log.warn("장소 정보가 거절됐어요 ({}): {}", e.getStatusCode(),
                     why.length() > 300 ? why.substring(0, 300) : why);
             return null;
         } catch (Exception e) {
             /* 한 곳을 못 받았다고 하루 전체를 막을 이유는 없습니다. */
-            log.warn("장소 정보를 받지 못했습니다: {}", e.getMessage());
+            log.warn("장소 정보를 받지 못했어요: {}", e.getMessage());
             return null;
         }
 

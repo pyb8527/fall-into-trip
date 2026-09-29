@@ -66,7 +66,7 @@ public class AuthController {
     @GetMapping("/me")
     public Map<String, Object> me(@CurrentUser AuthPrincipal me) {
         User user = users.findById(me.id())
-                .orElseThrow(() -> ApiException.unauthorized("로그인이 필요합니다."));
+                .orElseThrow(() -> ApiException.unauthorized("로그인이 필요해요."));
         return Map.of(
                 "user", UserView.of(user),
                 "hasPassword", user.hasPassword(),

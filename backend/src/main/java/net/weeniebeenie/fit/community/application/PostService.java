@@ -92,7 +92,7 @@ public class PostService {
 
         if (posts.findAllByAuthorIdOrderByCreatedAtDesc(me.id(), Pageable.ofSize(1))
                 .getTotalElements() >= MAX_POSTS_PER_USER) {
-            throw ApiException.badRequest("올릴 수 있는 글의 수를 넘었습니다. 예전 글을 내리고 다시 올려 주세요.");
+            throw ApiException.badRequest("올릴 수 있는 글의 수를 넘었어요. 예전 글을 내리고 다시 올려 주세요.");
         }
 
         List<Day> dayList = pickDays(days.findAllByTripIdOrderBySortAsc(tripId), dayIds);
@@ -103,7 +103,7 @@ public class PostService {
                 .filter(pl -> picked.contains(pl.getDayId()))
                 .toList();
         if (placeList.isEmpty()) {
-            throw ApiException.badRequest("장소가 하나도 없는 일정은 올릴 수 없습니다.");
+            throw ApiException.badRequest("장소가 하나도 없는 일정은 올릴 수 없어요.");
         }
 
         String clean = title == null || title.isBlank() ? trip.getTitle() : title.trim();
@@ -294,7 +294,7 @@ public class PostService {
            골라 보내도 3일차가 1일차보다 앞에 서지는 않습니다. */
         List<Day> out = all.stream().filter(d -> keep.contains(d.getId())).toList();
         if (out.isEmpty()) {
-            throw ApiException.badRequest("올릴 날을 하나도 못 찾았습니다.");
+            throw ApiException.badRequest("올릴 날을 하나도 못 찾았어요.");
         }
         return out;
     }
@@ -341,10 +341,10 @@ public class PostService {
     @Transactional(readOnly = true)
     public TripPost read(String postId) {
         TripPost post = posts.findById(postId)
-                .orElseThrow(() -> ApiException.notFound("글을 찾을 수 없습니다."));
+                .orElseThrow(() -> ApiException.notFound("글을 찾을 수 없어요."));
         if (post.isHidden()) {
             /* 내려간 글이 있다는 것 자체를 알릴 이유가 없습니다. */
-            throw ApiException.notFound("글을 찾을 수 없습니다.");
+            throw ApiException.notFound("글을 찾을 수 없어요.");
         }
         return post;
     }
@@ -380,7 +380,7 @@ public class PostService {
             return mapper.readTree(post.getSnapshot());
         } catch (Exception e) {
             throw new ApiException(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR,
-                    "일정을 읽지 못했습니다.");
+                    "일정을 읽지 못했어요.");
         }
     }
 
@@ -508,9 +508,9 @@ public class PostService {
      */
     private TripPost mine(AuthPrincipal me, String postId) {
         TripPost post = posts.findById(postId)
-                .orElseThrow(() -> ApiException.notFound("글을 찾을 수 없습니다."));
+                .orElseThrow(() -> ApiException.notFound("글을 찾을 수 없어요."));
         if (!post.getAuthorId().equals(me.id())) {
-            throw ApiException.forbidden("내 글만 고칠 수 있습니다.");
+            throw ApiException.forbidden("내 글만 고칠 수 있어요.");
         }
         return post;
     }
@@ -589,19 +589,19 @@ public class PostService {
 
         JsonNode root = snapshotOf(post);
         if (!root.isObject() || !root.path("days").isArray()) {
-            throw ApiException.badRequest("일정을 읽지 못했습니다.");
+            throw ApiException.badRequest("일정을 읽지 못했어요.");
         }
         ArrayNode dayNodes = (ArrayNode) root.path("days");
         if (dayAt < 0 || dayAt >= dayNodes.size()) {
-            throw ApiException.notFound("그런 날이 없습니다.");
+            throw ApiException.notFound("그런 날이 없어요.");
         }
         JsonNode day = dayNodes.get(dayAt);
         if (!day.path("places").isArray()) {
-            throw ApiException.badRequest("일정을 읽지 못했습니다.");
+            throw ApiException.badRequest("일정을 읽지 못했어요.");
         }
         ArrayNode placeNodes = (ArrayNode) day.path("places");
         if (placeAt < 0 || placeAt >= placeNodes.size()) {
-            throw ApiException.notFound("그런 장소가 없습니다.");
+            throw ApiException.notFound("그런 장소가 없어요.");
         }
 
         placeNodes.remove(placeAt);
@@ -620,7 +620,7 @@ public class PostService {
         /* 장소가 없는 글은 올릴 수도 없습니다(publish 참고). 빼다가 그렇게
            되는 길도 막습니다 — 그때 하려던 일은 고치기가 아니라 내리기입니다. */
         if (placeCount == 0) {
-            throw ApiException.badRequest("마지막 장소는 뺄 수 없습니다. 글을 내려 주세요.");
+            throw ApiException.badRequest("마지막 장소는 뺄 수 없어요. 글을 내려 주세요.");
         }
 
         /* 날이 하나 없어졌으면 번호와 색을 다시 셉니다 — 올릴 때와 같은
@@ -694,7 +694,7 @@ public class PostService {
             return mapper.writeValueAsString(snap);
         } catch (Exception e) {
             throw new ApiException(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR,
-                    "일정을 담지 못했습니다.");
+                    "일정을 담지 못했어요.");
         }
     }
 
@@ -703,10 +703,10 @@ public class PostService {
     @Transactional
     public void remove(AuthPrincipal me, String postId) {
         TripPost post = posts.findById(postId)
-                .orElseThrow(() -> ApiException.notFound("글을 찾을 수 없습니다."));
+                .orElseThrow(() -> ApiException.notFound("글을 찾을 수 없어요."));
         boolean mine = post.getAuthorId().equals(me.id());
         if (!mine && me.role() != Role.ADMIN) {
-            throw ApiException.forbidden("내 글만 내릴 수 있습니다.");
+            throw ApiException.forbidden("내 글만 내릴 수 있어요.");
         }
         posts.delete(post);
         audit.log(me.id(), mine ? "post.remove" : "post.remove.admin", postId);
@@ -726,10 +726,10 @@ public class PostService {
     public void report(AuthPrincipal me, String postId, String reason) {
         TripPost post = read(postId);
         if (post.getAuthorId().equals(me.id())) {
-            throw ApiException.badRequest("내 글은 신고할 수 없습니다.");
+            throw ApiException.badRequest("내 글은 신고할 수 없어요.");
         }
         if (reports.existsByPostIdAndUserId(postId, me.id())) {
-            throw ApiException.badRequest("이미 신고한 글입니다.");
+            throw ApiException.badRequest("이미 신고한 글이에요.");
         }
         reports.save(new PostReport(postId, me.id(),
                 reason == null || reason.isBlank() ? null : reason.trim()));
@@ -763,7 +763,7 @@ public class PostService {
     @Transactional
     public void setHidden(AuthPrincipal me, String postId, boolean hidden) {
         TripPost post = posts.findById(postId)
-                .orElseThrow(() -> ApiException.notFound("글을 찾을 수 없습니다."));
+                .orElseThrow(() -> ApiException.notFound("글을 찾을 수 없어요."));
         post.setHidden(hidden);
         post.touch();
         audit.log(me.id(), hidden ? "post.hide" : "post.unhide", postId);

@@ -19,7 +19,7 @@ public record Money(int units) implements Comparable<Money> {
 
     public Money {
         if (units < 0) {
-            throw ApiException.badRequest("금액은 0 이상이어야 합니다.");
+            throw ApiException.badRequest("금액은 0 이상이어야 해요.");
         }
     }
 
@@ -39,7 +39,7 @@ public record Money(int units) implements Comparable<Money> {
      */
     public int[] splitBy(int n) {
         if (n <= 0) {
-            throw ApiException.badRequest("나눠 낼 사람이 없습니다.");
+            throw ApiException.badRequest("나눠 낼 사람이 없어요.");
         }
         int base = units / n;
         int rest = units % n;

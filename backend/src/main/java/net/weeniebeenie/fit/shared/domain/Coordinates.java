@@ -13,13 +13,13 @@ public record Coordinates(double lat, double lng) {
 
     public Coordinates {
         if (!Double.isFinite(lat) || !Double.isFinite(lng)) {
-            throw ApiException.badRequest("좌표가 올바르지 않습니다.");
+            throw ApiException.badRequest("좌표가 올바르지 않아요.");
         }
         if (lat < -90 || lat > 90) {
-            throw ApiException.badRequest("위도는 -90 에서 90 사이여야 합니다.");
+            throw ApiException.badRequest("위도는 -90 에서 90 사이여야 해요.");
         }
         if (lng < -180 || lng > 180) {
-            throw ApiException.badRequest("경도는 -180 에서 180 사이여야 합니다.");
+            throw ApiException.badRequest("경도는 -180 에서 180 사이여야 해요.");
         }
     }
 

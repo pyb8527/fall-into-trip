@@ -69,9 +69,9 @@ public class SocialAuthService {
                 .orElse(null);
         if (known != null) {
             User user = users.findById(known.getUserId())
-                    .orElseThrow(() -> ApiException.unauthorized("계정을 찾을 수 없습니다."));
+                    .orElseThrow(() -> ApiException.unauthorized("계정을 찾을 수 없어요."));
             if (user.isDisabled()) {
-                throw ApiException.unauthorized("사용할 수 없는 계정입니다.");
+                throw ApiException.unauthorized("사용할 수 없는 계정이에요.");
             }
             user.setLastLoginAt(Instant.now());
             audit.log(user.getId(), "login.google", user.getId());
@@ -106,10 +106,10 @@ public class SocialAuthService {
               사람이 구글로 들어오는 경우가 여기입니다. */
         if (byEmail.hasPassword()) {
             throw ApiException.conflict(
-                    "이미 가입된 주소입니다. 비밀번호로 로그인한 뒤 설정에서 구글을 이어 주세요.");
+                    "이미 가입된 주소예요. 비밀번호로 로그인한 뒤 설정에서 구글을 이어 주세요.");
         }
         if (byEmail.isDisabled()) {
-            throw ApiException.unauthorized("사용할 수 없는 계정입니다.");
+            throw ApiException.unauthorized("사용할 수 없는 계정이에요.");
         }
         identities.save(new UserIdentity(who.provider(), who.subject(), byEmail.getId(), email));
         byEmail.setLastLoginAt(Instant.now());
@@ -130,13 +130,13 @@ public class SocialAuthService {
 
         identities.findByProviderAndSubject(who.provider(), who.subject()).ifPresent(already -> {
             if (already.getUserId().equals(userId)) {
-                throw ApiException.badRequest("이미 이어 두었습니다.");
+                throw ApiException.badRequest("이미 이어 뒀어요.");
             }
             /* 남의 계정에 이어져 있습니다. 누구인지는 안 알려 줍니다. */
-            throw ApiException.conflict("이 구글 계정은 다른 곳에 이어져 있습니다.");
+            throw ApiException.conflict("이 구글 계정은 다른 곳에 이어져 있어요.");
         });
         if (identities.findByUserIdAndProvider(userId, who.provider()).isPresent()) {
-            throw ApiException.badRequest("이미 다른 구글 계정을 이어 두었습니다. 먼저 끊어 주세요.");
+            throw ApiException.badRequest("이미 다른 구글 계정을 이어 뒀어요. 먼저 끊어 주세요.");
         }
         identities.save(new UserIdentity(who.provider(), who.subject(), userId,
                 Email.of(who.email()).value()));
@@ -152,13 +152,13 @@ public class SocialAuthService {
     @Transactional
     public void unlink(String userId, String provider) {
         User user = users.findById(userId)
-                .orElseThrow(() -> ApiException.unauthorized("로그인이 필요합니다."));
+                .orElseThrow(() -> ApiException.unauthorized("로그인이 필요해요."));
         UserIdentity mine = identities.findByUserIdAndProvider(userId, provider)
-                .orElseThrow(() -> ApiException.notFound("이어 둔 것이 없습니다."));
+                .orElseThrow(() -> ApiException.notFound("이어 둔 것이 없어요."));
 
         if (!user.hasPassword() && identities.countByUserId(userId) <= 1) {
             throw ApiException.badRequest(
-                    "이것을 끊으면 들어올 길이 없습니다. 먼저 비밀번호를 만들어 주세요.");
+                    "이것을 끊으면 들어올 길이 없어요. 먼저 비밀번호를 만들어 주세요.");
         }
         identities.delete(mine);
         audit.log(userId, "identity.unlink." + provider, userId);

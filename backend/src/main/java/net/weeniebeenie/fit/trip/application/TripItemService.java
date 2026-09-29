@@ -51,7 +51,7 @@ public class TripItemService {
         access.requireCanEdit(tripId, me.id());
 
         if (items.countByTripId(tripId) >= MAX_PER_TRIP) {
-            throw ApiException.badRequest("챙길 것을 " + MAX_PER_TRIP + "개까지 적을 수 있습니다.");
+            throw ApiException.badRequest("챙길 것을 " + MAX_PER_TRIP + "개까지 적을 수 있어요.");
         }
 
         String clean = name == null ? "" : name.trim();
@@ -80,7 +80,7 @@ public class TripItemService {
     @Transactional
     public void update(AuthPrincipal me, String itemId, Boolean done, String ownerId) {
         TripItem item = items.findById(itemId)
-                .orElseThrow(() -> ApiException.notFound("그런 것이 없습니다."));
+                .orElseThrow(() -> ApiException.notFound("그런 것이 없어요."));
         access.requireCanEdit(item.getTripId(), me.id());
 
         if (done != null) {
@@ -94,7 +94,7 @@ public class TripItemService {
     @Transactional
     public void delete(AuthPrincipal me, String itemId) {
         TripItem item = items.findById(itemId)
-                .orElseThrow(() -> ApiException.notFound("그런 것이 없습니다."));
+                .orElseThrow(() -> ApiException.notFound("그런 것이 없어요."));
         access.requireCanEdit(item.getTripId(), me.id());
         items.delete(item);
     }
@@ -107,7 +107,7 @@ public class TripItemService {
         boolean member = members.findAllByIdTripId(tripId).stream()
                 .anyMatch(m -> m.getId().getUserId().equals(ownerId));
         if (!member) {
-            throw ApiException.badRequest("이 여행의 동행자가 아닙니다.");
+            throw ApiException.badRequest("이 여행의 동행자가 아니에요.");
         }
         return ownerId;
     }

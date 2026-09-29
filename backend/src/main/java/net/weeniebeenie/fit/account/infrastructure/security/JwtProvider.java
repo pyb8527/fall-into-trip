@@ -29,7 +29,7 @@ public class JwtProvider {
     private SecretKey key() {
         byte[] bytes = props.getSecret().getBytes(StandardCharsets.UTF_8);
         if (bytes.length < 32) {
-            throw new IllegalStateException("fit.jwt.secret 은 32바이트 이상이어야 합니다.");
+            throw new IllegalStateException("fit.jwt.secret 은 32바이트 이상이어야 해요.");
         }
         return Keys.hmacShaKeyFor(bytes);
     }

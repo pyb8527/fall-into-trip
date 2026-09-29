@@ -86,7 +86,7 @@ public class SavedPlaceService {
         }
         if (saved.countByUserId(me.id()) >= MAX_SAVED) {
             throw ApiException.badRequest(
-                    "보석함이 가득 찼습니다. 안 쓰는 것을 지우고 담아 주세요.");
+                    "보석함이 가득 찼어요. 안 쓰는 것을 지우고 담아 주세요.");
         }
 
         return saved.save(SavedPlace.builder()
@@ -120,10 +120,10 @@ public class SavedPlaceService {
     @Transactional
     public SavedPlace edit(AuthPrincipal me, String savedId, String icon, String note) {
         SavedPlace item = saved.findById(savedId)
-                .orElseThrow(() -> ApiException.notFound("담아 둔 장소를 찾을 수 없습니다."));
+                .orElseThrow(() -> ApiException.notFound("담아 둔 장소를 찾을 수 없어요."));
         if (!item.getUserId().equals(me.id())) {
             /* 남의 보석함이 있다는 것 자체를 알릴 이유가 없습니다. */
-            throw ApiException.notFound("담아 둔 장소를 찾을 수 없습니다.");
+            throw ApiException.notFound("담아 둔 장소를 찾을 수 없어요.");
         }
         if (icon != null) {
             item.setIcon(PlaceKind.clean(icon));
@@ -137,10 +137,10 @@ public class SavedPlaceService {
     @Transactional
     public void remove(AuthPrincipal me, String savedId) {
         SavedPlace item = saved.findById(savedId)
-                .orElseThrow(() -> ApiException.notFound("담아 둔 장소를 찾을 수 없습니다."));
+                .orElseThrow(() -> ApiException.notFound("담아 둔 장소를 찾을 수 없어요."));
         if (!item.getUserId().equals(me.id())) {
             /* 남의 보석함이 있다는 것 자체를 알릴 이유가 없습니다. */
-            throw ApiException.notFound("담아 둔 장소를 찾을 수 없습니다.");
+            throw ApiException.notFound("담아 둔 장소를 찾을 수 없어요.");
         }
         saved.delete(item);
     }
@@ -154,21 +154,21 @@ public class SavedPlaceService {
     @Transactional
     public List<Place> pour(AuthPrincipal me, String dayId, List<String> savedIds) {
         Day day = days.findById(dayId)
-                .orElseThrow(() -> ApiException.notFound("날짜를 찾을 수 없습니다."));
+                .orElseThrow(() -> ApiException.notFound("날짜를 찾을 수 없어요."));
         access.requireCanEdit(day.getTripId(), me.id());
 
         if (savedIds == null || savedIds.isEmpty()) {
             throw ApiException.badRequest("넣을 장소를 골라 주세요.");
         }
         if (savedIds.size() > MAX_AT_ONCE) {
-            throw ApiException.badRequest("한 번에 " + MAX_AT_ONCE + "곳까지 넣을 수 있습니다.");
+            throw ApiException.badRequest("한 번에 " + MAX_AT_ONCE + "곳까지 넣을 수 있어요.");
         }
 
         /* 고른 순서가 아니라 담아 둔 순서로 들어갑니다. 화면에서 고른 차례를
            서버가 알 수 없고, 넣은 뒤 화살표로 옮기면 됩니다. */
         List<SavedPlace> picked = saved.findAllByUserIdAndIdIn(me.id(), savedIds);
         if (picked.isEmpty()) {
-            throw ApiException.notFound("담아 둔 장소를 찾을 수 없습니다.");
+            throw ApiException.notFound("담아 둔 장소를 찾을 수 없어요.");
         }
 
         int sort = places.findAllByDayIdOrderBySortAsc(dayId).size();

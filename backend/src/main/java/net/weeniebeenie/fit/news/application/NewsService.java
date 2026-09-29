@@ -125,12 +125,12 @@ public class NewsService {
             boolean born = !r.at().isAfter(r.bornAt());
             rows.add(inTrip(r.at(), born ? "place.add" : "place.edit", r.actorId(),
                     r.tripId(), r.tripTitle(),
-                    born ? r.dayLabel() + "에 " + quoted(r.name()) + " 를 넣었습니다."
-                         : quoted(r.name()) + " 를 고쳤습니다."));
+                    born ? r.dayLabel() + "에 " + quoted(r.name()) + " 를 넣었어요."
+                         : quoted(r.name()) + " 를 고쳤어요."));
         }
         for (CandidateRow r : feed.candidates(tripIds, me.id(), since, LIMIT)) {
             rows.add(inTrip(r.at(), "candidate.add", r.actorId(), r.tripId(), r.tripTitle(),
-                    quoted(r.name()) + " 를 후보로 올렸습니다."));
+                    quoted(r.name()) + " 를 후보로 올렸어요."));
         }
         for (VoteAggRow r : feed.votes(tripIds, me.id(), since, LIMIT)) {
             /* 한 사람이면 좋다·아니라를 그대로 말합니다. 여럿이면 갈렸을 수
@@ -139,22 +139,22 @@ public class NewsService {
             boolean one = r.people() == 1;
             rows.add(inTrip(r.at(), "candidate.vote", one ? r.actorId() : null,
                     r.tripId(), r.tripTitle(),
-                    one ? quoted(r.name()) + " 에 " + (r.yes() == 1 ? "좋다고" : "아니라고") + " 했습니다."
-                        : quoted(r.name()) + " 에 " + r.people() + "명이 답했습니다."));
+                    one ? quoted(r.name()) + " 에 " + (r.yes() == 1 ? "좋다고" : "아니라고") + " 했어요."
+                        : quoted(r.name()) + " 에 " + r.people() + "명이 답했어요."));
         }
         for (PostAggRow r : feed.likes(me.id(), since, LIMIT)) {
             boolean one = r.people() == 1;
             rows.add(inPost(r.at(), "post.like", one ? r.actorId() : null,
                     r.postId(), r.postTitle(),
-                    one ? quoted(r.postTitle()) + " 를 추천했습니다."
-                        : quoted(r.postTitle()) + " 를 " + r.people() + "명이 추천했습니다."));
+                    one ? quoted(r.postTitle()) + " 를 추천했어요."
+                        : quoted(r.postTitle()) + " 를 " + r.people() + "명이 추천했어요."));
         }
         for (PostAggRow r : feed.comments(me.id(), since, LIMIT)) {
             boolean one = r.people() == 1;
             rows.add(inPost(r.at(), "post.comment", one ? r.actorId() : null,
                     r.postId(), r.postTitle(),
-                    one ? quoted(r.postTitle()) + " 에 댓글을 남겼습니다."
-                        : quoted(r.postTitle()) + " 에 " + r.people() + "명이 댓글을 남겼습니다."));
+                    one ? quoted(r.postTitle()) + " 에 댓글을 남겼어요."
+                        : quoted(r.postTitle()) + " 에 " + r.people() + "명이 댓글을 남겼어요."));
         }
 
         rows.sort(Comparator.comparing(Item::at).reversed());
@@ -180,7 +180,7 @@ public class NewsService {
     @Transactional
     public Instant seen(AuthPrincipal me) {
         User user = users.findById(me.id())
-                .orElseThrow(() -> ApiException.notFound("계정을 찾을 수 없습니다."));
+                .orElseThrow(() -> ApiException.notFound("계정을 찾을 수 없어요."));
         Instant now = Instant.now();
         user.setNewsSeenAt(now);
         return now;

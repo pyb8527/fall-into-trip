@@ -92,23 +92,23 @@ public class SocialTokens {
      */
     public Person readGoogle(String credential) {
         if (!enabled(GOOGLE)) {
-            throw ApiException.badRequest("구글 로그인이 꺼져 있습니다.");
+            throw ApiException.badRequest("구글 로그인이 꺼져 있어요.");
         }
         Jwt jwt = read(GOOGLE, credential);
 
         if (!Boolean.TRUE.equals(jwt.getClaim("email_verified"))) {
-            throw ApiException.badRequest("구글에서 확인되지 않은 주소입니다. 다른 방법으로 로그인해 주세요.");
+            throw ApiException.badRequest("구글에서 확인되지 않은 주소예요. 다른 방법으로 로그인해 주세요.");
         }
         String email = jwt.getClaimAsString("email");
         if (email == null || email.isBlank()) {
-            throw ApiException.badRequest("구글이 이메일을 주지 않았습니다.");
+            throw ApiException.badRequest("구글이 이메일을 주지 않았어요.");
         }
         return new Person(GOOGLE, jwt.getSubject(), email, jwt.getClaimAsString("name"));
     }
 
     private Jwt read(String provider, String credential) {
         if (credential == null || credential.isBlank()) {
-            throw ApiException.badRequest("로그인 정보가 비어 있습니다.");
+            throw ApiException.badRequest("로그인 정보가 비어 있어요.");
         }
         try {
             return decoders.computeIfAbsent(provider, this::decoderFor).decode(credential);
@@ -120,13 +120,13 @@ public class SocialTokens {
               곧 찔러 보는 사람에게 주는 힌트가 됩니다. 로그인 실패 문구를
               뭉뚱그리는 것과 같은 이유입니다.
              */
-            throw ApiException.badRequest("로그인 정보를 확인하지 못했습니다. 다시 시도해 주세요.");
+            throw ApiException.badRequest("로그인 정보를 확인하지 못했어요. 다시 시도해 주세요.");
         }
     }
 
     private JwtDecoder decoderFor(String provider) {
         if (!GOOGLE.equals(provider)) {
-            throw ApiException.badRequest("모르는 로그인 방법입니다.");
+            throw ApiException.badRequest("모르는 로그인 방법이에요.");
         }
         NimbusJwtDecoder decoder =
                 NimbusJwtDecoder.withJwkSetUri("https://www.googleapis.com/oauth2/v3/certs").build();

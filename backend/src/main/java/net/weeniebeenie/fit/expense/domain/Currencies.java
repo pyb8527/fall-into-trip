@@ -38,7 +38,7 @@ public final class Currencies {
         try {
             Currency.getInstance(code);
         } catch (IllegalArgumentException e) {
-            throw ApiException.badRequest("모르는 통화입니다: " + code);
+            throw ApiException.badRequest("모르는 통화예요: " + code);
         }
         return code;
     }

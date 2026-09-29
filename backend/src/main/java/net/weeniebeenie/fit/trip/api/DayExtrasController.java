@@ -69,7 +69,7 @@ public class DayExtrasController {
         try {
             return RouteService.Mode.valueOf(mode.trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException e) {
-            throw ApiException.badRequest("알 수 없는 이동 수단입니다.");
+            throw ApiException.badRequest("알 수 없는 이동 수단이에요.");
         }
     }
 }

@@ -14,7 +14,7 @@ public final class AuthDtos {
 
     public record LoginRequest(
             @NotBlank(message = "이메일을 넣어 주세요.")
-            @Email(message = "이메일 형식이 올바르지 않습니다.")
+            @Email(message = "이메일 형식이 올바르지 않아요.")
             String email,
 
             @NotBlank(message = "비밀번호를 넣어 주세요.")
@@ -23,11 +23,11 @@ public final class AuthDtos {
 
     public record RegisterRequest(
             @NotBlank(message = "이메일을 넣어 주세요.")
-            @Email(message = "이메일 형식이 올바르지 않습니다.")
+            @Email(message = "이메일 형식이 올바르지 않아요.")
             String email,
 
             @NotBlank(message = "이름을 넣어 주세요.")
-            @Size(max = 80, message = "이름이 너무 깁니다.")
+            @Size(max = 80, message = "이름이 너무 길어요.")
             String name,
 
             @NotBlank(message = "비밀번호를 넣어 주세요.")
@@ -36,11 +36,11 @@ public final class AuthDtos {
 
     public record SetupRequest(
             @NotBlank(message = "이메일을 넣어 주세요.")
-            @Email(message = "이메일 형식이 올바르지 않습니다.")
+            @Email(message = "이메일 형식이 올바르지 않아요.")
             String email,
 
             @NotBlank(message = "이름을 넣어 주세요.")
-            @Size(max = 80, message = "이름이 너무 깁니다.")
+            @Size(max = 80, message = "이름이 너무 길어요.")
             String name,
 
             @NotBlank(message = "비밀번호를 넣어 주세요.")

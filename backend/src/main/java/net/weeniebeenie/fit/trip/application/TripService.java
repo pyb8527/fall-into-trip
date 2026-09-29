@@ -74,13 +74,13 @@ public class TripService {
            것으로 하나 떠 두는 것은 자연스러운 일입니다. */
         access.requireCanRead(tripId, me.id());
         Trip origin = trips.findById(tripId)
-                .orElseThrow(() -> ApiException.notFound("그런 여행이 없습니다."));
+                .orElseThrow(() -> ApiException.notFound("그런 여행이 없어요."));
 
         String cleanTitle = title == null || title.isBlank()
                 ? origin.getTitle() + " (사본)"
                 : title.trim();
         if (cleanTitle.length() > 120) {
-            throw ApiException.badRequest("여행 이름이 너무 깁니다.");
+            throw ApiException.badRequest("여행 이름이 너무 길어요.");
         }
         LocalDate start = DayLabels.parse(startIso);
 
@@ -147,13 +147,13 @@ public class TripService {
     public Trip resolveFor(AuthPrincipal me, String tripId) {
         if (tripId != null && !tripId.isBlank()) {
             return trips.findById(tripId)
-                    .orElseThrow(() -> ApiException.notFound("여행을 찾을 수 없습니다."));
+                    .orElseThrow(() -> ApiException.notFound("여행을 찾을 수 없어요."));
         }
         return members.findAllByIdUserId(me.id()).stream()
                 .map(m -> trips.findById(m.getTripId()).orElse(null))
                 .filter(java.util.Objects::nonNull)
                 .min(java.util.Comparator.comparing(Trip::getCreatedAt))
-                .orElseThrow(() -> ApiException.notFound("아직 여행이 없습니다."));
+                .orElseThrow(() -> ApiException.notFound("아직 여행이 없어요."));
     }
 
     @Transactional
@@ -205,7 +205,7 @@ public class TripService {
         if (title != null) {
             String cleanTitle = title.trim();
             if (cleanTitle.isEmpty()) {
-                throw ApiException.badRequest("여행 이름이 비어 있습니다.");
+                throw ApiException.badRequest("여행 이름이 비어 있어요.");
             }
             trip.setTitle(cleanTitle);
         }
@@ -228,7 +228,7 @@ public class TripService {
                조각이 남습니다. 너무 길면 통째로 물립니다. */
             String clean = emoji.trim();
             if (clean.length() > 16) {
-                throw ApiException.badRequest("표식이 너무 깁니다.");
+                throw ApiException.badRequest("표식이 너무 길어요.");
             }
             trip.setEmoji(clean.isEmpty() ? null : clean);
         }

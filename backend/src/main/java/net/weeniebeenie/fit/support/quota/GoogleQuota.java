@@ -104,7 +104,7 @@ public class GoogleQuota {
 
         if (!inHour || !inDay) {
             /* 누구인지는 남기되 무엇을 찾았는지는 남기지 않습니다. */
-            log.warn("구글 호출 한도에 걸렸습니다: who={} calls={}", who, calls);
+            log.warn("구글 호출 한도에 걸렸어요: who={} calls={}", who, calls);
             return false;
         }
         return true;

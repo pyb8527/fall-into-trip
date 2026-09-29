@@ -57,10 +57,10 @@ public class FolderService {
     public TripFolder create(AuthPrincipal me, String name) {
         String clean = clean(name);
         if (folders.countByUserId(me.id()) >= MAX_FOLDERS) {
-            throw ApiException.badRequest("폴더는 " + MAX_FOLDERS + "개까지 만들 수 있습니다.");
+            throw ApiException.badRequest("폴더는 " + MAX_FOLDERS + "개까지 만들 수 있어요.");
         }
         folders.findByUserIdAndName(me.id(), clean).ifPresent(f -> {
-            throw ApiException.badRequest("같은 이름의 폴더가 이미 있습니다.");
+            throw ApiException.badRequest("같은 이름의 폴더가 이미 있어요.");
         });
         return folders.save(TripFolder.builder()
                 .userId(me.id())
@@ -75,7 +75,7 @@ public class FolderService {
         String clean = clean(name);
         folders.findByUserIdAndName(me.id(), clean).ifPresent(other -> {
             if (!other.getId().equals(folderId)) {
-                throw ApiException.badRequest("같은 이름의 폴더가 이미 있습니다.");
+                throw ApiException.badRequest("같은 이름의 폴더가 이미 있어요.");
             }
         });
         folder.setName(clean);
@@ -103,7 +103,7 @@ public class FolderService {
         /* 내가 볼 수 있는 여행만 정리할 수 있습니다. 남의 여행 id 를 넣어
            내 폴더에 담아 두는 길을 열어 둘 이유가 없습니다. */
         if (members.findByIdTripIdAndIdUserId(tripId, me.id()).isEmpty()) {
-            throw ApiException.notFound("여행을 찾을 수 없습니다.");
+            throw ApiException.notFound("여행을 찾을 수 없어요.");
         }
 
         if (folderId == null || folderId.isBlank()) {
@@ -127,10 +127,10 @@ public class FolderService {
 
     private TripFolder mine(AuthPrincipal me, String folderId) {
         TripFolder folder = folders.findById(folderId)
-                .orElseThrow(() -> ApiException.notFound("폴더를 찾을 수 없습니다."));
+                .orElseThrow(() -> ApiException.notFound("폴더를 찾을 수 없어요."));
         if (!folder.getUserId().equals(me.id())) {
             /* 남의 폴더가 있다는 것 자체를 알릴 이유가 없습니다. */
-            throw ApiException.notFound("폴더를 찾을 수 없습니다.");
+            throw ApiException.notFound("폴더를 찾을 수 없어요.");
         }
         return folder;
     }
@@ -141,7 +141,7 @@ public class FolderService {
             throw ApiException.badRequest("폴더 이름을 넣어 주세요.");
         }
         if (clean.length() > 40) {
-            throw ApiException.badRequest("폴더 이름이 너무 깁니다.");
+            throw ApiException.badRequest("폴더 이름이 너무 길어요.");
         }
         return clean;
     }

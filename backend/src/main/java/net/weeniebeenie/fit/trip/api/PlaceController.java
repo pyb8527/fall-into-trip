@@ -56,14 +56,14 @@ public class PlaceController {
                                         @PathVariable String placeId,
                                         @RequestBody HereRequest req) {
         if (req == null || req.lat() == null || req.lng() == null) {
-            throw ApiException.badRequest("지금 위치를 알 수 없습니다.");
+            throw ApiException.badRequest("지금 위치를 알 수 없어요.");
         }
         RouteService.Mode mode;
         try {
             mode = RouteService.Mode.valueOf(
                     (req.mode() == null ? "TRANSIT" : req.mode()).trim().toUpperCase(java.util.Locale.ROOT));
         } catch (IllegalArgumentException e) {
-            throw ApiException.badRequest("알 수 없는 이동 수단입니다.");
+            throw ApiException.badRequest("알 수 없는 이동 수단이에요.");
         }
         return Map.of("leg", routes.fromHere(me, placeId, req.lat(), req.lng(), mode));
     }

@@ -73,7 +73,7 @@ public class TripReminder {
                   대한 알림이라, 전원이 받아야 합니다.
                  */
                 push.tell(people, null, "tomorrow:" + day.getId(),
-                        trip.getTitle() + " — 내일입니다",
+                        trip.getTitle() + " — 내일이에요",
                         lineOf(plan, day),
                         "/trip/" + trip.getId());
             });

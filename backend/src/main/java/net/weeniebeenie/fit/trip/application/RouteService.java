@@ -141,11 +141,11 @@ public class RouteService {
     */
     public DayRoute of(AuthPrincipal me, String dayId, Mode mode) {
         Day day = days.findById(dayId)
-                .orElseThrow(() -> ApiException.notFound("날짜를 찾을 수 없습니다."));
+                .orElseThrow(() -> ApiException.notFound("날짜를 찾을 수 없어요."));
         access.requireCanRead(day.getTripId(), me.id());
 
         if (!enabled()) {
-            throw ApiException.badRequest("경로 안내가 꺼져 있습니다.");
+            throw ApiException.badRequest("경로 안내가 꺼져 있어요.");
         }
 
         List<Place> list = places.findAllByDayIdOrderBySortAsc(dayId);
@@ -199,11 +199,11 @@ public class RouteService {
      */
     public Compared compare(AuthPrincipal me, String dayId) {
         Day day = days.findById(dayId)
-                .orElseThrow(() -> ApiException.notFound("날짜를 찾을 수 없습니다."));
+                .orElseThrow(() -> ApiException.notFound("날짜를 찾을 수 없어요."));
         access.requireCanRead(day.getTripId(), me.id());
 
         if (!enabled()) {
-            throw ApiException.badRequest("경로 안내가 꺼져 있습니다.");
+            throw ApiException.badRequest("경로 안내가 꺼져 있어요.");
         }
 
         List<Place> list = places.findAllByDayIdOrderBySortAsc(dayId);
@@ -271,8 +271,8 @@ public class RouteService {
         if (longEnough == 0 || transitFound > 0) {
             return null;
         }
-        return "이 지역은 구글이 대중교통 길찾기를 내주지 않습니다. "
-                + "구글 지도 앱에서는 보이지만 다른 앱으로는 가져올 수 없는 자리입니다.";
+        return "이 지역은 구글이 대중교통 길찾기를 내주지 않아요. "
+                + "구글 지도 앱에서는 보이지만 다른 앱으로는 가져올 수 없는 자리예요.";
     }
 
     /**
@@ -408,13 +408,13 @@ public class RouteService {
      */
     public Leg fromHere(AuthPrincipal me, String placeId, double lat, double lng, Mode mode) {
         Place to = places.findById(placeId)
-                .orElseThrow(() -> ApiException.notFound("장소를 찾을 수 없습니다."));
+                .orElseThrow(() -> ApiException.notFound("장소를 찾을 수 없어요."));
         Day day = days.findById(to.getDayId())
-                .orElseThrow(() -> ApiException.notFound("날짜를 찾을 수 없습니다."));
+                .orElseThrow(() -> ApiException.notFound("날짜를 찾을 수 없어요."));
         access.requireCanRead(day.getTripId(), me.id());
 
         if (!enabled()) {
-            throw ApiException.badRequest("경로 안내가 꺼져 있습니다.");
+            throw ApiException.badRequest("경로 안내가 꺼져 있어요.");
         }
 
         Coordinates at = Coordinates.of(lat, lng);
@@ -632,7 +632,7 @@ public class RouteService {
                   찍히고 있고, 그 좌표는 사람이 일정에 스스로 넣은 자리라
                   자취가 아닙니다.
                  */
-                log.info("경로가 비었습니다: mode={} {},{} -> {},{} | 물은 것={} | 받은 것={}",
+                log.info("경로가 비었어요: mode={} {},{} -> {},{} | 물은 것={} | 받은 것={}",
                         mode, from.getLat(), from.getLng(), to.getLat(), to.getLng(),
                         body, res == null ? "null" : res.toString());
                 return Leg.unreachable(from.getId(), to.getId());
@@ -664,7 +664,7 @@ public class RouteService {
               "못 물어봤다" 입니다. 둘을 같은 값으로 돌려주면 부르는 쪽이
               가릴 수 없고, 그러면 실패한 답이 캐시에 여섯 시간 눌러앉습니다.
              */
-            log.warn("경로를 받지 못했습니다: mode={} {}", mode, e.getMessage());
+            log.warn("경로를 받지 못했어요: mode={} {}", mode, e.getMessage());
             return null;
         }
     }
@@ -703,7 +703,7 @@ public class RouteService {
             double parsed = Double.parseDouble(digits.trim());
             return parsed <= 0 ? 0 : (int) Math.round(parsed);
         } catch (NumberFormatException e) {
-            log.warn("소요시간을 못 읽었습니다: {}", text);
+            log.warn("소요시간을 못 읽었어요: {}", text);
             return 0;
         }
     }

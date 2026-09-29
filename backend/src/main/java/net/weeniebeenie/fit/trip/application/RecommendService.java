@@ -113,7 +113,7 @@ public class RecommendService {
             throw ApiException.badRequest("무엇을 찾는지 한 줄 적어 주세요.");
         }
         if (q.length() > 200) {
-            throw ApiException.badRequest("너무 깁니다. 한 문장으로 줄여 주세요.");
+            throw ApiException.badRequest("너무 길어요. 한 문장으로 줄여 주세요.");
         }
 
         List<Place> mine = inTrip ? places.findAllOfTrip(tripId) : List.of();
@@ -139,12 +139,12 @@ public class RecommendService {
         LocalDate on = null;
         if (dayId != null && !dayId.isBlank()) {
             if (!inTrip) {
-                throw ApiException.badRequest("여행 없이 날짜만 고를 수는 없습니다.");
+                throw ApiException.badRequest("여행 없이 날짜만 고를 수는 없어요.");
             }
             Day day = days.findById(dayId)
-                    .orElseThrow(() -> ApiException.notFound("날짜를 찾을 수 없습니다."));
+                    .orElseThrow(() -> ApiException.notFound("날짜를 찾을 수 없어요."));
             if (!day.getTripId().equals(tripId)) {
-                throw ApiException.badRequest("이 여행의 날짜가 아닙니다.");
+                throw ApiException.badRequest("이 여행의 날짜가 아니에요.");
             }
             on = day.getIso();
         }
@@ -246,12 +246,12 @@ public class RecommendService {
      */
     private Place[] endsOf(String tripId, boolean inTrip, List<Place> mine, Between between) {
         if (!inTrip) {
-            throw ApiException.badRequest("여행 없이 두 곳 사이를 고를 수는 없습니다.");
+            throw ApiException.badRequest("여행 없이 두 곳 사이를 고를 수는 없어요.");
         }
         Place from = pickIn(mine, between.fromPlaceId());
         Place to = pickIn(mine, between.toPlaceId());
         if (from == null || to == null) {
-            throw ApiException.badRequest("이 여행의 장소가 아닙니다.");
+            throw ApiException.badRequest("이 여행의 장소가 아니에요.");
         }
         if (from.getId().equals(to.getId())) {
             throw ApiException.badRequest("서로 다른 두 곳을 골라 주세요.");
@@ -428,11 +428,11 @@ public class RecommendService {
                                   boolean askedBetween, boolean alongRoute) {
         if (cards.isEmpty()) {
             return around == null
-                    ? "찾은 곳이 없습니다. 지역 이름을 함께 넣어 보세요 — \"오사카 조용한 카페\"."
-                    : "찾은 곳이 없습니다. 조금 다르게 물어보세요.";
+                    ? "찾은 곳이 없어요. 지역 이름을 함께 넣어 보세요 — \"오사카 조용한 카페\"."
+                    : "찾은 곳이 없어요. 조금 다르게 물어보세요.";
         }
         if (around == null) {
-            return "어디쯤인지 몰라 넓게 찾았습니다. 지역 이름을 함께 넣으면 더 가까운 곳이 나옵니다.";
+            return "어디쯤인지 몰라 넓게 찾았어요. 지역 이름을 함께 넣으면 더 가까운 곳이 나와요.";
         }
         /*
           길 위에서 찾아 달라고 했는데 못 그랬으면 그렇게 말합니다.
@@ -442,7 +442,7 @@ public class RecommendService {
           <b>물은 것과 답한 것이 다르면 그것을 말해야 합니다.</b>
          */
         if (askedBetween && !alongRoute) {
-            return "가는 길을 못 구해서 언저리에서 찾았습니다. 두 곳이 아주 가까우면 그렇습니다.";
+            return "가는 길을 못 구해서 언저리에서 찾았어요. 두 곳이 아주 가까우면 그래요.";
         }
         return null;
     }

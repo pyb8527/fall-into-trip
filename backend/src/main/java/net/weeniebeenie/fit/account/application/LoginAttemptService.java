@@ -36,7 +36,7 @@ public class LoginAttemptService {
         if (a.count >= MAX_TRIES) {
             long seconds = Duration.between(now, a.until).toSeconds();
             throw net.weeniebeenie.fit.shared.error.ApiException.tooMany(
-                    "로그인 시도가 너무 많습니다. " + Math.max(1, seconds) + "초 뒤에 다시 시도해 주세요.");
+                    "로그인 시도가 너무 많아요. " + Math.max(1, seconds) + "초 뒤에 다시 시도해 주세요.");
         }
     }
 

@@ -116,7 +116,7 @@ T("version 이 올라감", r.data.place.version === seen + 1, r.data.place.versi
 /* 뒤엣사람은 아직 옛 판을 들고 있다 */
 r = await call("PATCH", "/api/places/" + p1, { token: admin, body: { note: "B 가 덮어쓰려 함", version: seen } });
 T("나중 저장은 409 로 막힘", r.status === 409, r.data);
-T("이유를 알려 줌", /먼저 고쳤습니다/.test(r.data?.error ?? ""), r.data);
+T("이유를 알려 줌", /먼저 고쳤어요/.test(r.data?.error ?? ""), r.data);
 r = await call("GET", "/api/trip?trip=" + tripId, { token: admin });
 const kept = r.data.days[0].places.find(p => p.id === p1);
 T("앞사람 내용이 지켜짐", kept.note === "A 가 먼저 고침", kept.note);

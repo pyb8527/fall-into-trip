@@ -35,7 +35,7 @@ public final class TripDtos {
      * 여행이 되기 때문입니다.
      */
     public record DuplicateTripRequest(
-            @Size(max = 120, message = "여행 이름이 너무 깁니다.")
+            @Size(max = 120, message = "여행 이름이 너무 길어요.")
             String title,
 
             @NotBlank(message = "언제 떠날지 정해 주세요.")
@@ -44,14 +44,14 @@ public final class TripDtos {
 
     public record CreateTripRequest(
             @NotBlank(message = "여행 이름을 지어 주세요.")
-            @Size(max = 120, message = "여행 이름이 너무 깁니다.")
+            @Size(max = 120, message = "여행 이름이 너무 길어요.")
             String title,
 
             @NotBlank(message = "시작일을 넣어 주세요.")
             String startIso,
 
-            @Min(value = 0, message = "숙박일은 0 이상이어야 합니다.")
-            @Max(value = 30, message = "숙박일이 너무 깁니다.")
+            @Min(value = 0, message = "숙박일은 0 이상이어야 해요.")
+            @Max(value = 30, message = "숙박일이 너무 길어요.")
             Integer nights) {
 
         public int nightsOrZero() {

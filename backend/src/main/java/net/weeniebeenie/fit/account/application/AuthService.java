@@ -62,7 +62,7 @@ public class AuthService {
             /* 이미 있다고 그대로 알려 주면 어떤 주소가 가입돼 있는지 확인하는
                통로가 됩니다. 다만 가입 화면에서는 안내가 없으면 막막하므로,
                여기서는 알려 주되 로그인 쪽은 계속 뭉뚱그립니다. */
-            throw ApiException.badRequest("이미 가입된 이메일입니다.");
+            throw ApiException.badRequest("이미 가입된 이메일이에요.");
         }
 
         User user = users.save(User.builder()
@@ -85,13 +85,13 @@ public class AuthService {
     @Transactional
     public User setup(String email, String name, String password, String token) {
         if (!setupNeeded()) {
-            throw ApiException.forbidden("이미 설정이 끝났습니다.");
+            throw ApiException.forbidden("이미 설정이 끝났어요.");
         }
         if (setupToken == null || setupToken.isBlank()) {
-            throw ApiException.badRequest("서버에 설치 토큰이 설정되어 있지 않습니다.");
+            throw ApiException.badRequest("서버에 설치 토큰이 설정되어 있지 않아요.");
         }
         if (!setupToken.equals(token)) {
-            throw ApiException.forbidden("설치 토큰이 올바르지 않습니다.");
+            throw ApiException.forbidden("설치 토큰이 올바르지 않아요.");
         }
         String normalized = Email.of(email).value();
         String cleanName = requireName(name);
@@ -130,7 +130,7 @@ public class AuthService {
             normalized = Email.of(email).value();
         } catch (ApiException e) {
             attempts.recordFailure(key);
-            throw ApiException.unauthorized("이메일 또는 비밀번호가 올바르지 않습니다.");
+            throw ApiException.unauthorized("이메일 또는 비밀번호가 올바르지 않아요.");
         }
 
         User user = users.findByEmail(normalized).orElse(null);
@@ -146,7 +146,7 @@ public class AuthService {
                 && encoder.matches(password == null ? "" : password, user.getPasswordHash());
         if (!ok) {
             attempts.recordFailure(key);
-            throw ApiException.unauthorized("이메일 또는 비밀번호가 올바르지 않습니다.");
+            throw ApiException.unauthorized("이메일 또는 비밀번호가 올바르지 않아요.");
         }
         attempts.reset(key);
         user.setLastLoginAt(Instant.now());
@@ -157,12 +157,12 @@ public class AuthService {
     @Transactional
     public void changePassword(String userId, String current, String next) {
         User user = users.findById(userId)
-                .orElseThrow(() -> ApiException.unauthorized("로그인이 필요합니다."));
+                .orElseThrow(() -> ApiException.unauthorized("로그인이 필요해요."));
         boolean had = user.hasPassword();
         /* 비밀번호를 아직 만든 적이 없으면 지금 만드는 것입니다. 현재 것을
            물어보면 답할 수가 없습니다 — 구글로만 들어온 사람입니다. */
         if (user.hasPassword() && !encoder.matches(current == null ? "" : current, user.getPasswordHash())) {
-            throw ApiException.badRequest("현재 비밀번호가 올바르지 않습니다.");
+            throw ApiException.badRequest("현재 비밀번호가 올바르지 않아요.");
         }
         validatePassword(next);
         user.setPasswordHash(encoder.encode(next));
@@ -181,14 +181,14 @@ public class AuthService {
             throw ApiException.badRequest("이름을 넣어 주세요.");
         }
         if (name.length() > NAME_MAX) {
-            throw ApiException.badRequest("이름이 너무 깁니다.");
+            throw ApiException.badRequest("이름이 너무 길어요.");
         }
         return name;
     }
 
     public static void validatePassword(String password) {
         if (password == null || password.length() < PASSWORD_MIN || password.length() > PASSWORD_MAX) {
-            throw ApiException.badRequest("비밀번호는 " + PASSWORD_MIN + "자 이상이어야 합니다.");
+            throw ApiException.badRequest("비밀번호는 " + PASSWORD_MIN + "자 이상이어야 해요.");
         }
     }
 }

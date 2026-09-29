@@ -96,7 +96,7 @@ public class AdminUserController {
         try {
             return Role.valueOf(raw.trim().toUpperCase());
         } catch (IllegalArgumentException e) {
-            throw ApiException.badRequest("알 수 없는 역할입니다: " + raw);
+            throw ApiException.badRequest("알 수 없는 역할이에요: " + raw);
         }
     }
 }

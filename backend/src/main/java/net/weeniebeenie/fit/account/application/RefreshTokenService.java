@@ -118,7 +118,7 @@ public class RefreshTokenService {
                     .digest(raw.getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(digest);
         } catch (Exception e) {
-            throw new IllegalStateException("토큰을 처리하지 못했습니다.", e);
+            throw new IllegalStateException("토큰을 처리하지 못했어요.", e);
         }
     }
 

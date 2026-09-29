@@ -87,7 +87,7 @@ public final class WebPush {
                        붙어 33바이트로 나오는 일이 있어 잘라 맞춥니다. */
                     b64(fixed(priv.getS().toByteArray(), 32)));
         } catch (GeneralSecurityException e) {
-            throw new IllegalStateException("알림 열쇠를 만들지 못했습니다.", e);
+            throw new IllegalStateException("알림 열쇠를 만들지 못했어요.", e);
         }
     }
 
@@ -169,7 +169,7 @@ public final class WebPush {
 
             return body.array();
         } catch (GeneralSecurityException e) {
-            throw new IllegalStateException("알림을 봉하지 못했습니다.", e);
+            throw new IllegalStateException("알림을 봉하지 못했어요.", e);
         }
     }
 
@@ -219,7 +219,7 @@ public final class WebPush {
             }
             return new String(padded, 0, Math.max(0, end - 1), StandardCharsets.UTF_8);
         } catch (GeneralSecurityException e) {
-            throw new IllegalStateException("알림을 열지 못했습니다.", e);
+            throw new IllegalStateException("알림을 열지 못했어요.", e);
         }
     }
 
@@ -255,7 +255,7 @@ public final class WebPush {
              */
             return header + "." + claims + "." + b64(joseOf(sig.sign()));
         } catch (GeneralSecurityException e) {
-            throw new IllegalStateException("알림 표를 만들지 못했습니다.", e);
+            throw new IllegalStateException("알림 표를 만들지 못했어요.", e);
         }
     }
 
@@ -287,7 +287,7 @@ public final class WebPush {
      */
     static byte[] expand(byte[] prk, byte[] info, int length) {
         if (length > 32) {
-            throw new IllegalArgumentException("한 번에 32바이트까지만 펼칩니다.");
+            throw new IllegalArgumentException("한 번에 32바이트까지만 펼쳐요.");
         }
         byte[] input = Arrays.copyOf(info, info.length + 1);
         input[info.length] = 1;
@@ -342,7 +342,7 @@ public final class WebPush {
     /** 65바이트 날것을 자바가 아는 공개키로. */
     static ECPublicKey publicFrom(byte[] raw) throws GeneralSecurityException {
         if (raw.length != RAW_KEY_LEN || raw[0] != 4) {
-            throw new InvalidKeyException("공개키 모양이 아닙니다.");
+            throw new InvalidKeyException("공개키 모양이 아니에요.");
         }
         BigInteger x = new BigInteger(1, Arrays.copyOfRange(raw, 1, 33));
         BigInteger y = new BigInteger(1, Arrays.copyOfRange(raw, 33, 65));

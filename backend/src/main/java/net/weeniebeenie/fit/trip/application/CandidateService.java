@@ -86,14 +86,14 @@ public class CandidateService {
         access.requireCanEdit(tripId, me.id());
 
         if (candidates.countByTripId(tripId) >= MAX_CANDIDATES) {
-            throw ApiException.badRequest("후보가 너무 많습니다. 정한 것을 일정으로 옮겨 주세요.");
+            throw ApiException.badRequest("후보가 너무 많아요. 정한 것을 일정으로 옮겨 주세요.");
         }
 
         Draft from = draft;
         if (draft != null && draft.savedId() != null && !draft.savedId().isBlank()) {
             SavedPlace item = saved.findById(draft.savedId())
                     .filter(s -> s.getUserId().equals(me.id()))
-                    .orElseThrow(() -> ApiException.notFound("담아 둔 장소를 찾을 수 없습니다."));
+                    .orElseThrow(() -> ApiException.notFound("담아 둔 장소를 찾을 수 없어요."));
             from = new Draft(item.getName(), item.getLat(), item.getLng(),
                     item.getPlaceId(), item.getCat(), item.getNote(), null, item.getIcon());
         }
@@ -123,7 +123,7 @@ public class CandidateService {
     @Transactional
     public void vote(AuthPrincipal me, String candidateId, Boolean yes) {
         TripCandidate candidate = candidates.findById(candidateId)
-                .orElseThrow(() -> ApiException.notFound("후보를 찾을 수 없습니다."));
+                .orElseThrow(() -> ApiException.notFound("후보를 찾을 수 없어요."));
         access.requireCanRead(candidate.getTripId(), me.id());
 
         if (yes == null) {
@@ -142,12 +142,12 @@ public class CandidateService {
     @Transactional
     public void remove(AuthPrincipal me, String candidateId) {
         TripCandidate candidate = candidates.findById(candidateId)
-                .orElseThrow(() -> ApiException.notFound("후보를 찾을 수 없습니다."));
+                .orElseThrow(() -> ApiException.notFound("후보를 찾을 수 없어요."));
         access.requireCanEdit(candidate.getTripId(), me.id());
 
         boolean mine = candidate.getAddedBy().equals(me.id());
         if (!mine && !isOwner(candidate.getTripId(), me.id())) {
-            throw ApiException.forbidden("올린 사람만 내릴 수 있습니다.");
+            throw ApiException.forbidden("올린 사람만 내릴 수 있어요.");
         }
         candidates.delete(candidate);
     }
@@ -165,7 +165,7 @@ public class CandidateService {
     @Transactional
     public int pour(AuthPrincipal me, String dayId, List<String> candidateIds) {
         Day day = days.findById(dayId)
-                .orElseThrow(() -> ApiException.notFound("날짜를 찾을 수 없습니다."));
+                .orElseThrow(() -> ApiException.notFound("날짜를 찾을 수 없어요."));
         access.requireCanEdit(day.getTripId(), me.id());
 
         if (candidateIds == null || candidateIds.isEmpty()) {
@@ -196,7 +196,7 @@ public class CandidateService {
             made++;
         }
         if (made == 0) {
-            throw ApiException.notFound("옮길 후보를 찾지 못했습니다.");
+            throw ApiException.notFound("옮길 후보를 찾지 못했어요.");
         }
         return made;
     }

@@ -82,7 +82,7 @@ public class AdminAuditController {
         try {
             return LocalDate.parse(value).atStartOfDay(ZoneOffset.UTC).toInstant();
         } catch (DateTimeParseException e) {
-            throw ApiException.badRequest(field + " 의 날짜 형식이 올바르지 않습니다: " + raw);
+            throw ApiException.badRequest(field + " 의 날짜 형식이 올바르지 않아요: " + raw);
         }
     }
 }

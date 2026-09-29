@@ -22,10 +22,10 @@ public record Email(String value) {
         }
         value = value.trim().toLowerCase();
         if (value.length() > MAX) {
-            throw ApiException.badRequest("이메일이 너무 깁니다.");
+            throw ApiException.badRequest("이메일이 너무 길어요.");
         }
         if (!SHAPE.matcher(value).matches()) {
-            throw ApiException.badRequest("이메일 형식이 올바르지 않습니다.");
+            throw ApiException.badRequest("이메일 형식이 올바르지 않아요.");
         }
     }
 

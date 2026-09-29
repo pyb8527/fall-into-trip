@@ -58,14 +58,14 @@ public class DayService {
     @Transactional
     public Day update(AuthPrincipal me, String dayId, DayPatch patch) {
         Day day = days.findById(dayId)
-                .orElseThrow(() -> ApiException.notFound("날짜를 찾을 수 없습니다."));
+                .orElseThrow(() -> ApiException.notFound("날짜를 찾을 수 없어요."));
         access.requireCanEdit(day.getTripId(), me.id());
         Versioned.check(patch.version(), day.getVersion());
 
         if (patch.label() != null) {
             String label = patch.label().trim();
             if (label.isEmpty()) {
-                throw ApiException.badRequest("날짜 이름이 비어 있습니다.");
+                throw ApiException.badRequest("날짜 이름이 비어 있어요.");
             }
             day.setLabel(label);
         }
@@ -138,11 +138,11 @@ public class DayService {
     @Transactional
     public void delete(AuthPrincipal me, String dayId) {
         Day day = days.findById(dayId)
-                .orElseThrow(() -> ApiException.notFound("날짜를 찾을 수 없습니다."));
+                .orElseThrow(() -> ApiException.notFound("날짜를 찾을 수 없어요."));
         access.requireCanEdit(day.getTripId(), me.id());
 
         if (days.countByTripId(day.getTripId()) <= 1) {
-            throw ApiException.badRequest("마지막 날짜는 지울 수 없습니다.");
+            throw ApiException.badRequest("마지막 날짜는 지울 수 없어요.");
         }
         days.delete(day);
 

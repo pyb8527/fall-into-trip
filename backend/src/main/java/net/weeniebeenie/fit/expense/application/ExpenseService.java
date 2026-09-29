@@ -120,7 +120,7 @@ public class ExpenseService {
         access.requireCanEdit(tripId, me.id());
 
         if (expenses.countByTripId(tripId) >= MAX_PER_TRIP) {
-            throw ApiException.badRequest("한 여행에 " + MAX_PER_TRIP + "건까지 적을 수 있습니다.");
+            throw ApiException.badRequest("한 여행에 " + MAX_PER_TRIP + "건까지 적을 수 있어요.");
         }
 
         String name = requireName(draft.name());
@@ -133,7 +133,7 @@ public class ExpenseService {
                 ? me.id()
                 : draft.payerId();
         if (!memberIds.contains(payer)) {
-            throw ApiException.badRequest("이 여행의 동행자가 아닙니다.");
+            throw ApiException.badRequest("이 여행의 동행자가 아니에요.");
         }
 
         Expense made = expenses.save(Expense.builder()
@@ -188,7 +188,7 @@ public class ExpenseService {
         }
         if (draft.payerId() != null) {
             if (!memberIds.contains(draft.payerId())) {
-                throw ApiException.badRequest("이 여행의 동행자가 아닙니다.");
+                throw ApiException.badRequest("이 여행의 동행자가 아니에요.");
             }
             expense.setPayerId(draft.payerId());
         }
@@ -223,7 +223,7 @@ public class ExpenseService {
 
     private Expense read(String expenseId) {
         return expenses.findById(expenseId)
-                .orElseThrow(() -> ApiException.notFound("그런 지출이 없습니다."));
+                .orElseThrow(() -> ApiException.notFound("그런 지출이 없어요."));
     }
 
     private List<String> memberIdsOf(String tripId) {
@@ -253,11 +253,11 @@ public class ExpenseService {
             return null;
         }
         Place place = places.findById(placeId)
-                .orElseThrow(() -> ApiException.notFound("장소를 찾을 수 없습니다."));
+                .orElseThrow(() -> ApiException.notFound("장소를 찾을 수 없어요."));
         Day day = days.findById(place.getDayId())
-                .orElseThrow(() -> ApiException.notFound("날짜를 찾을 수 없습니다."));
+                .orElseThrow(() -> ApiException.notFound("날짜를 찾을 수 없어요."));
         if (!day.getTripId().equals(tripId)) {
-            throw ApiException.badRequest("이 여행의 장소가 아닙니다.");
+            throw ApiException.badRequest("이 여행의 장소가 아니에요.");
         }
         return placeId;
     }
@@ -268,9 +268,9 @@ public class ExpenseService {
             return null;
         }
         Day day = days.findById(dayId)
-                .orElseThrow(() -> ApiException.notFound("날짜를 찾을 수 없습니다."));
+                .orElseThrow(() -> ApiException.notFound("날짜를 찾을 수 없어요."));
         if (!day.getTripId().equals(tripId)) {
-            throw ApiException.badRequest("이 여행의 날짜가 아닙니다.");
+            throw ApiException.badRequest("이 여행의 날짜가 아니에요.");
         }
         return dayId;
     }
@@ -295,7 +295,7 @@ public class ExpenseService {
         try {
             return mapper.writeValueAsString(kept);
         } catch (Exception e) {
-            throw ApiException.badRequest("나눠 낼 사람을 알아듣지 못했습니다.");
+            throw ApiException.badRequest("나눠 낼 사람을 알아듣지 못했어요.");
         }
     }
 
@@ -335,11 +335,11 @@ public class ExpenseService {
             throw ApiException.badRequest("금액을 넣어 주세요.");
         }
         if (raw < 0) {
-            throw ApiException.badRequest("금액은 0 이상이어야 합니다.");
+            throw ApiException.badRequest("금액은 0 이상이어야 해요.");
         }
         /* 20억을 넘으면 int 가 넘칩니다. 원화로도 그만한 여행 경비는 없습니다. */
         if (raw > 2_000_000_000) {
-            throw ApiException.badRequest("금액이 너무 큽니다.");
+            throw ApiException.badRequest("금액이 너무 커요.");
         }
         return raw;
     }

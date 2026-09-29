@@ -58,9 +58,9 @@ public class CommentService {
                            Integer dayIndex, Integer placeIndex) {
         TripPost post = posts.findById(postId)
                 .filter(p -> !p.isHidden())
-                .orElseThrow(() -> ApiException.notFound("글을 찾을 수 없습니다."));
+                .orElseThrow(() -> ApiException.notFound("글을 찾을 수 없어요."));
         if (!post.isFeedback()) {
-            throw ApiException.badRequest("이 글은 의견을 받지 않습니다.");
+            throw ApiException.badRequest("이 글은 의견을 받지 않아요.");
         }
 
         String clean = text == null ? "" : text.trim();
@@ -68,10 +68,10 @@ public class CommentService {
             throw ApiException.badRequest("남길 말을 적어 주세요.");
         }
         if (clean.length() > MAX_LENGTH) {
-            throw ApiException.badRequest("댓글은 " + MAX_LENGTH + "자까지입니다.");
+            throw ApiException.badRequest("댓글은 " + MAX_LENGTH + "자까지예요.");
         }
         if (comments.countByUserIdAndPostId(me.id(), postId) >= MAX_PER_POST) {
-            throw ApiException.badRequest("한 글에는 " + MAX_PER_POST + "개까지 남길 수 있습니다.");
+            throw ApiException.badRequest("한 글에는 " + MAX_PER_POST + "개까지 남길 수 있어요.");
         }
 
         PostComment comment = comments.save(PostComment.builder()
@@ -90,13 +90,13 @@ public class CommentService {
     @Transactional
     public void remove(AuthPrincipal me, String commentId) {
         PostComment comment = comments.findById(commentId)
-                .orElseThrow(() -> ApiException.notFound("댓글을 찾을 수 없습니다."));
+                .orElseThrow(() -> ApiException.notFound("댓글을 찾을 수 없어요."));
         boolean mine = comment.getUserId().equals(me.id());
         boolean host = posts.findById(comment.getPostId())
                 .map(p -> p.getAuthorId().equals(me.id()))
                 .orElse(false);
         if (!mine && !host && me.role() != Role.ADMIN) {
-            throw ApiException.forbidden("내가 남긴 것만 지울 수 있습니다.");
+            throw ApiException.forbidden("내가 남긴 것만 지울 수 있어요.");
         }
         comments.delete(comment);
         audit.log(me.id(), mine ? "comment.remove" : "comment.remove.host", commentId);
@@ -105,12 +105,12 @@ public class CommentService {
     @Transactional
     public void report(AuthPrincipal me, String commentId, String reason) {
         PostComment comment = comments.findById(commentId)
-                .orElseThrow(() -> ApiException.notFound("댓글을 찾을 수 없습니다."));
+                .orElseThrow(() -> ApiException.notFound("댓글을 찾을 수 없어요."));
         if (comment.getUserId().equals(me.id())) {
-            throw ApiException.badRequest("내가 남긴 것은 신고할 수 없습니다.");
+            throw ApiException.badRequest("내가 남긴 것은 신고할 수 없어요.");
         }
         if (reports.existsByCommentIdAndUserId(commentId, me.id())) {
-            throw ApiException.badRequest("이미 신고했습니다.");
+            throw ApiException.badRequest("이미 신고했어요.");
         }
         reports.save(new CommentReport(commentId, me.id(),
                 reason == null || reason.isBlank() ? null : reason.trim()));
@@ -139,7 +139,7 @@ public class CommentService {
     @Transactional
     public void setHidden(AuthPrincipal me, String commentId, boolean hidden) {
         PostComment comment = comments.findById(commentId)
-                .orElseThrow(() -> ApiException.notFound("댓글을 찾을 수 없습니다."));
+                .orElseThrow(() -> ApiException.notFound("댓글을 찾을 수 없어요."));
         comment.setHidden(hidden);
         audit.log(me.id(), hidden ? "comment.hide" : "comment.unhide", commentId);
     }

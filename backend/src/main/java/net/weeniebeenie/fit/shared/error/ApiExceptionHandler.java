@@ -35,7 +35,7 @@ public class ApiExceptionHandler {
         String message = e.getBindingResult().getFieldErrors().stream()
                 .map(FieldError::getDefaultMessage)
                 .findFirst()
-                .orElse("입력값이 올바르지 않습니다.");
+                .orElse("입력값이 올바르지 않아요.");
         return ResponseEntity.badRequest().body(Map.of("error", message));
     }
 
@@ -47,14 +47,14 @@ public class ApiExceptionHandler {
      */
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<Map<String, Object>> onUnreadable(HttpMessageNotReadableException e) {
-        log.warn("본문을 읽지 못했습니다: {}", e.getMessage());
-        return ResponseEntity.badRequest().body(Map.of("error", "요청 내용을 읽지 못했습니다."));
+        log.warn("본문을 읽지 못했어요: {}", e.getMessage());
+        return ResponseEntity.badRequest().body(Map.of("error", "요청 내용을 읽지 못했어요."));
     }
 
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<Map<String, Object>> onDenied(AccessDeniedException e) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(Map.of("error", "권한이 없습니다."));
+                .body(Map.of("error", "권한이 없어요."));
     }
 
     /**
@@ -66,7 +66,7 @@ public class ApiExceptionHandler {
     @ExceptionHandler(OptimisticLockingFailureException.class)
     public ResponseEntity<Map<String, Object>> onConflict() {
         return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(Map.of("error", "다른 사람이 먼저 고쳤습니다. 새로 불러온 뒤 다시 저장해 주세요.",
+                .body(Map.of("error", "다른 사람이 먼저 고쳤어요. 새로 불러온 뒤 다시 저장해 주세요.",
                              "code", "STALE"));
     }
 
@@ -74,13 +74,13 @@ public class ApiExceptionHandler {
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<Map<String, Object>> onNoRoute() {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(Map.of("error", "없는 주소입니다."));
+                .body(Map.of("error", "없는 주소예요."));
     }
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     public ResponseEntity<Map<String, Object>> onBadMethod() {
         return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
-                .body(Map.of("error", "허용되지 않은 방식입니다."));
+                .body(Map.of("error", "허용되지 않은 방식이에요."));
     }
 
     /** 예상 못 한 오류는 속을 드러내지 않고 로그에만 남깁니다. */
@@ -88,6 +88,6 @@ public class ApiExceptionHandler {
     public ResponseEntity<Map<String, Object>> onOther(Exception e, HttpServletRequest req) {
         log.error("[500] {} {}", req.getMethod(), req.getRequestURI(), e);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("error", "서버 오류가 발생했습니다."));
+                .body(Map.of("error", "서버 오류가 생겼어요."));
     }
 }

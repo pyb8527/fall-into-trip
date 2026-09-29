@@ -28,12 +28,12 @@ public class AdminGuard {
     @Transactional(readOnly = true)
     public User requireAdmin(AuthPrincipal me) {
         if (me == null) {
-            throw ApiException.unauthorized("로그인이 필요합니다.");
+            throw ApiException.unauthorized("로그인이 필요해요.");
         }
         User actor = users.findById(me.id())
-                .orElseThrow(() -> ApiException.unauthorized("로그인이 필요합니다."));
+                .orElseThrow(() -> ApiException.unauthorized("로그인이 필요해요."));
         if (actor.isDisabled() || !actor.isAdmin()) {
-            throw ApiException.forbidden("권한이 없습니다.");
+            throw ApiException.forbidden("권한이 없어요.");
         }
         return actor;
     }

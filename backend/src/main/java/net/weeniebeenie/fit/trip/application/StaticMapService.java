@@ -142,11 +142,11 @@ public class StaticMapService {
      */
     public byte[] renderDays(List<List<Point>> days, int width, int height) {
         if (!enabled()) {
-            throw ApiException.badRequest("지도 그림이 꺼져 있습니다.");
+            throw ApiException.badRequest("지도 그림이 꺼져 있어요.");
         }
         List<List<Point>> thinned = thinDays(days);
         if (thinned.isEmpty()) {
-            throw ApiException.badRequest("그릴 곳이 없습니다.");
+            throw ApiException.badRequest("그릴 곳이 없어요.");
         }
 
         String id = cacheKey(thinned, width, height);
@@ -208,19 +208,19 @@ public class StaticMapService {
               구글이 돌려준 설명입니다. 그래도 길게 남기지는 않습니다.
              */
             String why = e.getResponseBodyAsString();
-            log.warn("지도 그림을 받지 못했습니다 ({}): {}", e.getStatusCode(),
+            log.warn("지도 그림을 받지 못했어요 ({}): {}", e.getStatusCode(),
                     why.length() > 200 ? why.substring(0, 200) : why);
             throw new ApiException(org.springframework.http.HttpStatus.BAD_GATEWAY,
-                    "지도 그림을 받지 못했습니다.");
+                    "지도 그림을 받지 못했어요.");
         } catch (Exception e) {
-            log.warn("지도 그림을 받지 못했습니다: {}", e.getMessage());
+            log.warn("지도 그림을 받지 못했어요: {}", e.getMessage());
             throw new ApiException(org.springframework.http.HttpStatus.BAD_GATEWAY,
-                    "지도 그림을 받지 못했습니다.");
+                    "지도 그림을 받지 못했어요.");
         }
 
         if (png == null || png.length == 0) {
             throw new ApiException(org.springframework.http.HttpStatus.BAD_GATEWAY,
-                    "지도 그림을 받지 못했습니다.");
+                    "지도 그림을 받지 못했어요.");
         }
         cache.put(id, new Cached(png, Instant.now().plus(KEEP)));
         return png;

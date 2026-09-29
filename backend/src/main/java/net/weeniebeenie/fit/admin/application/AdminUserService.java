@@ -93,9 +93,9 @@ public class AdminUserService {
             /* 스스로 내려오면 되돌릴 사람이 없습니다. 다른 운영자에게 부탁해야 합니다. */
             if (target.getId().equals(actor.getId())) {
                 throw ApiException.badRequest(
-                        "자기 권한은 스스로 낮출 수 없습니다. 다른 운영자에게 요청해 주세요.");
+                        "자기 권한은 스스로 낮출 수 없어요. 다른 운영자에게 요청해 주세요.");
             }
-            requireNotLastAdmin(target, "마지막 운영자의 권한은 낮출 수 없습니다.");
+            requireNotLastAdmin(target, "마지막 운영자의 권한은 낮출 수 없어요.");
         }
 
         Role before = target.getRole();
@@ -118,9 +118,9 @@ public class AdminUserService {
         }
         if (disabled) {
             if (target.getId().equals(actor.getId())) {
-                throw ApiException.badRequest("자기 계정은 스스로 잠글 수 없습니다.");
+                throw ApiException.badRequest("자기 계정은 스스로 잠글 수 없어요.");
             }
-            requireNotLastAdmin(target, "마지막 운영자의 계정은 잠글 수 없습니다.");
+            requireNotLastAdmin(target, "마지막 운영자의 계정은 잠글 수 없어요.");
         }
 
         target.setDisabled(disabled);
@@ -178,14 +178,14 @@ public class AdminUserService {
         User target = find(userId);
 
         if (target.getId().equals(actor.getId())) {
-            throw ApiException.badRequest("자기 계정은 스스로 지울 수 없습니다.");
+            throw ApiException.badRequest("자기 계정은 스스로 지울 수 없어요.");
         }
-        requireNotLastAdmin(target, "마지막 운영자의 계정은 지울 수 없습니다.");
+        requireNotLastAdmin(target, "마지막 운영자의 계정은 지울 수 없어요.");
 
         long owned = trips.countByOwnerId(target.getId());
         if (owned > 0) {
             throw ApiException.conflict("이 계정이 여행 " + owned
-                    + "개의 주인입니다. 여행을 넘기거나 지운 뒤에 다시 시도하거나, 계정을 잠가 주세요.");
+                    + "개의 주인이에요. 여행을 넘기거나 지운 뒤에 다시 시도하거나, 계정을 잠가 주세요.");
         }
 
         String email = target.getEmail();
@@ -195,7 +195,7 @@ public class AdminUserService {
             users.flush();
         } catch (DataIntegrityViolationException e) {
             /* 지출·장소 기록처럼 아직 이 사람을 가리키는 것이 남아 있습니다. */
-            throw ApiException.conflict("이 계정이 남긴 기록이 있어 지울 수 없습니다. 계정을 잠가 주세요.");
+            throw ApiException.conflict("이 계정이 남긴 기록이 있어 지울 수 없어요. 계정을 잠가 주세요.");
         }
 
         audit.log(actor.getId(), "admin.user.delete", target.getId(), Map.of("email", email));
@@ -205,7 +205,7 @@ public class AdminUserService {
 
     private User find(String userId) {
         return users.findById(userId)
-                .orElseThrow(() -> ApiException.notFound("없는 계정입니다."));
+                .orElseThrow(() -> ApiException.notFound("없는 계정이에요."));
     }
 
     private AdminUserView view(User user) {

@@ -36,27 +36,27 @@ public class TripAccessPolicy {
      */
     public void requireCanRead(String tripId, String userId) {
         if (members.findByIdTripIdAndIdUserId(tripId, userId).isEmpty()) {
-            throw ApiException.notFound("여행을 찾을 수 없습니다.");
+            throw ApiException.notFound("여행을 찾을 수 없어요.");
         }
     }
 
     /** 고칠 수 있는가. */
     public void requireCanEdit(String tripId, String userId) {
         TripMember member = members.findByIdTripIdAndIdUserId(tripId, userId)
-                .orElseThrow(() -> ApiException.notFound("여행을 찾을 수 없습니다."));
+                .orElseThrow(() -> ApiException.notFound("여행을 찾을 수 없어요."));
         if (member.getRole() != TripRole.EDITOR) {
-            throw ApiException.forbidden("이 여행을 고칠 권한이 없습니다.");
+            throw ApiException.forbidden("이 여행을 고칠 권한이 없어요.");
         }
     }
 
     /** 주인인가. 동행자를 부르거나 여행을 지울 때만 필요합니다. */
     public Trip requireOwner(String tripId, String userId) {
         Trip trip = trips.findById(tripId)
-                .orElseThrow(() -> ApiException.notFound("여행을 찾을 수 없습니다."));
+                .orElseThrow(() -> ApiException.notFound("여행을 찾을 수 없어요."));
         if (!trip.getOwnerId().equals(userId)) {
             /* 동행자에게는 있다는 사실까지만 알려 줍니다. */
             requireCanRead(tripId, userId);
-            throw ApiException.forbidden("여행을 만든 사람만 할 수 있습니다.");
+            throw ApiException.forbidden("여행을 만든 사람만 할 수 있어요.");
         }
         return trip;
     }

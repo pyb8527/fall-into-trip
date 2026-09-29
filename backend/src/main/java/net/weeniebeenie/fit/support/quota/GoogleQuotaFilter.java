@@ -85,6 +85,6 @@ public class GoogleQuotaFilter extends OncePerRequestFilter {
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding("UTF-8");
         response.getWriter().write(
-                "{\"error\":\"장소를 너무 자주 찾았습니다. 다음 시간에 다시 해 주세요.\"}");
+                "{\"error\":\"장소를 너무 자주 찾았어요. 다음 시간에 다시 해 주세요.\"}");
     }
 }

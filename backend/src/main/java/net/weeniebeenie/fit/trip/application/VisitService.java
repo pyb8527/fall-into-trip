@@ -47,9 +47,9 @@ public class VisitService {
     /** 볼 수 있는 여행의 장소여야 체크할 수 있습니다. */
     private void requireReadable(AuthPrincipal me, String placeId) {
         Place place = places.findById(placeId)
-                .orElseThrow(() -> ApiException.notFound("장소를 찾을 수 없습니다."));
+                .orElseThrow(() -> ApiException.notFound("장소를 찾을 수 없어요."));
         Day day = days.findById(place.getDayId())
-                .orElseThrow(() -> ApiException.notFound("날짜를 찾을 수 없습니다."));
+                .orElseThrow(() -> ApiException.notFound("날짜를 찾을 수 없어요."));
         access.requireCanRead(day.getTripId(), me.id());
     }
 }

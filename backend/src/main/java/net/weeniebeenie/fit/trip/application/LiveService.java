@@ -100,12 +100,12 @@ public class LiveService {
         for (TripPin mineHere : pins.findAllByTripIdAndExpiresAtAfterOrderByCreatedAtDesc(tripId, Instant.now())) {
             if (mineHere.getUserId().equals(me.id())
                     && new Coordinates(mineHere.getLat(), mineHere.getLng()).metersTo(at) < SAME_SPOT) {
-                throw ApiException.badRequest("바로 여기에 이미 깃발을 꽂아 두었습니다.");
+                throw ApiException.badRequest("바로 여기에 이미 깃발을 꽂아 뒀어요.");
             }
         }
 
         if (pins.countByTripIdAndUserIdAndExpiresAtAfter(tripId, me.id(), Instant.now()) >= MAX_PINS) {
-            throw ApiException.badRequest("한 번에 " + MAX_PINS + "개까지 꽂을 수 있습니다.");
+            throw ApiException.badRequest("한 번에 " + MAX_PINS + "개까지 꽂을 수 있어요.");
         }
 
         return pins.save(TripPin.builder()
@@ -121,9 +121,9 @@ public class LiveService {
     @Transactional
     public void pull(AuthPrincipal me, String pinId) {
         TripPin pin = pins.findById(pinId)
-                .orElseThrow(() -> ApiException.notFound("핀을 찾을 수 없습니다."));
+                .orElseThrow(() -> ApiException.notFound("핀을 찾을 수 없어요."));
         if (!pin.getUserId().equals(me.id())) {
-            throw ApiException.forbidden("내가 꽂은 것만 뺄 수 있습니다.");
+            throw ApiException.forbidden("내가 꽂은 것만 뺄 수 있어요.");
         }
         pins.delete(pin);
     }

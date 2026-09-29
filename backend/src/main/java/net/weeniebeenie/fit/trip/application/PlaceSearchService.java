@@ -127,7 +127,7 @@ public class PlaceSearchService {
             return List.of();
         }
         if (!enabled()) {
-            throw ApiException.badRequest("장소 검색이 꺼져 있습니다. 좌표를 직접 넣어 주세요.");
+            throw ApiException.badRequest("장소 검색이 꺼져 있어요. 좌표를 직접 넣어 주세요.");
         }
 
         /*
@@ -176,15 +176,15 @@ public class PlaceSearchService {
               옮겨 온 뒤 가장 흔한 것이 바로 그 "안 켬" 입니다.
              */
             String why = e.getResponseBodyAsString();
-            log.warn("장소 검색이 거절됐습니다 ({}): {}", e.getStatusCode(),
+            log.warn("장소 검색이 거절됐어요 ({}): {}", e.getStatusCode(),
                     why.length() > 300 ? why.substring(0, 300) : why);
             throw new ApiException(org.springframework.http.HttpStatus.BAD_GATEWAY,
-                    "장소 검색을 쓸 수 없습니다. 좌표를 직접 넣어 주세요.");
+                    "장소 검색을 쓸 수 없어요. 좌표를 직접 넣어 주세요.");
         } catch (Exception e) {
             /* 구글이 느리거나 막혔습니다. 우리 잘못이 아니라는 것만 알려 줍니다. */
-            log.warn("장소 검색 요청이 실패했습니다: {}", e.getMessage());
+            log.warn("장소 검색 요청이 실패했어요: {}", e.getMessage());
             throw new ApiException(org.springframework.http.HttpStatus.BAD_GATEWAY,
-                    "장소를 찾지 못했습니다. 잠시 뒤 다시 시도해 주세요.");
+                    "장소를 찾지 못했어요. 잠시 뒤 다시 시도해 주세요.");
         }
 
         if (body == null) {

@@ -108,7 +108,7 @@ public class PushService {
             WebPush.Keys made = WebPush.newKeys();
             settings.save(new Setting(KEY_PUBLIC, made.publicKey()));
             settings.save(new Setting(KEY_PRIVATE, made.privateKey()));
-            log.info("알림 열쇠를 새로 만들었습니다.");
+            log.info("알림 열쇠를 새로 만들었어요.");
             return made.publicKey();
         });
     }
@@ -139,7 +139,7 @@ public class PushService {
         */
         boolean expo = endpoint != null && endpoint.startsWith("ExponentPushToken");
         if (endpoint == null || endpoint.isBlank() || (!expo && (p256dh == null || auth == null))) {
-            throw ApiException.badRequest("알림을 켤 수 없습니다. 기기가 준 값이 비었습니다.");
+            throw ApiException.badRequest("알림을 켤 수 없어요. 기기가 준 값이 비었어요.");
         }
 
         PushSubscription found = subs.findByEndpoint(endpoint).orElse(null);
@@ -153,7 +153,7 @@ public class PushService {
         }
 
         if (subs.countByUserId(me.id()) >= MAX_DEVICES) {
-            throw ApiException.badRequest("기기를 너무 많이 켜 두었습니다. 안 쓰는 것에서 꺼 주세요.");
+            throw ApiException.badRequest("기기를 너무 많이 켜 뒀어요. 안 쓰는 것에서 꺼 주세요.");
         }
 
         subs.save(PushSubscription.builder()
@@ -236,7 +236,7 @@ public class PushService {
         if (secret == null || sub == null) {
             return;
         }
-        send(sub, secret, json("알림을 켰습니다", "동행자가 일정을 고치면 여기로 알려 드립니다.", "/"));
+        send(sub, secret, json("알림을 켰어요", "동행자가 일정을 고치면 여기로 알려 드려요.", "/"));
     }
 
     private void send(PushSubscription sub, String secret, String payload) {
@@ -272,10 +272,10 @@ public class PushService {
                 return;
             }
             sub.setFailedAt(Instant.now());
-            log.warn("알림을 보내지 못했습니다 ({}): {}", code, e.getResponseBodyAsString());
+            log.warn("알림을 보내지 못했어요 ({}): {}", code, e.getResponseBodyAsString());
         } catch (Exception e) {
             sub.setFailedAt(Instant.now());
-            log.warn("알림을 보내지 못했습니다: {}", e.getMessage());
+            log.warn("알림을 보내지 못했어요: {}", e.getMessage());
         }
     }
 
@@ -355,7 +355,7 @@ public class PushService {
                     .retrieve()
                     .toBodilessEntity();
         } catch (Exception e) {
-            log.warn("앱 알림을 못 보냈습니다: {}", e.getMessage());
+            log.warn("앱 알림을 못 보냈어요: {}", e.getMessage());
         }
     }
 

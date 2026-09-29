@@ -30,7 +30,7 @@ public class AuditService {
                     .detail(detail == null ? null : mapper.writeValueAsString(detail))
                     .build());
         } catch (Exception e) {
-            log.warn("감사 로그를 남기지 못했습니다: {} {}", action, target, e);
+            log.warn("감사 로그를 남기지 못했어요: {} {}", action, target, e);
         }
     }
 
