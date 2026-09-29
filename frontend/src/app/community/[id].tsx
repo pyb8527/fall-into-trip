@@ -891,20 +891,29 @@ function DayBlock({
               남긴 것입니다. 둘을 같은 회색 글로 붙여 두면 어느 것이 계획이고
               어느 것이 겪은 일인지 안 갈립니다 — 별과 사진이 그것을 가릅니다.
             */}
-            {place.photo || place.stars || place.review ? (
-              <Row gap={Spacing.sm} style={styles.markRow}>
-                {place.photo ? <OurPhoto id={place.photo} height={56} width={56} /> : null}
-                <View style={styles.grow}>
-                  {place.stars ? (
-                    <Caption tone="brand">{'★'.repeat(place.stars)}</Caption>
-                  ) : null}
-                  {place.review ? (
-                    <Body small numberOfLines={2}>
-                      {place.review}
-                    </Body>
-                  ) : null}
-                </View>
-              </Row>
+            {/*
+              사진이 먼저, 크게.
+
+              <h3>곁다리로 붙어 있었습니다</h3>
+
+              <p>56픽셀 네모로 글 옆에 서 있었습니다. 그 크기로는 무엇이
+              찍혔는지 알 수가 없어서, 사진이 있으나 없으나 같았습니다.
+
+              <p>여기는 남의 여행기를 <b>읽는</b> 자리입니다. 어디를 갔는지는
+              위의 이름이 말하고, 거기가 어땠는지는 사진이 말합니다 — 그러면
+              사진이 글보다 커야 합니다.
+
+              <p>한 줄도 자르지 않습니다. 두 줄에서 끊어 놓고 "더 보기" 도
+              없으면, 쓴 사람은 썼는데 읽는 사람은 못 읽습니다.
+            */}
+            {place.photo ? <OurPhoto id={place.photo} height={220} style={styles.shot} /> : null}
+            {place.stars || place.review ? (
+              <View style={styles.said}>
+                {place.stars ? (
+                  <Caption tone="brand">{'★'.repeat(place.stars)}</Caption>
+                ) : null}
+                {place.review ? <Body small>{place.review}</Body> : null}
+              </View>
             ) : null}
             {place.cat || place.cost ? (
               <Row gap={Spacing.sm}>
@@ -1310,10 +1319,14 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 2,
   },
-  /* 다녀와서 남긴 것. 사진과 글이 나란히 섭니다. */
-  markRow: {
-    alignItems: 'center',
-    paddingTop: 2,
+  /* 다녀와서 남긴 사진. 이름 바로 아래에 붙여 그 장소의 것임을 보입니다. */
+  shot: {
+    marginTop: Spacing.xs,
+  },
+  /* 사진 아래의 별과 한 줄. */
+  said: {
+    gap: 2,
+    paddingTop: Spacing.xs,
   },
   order: {
     width: 22,
