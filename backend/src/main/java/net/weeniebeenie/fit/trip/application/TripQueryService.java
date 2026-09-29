@@ -40,10 +40,14 @@ public class TripQueryService {
                 dayList,
                 byDay,
                 visits.visitedPlaceIds(me.id(), trip.getId()),
+                visits.marksOf(me.id(), trip.getId()),
                 access.roleOf(trip.getId(), me.id()));
     }
 
     public record TripDetail(Trip trip, List<Day> days, Map<String, List<Place>> placesByDay,
-                             List<String> visitedPlaceIds, TripRole myRole) {
+                             List<String> visitedPlaceIds,
+                             /** 도장에 남긴 사진·별점·한 줄. 남긴 것이 있는 곳만 옵니다. */
+                             List<net.weeniebeenie.fit.trip.domain.Visit> marks,
+                             TripRole myRole) {
     }
 }

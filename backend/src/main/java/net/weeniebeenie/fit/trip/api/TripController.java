@@ -155,10 +155,29 @@ public class TripController {
                         d.placesByDay().getOrDefault(day.getId(), List.of()), mapper))
                 .toList();
 
+        /*
+          도장에 남긴 것.
+
+          <p>아무것도 안 남긴 도장은 빼고 보냅니다 — 대개 그냥 찍고 지나가므로,
+          다 실으면 장소 수만큼 빈 줄이 오갑니다.
+        */
+        List<Map<String, Object>> marks = d.marks().stream()
+                .filter(v -> v.getPhotoId() != null || v.getStars() != null || v.getNote() != null)
+                .map(v -> {
+                    Map<String, Object> one = new java.util.HashMap<>();
+                    one.put("placeId", v.getId().getPlaceId());
+                    one.put("photoId", v.getPhotoId());
+                    one.put("stars", v.getStars());
+                    one.put("note", v.getNote());
+                    return one;
+                })
+                .toList();
+
         return Map.of(
                 "trip", TripView.of(d.trip()),
                 "days", days,
                 "visited", d.visitedPlaceIds(),
+                "marks", marks,
                 "myRole", d.myRole() == null ? "NONE" : d.myRole().name());
     }
 }

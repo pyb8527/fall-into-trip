@@ -19,4 +19,20 @@ public interface VisitRepository extends JpaRepository<Visit, VisitId> {
                  WHERE p.dayId IN (SELECT d.id FROM Day d WHERE d.tripId = :tripId))
            """)
     List<String> findPlaceIdsOfTrip(@Param("userId") String userId, @Param("tripId") String tripId);
+
+    /**
+     * 도장 줄 통째로.
+     *
+     * <p>사진·별점·한 줄이 붙으면서 "다녀왔다" 만으로는 모자라게 됐습니다.
+     * 번호만 세는 쪽(위)은 그대로 둡니다 — 여행 중 화면은 몇 군데 찍었는지만
+     * 보는 자리가 있고, 그때 사진까지 읽어 올 이유가 없습니다.
+     */
+    @Query("""
+           SELECT v FROM Visit v
+           WHERE v.id.userId = :userId
+             AND v.id.placeId IN (
+                 SELECT p.id FROM Place p
+                 WHERE p.dayId IN (SELECT d.id FROM Day d WHERE d.tripId = :tripId))
+           """)
+    List<Visit> findAllOfTrip(@Param("userId") String userId, @Param("tripId") String tripId);
 }
