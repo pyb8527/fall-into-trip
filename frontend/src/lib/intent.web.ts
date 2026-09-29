@@ -92,9 +92,9 @@ export function intentState(): IntentState {
 /** 무엇을 받게 되는지 한 줄. 사람에게 크기를 먼저 알려 줘야 합니다. */
 export function modelNote(): string {
   if (builtIn()) {
-    return '이 브라우저에 이미 있는 모델을 씁니다. 받을 것이 없습니다.';
+    return '이 브라우저에 이미 있는 모델을 써요. 받을 것이 없어요.';
   }
-  return `${pickModel().note} 를 한 번만 받으면 됩니다.`;
+  return `${pickModel().note} 를 한 번만 받으면 돼요.`;
 }
 
 export async function fetchModel(onProgress?: (p: Progress) => void): Promise<boolean> {

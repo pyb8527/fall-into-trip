@@ -95,7 +95,7 @@ export function SavedPicker({
       if (next.has(id)) {
         next.delete(id);
       } else if (next.size >= AT_ONCE) {
-        setFailed(`한 번에 ${AT_ONCE}곳까지 넣을 수 있습니다.`);
+        setFailed(`한 번에 ${AT_ONCE}곳까지 넣을 수 있어요.`);
         return prev;
       } else {
         next.add(id);
@@ -131,8 +131,8 @@ export function SavedPicker({
         ) : undefined
       }>
       <Caption tone="secondary">
-        고른 곳이 이 날 맨 뒤에 붙습니다. 보석함에서는 안 없어집니다 — 같은 곳을 여러
-        여행에 넣을 수 있어야 합니다.
+        고른 곳이 이 날 맨 뒤에 붙어요. 보석함에서는 안 없어져요 — 같은 곳을 여러
+        여행에 넣을 수 있어야 해요.
       </Caption>
 
       {loading && !data ? <Loading /> : null}
@@ -140,7 +140,7 @@ export function SavedPicker({
       {failed ? <ErrorNote message={failed} /> : null}
 
       {data && all.length === 0 ? (
-        <Empty message="보석함이 비어 있습니다. 장소를 찾다가 별을 누르면 여기 쌓이고, 그다음부터 이 자리에서 꺼내 쓸 수 있습니다." />
+        <Empty message="보석함이 비어 있어요. 장소를 찾다가 별을 누르면 여기 쌓이고, 그다음부터 이 자리에서 꺼내 쓸 수 있어요." />
       ) : null}
 
       {/* 몇 개 안 될 때는 찾을 것이 없습니다. 칸만 자리를 차지합니다. */}
@@ -183,7 +183,7 @@ export function SavedPicker({
 
       {data && all.length > 0 && shown.length === 0 ? (
         <Empty
-          message={q.trim() ? `"${q.trim()}" 로는 찾은 것이 없습니다.` : '이 갈래에는 아직 없습니다.'}
+          message={q.trim() ? `"${q.trim()}" 로는 찾은 것이 없어요.` : '이 갈래에는 아직 없어요.'}
         />
       ) : null}
 

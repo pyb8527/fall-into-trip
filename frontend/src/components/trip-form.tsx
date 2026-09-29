@@ -50,7 +50,7 @@ export function TripForm({
       return;
     }
     if (!title.trim()) {
-      setError('이름부터 지어 주세요. 나중에 바꿔도 됩니다.');
+      setError('이름부터 지어 주세요. 나중에 바꿔도 돼요.');
       return;
     }
     if (!startIso) {
@@ -96,7 +96,7 @@ export function TripForm({
         min={0}
         max={MAX_NIGHTS}
         unit="박"
-        hint="0이면 당일치기입니다."
+        hint="0이면 당일치기예요."
       />
 
       <Caption tone="secondary">{summary(startIso, nights)}</Caption>

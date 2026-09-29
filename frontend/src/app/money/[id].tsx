@@ -128,7 +128,7 @@ export default function Money() {
       await api.delete(`/api/expenses/${spend.id}`);
       refresh();
       showUndo({
-        message: `'${spend.name}' 을 지웠습니다.`,
+        message: `'${spend.name}' 을 지웠어요.`,
         onUndo: () => restore(spend),
       });
     } catch (e) {
@@ -214,7 +214,7 @@ export default function Money() {
           ) : null}
 
           {spent.data && list.length === 0 ? (
-            <Empty message="아직 적어 둔 것이 없습니다. 쓴 김에 적어 두면 돌아와서 편합니다." />
+            <Empty message="아직 적어 둔 것이 없어요. 쓴 김에 적어 두면 돌아와서 편해요." />
           ) : null}
 
           {/* 날짜별로 묶습니다. 여행의 돈은 하루 단위로 기억됩니다 —
@@ -348,7 +348,7 @@ function Settle({ books, loading }: { books: Books[]; loading: boolean }) {
     return <Loading />;
   }
   if (books.length === 0) {
-    return <Empty message="아직 나눌 것이 없습니다." />;
+    return <Empty message="아직 나눌 것이 없어요." />;
   }
 
   return (
@@ -381,7 +381,7 @@ function Settle({ books, loading }: { books: Books[]; loading: boolean }) {
           {book.transfers.length > 0 ? (
             <>
               <Divider />
-              <Caption tone="secondary">이렇게 주고받으면 끝납니다</Caption>
+              <Caption tone="secondary">이렇게 주고받으면 끝나요</Caption>
               {book.transfers.map((t, i) => (
                 <Split key={i}>
                   <Body>
@@ -394,7 +394,7 @@ function Settle({ books, loading }: { books: Books[]; loading: boolean }) {
               ))}
             </>
           ) : (
-            <Caption tone="success">주고받을 것이 없습니다.</Caption>
+            <Caption tone="success">주고받을 것이 없어요.</Caption>
           )}
         </Card>
       ))}
@@ -518,7 +518,7 @@ function SpendSheet({
       visible={visible}
       title={spend ? '고치기' : '쓴 돈 적기'}
       onClose={onCancel}
-      footer={<Button label={spend ? '고쳤습니다' : '적기'} onPress={submit} busy={busy} />}>
+      footer={<Button label={spend ? '고쳤어요' : '적기'} onPress={submit} busy={busy} />}>
       <Field
         label="무엇에"
         value={name}
@@ -534,7 +534,7 @@ function SpendSheet({
         placeholder={decimals > 0 ? '12.50' : '9000'}
         keyboardType="decimal-pad"
         inputMode="decimal"
-        hint={decimals > 0 ? '소수점 아래 두 자리까지 적을 수 있습니다.' : undefined}
+        hint={decimals > 0 ? '소수점 아래 두 자리까지 적을 수 있어요.' : undefined}
       />
 
       <View style={styles.pick}>

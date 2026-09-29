@@ -150,7 +150,7 @@ export default function Travel() {
   if (error || !data) {
     return (
       <Screen>
-        <ErrorNote message={error ?? '그런 여행이 없습니다.'} onRetry={reload} />
+        <ErrorNote message={error ?? '그런 여행이 없어요.'} onRetry={reload} />
       </Screen>
     );
   }
@@ -186,7 +186,7 @@ export default function Travel() {
           <Title>{day ? day.date || day.label : '날짜 없음'}</Title>
           {places.length > 0 ? (
             <Caption tone={done === places.length ? 'success' : 'muted'} strong>
-              {done === places.length ? '이 날 다 찍었습니다' : `${done}/${places.length} 찍음`}
+              {done === places.length ? '이 날 다 다녀왔어요' : `${done}/${places.length} 다녀옴`}
             </Caption>
           ) : null}
         </Split>
@@ -222,7 +222,7 @@ export default function Travel() {
       </View>
 
       {places.length === 0 ? (
-        <Empty message="이 날은 아직 비어 있습니다." />
+        <Empty message="이 날은 아직 비어 있어요." />
       ) : (
         <ScrollView
           ref={deck}
@@ -288,7 +288,7 @@ function StampBook({
             key={place.id}
             onPress={() => onJump(i)}
             accessibilityRole="button"
-            accessibilityLabel={`${place.name}${on ? ' 찍음' : ''}`}
+            accessibilityLabel={`${place.name}${on ? ' 다녀옴' : ''}`}
             style={[
               styles.chit,
               {
@@ -349,11 +349,11 @@ function PlaceCard({
 
       {info?.permanentlyClosed ? (
         <Caption tone="danger" strong>
-          문을 닫은 곳입니다
+          문을 닫은 곳이에요
         </Caption>
       ) : info?.closedOnDay ? (
         <Caption tone="danger" strong>
-          이 날은 휴무입니다
+          이 날은 휴무예요
         </Caption>
       ) : info && info.spans.length > 0 ? (
         <Caption tone="secondary">
@@ -391,7 +391,7 @@ function PlaceCard({
             ? `${Math.max(1, Math.round(next.seconds / 60))}분 · ${
                 next.meters < 1000 ? `${next.meters}m` : `${(next.meters / 1000).toFixed(1)}km`
               }`
-            : '길을 찾지 못했습니다'}
+            : '길을 찾지 못했어요'}
         </Caption>
       ) : null}
 

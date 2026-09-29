@@ -436,7 +436,7 @@ export default function Home() {
                       </Body>
                       <Caption tone="secondary">
                         장소 {post.placeCount}곳
-                        {post.likeCount > 0 ? ` · 추천 ${post.likeCount}` : ''}
+                        {post.likeCount > 0 ? ` · ♥ ${post.likeCount}` : ''}
                       </Caption>
                     </View>
                   </Press>
@@ -479,7 +479,9 @@ export default function Home() {
                       {place.name}
                     </Body>
                     <Caption tone="muted">
-                      {[labelOf(place.icon), `일정 ${place.posts}개에`].filter(Boolean).join(' · ')}
+                      {[labelOf(place.icon), `여행 ${place.posts}개에 담김`]
+                        .filter(Boolean)
+                        .join(' · ')}
                     </Caption>
                   </Grow>
                 </Row>

@@ -97,7 +97,7 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
       return;
     }
     if (isRegister && password.length < PASSWORD_MIN) {
-      setError(`비밀번호는 ${PASSWORD_MIN}자 이상이어야 합니다.`);
+      setError(`비밀번호는 ${PASSWORD_MIN}자 이상이어야 해요.`);
       return;
     }
 

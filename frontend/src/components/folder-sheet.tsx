@@ -102,13 +102,13 @@ export function FolderSheet({
   return (
     <BottomSheet visible={visible} title="폴더에 넣기" onClose={onClose}>
       <Caption tone="secondary">
-        「{tripTitle}」 를 어디에 둘까요? 폴더는 나에게만 보입니다 — 같이 간 사람은 자기 식대로
-        정리합니다.
+        「{tripTitle}」 를 어디에 둘까요? 폴더는 나에게만 보여요 — 같이 간 사람은 자기 식대로
+        정리해요.
       </Caption>
 
       <ListRow
         title="폴더 없음"
-        subtitle="목록에 그대로 둡니다"
+        subtitle="목록에 그대로 둬요"
         right={current === null ? <Badge label="여기" tone="accent" /> : undefined}
         onPress={() =>
           run(() => api.put(`/api/trips/${tripId}/folder`, {}))
@@ -156,7 +156,7 @@ export function FolderSheet({
       <ConfirmDialog
         visible={dropping !== null}
         title="폴더를 지울까요?"
-        message="안에 든 여행은 그대로 남습니다. 묶어 둔 표시만 풀립니다."
+        message="안에 든 여행은 그대로 남아요. 묶어 둔 표시만 풀려요."
         confirmLabel="지우기"
         danger
         busy={busy}

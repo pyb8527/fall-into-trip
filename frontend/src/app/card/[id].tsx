@@ -78,7 +78,7 @@ export default function Card() {
   if (error || !data) {
     return (
       <Screen>
-        <ErrorNote message={error ?? '여행을 찾을 수 없습니다.'} />
+        <ErrorNote message={error ?? '여행을 찾을 수 없어요.'} />
       </Screen>
     );
   }
@@ -166,13 +166,13 @@ function Receipt({
       <Divider />
 
       <Split>
-        <Caption>들른 곳</Caption>
+        <Caption>담은 곳</Caption>
         <Caption>{places.length}곳</Caption>
       </Split>
       <Split>
         <Caption>다녀옴</Caption>
         <Caption>
-          {done} / {places.length}
+          {done}/{places.length}
         </Caption>
       </Split>
       {/*
@@ -463,7 +463,7 @@ function Replay({ trip }: { trip: TripDetail }) {
           }}
         />
         <Caption tone="secondary">
-          {done ? `${places.length}곳 다 봤습니다` : `${step + 1} / ${places.length}`}
+          {done ? `${places.length}곳 다 봤어요` : `${step + 1} / ${places.length}`}
         </Caption>
       </Row>
 
@@ -482,7 +482,7 @@ function Replay({ trip }: { trip: TripDetail }) {
       ) : null}
 
       {places.length === 0 ? (
-        <Caption tone="secondary">지도에 찍을 곳이 아직 없습니다.</Caption>
+        <Caption tone="secondary">지도에 찍을 곳이 아직 없어요.</Caption>
       ) : null}
     </View>
   );

@@ -69,14 +69,14 @@ export function savedAgo(createdAt: string): string {
   }
   const days = Math.floor((Date.now() - at) / 86_400_000);
   if (days <= 0) {
-    return '오늘 담음';
+    return '오늘 주움';
   }
   if (days === 1) {
-    return '어제 담음';
+    return '어제 주움';
   }
   if (days < 30) {
-    return `${days}일 전 담음`;
+    return `${days}일 전 주움`;
   }
   const months = Math.round(days / 30);
-  return months < 12 ? `${months}달 전 담음` : `${Math.round(months / 12)}년 전 담음`;
+  return months < 12 ? `${months}달 전 주움` : `${Math.round(months / 12)}년 전 주움`;
 }

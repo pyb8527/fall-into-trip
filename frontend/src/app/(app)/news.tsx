@@ -73,7 +73,7 @@ export default function NewsScreen() {
   return (
     <Screen>
       {items.length === 0 ? (
-        <Empty message="아직 온 소식이 없습니다. 동행자가 일정을 고치면 여기에 쌓입니다." />
+        <Empty message="아직 온 소식이 없어요. 동행자가 일정을 고치면 여기에 쌓여요." />
       ) : (
         <>
           <View style={styles.list}>
@@ -83,7 +83,7 @@ export default function NewsScreen() {
           </View>
           {/* 30일이라고 미리 말해 둡니다. 어제 것이 안 보이는 날에 고장인지
               지난 것인지 알 수 있어야 합니다. */}
-          <Caption>지난 30일치입니다.</Caption>
+          <Caption>지난 30일치예요.</Caption>
         </>
       )}
       {/* 소식이 하나도 없어도 이 줄은 섭니다. 위 목록과 성격이 달라서입니다 —
@@ -112,13 +112,13 @@ function MineNote({ tipCount, viewCount }: { tipCount: number; viewCount: number
     <View style={styles.mine}>
       <Body>
         {viewCount > 0
-          ? `남긴 한 줄 ${tipCount}개가 ${viewCount}번 쓰였습니다.`
-          : `남긴 한 줄 ${tipCount}개. 아직 읽은 사람이 없습니다.`}
+          ? `남긴 한 줄 ${tipCount}개가 ${viewCount}번 쓰였어요.`
+          : `남긴 한 줄 ${tipCount}개. 아직 읽은 사람이 없어요.`}
       </Body>
       {/* 부풀리지 않습니다. 손님이 읽은 것은 셀 수가 없고(사람 번호가 없어
           "하루 한 번" 이 성립하지 않습니다), 그것을 안 밝히면 이 수 하나
           때문에 나머지 화면까지 못 믿게 됩니다. */}
-      <Caption>로그인하고 본 것만 셉니다. 실제로는 더 쓰였을 수 있습니다.</Caption>
+      <Caption>로그인하고 본 것만 세어요. 실제로는 더 쓰였을 수 있어요.</Caption>
     </View>
   );
 }

@@ -84,7 +84,7 @@ export default function AdminUsers() {
       {loading && !data ? <Loading /> : null}
       {error ? <ErrorNote message={error} onRetry={reload} /> : null}
 
-      {data && data.items.length === 0 ? <Empty message="조건에 맞는 계정이 없습니다." /> : null}
+      {data && data.items.length === 0 ? <Empty message="조건에 맞는 계정이 없어요." /> : null}
 
       {data?.items.map((u) => (
         <UserCard key={u.id} user={u} onChanged={reload} />
@@ -206,7 +206,7 @@ function UserCard({ user, onChanged }: { user: AdminUser; onChanged: () => void 
           busy={busy}
           disabled={user.activeSessions === 0}
           onPress={() =>
-            run(() => api.post(`/api/admin/users/${user.id}/logout`), '모든 기기에서 내보냈습니다.')
+            run(() => api.post(`/api/admin/users/${user.id}/logout`), '모든 기기에서 내보냈어요.')
           }
         />
 
@@ -232,7 +232,7 @@ function UserCard({ user, onChanged }: { user: AdminUser; onChanged: () => void 
             value={newPassword}
             onChangeText={setNewPassword}
             secureTextEntry
-            hint="8자 이상. 설정하면 이 계정의 모든 세션이 끊기고, 감사 로그에 남습니다."
+            hint="8자 이상. 설정하면 이 계정의 모든 세션이 끊기고, 감사 로그에 남아요."
           />
           <Row gap={Spacing.sm}>
             <Button
@@ -245,7 +245,7 @@ function UserCard({ user, onChanged }: { user: AdminUser; onChanged: () => void 
                   await api.post(`/api/admin/users/${user.id}/password`, { password: newPassword });
                   setNewPassword('');
                   setResetting(false);
-                }, '비밀번호를 바꿨습니다. 본인에게 직접 전달해 주세요.')
+                }, '비밀번호를 바꿨어요. 본인에게 직접 전달해 주세요.')
               }
             />
             <Button

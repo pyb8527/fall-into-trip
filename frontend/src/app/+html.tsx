@@ -93,7 +93,7 @@ export default function Document({ children }: PropsWithChildren) {
 }
 #fit-splash img { width: 160px; height: auto; }
 #fit-splash.gone { opacity: 0; pointer-events: none; }
-/* 움직임을 줄여 달라고 해 둔 사람에게는 서서히 사라지는 것도 안 합니다. */
+/* 움직임을 줄여 달라고 해 둔 사람에게는 서서히 사라지는 것도 안 해요. */
 @media (prefers-reduced-motion: reduce) { #fit-splash { transition: none; } }`,
           }}
         />
@@ -128,9 +128,9 @@ export default function Document({ children }: PropsWithChildren) {
     앱 껍데기에게 "이제 보인다" 고 알립니다.
 
     껍데기의 시작 화면은 웹뷰가 다 받았다고 할 때(onLoadEnd) 내려가는데,
-    그때는 이미 화면이 뜬 뒤라 이 시작 화면을 볼 틈이 없습니다. 이 줄이
+    그때는 이미 화면이 뜬 뒤라 이 시작 화면을 볼 틈이 없어요. 이 줄이
     그려진 지금이 넘겨받기 좋은 때입니다 — 같은 글자가 같은 자리에 있어
-    이어지는 것처럼 보입니다.
+    이어지는 것처럼 보여요.
   */
   if (window.ReactNativeWebView) {
     try {
@@ -152,9 +152,9 @@ export default function Document({ children }: PropsWithChildren) {
 
     화면이 붙었다고 곧바로 걷으면, 글꼴이 아직 안 온 동안 첫 글자들이
     대체 글꼴로 한 번 그려졌다가 바뀝니다. 스플래시 다음의 로딩 화면만
-    다른 글씨체로 나오던 것이 이것입니다.
+    다른 글씨체로 나오던 것이 이거예요.
 
-    글꼴은 화면 코드가 받아 옵니다(ui/hand). 여기서는 받아졌는지만 봅니다.
+    글꼴은 화면 코드가 받아 와요(ui/hand). 여기서는 받아졌는지만 봐요.
     3초까지만 기다립니다 — 망이 느리다고 시작 화면을 붙들고 있는 것이,
     글씨체 한 번 바뀌는 것보다 나쁩니다.
   */

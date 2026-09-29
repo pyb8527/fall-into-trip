@@ -98,7 +98,7 @@ export default function Welcome() {
         <LogoLockup size={114} />
       </View>
 
-      <Title>여행은 짜는 동안이 제일 깁니다</Title>
+      <Title>여행은 짜는 동안이 제일 길어요</Title>
 
       {shown.length > 0 ? (
         <View style={styles.feed}>
@@ -147,9 +147,9 @@ function Peek({ post, onOpen }: { post: PostCard; onOpen: () => void }) {
 
 /** 보여 줄 것이 없을 때만 쓰는 말. 한 줄에 하나씩. */
 const POINTS = [
-  '한 일정을 여럿이 함께 고칩니다.',
-  '가고 싶은 곳을 보석함에 모아 둡니다.',
-  '남이 다녀온 길을 통째로 가져옵니다.',
+  '한 일정을 여럿이 함께 고쳐요.',
+  '가고 싶은 곳을 보석함에 모아 둬요.',
+  '남이 다녀온 길을 통째로 가져와요.',
 ];
 
 const styles = StyleSheet.create({

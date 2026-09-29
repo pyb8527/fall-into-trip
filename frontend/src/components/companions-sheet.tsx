@@ -143,7 +143,7 @@ function Inner({
       ))}
 
       {data && data.members.length <= 1 ? (
-        <Empty message="아직 혼자입니다. 링크를 만들어 불러 보세요." />
+        <Empty message="아직 혼자예요. 링크를 만들어 불러 보세요." />
       ) : null}
 
       <Divider />
@@ -153,7 +153,7 @@ function Inner({
       ) : (
         <>
           <Caption tone="secondary">
-            부르고 내보내는 것은 여행을 만든 사람만 할 수 있습니다.
+            부르고 내보내는 것은 여행을 만든 사람만 할 수 있어요.
           </Caption>
           <Button
             label="이 여행에서 나가기"
@@ -168,7 +168,7 @@ function Inner({
         title="내보낼까요?"
         message={
           dropping
-            ? `${dropping.name} 님이 이 여행을 더 볼 수 없게 됩니다. 넣어 둔 장소는 그대로 남습니다.`
+            ? `${dropping.name} 님이 이 여행을 더 볼 수 없게 돼요. 넣어 둔 장소는 그대로 남아요.`
             : undefined
         }
         confirmLabel="내보내기"
@@ -187,7 +187,7 @@ function Inner({
       <ConfirmDialog
         visible={leaving}
         title="나갈까요?"
-        message="다시 들어오려면 초대 링크를 새로 받아야 합니다."
+        message="다시 들어오려면 초대 링크를 새로 받아야 해요."
         confirmLabel="나가기"
         danger
         busy={busy}
@@ -262,12 +262,12 @@ function InviteSection({ tripId }: { tripId: string }) {
   }
 
   async function send() {
-    const how = await shareLink(link, '여행에 초대합니다');
+    const how = await shareLink(link, '여행에 초대해요');
     setNotice(
       how === 'copied'
-        ? '링크를 복사했습니다.'
+        ? '링크를 복사했어요.'
         : how === 'failed'
-          ? '보내기가 열리지 않았습니다. 아래 주소를 직접 붙여 넣어 주세요.'
+          ? '보내기가 열리지 않았어요. 아래 주소를 직접 붙여 넣어 주세요.'
           : null,
     );
   }
@@ -298,7 +298,7 @@ function InviteSection({ tripId }: { tripId: string }) {
         />
       ) : (
         <Caption tone="secondary">
-          내가 닫을 때까지 계속 열려 있습니다. 링크가 새어 나갔다 싶으면 아래 목록에서
+          내가 닫을 때까지 계속 열려 있어요. 링크가 새어 나갔다 싶으면 아래 목록에서
           못 쓰게 해 주세요.
         </Caption>
       )}
@@ -309,7 +309,7 @@ function InviteSection({ tripId }: { tripId: string }) {
         min={1}
         max={MAX_USES}
         unit="명"
-        hint="이 횟수만큼 쓰이면 링크가 닫힙니다."
+        hint="이 횟수만큼 쓰이면 링크가 닫혀요."
       />
 
       {failed ? <ErrorNote message={failed} /> : null}
@@ -319,7 +319,7 @@ function InviteSection({ tripId }: { tripId: string }) {
       {made ? (
         <View style={styles.made}>
           <Caption tone="success" strong>
-            링크를 만들었습니다. 이 창을 닫으면 다시 볼 수 없습니다.
+            링크를 만들었어요. 이 창을 닫으면 다시 볼 수 없어요.
           </Caption>
           {/* 눌러서 옮길 수 있게 두고, 안 되는 경우를 위해 글자로도 띄웁니다. */}
           <Body small selectable style={styles.link}>
@@ -402,7 +402,7 @@ function InviteRowView({ invite, onChanged }: { invite: InviteRow; onChanged: ()
       <ConfirmDialog
         visible={asking}
         title="이 링크를 못 쓰게 할까요?"
-        message="이미 이 링크로 들어온 사람은 그대로 남습니다. 앞으로 이 링크로는 못 들어옵니다."
+        message="이미 이 링크로 들어온 사람은 그대로 남아요. 앞으로 이 링크로는 못 들어와요."
         confirmLabel="못 쓰게 하기"
         danger
         busy={busy}

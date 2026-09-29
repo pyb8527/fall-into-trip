@@ -102,8 +102,8 @@ export default function Popular() {
       {tab === 'places' ? (
         <>
           <Caption tone="secondary">
-            올라온 일정에 여럿이 넣은 곳입니다. 한 일정에서 여러 번 넣었어도 한 번으로
-            셉니다.
+            올라온 여행에 여럿이 넣은 곳이에요. 한 여행에서 여러 번 넣었어도 한 번으로
+            세어요.
           </Caption>
 
           {/*
@@ -140,7 +140,7 @@ export default function Popular() {
                 options={(regions?.regions ?? []).map((r) => ({
                   value: r.region,
                   label: r.region,
-                  hint: `일정 ${r.posts}개`,
+                  hint: `여행 ${r.posts}개`,
                 }))}
               />
             ) : null}
@@ -153,8 +153,8 @@ export default function Popular() {
             <Empty
               message={
                 kind
-                  ? '이런 곳은 아직 올라온 것이 없습니다.'
-                  : '아직 올라온 일정이 없습니다. 첫 번째가 되어 보세요.'
+                  ? '이런 곳은 아직 올라온 것이 없어요.'
+                  : '아직 올라온 일정이 없어요. 첫 번째가 되어 보세요.'
               }
             />
           ) : null}
@@ -166,7 +166,9 @@ export default function Popular() {
                 at={i + 1}
                 mark={<Mark emoji={iconOf(place.icon)} fallback="📍" />}
                 title={place.name}
-                sub={[labelOf(place.icon), `일정 ${place.posts}개에`].filter(Boolean).join(' · ')}
+                sub={[labelOf(place.icon), `여행 ${place.posts}개에 담김`]
+                  .filter(Boolean)
+                  .join(' · ')}
                 onPress={
                   place.lat != null && place.lng != null
                     ? () =>
@@ -185,13 +187,13 @@ export default function Popular() {
         </>
       ) : (
         <>
-          <Caption tone="secondary">여럿이 다녀온 지역입니다. 누르면 그 지역 글만 봅니다.</Caption>
+          <Caption tone="secondary">여럿이 다녀온 지역이에요. 누르면 그 지역 글만 봐요.</Caption>
 
           {loadingRegions && !regions ? <Loading /> : null}
           {regionError ? <ErrorNote message={regionError} onRetry={reloadRegions} /> : null}
 
           {regions && regions.regions.length === 0 ? (
-            <Empty message="아직 올라온 일정이 없습니다. 첫 번째가 되어 보세요." />
+            <Empty message="아직 올라온 일정이 없어요. 첫 번째가 되어 보세요." />
           ) : null}
 
           <View style={styles.list}>
@@ -200,7 +202,7 @@ export default function Popular() {
                 key={r.region}
                 at={i + 1}
                 title={r.region}
-                sub={`일정 ${r.posts}개${r.likes > 0 ? ` · 추천 ${r.likes}` : ''}`}
+                sub={`여행 ${r.posts}개${r.likes > 0 ? ` · ♥ ${r.likes}` : ''}`}
                 onPress={() => router.push(`/community?region=${encodeURIComponent(r.region)}`)}
               />
             ))}

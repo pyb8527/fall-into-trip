@@ -73,7 +73,7 @@ export default function AdminPosts() {
     <Screen>
       <Title>신고된 것</Title>
       <Body tone="secondary">
-        신고가 쌓여 자동으로 감춰진 것과, 신고가 들어왔지만 아직 보이는 것입니다.
+        신고가 쌓여 자동으로 감춰진 것과, 신고가 들어왔지만 아직 보이는 거예요.
       </Body>
 
       <SegmentedTabs
@@ -87,7 +87,7 @@ export default function AdminPosts() {
 
       {loading && !data ? <Loading /> : null}
       {error ? <ErrorNote message={error} onRetry={reload} /> : null}
-      {data && data.items.length === 0 ? <Empty message="살펴볼 것이 없습니다." /> : null}
+      {data && data.items.length === 0 ? <Empty message="살펴볼 것이 없어요." /> : null}
 
       {data?.items.map((item) => (
         <ReportedRow key={item.id} kind={kind} item={item} onChanged={reload} />

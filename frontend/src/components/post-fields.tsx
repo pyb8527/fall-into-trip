@@ -106,8 +106,8 @@ export function PostFields({
         label="한 줄 소개"
         value={value.summary}
         onChangeText={(next) => set('summary', next)}
-        placeholder="먹으러만 다닌 일정입니다"
-        hint="목록에서 이 줄이 보입니다. 비워도 됩니다."
+        placeholder="먹으러만 다닌 일정이에요"
+        hint="목록에서 이 줄이 보여요. 비워도 돼요."
       />
 
       {/* 지역은 안 골라도 올라갑니다. 다만 지역으로 거를 때 안 걸립니다. */}
@@ -159,7 +159,7 @@ export function PostFields({
           value={typing}
           onChangeText={setTyping}
           placeholder="아이랑"
-          hint={`${MAX_TAGS}개까지. 엔터로 답니다.`}
+          hint={`${MAX_TAGS}개까지. 엔터로 달아요.`}
           returnKeyType="done"
           onSubmitEditing={() => addTag(typing)}
         />
@@ -185,7 +185,7 @@ export function PostFields({
         <Chip label="받기" selected={value.feedback} onPress={() => set('feedback', true)} />
       </Row>
       <Caption tone="secondary">
-        받으면 다른 사람이 일정 전체에, 또는 장소 하나하나에 댓글을 달 수 있습니다.
+        받으면 다른 사람이 일정 전체에, 또는 장소 하나하나에 댓글을 달 수 있어요.
       </Caption>
     </>
   );

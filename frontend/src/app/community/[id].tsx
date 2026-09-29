@@ -256,7 +256,7 @@ export default function Post() {
         next.delete(name);
         return next;
       });
-      setNotice(`「${name}」 를 보석함에서 뺐습니다.`);
+      setNotice(`「${name}」 를 보석함에서 뺐어요.`);
     } catch (e) {
       setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
     }
@@ -290,7 +290,7 @@ export default function Post() {
         잠시 뒤 사라지므로 하던 일을 막지 않습니다.
       */
       showUndo({
-        message: `「${place.name}」 를 보석함에 담았습니다. 일정에 추가하러 가실까요?`,
+        message: `「${place.name}」 를 보석함에 담았어요. 일정에 추가하러 가실까요?`,
         label: '보석함으로',
         onUndo: () => router.push('/(app)/saved'),
       });
@@ -316,7 +316,7 @@ export default function Post() {
       setLooking(null);
       setActiveId(null);
       reload();
-      setNotice('글에서 뺐습니다.');
+      setNotice('글에서 뺐어요.');
     } catch (e) {
       setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
     } finally {
@@ -329,7 +329,7 @@ export default function Post() {
     setBusy(true);
     try {
       await api.post(`/api/posts/${id}/report`, { reason });
-      setNotice('신고했습니다. 운영자가 확인합니다.');
+      setNotice('신고했어요. 운영자가 확인해요.');
     } catch (e) {
       setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
     } finally {
@@ -390,7 +390,7 @@ export default function Post() {
   if (error || !data) {
     return (
       <Screen>
-        <ErrorNote message={error ?? '글을 찾을 수 없습니다.'} onRetry={reload} />
+        <ErrorNote message={error ?? '글을 찾을 수 없어요.'} onRetry={reload} />
       </Screen>
     );
   }
@@ -625,7 +625,7 @@ export default function Post() {
       <ConfirmDialog
         visible={removing}
         title="내릴까요?"
-        message="둘러보기에서 사라집니다. 내 여행은 그대로 남습니다."
+        message="둘러보기에서 사라져요. 내 여행은 그대로 남아요."
         confirmLabel="내리기"
         danger
         busy={busy}
@@ -709,7 +709,7 @@ export default function Post() {
             ? `${
                 data.itinerary.days[dropping.dayIndex]?.places[dropping.placeIndex]?.name ??
                 '이 장소'
-              } 이(가) 이 글에서 사라집니다. 여기 달린 댓글도 함께 사라집니다. 내 여행은 그대로 남습니다.`
+              } 이(가) 이 글에서 사라져요. 여기 달린 댓글도 함께 사라져요. 내 여행은 그대로 남아요.`
             : ''
         }
         confirmLabel="빼기"
@@ -747,7 +747,7 @@ export default function Post() {
       <ConfirmDialog
         visible={reporting}
         title="이 글을 신고할까요?"
-        message="여러 사람이 신고하면 운영자가 확인할 때까지 자동으로 감춰집니다."
+        message="여러 사람이 신고하면 운영자가 확인할 때까지 자동으로 감춰져요."
         confirmLabel="신고"
         danger
         busy={busy}
@@ -1032,7 +1032,7 @@ function EditSheet({
       return;
     }
     if (!shape.title.trim()) {
-      setFailed('제목은 비울 수 없습니다. 목록에서 이것만 보입니다.');
+      setFailed('제목은 비울 수 없어요. 목록에서 이것만 보여요.');
       return;
     }
     setFailed(null);
@@ -1060,7 +1060,7 @@ function EditSheet({
       onClose={onCancel}
       footer={<Button label="고치기" onPress={submit} busy={busy} />}>
       <Caption tone="secondary">
-        일정은 그대로입니다. 장소를 빼려면 그 장소를 누르고 점 세 개를 누릅니다.
+        일정은 그대로예요. 장소를 빼려면 그 장소를 누르고 점 세 개를 눌러요.
       </Caption>
 
       <PostFields value={shape} onChange={setShape} />
@@ -1130,8 +1130,8 @@ function CopySheet({
       onClose={onCancel}
       footer={<Button label="내 여행으로 가져오기" onPress={submit} busy={busy} />}>
       <Caption tone="secondary">
-        「{title}」 의 일정이 그대로 복사됩니다. 첫날을 정하면 나머지 날짜가 따라옵니다. 가져온
-        뒤에는 마음대로 고칠 수 있습니다.
+        「{title}」 의 일정이 그대로 복사돼요. 첫날을 정하면 나머지 날짜가 따라와요. 가져온
+        뒤에는 마음대로 고칠 수 있어요.
       </Caption>
       <DateField label="떠나는 날" value={startIso} onChange={setStartIso} />
 

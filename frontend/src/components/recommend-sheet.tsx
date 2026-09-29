@@ -264,10 +264,10 @@ export function RecommendSheet({
     <BottomSheet visible={visible} title="어디 갈지 물어보기" onClose={onClose}>
       <Caption tone="secondary">
         {day
-          ? `${day.label} 기준으로 찾습니다. 그날 문 여는지도 함께 봅니다.`
+          ? `${day.label} 기준으로 찾아요. 그날 문 여는지도 함께 봐요.`
           : tripId
-            ? '이 여행에 넣어 둔 곳들 언저리에서 찾습니다. 날을 고르면 그날 문 여는지도 봅니다.'
-            : '보석함에 담아 둔 곳들 언저리에서 찾습니다.'}
+            ? '이 여행에 넣어 둔 곳들 언저리에서 찾아요. 날을 고르면 그날 문 여는지도 봐요.'
+            : '보석함에 담아 둔 곳들 언저리에서 찾아요.'}
       </Caption>
 
       <Field
@@ -405,15 +405,15 @@ export function RecommendSheet({
       {canParseHere && brain !== 'ready' ? (
         brain === 'fetching' ? (
           <Caption tone="secondary">
-            기기에 넣을 모델을 받는 중입니다 ({Math.round(pulling * 100)}%). 그동안에도 물어볼 수
-            있습니다.
+            기기에 넣을 모델을 받는 중이에요 ({Math.round(pulling * 100)}%). 그동안에도 물어볼 수
+            있어요.
           </Caption>
         ) : (
           <Row gap={Spacing.sm} style={styles.brain}>
             <View style={styles.grow}>
               <Caption tone="secondary">
-                지금은 물어본 문장이 서버를 거쳐 구글로 갑니다. 여기서 먼저 추리게 하면 문장은
-                이 기기 밖으로 나가지 않습니다. {modelNote()}
+                지금은 물어본 문장이 서버를 거쳐 구글로 가요. 여기서 먼저 추리게 하면 문장은
+                이 기기 밖으로 나가지 않아요. {modelNote()}
               </Caption>
             </View>
             <Button label="받기" variant="ghost" compact onPress={pullModel} />
@@ -422,7 +422,7 @@ export function RecommendSheet({
       ) : null}
 
       {canParseHere && brain === 'ready' ? (
-        <Caption tone="success">이 문장은 이 기기 밖으로 나가지 않습니다.</Caption>
+        <Caption tone="success">이 문장은 이 기기 밖으로 나가지 않아요.</Caption>
       ) : null}
 
       {busy ? <Loading label="찾는 중" /> : null}
@@ -479,7 +479,7 @@ export function RecommendSheet({
                 안 하느니만 못합니다. */}
             {card.openOnDay === false ? (
               <Caption tone="danger" strong>
-                그날 쉽니다
+                그날 쉬어요
               </Caption>
             ) : null}
           </Row>
@@ -558,9 +558,9 @@ const WHERE: Record<Where, string> = {
 };
 
 const KEPT: Record<Where, string> = {
-  trip: '일정에 넣었습니다.',
-  candidate: '투표장에 올렸습니다.',
-  saved: '보석함에 담았습니다.',
+  trip: '일정에 넣었어요.',
+  candidate: '투표장에 올렸어요.',
+  saved: '보석함에 담았어요.',
 };
 
 type Card = {

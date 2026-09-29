@@ -167,8 +167,8 @@ export function CommentList({
         <Empty
           message={
             at
-              ? '이 장소에 대한 댓글은 아직 없습니다. 먼저 남겨 보세요.'
-              : '아직 댓글이 없습니다. 먼저 남겨 보세요.'
+              ? '이 장소에 대한 댓글은 아직 없어요. 먼저 남겨 보세요.'
+              : '아직 댓글이 없어요. 먼저 남겨 보세요.'
           }
         />
       ) : null}
@@ -223,7 +223,7 @@ export function CommentList({
             value={text}
             onChangeText={setText}
             placeholder={
-              at ? '여기 말고 옆집이 더 낫습니다' : '첫날은 좀 빡셉니다. 하나 빼는 게 어떨까요?'
+              at ? '여기 말고 옆집이 더 나아요' : '첫날은 좀 빡세요. 하나 빼는 게 어떨까요?'
             }
             hint="500자까지"
           />
@@ -253,7 +253,7 @@ export function CommentList({
       <ConfirmDialog
         visible={reporting !== null}
         title="이 댓글을 신고할까요?"
-        message="여러 사람이 신고하면 운영자가 확인할 때까지 자동으로 감춰집니다."
+        message="여러 사람이 신고하면 운영자가 확인할 때까지 자동으로 감춰져요."
         confirmLabel="신고"
         danger
         busy={busy}

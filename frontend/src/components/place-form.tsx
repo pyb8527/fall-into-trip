@@ -124,11 +124,11 @@ export function PlaceForm({
       return;
     }
     if (!name.trim()) {
-      setError('이름이 있어야 합니다. 부르기 쉬운 것으로 넣어 주세요.');
+      setError('이름이 있어야 해요. 부르기 쉬운 것으로 넣어 주세요.');
       return;
     }
     if (!hasSpot) {
-      setError('먼저 찾아서 골라 주세요. 지도에 찍을 자리가 있어야 합니다.');
+      setError('먼저 찾아서 골라 주세요. 지도에 찍을 자리가 있어야 해요.');
       return;
     }
     /* 적어 둔 것이 숫자로 안 읽히면 여기서 멈춥니다. 서버로 보내 400 을
@@ -136,7 +136,7 @@ export function PlaceForm({
     const typed = costAmount.trim();
     const costUnits = typed === '' ? null : unitsOf(typed, decimalsOf(costCurrency));
     if (typed !== '' && costUnits === null) {
-      setError('비용은 숫자로 넣어 주세요. 통화 기호는 옆에서 고릅니다.');
+      setError('비용은 숫자로 넣어 주세요. 통화 기호는 옆에서 골라요.');
       return;
     }
 
@@ -174,7 +174,7 @@ export function PlaceForm({
       onDone();
     } catch (e) {
       if (e instanceof ApiError && e.code === 'STALE') {
-        setError('동행자가 먼저 고쳤습니다. 화면을 새로 불러온 뒤 다시 저장해 주세요.');
+        setError('동행자가 먼저 고쳤어요. 화면을 새로 불러온 뒤 다시 저장해 주세요.');
       } else {
         setError(e instanceof ApiError ? e.message : UNEXPECTED);
       }
@@ -211,7 +211,7 @@ export function PlaceForm({
           <Icon name="map-pin" tone="accent" />
           <View style={styles.spotText}>
             <Body small strong>
-              지도에 찍을 자리를 잡았습니다
+              지도에 찍을 자리를 잡았어요
             </Body>
             {picked ? <Caption numberOfLines={2}>{picked}</Caption> : null}
           </View>
@@ -225,7 +225,7 @@ export function PlaceForm({
         onChangeText={setName}
         placeholder="난바 파크스"
         maxLength={120}
-        hint="찾은 이름 그대로도 좋고, 우리끼리 부르는 이름도 좋습니다."
+        hint="찾은 이름 그대로도 좋고, 우리끼리 부르는 이름도 좋아요."
       />
 
       {/*
@@ -267,7 +267,7 @@ export function PlaceForm({
         placeholder={decimalsOf(costCurrency) > 0 ? '12.50' : '1200'}
         inputMode="decimal"
         hint={
-          decimalsOf(costCurrency) > 0 ? '소수점 아래 두 자리까지 적을 수 있습니다.' : undefined
+          decimalsOf(costCurrency) > 0 ? '소수점 아래 두 자리까지 적을 수 있어요.' : undefined
         }
       />
       <Row gap={Spacing.xs} style={styles.currencies}>
@@ -286,7 +286,7 @@ export function PlaceForm({
         value={cost}
         onChangeText={setCost}
         placeholder="1인 2천엔 / 무료"
-        hint="여기 적은 글자는 가계부에 안 더해집니다."
+        hint="여기 적은 글자는 가계부에 안 더해져요."
       />
 
       <Field label="메모" value={note} onChangeText={setNote} multiline />

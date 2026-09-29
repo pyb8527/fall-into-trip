@@ -161,7 +161,7 @@ function load(): Promise<void> {
         /* 다음에 다시 받아 볼 수 있게 풀어 둡니다. 한 번 실패한 것을 들고
            있으면 네트워크가 돌아와도 영영 안 뜹니다. */
         loading = null;
-        reject(new Error('구글 스크립트를 받지 못했습니다.'));
+        reject(new Error('구글 스크립트를 받지 못했어요.'));
       };
       document.head.appendChild(tag);
     });

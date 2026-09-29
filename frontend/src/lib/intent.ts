@@ -53,7 +53,7 @@ export const canParseHere = true;
 
 /** 무엇을 받게 되는지 한 줄. 사람에게 크기를 먼저 알려 줘야 합니다. */
 export function modelNote(): string {
-  return '약 1GB 를 한 번만 받으면 됩니다.';
+  return '약 1GB 를 한 번만 받으면 돼요.';
 }
 
 let session: LLMChatSession | null = null;
@@ -132,7 +132,7 @@ async function sit(want: 'intent' | 'booking') {
     return;
   }
   if (!modelPath) {
-    throw new Error('아직 안 받았습니다');
+    throw new Error('아직 안 받았어요');
   }
   try {
     session?.dispose();

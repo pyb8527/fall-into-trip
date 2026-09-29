@@ -182,8 +182,8 @@ function Inside() {
        보이므로 그렇다고 말합니다. */
     return (
       <Sorry
-        title="어디로 가야 할지 모릅니다"
-        body="이 빌드에 서버 주소가 안 들어갔습니다. 다시 빌드해야 합니다."
+        title="어디로 가야 할지 몰라요"
+        body="이 빌드에 서버 주소가 안 들어갔어요. 다시 빌드해야 해요."
       />
     );
   }
@@ -191,7 +191,7 @@ function Inside() {
   if (broken) {
     return (
       <Sorry
-        title="열 수가 없습니다"
+        title="열 수가 없어요"
         body={broken}
         onRetry={() => {
           setBroken(null);
@@ -232,14 +232,14 @@ function Inside() {
         onLoadEnd={shown}
         onMessage={(e) => heard(e.nativeEvent.data)}
         onError={(e) => {
-          setBroken(e.nativeEvent.description || '인터넷에 닿지 못했습니다.');
+          setBroken(e.nativeEvent.description || '인터넷에 닿지 못했어요.');
           shown();
         }}
         onHttpError={(e) => {
           /* 페이지 안의 그림 하나가 404 인 것과 화면 자체가 안 열린 것은
              다릅니다. 화면일 때만 말합니다. */
           if (e.nativeEvent.url === SITE || e.nativeEvent.url === `${SITE}/`) {
-            setBroken(`서버가 ${e.nativeEvent.statusCode} 를 돌려주었습니다.`);
+            setBroken(`서버가 ${e.nativeEvent.statusCode} 를 돌려줬어요.`);
             shown();
           }
         }}

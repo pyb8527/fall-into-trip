@@ -74,7 +74,7 @@ export function useHere(): HereState {
         setWatching(false);
         /* 폰에서는 설정까지 들어가야 되돌릴 수 있으므로 그렇게 적어 둡니다.
            브라우저처럼 "주소창 왼쪽" 이라고 하면 찾을 데가 없습니다. */
-        setError('위치 사용을 허용해 주세요. 설정 > FIT 에서 바꿀 수 있습니다.');
+        setError('위치 사용을 허용해 주세요. 설정 > FIT 에서 바꿀 수 있어요.');
         return;
       }
 
@@ -97,7 +97,7 @@ export function useHere(): HereState {
       );
     })().catch(() => {
       setWatching(false);
-      setError('지금 위치를 알 수 없습니다.');
+      setError('지금 위치를 알 수 없어요.');
     });
   }, []);
 

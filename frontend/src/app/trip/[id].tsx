@@ -139,9 +139,9 @@ const MODE_LABEL: Record<TravelMode, string> = {
  * 받으므로 문장째로 적어 둡니다.
  */
 const MODE_FITS: Record<TravelMode, string> = {
-  WALK: '걸어서 가면 닿습니다',
-  TRANSIT: '대중교통으로 가면 닿습니다',
-  DRIVE: '택시로 가면 닿습니다',
+  WALK: '걸어서 가면 닿아요',
+  TRANSIT: '대중교통으로 가면 닿아요',
+  DRIVE: '택시로 가면 닿아요',
 };
 
 /**
@@ -720,7 +720,7 @@ export default function TripScreen() {
          가계부 하나 때문에 일정까지 못 받는 것이 더 나쁩니다. */
       await downloadTripBook(data, spending?.expenses ?? null);
     } catch {
-      setActionError('엑셀로 만들지 못했습니다. 잠시 뒤 다시 눌러 보세요.');
+      setActionError('엑셀로 만들지 못했어요. 잠시 뒤 다시 눌러 보세요.');
     } finally {
       setBooking(false);
     }
@@ -1072,7 +1072,7 @@ export default function TripScreen() {
   if (!data) {
     return (
       <Screen>
-        <Empty message="그런 여행이 없습니다." />
+        <Empty message="그런 여행이 없어요." />
       </Screen>
     );
   }
@@ -1409,8 +1409,8 @@ export default function TripScreen() {
         */}
         {kept ? (
           <Caption tone="warning" strong>
-            지금은 저장해 둔 것을 보고 있습니다({keptAgo(kept.at)} 기준). 고치는 것은 연결된
-            뒤에 됩니다.
+            지금은 저장해 둔 것을 보고 있어요({keptAgo(kept.at)} 기준). 고치는 것은 연결된
+            뒤에 돼요.
           </Caption>
         ) : null}
 
@@ -1431,14 +1431,14 @@ export default function TripScreen() {
             {planted ? (
               <Caption tone="hot" strong>
                 {plantedWith
-                  ? `여기에 깃발을 꽂았습니다. ${plantedWith} 님도 바로 여기에 있습니다.`
-                  : '여기에 깃발을 꽂았습니다. 여섯 시간 뒤 저절로 사라집니다.'}
+                  ? `여기에 깃발을 꽂았어요. ${plantedWith} 님도 바로 여기에 있어요.`
+                  : '여기에 깃발을 꽂았어요. 여섯 시간 뒤 저절로 사라져요.'}
               </Caption>
             ) : null}
             {sharing ? (
               <Caption tone="success" strong>
-                지금 어디 있는지가 동행자에게 보입니다. 네 시간 뒤 저절로 꺼지고,
-                지나온 자리는 남지 않습니다.
+                지금 어디 있는지가 동행자에게 보여요. 네 시간 뒤 저절로 꺼지고,
+                지나온 자리는 남지 않아요.
               </Caption>
             ) : null}
           </View>
@@ -1449,7 +1449,7 @@ export default function TripScreen() {
         {mates.length > 0 ? (
           <Caption tone="secondary">
             지금 {mates.map((m) => `${faceOf(m.mark, m.name)} ${m.name}`).join(' · ')} 님이 지도에
-            보입니다.
+            보여요.
           </Caption>
         ) : null}
 
@@ -1515,7 +1515,7 @@ export default function TripScreen() {
             />
         </Row>
 
-        {days.length === 0 ? <Empty message="아직 날짜가 없습니다." /> : null}
+        {days.length === 0 ? <Empty message="아직 날짜가 없어요." /> : null}
 
         {days.map((day, di) =>
           activeDay === ALL || activeDay === di ? (
@@ -1644,7 +1644,7 @@ export default function TripScreen() {
 
       <BottomSheet visible={flags} title="꽂아 둔 깃발" onClose={() => setFlags(false)}>
         <Caption tone="secondary">
-          여섯 시간 뒤 저절로 사라집니다. 누르면 지도가 그 자리로 갑니다.
+          여섯 시간 뒤 저절로 사라져요. 누르면 지도가 그 자리로 가요.
         </Caption>
         {pins.map((pin) => (
           <Row key={pin.id} style={styles.pinRow}>
@@ -1694,7 +1694,7 @@ export default function TripScreen() {
           <ListRow
             left={<Icon name="printer" tone="secondary" />}
             title="일정 한 장 인쇄"
-            subtitle="종이로 뽑아 두면 배터리가 나가도 보입니다."
+            subtitle="종이로 뽑아 두면 배터리가 나가도 보여요."
             onPress={() => {
               setMore(false);
               printItinerary(data);
@@ -1712,7 +1712,7 @@ export default function TripScreen() {
         <ListRow
           left={<Icon name="download" tone="secondary" />}
           title="엑셀로 받기"
-          subtitle={booking ? '만드는 중…' : '일정과 가계부를 표로 뺍니다.'}
+          subtitle={booking ? '만드는 중…' : '일정과 가계부를 표로 빼요.'}
           onPress={takeBook}
         />
 
@@ -1726,7 +1726,7 @@ export default function TripScreen() {
         <ListRow
           left={<Icon name="copy" tone="secondary" />}
           title="이 일정으로 새 여행 만들기"
-          subtitle="장소는 그대로 오고 날짜만 새로 잡습니다."
+          subtitle="장소는 그대로 오고 날짜만 새로 잡아요."
           onPress={() => {
             setMore(false);
             setCloning(true);
@@ -1788,7 +1788,7 @@ export default function TripScreen() {
       <ConfirmDialog
         visible={dropping}
         title="이 여행을 지울까요?"
-        message="날짜와 장소가 모두 사라집니다. 동행자도 더 볼 수 없게 됩니다. 되돌릴 수 없습니다."
+        message="날짜와 장소가 모두 사라져요. 동행자도 더 볼 수 없게 돼요. 되돌릴 수 없어요."
         confirmLabel="지우기"
         danger
         onCancel={() => setDropping(false)}
@@ -1873,8 +1873,8 @@ function TripMarkPicker({ trip, onChanged }: { trip: Trip; onChanged: () => void
           </Body>
           <Caption tone="muted">
             {chosen
-              ? '내 여행 목록에서 이렇게 보입니다.'
-              : '목록에서 이름을 읽기 전에 알아볼 수 있습니다.'}
+              ? '내 여행 목록에서 이렇게 보여요.'
+              : '목록에서 이름을 읽기 전에 알아볼 수 있어요.'}
           </Caption>
         </Grow>
         <Row gap={Spacing.sm}>
@@ -2232,7 +2232,7 @@ function DayCard({
         목록이라, 그 아래에 카드가 끼면 목록이 밀리면서 무엇이 어떻게
         바뀌었는지가 더 안 보였습니다. 이제 목록 위에 띄웁니다.
       */
-      onNote({ message: '동선을 다시 세웠습니다.', onUndo: () => undoTidy(was) });
+      onNote({ message: '동선을 다시 세웠어요.', onUndo: () => undoTidy(was) });
       onChanged();
     } catch {
       setOrder(was);
@@ -2248,7 +2248,7 @@ function DayCard({
     } catch {
       /* 못 되돌렸으면 화면도 그대로 둡니다. 화면만 옛 순서로 두면 다음에
          열 때 슬쩍 되돌아가 있습니다. */
-      onNote({ message: '되돌리지 못했습니다. 잠시 뒤에 다시 해 보세요.' });
+      onNote({ message: '되돌리지 못했어요. 잠시 뒤에 다시 해 보세요.' });
     }
   }
 
@@ -2372,11 +2372,11 @@ function DayCard({
               {tidy.worthIt ? (
                 <>
                   <Body small strong>
-                    이렇게 돌면 {readableMeters(tidy.beforeMeters - tidy.afterMeters)} 덜 걷습니다.
+                    이렇게 돌면 {readableMeters(tidy.beforeMeters - tidy.afterMeters)} 덜 걸어요.
                   </Body>
                   <Caption tone="secondary">
                     {readableMeters(tidy.beforeMeters)} → {readableMeters(tidy.afterMeters)} · 시간을 적어 둔 곳은
-                    그대로 둡니다.
+                    그대로 둬요.
                   </Caption>
                   <Row gap={Spacing.sm}>
                     <Button label="이대로 바꾸기" compact onPress={applyTidy} />
@@ -2391,11 +2391,11 @@ function DayCard({
               ) : (
                 <>
                   <Body small strong>
-                    지금 순서로도 충분히 짧습니다.
+                    지금 순서로도 충분히 짧아요.
                   </Body>
                   <Row gap={Spacing.sm}>
                     <Button
-                      label="알겠습니다"
+                      label="알겠어요"
                       variant="ghost"
                       compact
                       onPress={() => setTidy(null)}
@@ -2417,7 +2417,7 @@ function DayCard({
           />
 
           {day.places.length === 0 ? (
-            <Caption>이 날에는 아직 장소가 없습니다.</Caption>
+            <Caption>이 날에는 아직 장소가 없어요.</Caption>
           ) : (
             <View style={styles.places}>
               {order.map((place, i) => (
@@ -2780,7 +2780,7 @@ function PlaceRow({
               {/* 실수로 두 번 넣었을 수도, 일부러 또 가려는 것일 수도 있습니다.
                   어느 쪽인지는 넣은 사람만 아니까 지우지 않고 알려만 줍니다. */}
               {alsoOn.length > 0 ? (
-                <Caption tone="warning">{alsoOn.join(' · ')}에도 넣어 두었습니다</Caption>
+                <Caption tone="warning">{alsoOn.join(' · ')}에도 넣어 뒀어요</Caption>
               ) : null}
               {/*
                 동행자가 손댄 자취.
@@ -2926,7 +2926,7 @@ function PlaceRow({
           <ListRow
             left={<Icon name="edit-2" tone="secondary" />}
             title="고치기"
-            subtitle="이름·시각·비용·메모를 손봅니다."
+            subtitle="이름·시각·비용·메모를 손봐요."
             onPress={() => {
               setFolded(false);
               onEdit();
@@ -2944,7 +2944,7 @@ function PlaceRow({
           <ListRow
             left={<Icon name="plus" tone="secondary" />}
             title="여기 다음에 장소 넣기"
-            subtitle="맨 뒤가 아니라 이 곳 바로 다음 자리에 들어갑니다."
+            subtitle="맨 뒤가 아니라 이 곳 바로 다음 자리에 들어가요."
             onPress={() => {
               setFolded(false);
               onAddAfter();
@@ -2966,7 +2966,7 @@ function PlaceRow({
         <ConfirmDialog
           visible={confirming}
           title="이 장소를 지울까요?"
-          message={`${place.name} 이(가) 일정에서 사라집니다. 되돌릴 수 없습니다.`}
+          message={`${place.name} 이(가) 일정에서 사라져요. 되돌릴 수 없어요.`}
           confirmLabel="지우기"
           danger
           onCancel={() => setConfirming(false)}
@@ -3114,7 +3114,7 @@ function GapBlock({
   if (gap.options.length === 0) {
     return (
       <Row gap={Spacing.xs} style={styles.gap}>
-        <Caption tone="muted">이어지는 길을 찾지 못했습니다</Caption>
+        <Caption tone="muted">이어지는 길을 찾지 못했어요</Caption>
       </Row>
     );
   }
@@ -3144,7 +3144,7 @@ function GapBlock({
         <p>잠깐만 답니다. 계속 붙여 두면 그냥 장식이 되고, 다음에 정말
         바뀌었을 때 눈에 안 걸립니다.
       */}
-      {justChanged ? <Badge label="이 구간이 바뀌었습니다" tone="accent" /> : null}
+      {justChanged ? <Badge label="이 구간이 바뀌었어요" tone="accent" /> : null}
       <Row gap={Spacing.xs}>
         {gap.options.map((option) => {
           const on = chosen?.mode === option.mode;
@@ -3192,7 +3192,7 @@ function GapBlock({
       {late > 0 ? (
         <Row gap={Spacing.sm}>
           <Caption tone="danger" strong>
-            {arriveBy} 까지 {asDuration(late * 60)} 모자랍니다
+            {arriveBy} 까지 {asDuration(late * 60)} 모자라요
           </Caption>
           {rescue ? <Caption tone="secondary">{MODE_FITS[rescue.mode]}</Caption> : null}
         </Row>
@@ -3201,7 +3201,7 @@ function GapBlock({
       {/* 택시 요금은 구글이 알려 주지 않아 나라별 기본요금으로 어림한 값입니다.
           정확한 값인 척하면 그 돈만 들고 탔다가 모자랍니다. */}
       {gap.options.some((o) => o.fare?.estimated) ? (
-        <Caption tone="muted">택시 요금은 기본요금으로 어림한 값입니다</Caption>
+        <Caption tone="muted">택시 요금은 기본요금으로 어림한 값이에요</Caption>
       ) : null}
     </View>
   );
@@ -3302,14 +3302,14 @@ function PlaceHours({ info, at }: { info: PlaceInfo; at?: string | null }) {
   if (info.permanentlyClosed) {
     return (
       <Caption tone="danger" strong>
-        문을 닫은 곳입니다
+        문을 닫은 곳이에요
       </Caption>
     );
   }
   if (info.closedOnDay) {
     return (
       <Caption tone="danger" strong>
-        이 날은 휴무입니다
+        이 날은 휴무예요
       </Caption>
     );
   }
@@ -3333,7 +3333,7 @@ function PlaceHours({ info, at }: { info: PlaceInfo; at?: string | null }) {
       </Caption>
       {off ? (
         <Caption tone="danger" strong>
-          적어 둔 시각에 안 엽니다
+          적어 둔 시각에 안 열어요
         </Caption>
       ) : null}
       {info.rating ? (
@@ -3445,12 +3445,12 @@ function PackSheet({
       }>
       {items.length > 0 ? (
         <Caption tone={done === items.length ? 'success' : 'secondary'} strong>
-          {done === items.length ? '다 챙겼습니다' : `${done}/${items.length} 챙김`}
+          {done === items.length ? '다 챙겼어요' : `${done}/${items.length} 챙김`}
         </Caption>
       ) : (
         <Caption tone="secondary">
           떠나기 전에 서로 "그거 챙겼어?" 를 묻게 되는 것들을 적어 두세요. 누가 챙길지도 함께
-          정하면 어댑터가 셋이 되는 일이 없습니다.
+          정하면 어댑터가 셋이 되는 일이 없어요.
         </Caption>
       )}
 
@@ -3589,7 +3589,7 @@ function StaySheet({
           </Body>
         </Row>
       ) : (
-        <Caption tone="secondary">숙소를 찾아서 골라 주세요. 좌표까지 함께 잡힙니다.</Caption>
+        <Caption tone="secondary">숙소를 찾아서 골라 주세요. 좌표까지 함께 잡혀요.</Caption>
       )}
 
       {/*
@@ -3639,7 +3639,7 @@ function StaySheet({
         value={flight}
         onChangeText={setFlight}
         placeholder="OZ112 09:20 인천 T1 → 간사이"
-        hint="지도에 찍는 것이 아니라 적어 두고 읽는 칸입니다."
+        hint="지도에 찍는 것이 아니라 적어 두고 읽는 칸이에요."
       />
 
       {/*
@@ -3654,7 +3654,7 @@ function StaySheet({
       */}
       <Switch
         label="이후 날들도 같은 곳"
-        hint="아직 잘 곳을 안 적은 날만 채웁니다. 옮겨 자는 날은 그대로 둡니다."
+        hint="아직 잘 곳을 안 적은 날만 채워요. 옮겨 자는 날은 그대로 둬요."
         value={forward}
         onChange={setForward}
       />
@@ -3703,7 +3703,7 @@ function BookingPaste({
     try {
       const got = await parseBooking(glued);
       if (!got) {
-        setSaid('읽지 못했습니다. 칸에 직접 적어 주세요.');
+        setSaid('읽지 못했어요. 칸에 직접 적어 주세요.');
         return;
       }
       setFound(got);
@@ -3713,8 +3713,8 @@ function BookingPaste({
          골라서 들어온 것이고, 앱이 그 선택을 뒤집을 이유가 없습니다. */
       setSaid(
         got.iso && dayIso && got.iso !== dayIso
-          ? `${got.iso} 예약으로 읽혔습니다. 지금 보고 있는 날과 다릅니다.`
-          : '아래 칸에 채웠습니다. 보고 고친 뒤 저장해 주세요.',
+          ? `${got.iso} 예약으로 읽혔어요. 지금 보고 있는 날과 달라요.`
+          : '아래 칸에 채웠어요. 보고 고친 뒤 저장해 주세요.',
       );
     } finally {
       setBusy(false);
@@ -3729,13 +3729,13 @@ function BookingPaste({
         onChangeText={setText}
         placeholder="예약 확인 메일이나 문자를 그대로 붙여 넣으세요"
         multiline
-        hint="이 기기 안에서 읽습니다. 붙여 넣은 글은 서버로 가지 않습니다."
+        hint="이 기기 안에서 읽어요. 붙여 넣은 글은 서버로 가지 않아요."
       />
       <Row gap={Spacing.sm}>
         <Button label="읽기" variant="secondary" compact onPress={read} busy={busy} />
         {found?.stayName ? (
           <Caption tone="secondary" numberOfLines={1}>
-            숙소로 「{found.stayName}」 를 읽었습니다 — 아래에서 찾아 골라 주세요
+            숙소로 「{found.stayName}」 를 읽었어요 — 아래에서 찾아 골라 주세요
           </Caption>
         ) : null}
       </Row>
@@ -3801,8 +3801,8 @@ function CloneSheet({
       onClose={onCancel}
       footer={<Button label="만들기" onPress={submit} busy={busy} />}>
       <Caption tone="secondary">
-        「{title}」 의 날짜와 장소가 그대로 옮겨집니다. 동행자는 부르지 않고, 다녀온 표시는
-        지웁니다 — 아직 가지 않은 여행이니까요.
+        「{title}」 의 날짜와 장소가 그대로 옮겨져요. 동행자는 부르지 않고, 다녀온 표시는
+        지워요 — 아직 가지 않은 여행이니까요.
       </Caption>
       <Field
         label="새 이름"

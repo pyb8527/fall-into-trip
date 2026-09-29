@@ -64,7 +64,7 @@ export default function InviteScreen() {
         <>
           <ErrorNote message={error} />
           <Caption tone="secondary">
-            기한이 지났거나 닫힌 링크일 수 있습니다. 부른 사람에게 새로 받아 주세요.
+            기한이 지났거나 닫힌 링크일 수 있어요. 부른 사람에게 새로 받아 주세요.
           </Caption>
         </>
       ) : null}
@@ -74,20 +74,20 @@ export default function InviteScreen() {
           <View style={styles.head}>
             <Title>{invite.tripTitle}</Title>
             <Body tone="secondary">
-              {invite.ownerName ? `${invite.ownerName} 님이 초대했습니다.` : '초대를 받았습니다.'}
+              {invite.ownerName ? `${invite.ownerName} 님이 초대했어요.` : '초대를 받았어요.'}
             </Body>
           </View>
 
           <Card>
             <Caption tone="secondary">
               {invite.role === 'EDITOR'
-                ? '일정을 같이 짤 수 있습니다. 장소를 넣고 고칠 수 있어요.'
-                : '일정을 볼 수 있습니다. 고치지는 못합니다.'}
+                ? '일정을 같이 짤 수 있어요. 장소를 넣고 고칠 수 있어요.'
+                : '일정을 볼 수 있어요. 고치지는 못해요.'}
             </Caption>
             <Caption tone="secondary">
               {invite.expiresAt
-                ? `${invite.expiresAt.slice(0, 10)}까지 쓸 수 있는 링크입니다.`
-                : '기한이 없는 링크입니다.'}
+                ? `${invite.expiresAt.slice(0, 10)}까지 쓸 수 있는 링크예요.`
+                : '기한이 없는 링크예요.'}
             </Caption>
           </Card>
 
@@ -106,7 +106,7 @@ export default function InviteScreen() {
                 }
               />
               <Caption tone="secondary">
-                계정이 없어도 됩니다. 로그인 화면에서 바로 만들 수 있습니다.
+                계정이 없어도 돼요. 로그인 화면에서 바로 만들 수 있어요.
               </Caption>
             </>
           )}

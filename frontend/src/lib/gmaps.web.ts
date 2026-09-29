@@ -25,7 +25,7 @@ export function loadMaps(): Promise<void> {
   }
   loader = new Promise<void>((resolve, reject) => {
     if (!GMAPS_KEY || typeof window === 'undefined') {
-      reject(new Error('지도를 쓸 수 없습니다.'));
+      reject(new Error('지도를 쓸 수 없어요.'));
       return;
     }
     if ((window as any).google?.maps) {
@@ -48,7 +48,7 @@ export function loadMaps(): Promise<void> {
     script.onerror = () => {
       /* 다음 시도에서 다시 붙일 수 있게 비웁니다. */
       loader = null;
-      reject(new Error('지도를 불러오지 못했습니다.'));
+      reject(new Error('지도를 불러오지 못했어요.'));
     };
     document.head.appendChild(script);
   });

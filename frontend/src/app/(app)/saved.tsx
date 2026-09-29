@@ -216,8 +216,8 @@ export default function Saved() {
       showUndo({
         message:
           targets.length === 1
-            ? `「${targets[0].name}」 를 뺐습니다.`
-            : `${targets.length}곳을 뺐습니다.`,
+            ? `「${targets[0].name}」 를 뺐어요.`
+            : `${targets.length}곳을 뺐어요.`,
         onUndo: () => restore(targets),
       });
     } catch (e) {
@@ -358,8 +358,8 @@ export default function Saved() {
         <Grow>
           <Body tone="secondary">
             {all.length > 0
-              ? `주워 둔 ${all.length}곳. 골라서 일정 아무 날에나 얹습니다.`
-              : '눈에 띄는 곳을 담아 두었다가 일정에 꺼내 씁니다.'}
+              ? `주워 둔 ${all.length}곳. 골라서 일정 아무 날에나 얹어요.`
+              : '눈에 띄는 곳을 담아 두었다가 일정에 꺼내 써요.'}
           </Body>
         </Grow>
         <Button label="담기" compact onPress={() => setKeeping(true)} />
@@ -370,7 +370,7 @@ export default function Saved() {
       {failed ? <ErrorNote message={failed} /> : null}
 
       {data && all.length === 0 ? (
-        <Empty message="아직 주워 둔 보석이 없습니다. 여행 둘러보기나 장소 찾기에서 별을 누르면 여기 쌓입니다. 위 「담기」 로 바로 찾아 담을 수도 있습니다." />
+        <Empty message="아직 주워 둔 보석이 없어요. 여행 둘러보기나 장소 찾기에서 별을 누르면 여기 쌓여요. 위 「담기」 로 바로 찾아 담을 수도 있어요." />
       ) : null}
 
       {/* 몇 개 안 될 때는 찾을 것이 없습니다. 칸만 자리를 차지합니다. */}
@@ -395,7 +395,7 @@ export default function Saved() {
         <Split>
           <Row gap={Spacing.xs} style={styles.applied}>
             <Button
-              label={applied.length > 0 ? `조건 ${applied.length}` : '조건'}
+              label={applied.length > 0 ? `필터 ${applied.length}` : '필터'}
               variant="secondary"
               compact
               onPress={() => setSifting(true)}
@@ -412,7 +412,7 @@ export default function Saved() {
           둔 것을 거르는 것이라 개수가 곧바로 따라옵니다. */}
       <BottomSheet
         visible={sifting}
-        title="조건"
+        title="필터"
         onClose={() => setSifting(false)}
         footer={
           <Button label={`결과 ${shown.length}곳 보기`} onPress={() => setSifting(false)} />
@@ -457,7 +457,7 @@ export default function Saved() {
       {data && all.length > 0 && shown.length === 0 ? (
         <Empty
           message={
-            q.trim() ? `"${q.trim()}" 로는 찾은 것이 없습니다.` : '이런 곳은 아직 담아 둔 것이 없습니다.'
+            q.trim() ? `"${q.trim()}" 로는 찾은 것이 없어요.` : '이런 곳은 아직 담아 둔 것이 없어요.'
           }
         />
       ) : null}
@@ -493,7 +493,7 @@ export default function Saved() {
       */}
       <BottomSheet visible={keeping} title={KEEP} onClose={() => setKeeping(false)}>
         <Caption tone="secondary">
-          담아 두면 일정을 아직 안 만들었어도 됩니다. 나중에 아무 날에나 꺼내 넣습니다.
+          담아 두면 일정을 아직 안 만들었어도 돼요. 나중에 아무 날에나 꺼내 넣어요.
         </Caption>
         <PlaceSearch onPick={keepFound} />
         <Divider />
@@ -564,7 +564,7 @@ export default function Saved() {
               />
               <ConfirmButton
                 label={UNKEEP}
-                confirmLabel="뺍니다"
+                confirmLabel="빼기"
                 onConfirm={() => drop(looking.id)}
               />
             </Row>
@@ -575,7 +575,7 @@ export default function Saved() {
       {tagging ? (
         <BottomSheet visible title={`${tagging.name} 그림`} onClose={() => setTaggingId(null)}>
           <Caption tone="secondary">
-            지도에 이 그림으로 찍힙니다. 일정에 넣을 때도 그대로 따라갑니다.
+            지도에 이 그림으로 찍혀요. 일정에 넣을 때도 그대로 따라가요.
           </Caption>
           <IconPicker
             value={tagging.icon ?? null}
@@ -600,7 +600,7 @@ export default function Saved() {
 
       <DayPicker
         visible={pouring}
-        note={`고른 ${picked.size}곳이 그 날 맨 뒤에 붙습니다. 순서는 넣은 뒤 바꿀 수 있습니다.`}
+        note={`고른 ${picked.size}곳이 그 날 맨 뒤에 붙어요. 순서는 넣은 뒤 바꿀 수 있어요.`}
         onPour={(dayId) =>
           api.post(`/api/days/${dayId}/places/from-saved`, { savedIds: [...picked] })
         }

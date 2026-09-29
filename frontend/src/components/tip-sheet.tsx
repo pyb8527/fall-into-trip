@@ -97,14 +97,14 @@ export function TipSheet({
   return (
     <BottomSheet visible={visible} title={`${placeName} 한 줄`} onClose={onClose}>
       <Caption tone="secondary">
-        최근 일주일 안에 다녀온 사람들이 남긴 것입니다. 대기 시간처럼 금방 달라지는 것은 적힌
+        최근 일주일 안에 다녀온 사람들이 남긴 거예요. 대기 시간처럼 금방 달라지는 것은 적힌
         시각을 함께 보세요.
       </Caption>
 
       {failed ? <ErrorNote message={failed} /> : null}
       {tips === null ? <Loading /> : null}
       {tips && tips.length === 0 ? (
-        <Empty message="아직 아무도 안 남겼습니다. 다녀오셨다면 첫 줄을 남겨 주세요." />
+        <Empty message="아직 아무도 안 남겼어요. 다녀오셨다면 첫 줄을 남겨 주세요." />
       ) : null}
 
       {tips?.map((tip) => (
@@ -142,7 +142,7 @@ export function TipSheet({
             value={text}
             onChangeText={setText}
             placeholder="지금 대기 40분, 2번 출구로 나와야 함"
-            hint="200자까지. 같은 곳에는 하루 세 번까지 남길 수 있습니다."
+            hint="200자까지. 같은 곳에는 하루 세 번까지 남길 수 있어요."
             returnKeyType="done"
           />
           <Button
@@ -161,13 +161,13 @@ export function TipSheet({
           />
         </>
       ) : (
-        <Caption tone="secondary">로그인하면 한 줄 남길 수 있습니다.</Caption>
+        <Caption tone="secondary">로그인하면 한 줄 남길 수 있어요.</Caption>
       )}
 
       <ConfirmDialog
         visible={reporting !== null}
         title="이 한 줄을 신고할까요?"
-        message="여러 사람이 신고하면 운영자가 확인할 때까지 자동으로 감춰집니다."
+        message="여러 사람이 신고하면 운영자가 확인할 때까지 자동으로 감춰져요."
         confirmLabel="신고"
         danger
         busy={busy}

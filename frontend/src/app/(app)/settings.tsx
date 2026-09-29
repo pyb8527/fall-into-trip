@@ -77,7 +77,7 @@ export default function Settings() {
       <Card>
         <Subtitle>로그아웃</Subtitle>
         <Body small tone="secondary">
-          이 기기에서만 나갈지, 로그인해 둔 모든 기기에서 나갈지 고를 수 있습니다.
+          이 기기에서만 나갈지, 로그인해 둔 모든 기기에서 나갈지 고를 수 있어요.
         </Body>
         <Button label="로그아웃" variant="secondary" onPress={logout} />
         <Row style={styles.dangerRow}>
@@ -136,7 +136,7 @@ function NotifyCard() {
       const got = await turnOn(api);
       setState(got === 'failed' ? 'off' : got);
       if (got === 'failed') {
-        setFailed('알림을 켜지 못했습니다. 잠시 뒤 다시 눌러 주세요.');
+        setFailed('알림을 켜지 못했어요. 잠시 뒤 다시 눌러 주세요.');
       }
     } finally {
       setBusy(false);
@@ -147,15 +147,15 @@ function NotifyCard() {
     <Card>
       <Subtitle>알림</Subtitle>
       <Body small tone="secondary">
-        동행자가 일정을 고치면 이 기기로 알려 드립니다. 한 번 고칠 때마다 울리지는 않고, 한동안
-        고친 것을 묶어 한 번만 옵니다.
+        동행자가 일정을 고치면 이 기기로 알려 드려요. 한 번 고칠 때마다 울리지는 않고, 한동안
+        고친 것을 묶어 한 번만 와요.
       </Body>
 
       {state === 'blocked' ? (
         /* 우리가 할 수 있는 것이 없습니다. 어디서 푸는지만 알려 줍니다. */
         <Caption tone="danger">
-          이 브라우저에서 알림을 막아 두었습니다. 주소창 왼쪽의 자물쇠를 눌러 알림을 허용으로
-          바꾸면 켤 수 있습니다.
+          이 브라우저에서 알림을 막아 뒀어요. 주소창 왼쪽의 자물쇠를 눌러 알림을 허용으로
+          바꾸면 켤 수 있어요.
         </Caption>
       ) : (
         <Button
@@ -167,7 +167,7 @@ function NotifyCard() {
       )}
 
       {state === 'on' ? (
-        <Caption tone="success">켜 두었습니다. 기기마다 따로 켜야 합니다.</Caption>
+        <Caption tone="success">켜 뒀어요. 기기마다 따로 켜야 해요.</Caption>
       ) : null}
       {failed ? <ErrorNote message={failed} /> : null}
     </Card>
@@ -211,8 +211,8 @@ function MarkCard() {
     <Card>
       <Subtitle>지도에서 나</Subtitle>
       <Body small tone="secondary">
-        동행자와 위치를 나눌 때 지도에 이 그림으로 찍힙니다. 안 고르면 이름 첫 글자로
-        찍힙니다.
+        동행자와 위치를 나눌 때 지도에 이 그림으로 찍혀요. 안 고르면 이름 첫 글자로
+        찍혀요.
       </Body>
 
       <Row gap={Spacing.xs}>
@@ -312,7 +312,7 @@ function LinkedCard() {
       {linked ? (
         <>
           <Body small tone="secondary">
-            이어 두었습니다. 다음부터 구글 단추 하나로 들어옵니다.
+            이어 뒀어요. 다음부터 구글 단추 하나로 들어와요.
           </Body>
           {error ? <ErrorNote message={error} /> : null}
           <Button label="끊기" variant="secondary" onPress={disconnect} busy={busy} />
@@ -320,7 +320,7 @@ function LinkedCard() {
       ) : (
         <>
           <Body small tone="secondary">
-            이어 두면 비밀번호를 안 적고 들어옵니다. 비밀번호는 그대로 남습니다.
+            이어 두면 비밀번호를 안 적고 들어와요. 비밀번호는 그대로 남아요.
           </Body>
           {error ? <ErrorNote message={error} /> : null}
           <GoogleButton onCredential={connect} />
@@ -340,7 +340,7 @@ function PasswordCard() {
   const [busy, setBusy] = useState(false);
 
   const nextError =
-    next.length > 0 && next.length < PASSWORD_MIN ? `${PASSWORD_MIN}자 이상이어야 합니다.` : undefined;
+    next.length > 0 && next.length < PASSWORD_MIN ? `${PASSWORD_MIN}자 이상이어야 해요.` : undefined;
   const ready = !!current && next.length >= PASSWORD_MIN;
 
   async function submit() {
@@ -379,7 +379,7 @@ function PasswordCard() {
         onChangeText={setNext}
         secureTextEntry
         autoComplete="new-password"
-        hint={`${PASSWORD_MIN}자 이상. 바꾸면 다른 기기는 모두 로그아웃됩니다.`}
+        hint={`${PASSWORD_MIN}자 이상. 바꾸면 다른 기기는 모두 로그아웃돼요.`}
         error={nextError}
         returnKeyType="done"
         onSubmitEditing={submit}
@@ -387,7 +387,7 @@ function PasswordCard() {
       {error ? <ErrorNote message={error} /> : null}
       {done ? (
         <Body small tone="success" strong>
-          바꿨습니다. 다른 기기는 모두 로그아웃됐습니다.
+          바꿨어요. 다른 기기는 모두 로그아웃됐어요.
         </Body>
       ) : null}
       <Button label="바꾸기" onPress={submit} busy={busy} disabled={!ready} />

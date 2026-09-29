@@ -74,8 +74,8 @@ export function useHere(): HereState {
         id.current = null;
         setError(
           e.code === e.PERMISSION_DENIED
-            ? '위치 사용을 허용해 주세요. 주소창 왼쪽에서 바꿀 수 있습니다.'
-            : '지금 위치를 알 수 없습니다.',
+            ? '위치 사용을 허용해 주세요. 주소창 왼쪽에서 바꿀 수 있어요.'
+            : '지금 위치를 알 수 없어요.',
         );
       },
       {

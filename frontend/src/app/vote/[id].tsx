@@ -110,7 +110,7 @@ export default function Vote() {
       <View style={styles.head}>
         <Title>가고 싶은 곳</Title>
         <Body tone="secondary">
-          다 좋다고 한 곳만 일정으로 옮깁니다. 아직 안 누른 사람이 있으면 정해지지 않습니다.
+          다 좋다고 한 곳만 일정으로 옮겨요. 아직 안 누른 사람이 있으면 정해지지 않아요.
         </Body>
       </View>
 
@@ -119,7 +119,7 @@ export default function Vote() {
       {failed ? <ErrorNote message={failed} /> : null}
 
       {data && data.candidates.length === 0 ? (
-        <Empty message="아직 올라온 곳이 없습니다. 가고 싶은 데를 먼저 던져 보세요." />
+        <Empty message="아직 올라온 곳이 없어요. 가고 싶은 데를 먼저 던져 보세요." />
       ) : null}
 
       {data?.candidates.map((candidate) => (
@@ -187,7 +187,7 @@ export default function Vote() {
         title="목록에서 내릴까요?"
         message={
           dropping
-            ? `${dropping.name} 과(와) 지금까지 받은 표가 사라집니다. 되돌릴 수 없습니다.`
+            ? `${dropping.name} 과(와) 지금까지 받은 표가 사라져요. 되돌릴 수 없어요.`
             : undefined
         }
         confirmLabel="내리기"
@@ -204,7 +204,7 @@ export default function Vote() {
 
       <DayPicker
         visible={pouring}
-        note={`정해진 ${agreed.length}곳이 그 날 맨 뒤에 붙고, 여기 목록에서는 사라집니다.`}
+        note={`정해진 ${agreed.length}곳이 그 날 맨 뒤에 붙고, 여기 목록에서는 사라져요.`}
         days={trip?.days ?? []}
         onPour={(dayId) =>
           api.post(`/api/days/${dayId}/places/from-candidates`, {

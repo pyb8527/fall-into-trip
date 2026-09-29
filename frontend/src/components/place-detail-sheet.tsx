@@ -183,7 +183,7 @@ export function PlaceDetailSheet({
       {/* 아예 문 닫은 가게를 넣게 두면 안 됩니다. 가장 먼저 말합니다. */}
       {info?.permanentlyClosed ? (
         <Caption tone="danger" strong>
-          문을 닫은 곳입니다.
+          문을 닫은 곳이에요.
         </Caption>
       ) : null}
 
@@ -272,10 +272,10 @@ function Hours({ info, onIso }: { info: PlaceInfo; onIso?: string | null }) {
       <Row gap={Spacing.sm} style={styles.facts}>
         {info.closedOnDay ? (
           <Caption tone="danger" strong>
-            {onIso ? '그날 쉽니다' : '오늘 쉽니다'}
+            {onIso ? '그날 쉬어요' : '오늘 쉬어요'}
           </Caption>
         ) : (
-          <Body small>{info.onDay ?? '영업시간을 알 수 없습니다'}</Body>
+          <Body small>{info.onDay ?? '영업시간을 알 수 없어요'}</Body>
         )}
         {/* 구간이 둘이면 사이가 브레이크 타임입니다. 점심에 갔다가 문이 닫혀
             있는 일을 막습니다. */}

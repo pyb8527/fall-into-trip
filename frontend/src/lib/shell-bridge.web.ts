@@ -91,14 +91,14 @@ if (typeof window !== 'undefined') {
  */
 export function askShell(ask: Ask, seconds = 90): Promise<unknown> {
   if (!inShell) {
-    return Promise.reject(new Error('껍데기가 없습니다'));
+    return Promise.reject(new Error('껍데기가 없어요'));
   }
   const id = `${Date.now().toString(36)}-${counter++}`;
 
   return new Promise((ok, no) => {
     const timer = setTimeout(() => {
       if (waiting.delete(id)) {
-        no(new Error('껍데기가 답을 안 합니다'));
+        no(new Error('껍데기가 답을 안 해요'));
       }
     }, seconds * 1000);
 

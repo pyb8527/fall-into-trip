@@ -84,7 +84,7 @@ export function PublishForm({
       return;
     }
     if (!shape.title.trim()) {
-      setFailed('제목부터 지어 주세요. 목록에서 이것만 보입니다.');
+      setFailed('제목부터 지어 주세요. 목록에서 이것만 보여요.');
       return;
     }
     setFailed(null);
@@ -113,11 +113,11 @@ export function PublishForm({
       onClose={onCancel}
       footer={<Button label="내놓기" onPress={submit} busy={busy} />}>
       <Caption tone="secondary">
-        지금 일정이 그대로 복사되어 올라갑니다. 나중에 일정을 고쳐도 올린 글은 바뀌지 않습니다.
+        지금 일정이 그대로 복사되어 올라가요. 나중에 일정을 고쳐도 올린 글은 바뀌지 않아요.
         고친 것을 보여 주려면 내리고 다시 올려 주세요.
       </Caption>
       <Caption tone="secondary">
-        누가 다녀왔는지, 동행자가 누구인지는 올라가지 않습니다. 날짜와 장소만 갑니다.
+        누가 다녀왔는지, 동행자가 누구인지는 올라가지 않아요. 날짜와 장소만 가요.
       </Caption>
 
       {/*

@@ -110,7 +110,7 @@ export default function AdminAudit() {
       {loading && !data ? <Loading /> : null}
       {error ? <ErrorNote message={error} onRetry={reload} /> : null}
 
-      {data && data.items.length === 0 ? <Empty message="조건에 맞는 기록이 없습니다." /> : null}
+      {data && data.items.length === 0 ? <Empty message="조건에 맞는 기록이 없어요." /> : null}
 
       {data?.items.map((entry) => (
         <EntryCard key={entry.id} entry={entry} />

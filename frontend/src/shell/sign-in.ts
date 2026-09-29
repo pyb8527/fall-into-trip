@@ -52,7 +52,7 @@ export const canSignIn = !!(IOS || ANDROID);
 export async function googleIdToken(): Promise<string | null> {
   const clientId = (ANDROID || IOS)!;
   if (!clientId) {
-    throw new Error('이 빌드에 구글 클라이언트 ID 가 없습니다');
+    throw new Error('이 빌드에 구글 클라이언트 ID 가 없어요');
   }
 
   const request = new AuthSession.AuthRequest({

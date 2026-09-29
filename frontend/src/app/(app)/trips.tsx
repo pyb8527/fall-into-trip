@@ -162,10 +162,10 @@ export default function Trips() {
       {error ? <ErrorNote message={error} onRetry={reload} /> : null}
 
       {data && all.length === 0 ? (
-        <Empty message="아직 그려 둔 여행이 없습니다. 아래에서 첫 줄을 그어 보세요." />
+        <Empty message="아직 그려 둔 여행이 없어요. 아래에서 첫 줄을 그어 보세요." />
       ) : null}
       {data && all.length > 0 && trips.length === 0 ? (
-        <Empty message={`"${q.trim()}" 로는 찾은 것이 없습니다.`} />
+        <Empty message={`"${q.trim()}" 로는 찾은 것이 없어요.`} />
       ) : null}
 
       {/* 폴더를 하나라도 만들었으면 여행이 하나뿐이어도 띠를 둡니다. 안 그러면
@@ -279,7 +279,7 @@ export default function Trips() {
       {opened ? (
         <BottomSheet visible title={opened.name} onClose={() => setOpened(null)}>
           {inFolder(opened).length === 0 ? (
-            <Empty message="이 폴더는 아직 비어 있습니다." />
+            <Empty message="이 폴더는 아직 비어 있어요." />
           ) : null}
           {inFolder(opened).map((trip) => (
               <TripRow
@@ -374,7 +374,7 @@ function NewFolderSheet({
 
   return (
     <BottomSheet visible={visible} title="새 폴더" onClose={onClose}>
-      <Caption tone="secondary">폴더는 나에게만 보입니다. 같이 간 사람은 자기 식대로 정리합니다.</Caption>
+      <Caption tone="secondary">폴더는 나에게만 보여요. 같이 간 사람은 자기 식대로 정리해요.</Caption>
       {failed ? <ErrorNote message={failed} /> : null}
       <Field
         label="이름"
@@ -502,8 +502,8 @@ function byWhen(trips: TripSummary[]): Section[] {
 
   return [
     { title: '지금 그 길 위', trips: going },
-    { title: '곧 떠납니다', trips: coming },
-    { title: '다녀왔습니다', trips: done },
+    { title: '곧 떠나요', trips: coming },
+    { title: '다녀왔어요', trips: done },
   ].filter((s) => s.trips.length > 0);
 }
 

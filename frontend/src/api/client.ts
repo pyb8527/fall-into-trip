@@ -128,10 +128,10 @@ export function refreshSession(): Promise<RefreshedSession | null> {
  * 못했습니다" 라고만 하면 무엇을 어떻게 해야 할지가 없습니다. 무슨 일인지
  * 모른다고 말하고, 할 수 있는 일을 하나 알려 줍니다.
  */
-export const UNEXPECTED = '뜻밖의 일이 생겼습니다. 화면을 새로 불러온 뒤 다시 해 주세요.';
+export const UNEXPECTED = '뜻밖의 일이 생겼어요. 화면을 새로 불러온 뒤 다시 해 주세요.';
 
 async function toError(res: Response): Promise<ApiError> {
-  let message = '서버가 답하지 않았습니다.';
+  let message = '서버가 답하지 않았어요.';
   let code: string | undefined;
   try {
     const data = (await res.json()) as { error?: string; code?: string };
@@ -142,7 +142,7 @@ async function toError(res: Response): Promise<ApiError> {
   } catch {
     /* 본문이 JSON 이 아니면 상태 코드만으로 안내합니다. */
     if (res.status === 404) {
-      message = '없는 자리입니다.';
+      message = '없는 자리예요.';
     }
   }
   return new ApiError(res.status, message, code);
@@ -178,7 +178,7 @@ async function fetchOk(path: string, options: Options = {}): Promise<Response> {
   try {
     res = await send(path, options);
   } catch {
-    throw new ApiError(0, '연결이 끊겼습니다. 잠시 뒤 다시 해 주세요.');
+    throw new ApiError(0, '연결이 끊겼어요. 잠시 뒤 다시 해 주세요.');
   }
 
   /* 액세스 토큰이 만료됐을 뿐일 수 있습니다. 한 번만 되살려 보고 다시 던집니다. */
@@ -192,7 +192,7 @@ async function fetchOk(path: string, options: Options = {}): Promise<Response> {
     try {
       res = await send(path, options);
     } catch {
-      throw new ApiError(0, '연결이 끊겼습니다. 잠시 뒤 다시 해 주세요.');
+      throw new ApiError(0, '연결이 끊겼어요. 잠시 뒤 다시 해 주세요.');
     }
     if (res.status === 401) {
       /* 새 토큰으로도 거절당했다면 권한 문제입니다. 더 시도하지 않습니다. */

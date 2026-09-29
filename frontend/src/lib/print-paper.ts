@@ -38,8 +38,8 @@ export function paper(trip: TripDetail): string {
 <style>
   @page { size: A4; margin: 14mm; }
 
-  /* 종이에는 우리 글꼴을 싣지 않습니다. 인쇄는 대개 한 번뿐인데 그것 하나
-     받자고 기다리게 할 일이 아니고, 기기에 있는 것으로도 충분합니다. */
+  /* 종이에는 우리 글꼴을 싣지 않아요. 인쇄는 대개 한 번뿐인데 그것 하나
+     받자고 기다리게 할 일이 아니고, 기기에 있는 것으로도 충분해요. */
   body {
     margin: 0;
     color: #000;
@@ -52,7 +52,7 @@ export function paper(trip: TripDetail): string {
   h1 { margin: 0 0 2mm; font-size: 17pt; letter-spacing: -0.02em; }
   .span { margin: 0 0 6mm; font-size: 9.5pt; color: #444; }
 
-  /* 하루가 페이지 중간에서 잘리면 앞장 뒷장을 오가며 봐야 합니다. */
+  /* 하루가 페이지 중간에서 잘리면 앞장 뒷장을 오가며 봐야 해요. */
   .day { break-inside: avoid; page-break-inside: avoid; margin-bottom: 6mm; }
   .dayhead {
     display: flex; align-items: baseline; gap: 3mm;
@@ -65,13 +65,13 @@ export function paper(trip: TripDetail): string {
   table { width: 100%; border-collapse: collapse; }
   td { vertical-align: top; padding: 1.1mm 0; }
 
-  /* 시간은 자릿수를 맞춰 세웁니다. 세로로 훑을 때 눈이 흔들리지 않습니다. */
+  /* 시간은 자릿수를 맞춰 세웁니다. 세로로 훑을 때 눈이 흔들리지 않아요. */
   .time { width: 15mm; font-variant-numeric: tabular-nums; color: #444; font-size: 9.5pt; }
   .no { width: 7mm; font-variant-numeric: tabular-nums; color: #666; font-size: 9.5pt; }
   .name { font-weight: 600; }
   .sub { font-size: 9pt; color: #444; }
 
-  /* 길에서 적어 넣을 자리. 종이로 뽑는 이유의 절반은 이것입니다. */
+  /* 길에서 적어 넣을 자리. 종이로 뽑는 이유의 절반은 이거예요. */
   .blank { border-bottom: 0.4pt dotted #999; height: 4mm; }
 
   .foot { margin-top: 8mm; font-size: 8.5pt; color: #666; }
@@ -89,7 +89,7 @@ export function paper(trip: TripDetail): string {
 function dayBlock(day: Day): string {
   const rows = day.places.length
     ? day.places.map(placeRow).join('')
-    : '<tr><td colspan="3" class="sub">아직 넣어 둔 곳이 없습니다.</td></tr>';
+    : '<tr><td colspan="3" class="sub">아직 넣어 둔 곳이 없어요.</td></tr>';
 
   return `<div class="day">
   <div class="dayhead">

@@ -28,7 +28,7 @@ export default function Setup() {
 
   const passwordError =
     password.length > 0 && password.length < PASSWORD_MIN
-      ? `${PASSWORD_MIN}자 이상이어야 합니다.`
+      ? `${PASSWORD_MIN}자 이상이어야 해요.`
       : undefined;
 
   async function submit() {
@@ -40,7 +40,7 @@ export default function Setup() {
       return;
     }
     if (password.length < PASSWORD_MIN) {
-      setError(`비밀번호는 ${PASSWORD_MIN}자 이상이어야 합니다.`);
+      setError(`비밀번호는 ${PASSWORD_MIN}자 이상이어야 해요.`);
       return;
     }
     setError(null);
@@ -62,7 +62,7 @@ export default function Setup() {
         <LogoMark size={44} />
         <Title>최초 설치</Title>
         <Body tone="secondary">
-          이 서버에는 아직 운영자가 없습니다. 첫 운영자 계정을 만들어 주세요.
+          이 서버에는 아직 운영자가 없어요. 첫 운영자 계정을 만들어 주세요.
         </Body>
       </View>
 
@@ -103,7 +103,7 @@ export default function Setup() {
           autoCapitalize="none"
           autoCorrect={false}
           secureTextEntry
-          hint="서버의 SETUP_TOKEN 환경변수에 넣어 둔 값입니다."
+          hint="서버의 SETUP_TOKEN 환경변수에 넣어 둔 값이에요."
           returnKeyType="done"
           onSubmitEditing={submit}
         />

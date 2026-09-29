@@ -78,7 +78,7 @@ export default function MoneyList() {
       <View style={styles.head}>
         <Title>가계부</Title>
         <Caption tone="secondary">
-          여행에서 서로 껄끄러워지는 자리는 돈입니다. 쓴 김에 적어 두면 돌아와서 편합니다.
+          여행에서 서로 껄끄러워지는 자리는 돈이에요. 쓴 김에 적어 두면 돌아와서 편해요.
         </Caption>
       </View>
 
@@ -86,7 +86,7 @@ export default function MoneyList() {
       {error ? <ErrorNote message={error} onRetry={reload} /> : null}
 
       {data && rows.length === 0 ? (
-        <Empty message="아직 여행이 없습니다. 여행을 하나 만들면 그 가계부가 여기 섭니다." />
+        <Empty message="아직 여행이 없어요. 여행을 하나 만들면 그 가계부가 여기 서요." />
       ) : null}
 
       {sorted.length > 0 ? (

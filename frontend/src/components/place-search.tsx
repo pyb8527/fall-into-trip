@@ -90,7 +90,7 @@ export function PlaceSearch({ onPick, here }: PlaceSearchProps) {
         autoCorrect={false}
         returnKeyType="search"
         onSubmitEditing={search}
-        hint="이름을 넣고 찾아 주세요. 고르면 지도에 자리가 잡힙니다."
+        hint="이름을 넣고 찾아 주세요. 고르면 지도에 자리가 잡혀요."
         action={{
           icon: 'search',
           label: '장소 찾기',
@@ -102,7 +102,7 @@ export function PlaceSearch({ onPick, here }: PlaceSearchProps) {
       {busy ? <Loading label="찾는 중" /> : null}
       {error ? <Caption tone="danger">{error}</Caption> : null}
 
-      {results && results.length === 0 ? <Caption>찾지 못했습니다.</Caption> : null}
+      {results && results.length === 0 ? <Caption>찾지 못했어요.</Caption> : null}
 
       <PlaceDetailSheet
         place={looking}

@@ -1004,7 +1004,7 @@ export function TripMap({
     }
     return (
       <View style={styles.blank}>
-        <Caption tone="muted">지도를 불러오지 못했습니다. 아래 일정은 그대로 볼 수 있습니다.</Caption>
+        <Caption tone="muted">지도를 불러오지 못했어요. 아래 일정은 그대로 볼 수 있어요.</Caption>
       </View>
     );
   }

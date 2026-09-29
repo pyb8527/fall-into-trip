@@ -63,7 +63,7 @@ export default function AdminHome() {
             <Subtitle>최근 24시간</Subtitle>
             <Body tone="secondary">활동 {data.auditLast24h.toLocaleString()}건</Body>
             {Object.keys(data.topActions).length === 0 ? (
-              <Caption>기록된 활동이 없습니다.</Caption>
+              <Caption>기록된 활동이 없어요.</Caption>
             ) : (
               <>
                 <Divider />
@@ -92,7 +92,7 @@ export default function AdminHome() {
 
       <ListRow
         title="신고된 것"
-        subtitle="일정 글과 한 줄을 되돌리거나 감춥니다"
+        subtitle="일정 글과 한 줄을 되돌리거나 감춰요"
         onPress={() => router.push('/admin/posts')}
       />
 

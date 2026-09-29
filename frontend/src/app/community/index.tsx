@@ -243,7 +243,7 @@ export default function Community() {
               <Button
                 label={
                   picked.length > 0
-                    ? `${SORTS.find((x) => x.value === sort)?.label} · 조건 ${picked.length}`
+                    ? `${SORTS.find((x) => x.value === sort)?.label} · 필터 ${picked.length}`
                     : (SORTS.find((x) => x.value === sort)?.label ?? '인기순')
                 }
                 variant="secondary"
@@ -261,7 +261,7 @@ export default function Community() {
 
       <BottomSheet
         visible={sifting}
-        title="조건"
+        title="필터"
         onClose={() => setSifting(false)}
         /*
           몇 개가 남는지를 판을 닫기 전에 말합니다.
@@ -397,12 +397,12 @@ export default function Community() {
         <Empty
           message={
             view === 'mine'
-              ? '아직 내놓은 길이 없습니다. 여행 화면에서 내놓을 수 있습니다.'
+              ? '아직 내놓은 길이 없어요. 여행 화면에서 내놓을 수 있어요.'
               : view === 'liked'
-                ? '아직 하트를 누른 글이 없습니다. 마음에 드는 길에 눌러 두세요.'
+                ? '아직 하트를 누른 글이 없어요. 마음에 드는 길에 눌러 두세요.'
                 : filtered
-                ? '조건에 맞는 길이 없습니다. 조건을 줄여 보세요.'
-                : '아직 올라온 길이 없습니다. 첫 번째가 되어 보세요.'
+                ? '조건에 맞는 길이 없어요. 조건을 줄여 보세요.'
+                : '아직 올라온 길이 없어요. 첫 번째가 되어 보세요.'
           }
         />
       ) : null}

@@ -99,7 +99,7 @@ export async function answer(ask: Ask): Promise<unknown> {
       file.write(ask.base64, { encoding: 'base64' });
 
       if (!(await Sharing.isAvailableAsync())) {
-        throw new Error('이 기기에서는 파일을 넘길 수 없습니다');
+        throw new Error('이 기기에서는 파일을 넘길 수 없어요');
       }
       await Sharing.shareAsync(file.uri, {
         mimeType: ask.mime,
