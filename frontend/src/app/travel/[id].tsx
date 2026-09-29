@@ -11,8 +11,18 @@ import {
 } from 'react-native';
 
 import { api } from '@/api/client';
-import type { Day, DayRoute, Place, PlaceInfo, RouteLeg, TripDetail } from '@/api/types';
+import type {
+  Day,
+  DayRoute,
+  Place,
+  PlaceInfo,
+  PlaceMark,
+  RouteLeg,
+  TripDetail,
+} from '@/api/types';
 import { useAsync } from '@/api/use-async';
+import { MarkSheet } from '@/components/mark-sheet';
+import { OurPhoto } from '@/components/our-photo';
 import { iconOf } from '@/constants/place-icons';
 import { Colors, dayColor, Gutter, Motion, Radius, Spacing } from '@/constants/theme';
 import { feelTick } from '@/lib/feel';
@@ -26,7 +36,9 @@ import {
   Chip,
   Empty,
   ErrorNote,
+  Grow,
   Loading,
+  Press,
   Row,
   Screen,
   Split,
@@ -110,10 +122,26 @@ export default function Travel() {
     [route],
   );
   const infoOf = useMemo(() => new Map((info ?? []).map((i) => [i.id, i])), [info]);
+  /* 장소 번호 → 그 자리에서 남긴 것. 남긴 것이 있는 곳만 옵니다. */
+  const markOf = useMemo(
+    () => new Map((data?.marks ?? []).map((m) => [m.placeId, m])),
+    [data],
+  );
 
   /* 도장첩에서 누르면 그 장으로 넘어갑니다. 옆으로 스무 번 쓸어 넘기게 할
      일이 아닙니다. */
   const deck = useRef<ScrollView>(null);
+
+  /**
+     * 자취를 남기는 판을 열어 둔 곳.
+     *
+     * <p>찍자마자 엽니다. 여행기의 재료가 여기서 나오는데, 따로 찾아 들어가게
+     * 하면 아무도 안 남깁니다 — 도장은 길 위에서 걸으며 누르는 것이고, 그때
+     * 한 번 더 들어가라고 하면 그걸로 끝입니다.
+     *
+     * <p>판은 안 남기고 닫을 수 있습니다. 남기는 것이 도장의 조건은 아닙니다.
+     */
+  const [marking, setMarking] = useState<Place | null>(null);
 
   async function toggle(place: Place) {
     const on = visited.has(place.id);
@@ -130,6 +158,9 @@ export default function Travel() {
     });
     try {
       on ? await api.delete(`/api/visits/${place.id}`) : await api.put(`/api/visits/${place.id}`);
+      if (!on) {
+        setMarking(place);
+      }
     } catch {
       /* 서버가 못 받았으면 되돌립니다. 안 그러면 다녀온 줄 알고 지나칩니다. */
       setMarks((prev) => {
@@ -249,6 +280,8 @@ export default function Travel() {
                 ink={ink}
                 stampedOn={day?.iso ?? null}
                 visited={visited.has(place.id)}
+                mark={markOf.get(place.id)}
+                onMark={() => setMarking(place)}
                 info={infoOf.get(place.id)}
                 next={legAfter.get(place.id)}
                 onToggle={() => toggle(place)}
@@ -257,6 +290,16 @@ export default function Travel() {
           ))}
         </ScrollView>
       )}
+
+      <MarkSheet
+        place={marking}
+        now={marking ? markOf.get(marking.id) : undefined}
+        onClose={() => setMarking(null)}
+        onSaved={() => {
+          setMarking(null);
+          reload();
+        }}
+      />
     </Screen>
   );
 }
@@ -317,6 +360,8 @@ function PlaceCard({
   ink,
   stampedOn,
   visited,
+  mark,
+  onMark,
   info,
   next,
   onToggle,
@@ -328,6 +373,10 @@ function PlaceCard({
   /** 도장에 찍힐 날짜(YYYY-MM-DD). */
   stampedOn: string | null;
   visited: boolean;
+  /** 그 자리에서 남긴 것. 없으면 안 남긴 것입니다. */
+  mark?: PlaceMark;
+  /** 남기는 판을 엽니다. */
+  onMark: () => void;
   info?: PlaceInfo;
   /** 다음 장소까지. 마지막 장소 뒤에는 없습니다. */
   next?: RouteLeg;
@@ -374,6 +423,41 @@ function PlaceCard({
         stamped={visited}
         onPress={onToggle}
       />
+
+      {/*
+        그 자리에서 남긴 것.
+
+        <p>찍은 뒤에만 냅니다. 안 찍은 곳에 "사진 남기기" 가 서 있으면 도장을
+        찍지 않고도 남길 수 있는 것처럼 보이는데, 남기는 것은 도장에 붙는
+        일입니다.
+
+        <p>남긴 것이 있으면 그것을 보여 주고, 없으면 남기라고 합니다. 둘 다
+        눌러서 고칩니다.
+      */}
+      {visited ? (
+        <Press
+          onPress={onMark}
+          scale={0.99}
+          accessibilityLabel={mark ? `${place.name} 에 남긴 것 고치기` : `${place.name} 에 사진과 한 줄 남기기`}>
+          {mark ? (
+            <Row gap={Spacing.sm} style={styles.markRow}>
+              <OurPhoto id={mark.photoId} height={56} width={56} />
+              <Grow gap={2}>
+                {mark.stars ? <Caption tone="brand">{'★'.repeat(mark.stars)}</Caption> : null}
+                {mark.note ? (
+                  <Body small numberOfLines={2}>
+                    {mark.note}
+                  </Body>
+                ) : (
+                  <Caption tone="secondary">한 줄 남기기</Caption>
+                )}
+              </Grow>
+            </Row>
+          ) : (
+            <Caption tone="secondary">＋ 사진과 한 줄 남기기</Caption>
+          )}
+        </Press>
+      ) : null}
 
       <Button
         label="길찾기"
@@ -648,5 +732,9 @@ const styles = StyleSheet.create({
   },
   markDate: {
     letterSpacing: 1.5,
+  },
+  /* 도장 아래에 남긴 것. 사진과 글이 나란히 섭니다. */
+  markRow: {
+    alignItems: 'center',
   },
 });

@@ -168,7 +168,22 @@ export type TripDetail = {
   trip: Trip;
   days: Day[];
   visited: string[];
+  /**
+   * 도장에 남긴 것.
+   *
+   * <p>남긴 것이 있는 곳만 옵니다 — 대개 그냥 찍고 지나가므로, 다 실으면
+   * 장소 수만큼 빈 줄이 오갑니다.
+   */
+  marks: PlaceMark[];
   myRole: TripRole;
+};
+
+/** 그 자리에서 남긴 것. 나중에 여행기의 재료가 됩니다. */
+export type PlaceMark = {
+  placeId: string;
+  photoId: Maybe<string>;
+  stars: Maybe<number>;
+  note: Maybe<string>;
 };
 
 /* ------------------------------------------------------------------ 운영 */

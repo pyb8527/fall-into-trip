@@ -150,7 +150,15 @@ async function toError(res: Response): Promise<ApiError> {
 
 async function send(path: string, options: Options): Promise<Response> {
   const headers: Record<string, string> = {};
-  if (options.body !== undefined) {
+  /*
+    파일을 보낼 때는 우리가 종류를 적지 않습니다.
+
+    <p>multipart 는 조각을 가르는 경계 문자열을 종류에 함께 적어야 하는데,
+    그것은 브라우저가 만듭니다. 우리가 'application/json' 이라고 적어 두면
+    서버가 본문을 JSON 으로 읽으려다 실패합니다.
+  */
+  const isForm = typeof FormData !== 'undefined' && options.body instanceof FormData;
+  if (options.body !== undefined && !isForm) {
     headers['content-type'] = 'application/json';
   }
   if (!options.anonymous && accessToken) {
@@ -161,7 +169,11 @@ async function send(path: string, options: Options): Promise<Response> {
     method: options.method ?? 'GET',
     headers,
     credentials: 'include',
-    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    body: options.body === undefined
+      ? undefined
+      : isForm
+        ? (options.body as FormData)
+        : JSON.stringify(options.body),
     signal: options.signal,
   });
 }
@@ -226,6 +238,13 @@ export const api = {
   /** 로그인·가입·설치처럼 토큰 없이 부르는 것. */
   anon: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: 'POST', body, anonymous: true }),
+  /**
+   * 파일 보내기.
+   *
+   * <p>토큰을 붙이고 만료되면 되살리는 일은 다른 부름과 같아야 하므로 여기를
+   * 거칩니다 — 사진 한 장 올리다 토큰이 만료되면 그것만 조용히 실패합니다.
+   */
+  upload: <T>(path: string, form: FormData) => request<T>(path, { method: 'POST', body: form }),
   /**
    * JSON 이 아닌 것. 지금은 동선 그림 한 장뿐입니다.
    *
