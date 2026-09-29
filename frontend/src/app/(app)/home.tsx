@@ -178,14 +178,14 @@ export default function Home() {
     <p>맨 위 카드는 늘 떠 있으므로 여기서 빠지는 것도 늘 하나입니다. 어떤
     날은 넷이고 어떤 날은 다섯인 일이 없습니다.
   */
-  const shortlist = useMemo(
-    () =>
-      (mine?.trips ?? [])
-        .filter((t) => t.id !== next?.trip.id)
-        .slice(-5)
-        .reverse(),
-    [mine, next],
-  );
+  const shortlist = useMemo(() => {
+    const all = mine?.trips ?? [];
+    /* 가장 가까운 여행을 맨 앞에 세웁니다. 빼지 않습니다 — 빼서 따로 카드로
+       내던 것을 목록 안으로 들인 참입니다. */
+    const rest = all.filter((t) => t.id !== next?.trip.id);
+    const head = next ? all.filter((t) => t.id === next.trip.id) : [];
+    return [...head, ...rest.slice(-5).reverse()].slice(0, 5);
+  }, [mine, next]);
 
   return (
     <Screen safeTop tabs={<AppTabs />}>
@@ -251,7 +251,17 @@ export default function Home() {
         <p>늘 올립니다. 길 위에 있든 다음 주에 떠나든 <b>가장 가까운 여행</b>
         하나인 것은 같고, 그것이 이 화면에서 가장 먼저 볼 것입니다.
       */}
-      {next ? <NextTrip trip={next.trip} at={next.at} road={road} /> : null}
+      {/*
+        여기 카드 하나가 따로 서 있었습니다(NextTrip).
+
+        <p>바로 아래 「내 여행」 이 같은 여행을 목록에서 빼 놓고 나머지를
+        내는 모양이었는데, 같은 종류의 것을 한 상자에 담자고 만든 목록
+        위에 그중 하나만 딴 상자로 얹혀 있는 셈이었습니다. 상자가 둘이면
+        경계도 둘입니다.
+
+        <p>목록 안 맨 윗줄로 들입니다. 그 줄이 「지금 그 길 위」 와 남은
+        곳 수를 그대로 답니다 — 카드가 하던 말을 줄이 합니다.
+      */}
 
       {/*
         내 여행 — 이 화면의 첫머리.
@@ -302,7 +312,12 @@ export default function Home() {
             ) : null}
           </Split>
           <Card style={styles.listCard}>
-            {shortlist.map((trip, i) => (
+            {shortlist.map((trip, i) => {
+              /* 가장 가까운 여행인지. 그 줄만 한 마디 더 답니다 — 전에는
+                 이 말을 하려고 카드 하나가 따로 서 있었습니다. */
+              const ahead = trip.id === next?.trip.id;
+              const going = ahead && next.at.kind === 'going';
+              return (
               <View key={trip.id}>
                 {i > 0 ? <Divider /> : null}
                 <Press
@@ -314,6 +329,18 @@ export default function Home() {
                     <Row gap={Spacing.sm} style={styles.grow}>
                       <TripMark theme={trip.theme} emoji={trip.emoji} />
                       <Grow gap={1}>
+                      {/* 무엇에 대한 줄인지 먼저 말합니다. 제목만 있으면
+                          이것이 다음 여행인지 그냥 목록의 하나인지 모릅니다. */}
+                      {ahead ? (
+                        <Row gap={Spacing.xs}>
+                          {/* 길 위에서만 찍히는 점. 글자로 "지금" 이라고
+                              적는 것보다 눈에 먼저 걸립니다. */}
+                          {going ? <View style={styles.live} /> : null}
+                          <Caption tone={going ? 'brand' : 'secondary'} strong={going}>
+                            {going ? '지금 그 길 위' : '다음 여행'}
+                          </Caption>
+                        </Row>
+                      ) : null}
                       <Body small strong numberOfLines={1}>
                         {trip.title}
                       </Body>
@@ -329,11 +356,15 @@ export default function Home() {
                       </Caption>
                       </Grow>
                     </Row>
-                    {countdownOf(trip.startIso, trip.endIso) ? (
+                    {going && road ? (
+                      /* 길 위에서는 남은 날이 아니라 남은 곳이 궁금합니다.
+                         "오늘" 이라고 적어 봐야 이미 아는 것입니다. */
+                      <Badge label={`${road.left}곳 남음`} tone="brand" />
+                    ) : countdownOf(trip.startIso, trip.endIso) ? (
                       <Badge
                         label={countdownLabel(countdownOf(trip.startIso, trip.endIso)!)}
                         tone={
-                          countdownIsNear(countdownOf(trip.startIso, trip.endIso)!)
+                          ahead || countdownIsNear(countdownOf(trip.startIso, trip.endIso)!)
                             ? 'brand'
                             : 'muted'
                         }
@@ -344,7 +375,8 @@ export default function Home() {
                   </Split>
                 </Press>
               </View>
-            ))}
+              );
+            })}
           </Card>
         </View>
       ) : null}
@@ -473,100 +505,6 @@ export default function Home() {
   );
 }
 
-/**
- * 다음 여행까지 며칠 — 그리고 길 위에 있으면, 지금 어떻게 돼 가는지.
- *
- * <p>세는 일은 <code>lib/countdown</code> 이 합니다. 여행 목록의 뱃지와
- * 같은 답을 써야 해서입니다 — 두 화면이 다른 날짜를 말하면 어느 쪽이
- * 맞는지 알 수 없습니다.
- *
- * <h3>여행이 시작되면 가는 곳이 달라집니다</h3>
- *
- * <p>전에는 이 줄이 "지금 그 길 위" 라고 <b>적어 놓고</b> 일정을 짜는
- * 화면을 열었습니다. 앱이 길 위인 것을 알면서 짜는 도구를 내민 셈입니다.
- *
- * <p>길 위에서 보라고 만든 화면이 이미 있습니다 —
- * <code>travel/[id].tsx</code>, 스탬프첩입니다. 지금 갈 곳 하나만 크게
- * 놓고 길찾기와 다녀옴만 남깁니다. 여행 중에는 그쪽을 엽니다.
- *
- * <p><b>짜는 화면을 막지는 않습니다.</b> 길 위에서도 일정은 고칩니다 — 비가
- * 와서 하나 빼는 일이 실제로 벌어집니다. 스탬프첩 오른쪽 위에 "일정 전체"
- * 가 늘 있습니다. 바뀌는 것은 <b>무엇이 먼저 열리는가</b>뿐입니다.
- *
- * @param road 오늘 남은 것. 여행 중이 아니거나 오늘에 해당하는 날이 없으면
- *             비어 있고, 그때는 지금까지처럼 제목만 말합니다
- */
-function NextTrip({
-  trip,
-  at,
-  road,
-}: {
-  trip: TripSummary;
-  at: Countdown;
-  road: { next: Place | null; left: number; total: number } | null;
-}) {
-  const router = useRouter();
-  const going = at.kind === 'going';
-
-  /* 길 위에서 궁금한 것은 "이따 어디 가나" 한 줄입니다. 다 찍었으면 그것도
-     말해 줍니다 — 남은 것이 없다는 것도 답입니다. */
-  const line = !road
-    ? null
-    : road.next
-      ? `다음 · ${road.next.name}`
-      : `오늘 ${road.total}곳 다 찍었습니다`;
-
-  return (
-    <Rise order={5}>
-      <Press
-        onPress={() =>
-          going
-            ? router.push({ pathname: '/travel/[id]', params: { id: trip.id } })
-            : router.push(`/trip/${trip.id}`)
-        }
-        accessibilityLabel={`${trip.title} — ${countdownLabel(at)}${line ? `, ${line}` : ''}`}>
-        {/*
-          길 위에 있을 때는 이 카드가 달라집니다.
-
-          여태 다른 카드들과 똑같이 생겨 있었습니다. 그런데 여행 중에 홈을
-          여는 것은 하루에 몇 번씩 있는 일이고, 그때 찾는 것은 늘 이 줄
-          하나입니다. 다른 것들과 같은 무게로 서 있으면 눈이 한 번 훑고
-          지나갑니다.
-
-          바탕을 옅게 물들입니다. 왼쪽에 색 띠도 둘렀었는데, 이 카드에는
-          이미 점과 「지금 그 길 위」와 남은 곳 배지가 있어서 넷째 표시가
-          되었습니다. 하나를 도드라지게 하려고 표시를 넷씩 붙이면 그때부터는
-          그냥 시끄러운 카드입니다.
-        */}
-        <Card style={going ? styles.onRoad : undefined}>
-          <Split>
-            <View style={styles.grow}>
-              {/* 무엇에 대한 줄인지 먼저 말합니다. 제목만 있으면 이것이
-                  다음 여행인지 방금 본 여행인지 알 수 없습니다. */}
-              <Row gap={Spacing.xs}>
-                {/* 길 위에서만 찍히는 점. 글자로 "지금" 이라고 적는 것보다
-                    눈에 먼저 걸립니다. */}
-                {going ? <View style={styles.live} /> : null}
-                <Caption tone={going ? 'brand' : 'secondary'} strong={going}>
-                  {going ? '지금 그 길 위' : '다음 여행'}
-                </Caption>
-              </Row>
-              <Subtitle>{trip.title}</Subtitle>
-              {/* 아직 안 받아 왔으면 아무 줄도 안 둡니다. 자리만 잡아 두면
-                  카드가 한 번 흔들립니다. */}
-              {line ? <Caption>{line}</Caption> : null}
-            </View>
-            <Badge
-              label={going && road ? `${road.left}곳 남음` : countdownLabel(at)}
-              tone={going ? 'brand' : countdownIsNear(at) ? 'brand' : 'muted'}
-            />
-          </Split>
-        </Card>
-      </Press>
-    </Rise>
-  );
-}
-
 /** 아직 아무것도 없는 사람에게, 어디서 시작하는지. */
 function FirstSteps() {
   const router = useRouter();
@@ -614,10 +552,6 @@ const styles = StyleSheet.create({
   },
   listRow: {
     paddingVertical: Spacing.md,
-  },
-  /* 길 위에 있을 때만. 옅게 물든 바탕으로 다른 카드들과 갈립니다. */
-  onRoad: {
-    backgroundColor: Colors.accentSoft,
   },
   /* 길 위라는 점. 지도의 "내 위치" 와 같은 색입니다. */
   live: {
