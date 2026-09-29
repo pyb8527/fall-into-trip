@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Linking, StyleSheet, View } from 'react-native';
 
 import { api } from '@/api/client';
-import type { PlaceInfo } from '@/api/types';
+import type { PlaceInfo, TravelMode } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import type { MapPlace } from '@/components/map-types';
 import { TripMap } from '@/components/trip-map';
@@ -40,6 +40,16 @@ import {
  * 대신 <b>구글 지도에서 열기</b> 를 둡니다. 사진도 후기도 메뉴도 거리뷰도
  * 거기 다 있고, 사람들은 어차피 그걸 켭니다.
  *
+ * <h3>여기에 달린 말도 여기서 봅니다</h3>
+ *
+ * <p>장소 하나에 달린 말(내 여행이면 「한 줄」, 남의 일정이면 「댓글」)을
+ * <b>줄에 단추로</b> 달고 있었습니다. 그래서 장소마다 단추가 하나 더 늘었고,
+ * 같은 일을 하는 자리가 화면마다 다른 모양이었습니다.
+ *
+ * <p>이 판이 이미 "여기가 어떤 데지" 를 답하는 자리입니다. 남이 남긴 말은
+ * 그 답의 일부입니다 — 평점 다음에 오는 것이 사람 말입니다. 두 화면이 같은
+ * 자리에서 같은 모양으로 냅니다.
+ *
  * <h3>넣는 단추는 밖에서 받습니다</h3>
  *
  * <p>부르는 자리마다 갈 곳이 다릅니다 — 보석함에서 열면 "담기" 하나, 추천
@@ -60,7 +70,9 @@ export function PlaceDetailSheet({
   /** 지금 서 있는 자리. 있으면 얼마나 먼지 적습니다. */
   here,
   about,
+  talk,
   actions,
+  mode,
   onClose,
 }: {
   place: Looked | null;
@@ -74,8 +86,27 @@ export function PlaceDetailSheet({
    * 이 곳을 고르는 데 더 큰 몫을 합니다.
    */
   about?: React.ReactNode;
+  /**
+   * 여기에 달린 말.
+   *
+   * <p>부르는 자리마다 무엇이 달리는지가 다릅니다 — 내 여행에서는 구글이
+   * 모르는 「한 줄」이고, 남의 일정에서는 그 장소에 대한 「댓글」입니다.
+   * 세는 것과 여는 것은 저쪽이 하고, 이 판은 부르는 이름과 개수만 받아
+   * 같은 모양으로 냅니다.
+   *
+   * <p>없으면 안 냅니다. 좌표만 찍어 둔 곳에는 달 데가 없습니다.
+   */
+  talk?: { noun: string; count: number; onOpen: () => void } | null;
   /** 이 곳을 어디에 담을지. 부르는 자리가 정합니다. */
   actions?: React.ReactNode;
+  /**
+   * 어떻게 갈지. 길찾기를 열 때 미리 골라 둡니다.
+   *
+   * <p>일정에서는 이 곳까지 오는 구간에 이미 고른 수단이 있습니다. 안
+   * 넘기면 구글이 자기 기본값으로 엽니다 — 전철로 가기로 해 둔 구간인데
+   * 운전 경로가 뜹니다.
+   */
+  mode?: TravelMode | null;
   onClose: () => void;
 }) {
   /*
@@ -179,6 +210,20 @@ export function PlaceDetailSheet({
         </Row>
       ) : null}
 
+      {/* 사람 말은 평점 다음, 구글로 나가는 단추 앞입니다. 여기까지가
+          "여기가 어떤 데지" 에 대한 답이고, 그다음은 나가는 길입니다. */}
+      {talk ? (
+        <>
+          <Divider />
+          <Button
+            label={talk.count > 0 ? `${talk.noun} ${talk.count}개 보기` : `${talk.noun} 남기기`}
+            variant={talk.count > 0 ? 'secondary' : 'ghost'}
+            compact
+            onPress={talk.onOpen}
+          />
+        </>
+      ) : null}
+
       <Divider />
 
       <Row gap={Spacing.sm}>
@@ -193,7 +238,7 @@ export function PlaceDetailSheet({
           label="길찾기"
           variant="ghost"
           compact
-          onPress={() => openDirections(place, null)}
+          onPress={() => openDirections(place, mode ?? null)}
         />
       </Row>
 

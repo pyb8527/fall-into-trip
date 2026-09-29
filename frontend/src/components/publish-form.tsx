@@ -3,8 +3,9 @@ import { useEffect, useState } from 'react';
 
 import { api, ApiError, UNEXPECTED } from '@/api/client';
 import { useAsync } from '@/api/use-async';
+import { PostFields, type PostShape } from '@/components/post-fields';
 import { Spacing } from '@/constants/theme';
-import { BottomSheet, Button, Caption, Chip, ErrorNote, Field, Row } from '@/ui';
+import { BottomSheet, Button, Caption, Chip, ErrorNote, Row } from '@/ui';
 
 /**
  * 내 일정을 게시판에 올립니다.
@@ -27,39 +28,20 @@ export function PublishForm({
   onDone: (postId: string) => void;
   onCancel: () => void;
 }) {
-  const [title, setTitle] = useState(tripTitle);
-  const [summary, setSummary] = useState('');
-  const [region, setRegion] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState(false);
-
   /*
-    태그.
+    겉에 적는 것들.
 
-    <p>지역과 기간은 조건이지 주제가 아닙니다. 사람들이 실제로 찾는 것은
-    "도쿄 3박" 보다 "아이랑", "혼자", "미술관", "비 올 때" 같은 것들입니다.
-
-    <p>고르는 목록을 두지 않고 직접 적습니다 — 무엇으로 묶일지는 미리 알 수
-    없고, 목록을 만들어 두면 거기 없는 여행은 아무 데도 안 걸립니다. 대신
-    이미 쓰인 것을 아래 보여 주어 저절로 같은 말로 모이게 합니다.
+    <p>고치는 판과 같은 칸을 씁니다(components/post-fields) — 올릴 때 적는
+    것과 고칠 때 적는 것이 같은데 두 군데에 적어 두면 한쪽만 고치는 날이
+    옵니다.
   */
-  const [tags, setTags] = useState<string[]>([]);
-  const [tagging, setTagging] = useState('');
-
-  const { data: tagList } = useAsync<{ tags: { tag: string; posts: number }[] }>(
-    (signal) => api.get('/api/posts/tags', signal),
-    [],
-  );
-
-  /** 적은 것을 태그로 만듭니다. 서버가 다듬는 것과 같은 규칙입니다. */
-  function addTag(raw: string) {
-    const clean = raw.trim().replace(/^#+/, '').trim().toLowerCase();
-    if (!clean || clean.length > 20 || tags.includes(clean) || tags.length >= 8) {
-      setTagging('');
-      return;
-    }
-    setTags((was) => [...was, clean]);
-    setTagging('');
-  }
+  const [shape, setShape] = useState<PostShape>({
+    title: tripTitle,
+    summary: '',
+    region: null,
+    tags: [],
+    feedback: false,
+  });
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
 
@@ -87,20 +69,12 @@ export function PublishForm({
     [tripId],
   );
 
-  const { data: regionList } = useAsync<{ regions: string[] }>(
-    (signal) => api.get('/api/posts/regions', signal),
-    [],
-  );
-
   /* 판은 닫혀도 화면에 남아 있어 처음 잡은 값이 다음에 열 때도 그대로입니다. */
   useEffect(() => {
     if (!visible) {
       return;
     }
-    setTitle(tripTitle);
-    setSummary('');
-    setRegion(null);
-    setFeedback(false);
+    setShape({ title: tripTitle, summary: '', region: null, tags: [], feedback: false });
     setFailed(null);
     setBusy(false);
   }, [visible, tripTitle]);
@@ -109,7 +83,7 @@ export function PublishForm({
     if (busy) {
       return;
     }
-    if (!title.trim()) {
+    if (!shape.title.trim()) {
       setFailed('제목부터 지어 주세요. 목록에서 이것만 보입니다.');
       return;
     }
@@ -117,12 +91,12 @@ export function PublishForm({
     setBusy(true);
     try {
       const res = await api.post<{ postId: string }>(`/api/trips/${tripId}/publish`, {
-        title: title.trim(),
-        summary: summary.trim(),
-        region,
-        tags,
+        title: shape.title.trim(),
+        summary: shape.summary.trim(),
+        region: shape.region,
+        tags: shape.tags,
         days: pickedDays,
-        feedback,
+        feedback: shape.feedback,
       });
       onDone(res.postId);
     } catch (e) {
@@ -145,15 +119,6 @@ export function PublishForm({
       <Caption tone="secondary">
         누가 다녀왔는지, 동행자가 누구인지는 올라가지 않습니다. 날짜와 장소만 갑니다.
       </Caption>
-
-      <Field label="제목" value={title} onChangeText={setTitle} placeholder="도쿄 3박 4일" />
-      <Field
-        label="한 줄 소개"
-        value={summary}
-        onChangeText={setSummary}
-        placeholder="먹으러만 다닌 일정입니다"
-        hint="목록에서 이 줄이 보입니다. 비워도 됩니다."
-      />
 
       {/*
         어느 날을 올릴지.
@@ -186,69 +151,7 @@ export function PublishForm({
         </>
       ) : null}
 
-      {/* 지역은 안 골라도 올라갑니다. 다만 지역으로 거를 때 안 걸립니다. */}
-      <Caption tone="secondary">어디로 다녀오셨나요?</Caption>
-      <Row gap={Spacing.xs}>
-        {regionList?.regions.map((r) => (
-          <Chip
-            key={r}
-            label={r}
-            selected={region === r}
-            onPress={() => setRegion(region === r ? null : r)}
-          />
-        ))}
-      </Row>
-
-      {/*
-        태그.
-
-        <p>지역 아래에 둡니다. 어디를 다녀왔는지 다음에 오는 것이 무엇에
-        대한 여행인지이고, 둘은 함께 적는 것이 자연스럽습니다.
-      */}
-      <Caption tone="secondary">무엇에 대한 여행인가요?</Caption>
-      {tags.length > 0 ? (
-        <Row gap={Spacing.xs} style={styles.wrap}>
-          {tags.map((t) => (
-            /* 누르면 뺍니다. 지우는 단추를 따로 두면 태그 하나가 두 칸이
-               되어 여덟 개를 달면 줄이 넘칩니다. */
-            <Chip key={t} label={`${t} ✕`} selected onPress={() => setTags((was) => was.filter((x) => x !== t))} />
-          ))}
-        </Row>
-      ) : null}
-      {tags.length < 8 ? (
-        <Field
-          label="태그"
-          value={tagging}
-          onChangeText={setTagging}
-          placeholder="아이랑"
-          hint="여덟 개까지. 엔터로 답니다."
-          returnKeyType="done"
-          onSubmitEditing={() => addTag(tagging)}
-        />
-      ) : null}
-      {/* 이미 쓰인 것들. 누르면 그대로 달립니다 — 같은 뜻을 저마다 다르게
-          적으면 어느 것으로도 다 안 걸립니다. */}
-      {(tagList?.tags.length ?? 0) > 0 && tags.length < 8 ? (
-        <Row gap={Spacing.xs} style={styles.wrap}>
-          {tagList?.tags
-            .filter((t) => !tags.includes(t.tag))
-            .slice(0, 12)
-            .map((t) => (
-              <Chip key={t.tag} label={t.tag} selected={false} onPress={() => addTag(t.tag)} />
-            ))}
-        </Row>
-      ) : null}
-
-      {/* 구경만 하라고 올린 글에 훈수가 달리면 반갑지 않습니다. 열어 둘
-          때만 댓글칸이 생깁니다. */}
-      <Caption tone="secondary">댓글을 받을까요?</Caption>
-      <Row gap={Spacing.xs}>
-        <Chip label="안 받기" selected={!feedback} onPress={() => setFeedback(false)} />
-        <Chip label="받기" selected={feedback} onPress={() => setFeedback(true)} />
-      </Row>
-      <Caption tone="secondary">
-        받으면 다른 사람이 일정 전체에, 또는 장소 하나하나에 댓글을 달 수 있습니다.
-      </Caption>
+      <PostFields value={shape} onChange={setShape} />
 
       {failed ? <ErrorNote message={failed} /> : null}
     </BottomSheet>

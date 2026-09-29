@@ -43,10 +43,9 @@ import { faceOf } from '@/constants/user-marks';
 import { feelDone, feelGrab, feelTick } from '@/lib/feel';
 import { SAME_SPOT, metersBetween, readableMeters } from '@/lib/geo';
 import type { Found } from '@/components/map-types';
-import { PlaceDetailSheet, type Looked } from '@/components/place-detail-sheet';
+import { PlaceDetailSheet } from '@/components/place-detail-sheet';
 import { PlaceSearch } from '@/components/place-search';
 import { RecommendSheet } from '@/components/recommend-sheet';
-import { openDirections } from '@/lib/directions';
 import { ago, todayIso } from '@/lib/countdown';
 import type { Booking } from '@/lib/intent-types';
 import { canParseBookingHere, intentState, parseBooking } from '@/lib/intent';
@@ -445,7 +444,15 @@ export default function TripScreen() {
     "그날 문 여는지, 평점이 몇인지" 이고, 그것 때문에 앱을 나갔다 돌아오게
     할 일이 아닙니다. 판 안에 구글로 가는 길이 그대로 있습니다.
   */
-  const [looking, setLooking] = useState<Looked | null>(null);
+  /*
+    들여다보고 있는 곳.
+
+    <p>전에는 Looked 만 들고 있었습니다. 그런데 판 안에서 한 줄을 열려면
+    <b>어느 장소인지</b>가 있어야 하고(한 줄은 구글 번호에 달립니다), 길찾기를
+    제대로 열려면 그 곳까지 오는 구간에 고른 수단이 있어야 합니다. 둘 다 줄만
+    알던 것이라 판까지 함께 넘깁니다.
+  */
+  const [looking, setLooking] = useState<{ place: Place; mode: TravelMode | null } | null>(null);
   const [cloning, setCloning] = useState(false);
   const [planted, setPlanted] = useState(0);
   /** 꽂은 자리에 이미 깃발을 꽂아 두고 있던 동행자. 없으면 null. */
@@ -1533,10 +1540,9 @@ export default function TripScreen() {
               onPick={(fromId, mode) => setPicked((p) => ({ ...p, [fromId]: mode }))}
               infoOf={infoOf}
               holdRow={holdRow}
-              onLook={setLooking}
+              onLook={(place, mode) => setLooking({ place, mode })}
               twiceIn={twiceIn}
               tipCounts={tipCounts}
-              onTips={setTipFor}
               spent={spentByDay.get(day.id) ?? null}
               spentAt={spentByPlace}
               touchedOf={touchedOf}
@@ -1575,10 +1581,44 @@ export default function TripScreen() {
       />
 
       <PlaceDetailSheet
-        place={looking}
+        place={
+          looking
+            ? {
+                name: looking.place.name,
+                lat: looking.place.lat,
+                lng: looking.place.lng,
+                placeId: looking.place.placeId,
+                icon: looking.place.icon,
+              }
+            : null
+        }
         /* 날짜 하나를 보고 있으면 그날 기준으로 영업시간을 봅니다. */
         onIso={dayIndex >= 0 ? (days[dayIndex]?.iso ?? null) : null}
         here={me.here}
+        mode={looking?.mode ?? null}
+        /*
+          한 줄이 줄에서 판 안으로 들어왔습니다.
+
+          <p>장소마다 단추가 하나 더 있었는데, 한 줄은 "여기가 어떤 데지" 에
+          대한 답의 일부라 이 판이 제자리입니다. 남의 일정에서 댓글이 같은
+          자리에 서는 것과 같습니다.
+
+          <p>구글 번호가 없는 곳에는 안 냅니다 — 한 줄은 그 번호에 달리는
+          것이라 달 데가 없습니다.
+        */
+        talk={
+          looking?.place.placeId
+            ? {
+                noun: '한 줄',
+                count: tipCounts[looking.place.placeId] ?? 0,
+                onOpen: () => {
+                  const target = looking.place;
+                  setLooking(null);
+                  setTipFor(target);
+                },
+              }
+            : null
+        }
         onClose={() => setLooking(null)}
       />
 
@@ -2023,7 +2063,6 @@ function DayCard({
   onLook,
   twiceIn,
   tipCounts,
-  onTips,
   spent,
   spentAt,
   touchedOf,
@@ -2054,13 +2093,12 @@ function DayCard({
   infoOf: Map<string, PlaceInfo>;
   /** 줄이 목록의 어디쯤인지 재려고 화면 요소를 붙들어 둡니다. */
   holdRow: (placeId: string, node: unknown) => void;
-  /** 장소 하나를 들여다보는 판을 엽니다. */
-  onLook: (place: Looked) => void;
+  /** 장소 하나를 들여다보는 판을 엽니다. 한 줄도 그 판 안에 있습니다. */
+  onLook: (place: Place, mode: TravelMode | null) => void;
   /** 두 날에 걸쳐 들어간 곳. 구글 번호 → 그 날들의 이름. */
   twiceIn: Map<string, string[]>;
-  /** 구글 번호별 최근 팁 수. */
+  /** 구글 번호별 최근 팁 수. 줄에서는 점으로만 알립니다. */
   tipCounts: Record<string, number>;
-  onTips: (place: Place) => void;
   /** 이 날 실제로 쓴 돈. 통화마다 하나씩. 아직 안 적었으면 비어 있습니다. */
   spent: Map<string, { sum: number; decimals: number }> | null;
   /** 장소마다 거기서 쓴 돈. 여행 전체 것이라 줄마다 꺼내 씁니다. */
@@ -2421,7 +2459,6 @@ function DayCard({
                     }
                     onLook={onLook}
                     tipCount={place.placeId ? (tipCounts[place.placeId] ?? 0) : 0}
-                    onTips={() => onTips(place)}
                     dragging={from === i}
                     index={i}
                     onDragStart={(at) => {
@@ -2591,7 +2628,6 @@ function PlaceRow({
   alsoOn,
   onLook,
   tipCount,
-  onTips,
   dragging,
   index,
   onDragStart,
@@ -2621,10 +2657,10 @@ function PlaceRow({
   info?: PlaceInfo;
   /** 이 곳이 들어가 있는 다른 날들. 비어 있으면 이 날에만 있습니다. */
   alsoOn: string[];
-  /** 평점·영업시간을 들여다보는 판을 엽니다. */
-  onLook: (place: Looked) => void;
+  /** 평점·영업시간을 들여다보는 판을 엽니다. 한 줄도 그 판 안에 있습니다. */
+  onLook: (place: Place, mode: TravelMode | null) => void;
+  /** 이 곳에 달린 한 줄의 개수. 판을 열기 전에는 점으로만 알립니다. */
   tipCount: number;
-  onTips: () => void;
   /** 지금 이 줄을 끌고 있는지. 끌고 있는 동안에는 조금 들어 올립니다. */
   dragging: boolean;
   index: number;
@@ -2653,6 +2689,8 @@ function PlaceRow({
   onPick: (fromId: string, mode: TravelMode) => void;
 }) {
   const [confirming, setConfirming] = useState(false);
+  /** 점 세 개로 접어 둔 것들을 펼쳤는지. */
+  const [folded, setFolded] = useState(false);
   const emoji = iconOf(place.icon);
   const chosen = gap ? chosenOf(gap) : null;
   /* 통화를 더하지 않습니다. 엔과 원을 합치려면 "언제 환율로" 가 남고 그
@@ -2810,50 +2848,30 @@ function PlaceRow({
         {active ? (
           <Row gap={0} style={styles.placeActions}>
             {[
-              /* 구글이 모르고 방금 다녀온 사람만 아는 것들이 여기 모입니다. */
-              place.placeId
-                ? {
-                    key: 'tips',
-                    name: 'message-square' as IconName,
-                    label: tipCount > 0 ? `한 줄 ${tipCount}개 보기` : '한 줄 남기기',
-                    /* 남긴 것이 있다는 말은 점이 합니다. active 는 눌러 둔
-                       상태(다녀옴 같은)를 뜻합니다. */
-                    dot: tipCount > 0,
-                    onPress: onTips,
-                  }
-                : null,
               /*
-                길찾기와 다릅니다.
+                <h3>일곱이 서 있었습니다</h3>
 
-                길찾기는 "어떻게 가지" 이고 이쪽은 "여기가 어떤 데지" 입니다 —
-                사진, 후기, 메뉴, 거리뷰. 우리가 갖고 있지 않은 것들이 거기 다
-                있습니다. 길찾기 단추만 있고 이것이 없어서, 정작 그 가게를 다시
-                보려면 직접 검색해야 했습니다.
+                <p>한 줄·자세히·길찾기·다녀옴·고치기·다음에·지우기. 한 줄에
+                일곱이면 칸이 손가락보다 좁아지고, 그림만 보고는 무엇이
+                무엇인지 알 수 없습니다.
+
+                <p>셋만 남깁니다. 길찾기는 이미 자세히 판 안에 있었으니 줄의
+                것은 처음부터 중복이었고, 한 줄도 "여기가 어떤 데지" 의 일부라
+                그 판으로 내려보냈습니다. 손보는 일들은 점 세 개로 접습니다 —
+                일정을 짜는 동안에만 쓰고 다 짠 뒤에는 거의 안 씁니다.
+
+                <p>안에 볼 것이 있으면 점을 찍습니다. 한 줄이 줄에서 사라졌으니
+                남긴 것이 있다는 말을 이 단추가 대신해야 합니다.
               */
               {
                 key: 'look',
                 name: 'info' as IconName,
-                label: `${place.name} 자세히 보기`,
-                onPress: () =>
-                  onLook({
-                    name: place.name,
-                    lat: place.lat,
-                    lng: place.lng,
-                    placeId: place.placeId,
-                    icon: place.icon,
-                  }),
-              },
-              /* 실제 안내는 구글 지도에 넘깁니다. 음성 안내도 환승 정보도 그쪽이
-                 낫고, 어차피 켤 것을 주소 옮겨 적게 만들 이유가 없습니다. */
-              {
-                key: 'go',
-                name: 'navigation' as IconName,
-                label: `${place.name} 길찾기`,
-                onPress: () =>
-                  openDirections(
-                    { name: place.name, lat: place.lat, lng: place.lng, placeId: place.placeId },
-                    chosen?.mode ?? null,
-                  ),
+                label:
+                  tipCount > 0
+                    ? `${place.name} 자세히 보기 · 한 줄 ${tipCount}개`
+                    : `${place.name} 자세히 보기`,
+                dot: tipCount > 0,
+                onPress: () => onLook(place, chosen?.mode ?? null),
               },
               {
                 key: 'visited',
@@ -2864,44 +2882,23 @@ function PlaceRow({
                 disabled: busy,
                 onPress: onToggle,
               },
-              canEdit
-                ? { key: 'edit', name: 'edit-2' as IconName, label: '장소 고치기', onPress: onEdit }
-                : null,
-              /*
-                여기 다음에 넣기.
-
-                <p>넣는 길이 날짜의 ＋ 하나뿐이라 무엇을 넣든 그 날 맨 뒤에
-                붙었습니다. 그런데 일정을 짜다 보면 "이치란 다음에 커피 한 잔"
-                처럼 <b>어느 곳 다음</b>이 정해져 있는 때가 훨씬 많습니다.
-                맨 뒤에 붙여 놓고 끌어서 올리는 것은 스무 곳짜리 날에서 할
-                짓이 아닙니다.
-              */
+              /* 고칠 수 없는 사람에게는 접을 것이 없습니다. */
               canEdit
                 ? {
-                    key: 'after',
-                    name: 'plus' as IconName,
-                    label: `${place.name} 다음에 장소 넣기`,
-                    onPress: onAddAfter,
-                  }
-                : null,
-              canEdit
-                ? {
-                    key: 'drop',
-                    name: 'trash-2' as IconName,
-                    label: '장소 지우기',
-                    tone: 'danger' as const,
-                    onPress: () => setConfirming(true),
+                    key: 'folded',
+                    name: 'more-horizontal' as IconName,
+                    label: `${place.name} 손보기`,
+                    onPress: () => setFolded(true),
                   }
                 : null,
             ]
               .filter((a) => a !== null)
               .map((a, i) => (
-                /* 칸막이는 첫 칸 빼고 답니다. 어느 것이 첫 칸인지는 사람마다
-                   다릅니다 — 고칠 수 있는 사람인지, 구글이 아는 곳인지에 따라
-                   넷에서 여섯까지 달라집니다. 그래서 세어서 답니다. */
+                /* 칸막이는 첫 칸 빼고 답니다. 고칠 수 있는 사람인지에 따라
+                   둘이거나 셋입니다. */
                 <View key={a.key} style={[styles.placeAction, i > 0 && styles.placeActionEdge]}>
                   <IconButton
-                    /* 바탕을 안 깝니다. 고른 줄은 바탕이 강조색인데 단추만 제
+                    /* 바탕을 안 깝니다. 고른 줄은 테두리로 말하는데 단추만 제
                        회색 동그라미를 들고 있으면 그 줄만 떨어져 나온 것처럼
                        보입니다. */
                     bare
@@ -2910,12 +2907,61 @@ function PlaceRow({
                     tone={a.tone}
                     active={a.active}
                     disabled={a.disabled}
+                    dot={a.dot}
                     onPress={a.onPress}
                   />
                 </View>
               ))}
           </Row>
         ) : null}
+
+        {/*
+          접어 둔 것들.
+
+          <p>일정을 짜는 동안 쓰는 셋입니다. 짜기가 끝나면 거의 안 쓰므로 줄에
+          늘 세워 둘 만한 것이 아닙니다. 「이 여행 다루기」 와 같은 모양으로
+          냅니다 — 접은 것을 펼치는 자리는 이 앱에서 하나입니다.
+        */}
+        <BottomSheet visible={folded} title={place.name} onClose={() => setFolded(false)}>
+          <ListRow
+            left={<Icon name="edit-2" tone="secondary" />}
+            title="고치기"
+            subtitle="이름·시각·비용·메모를 손봅니다."
+            onPress={() => {
+              setFolded(false);
+              onEdit();
+            }}
+          />
+
+          {/*
+            여기 다음에 넣기.
+
+            <p>넣는 길이 날짜의 ＋ 하나뿐이라 무엇을 넣든 그 날 맨 뒤에
+            붙었습니다. 그런데 일정을 짜다 보면 "이치란 다음에 커피 한 잔"
+            처럼 <b>어느 곳 다음</b>이 정해져 있는 때가 훨씬 많습니다. 맨 뒤에
+            붙여 놓고 끌어서 올리는 것은 스무 곳짜리 날에서 할 짓이 아닙니다.
+          */}
+          <ListRow
+            left={<Icon name="plus" tone="secondary" />}
+            title="여기 다음에 장소 넣기"
+            subtitle="맨 뒤가 아니라 이 곳 바로 다음 자리에 들어갑니다."
+            onPress={() => {
+              setFolded(false);
+              onAddAfter();
+            }}
+          />
+
+          {/* 되돌릴 수 없는 일이라 맨 아래, 선 하나 건너에 둡니다. */}
+          <Divider />
+          <Button
+            label="이 장소 지우기"
+            variant="danger"
+            onPress={() => {
+              setFolded(false);
+              setConfirming(true);
+            }}
+          />
+        </BottomSheet>
 
         <ConfirmDialog
           visible={confirming}

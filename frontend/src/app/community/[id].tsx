@@ -17,6 +17,7 @@ import {
 } from '@/components/comment-list';
 import type { MapPlace } from '@/components/map-types';
 import { PlaceDetailSheet } from '@/components/place-detail-sheet';
+import { PostFields, type PostShape } from '@/components/post-fields';
 import { PostMap } from '@/components/post-map';
 import { SignUpGate } from '@/components/signup-gate';
 import { TripMap } from '@/components/trip-map';
@@ -69,7 +70,16 @@ export default function Post() {
   );
 
   const [copying, setCopying] = useState(false);
+  /**
+   * 글에서 빼려고 고른 장소.
+   *
+   * <p>되돌릴 수 없는 일이라 먼저 묻습니다. 여기 달린 댓글도 함께 사라지므로
+   * 「먼저 하고 나중에 알리기」 로 둘 수 없습니다.
+   */
+  const [dropping, setDropping] = useState<{ dayIndex: number; placeIndex: number } | null>(null);
   const [removing, setRemoving] = useState(false);
+  /** 글의 겉을 고치는 판을 열어 두었는지. */
+  const [editing, setEditing] = useState(false);
   const [reporting, setReporting] = useState(false);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -122,7 +132,17 @@ export default function Post() {
   /** 지도에서 켜 둔 곳. */
   const [activeId, setActiveId] = useState<string | null>(null);
   /** 들여다보는 중인 곳. 판이 지도를 덮으므로 지도는 안 움직입니다. */
-  const [looking, setLooking] = useState<ItineraryPlace | null>(null);
+  /*
+    들여다보고 있는 곳.
+
+    <p>장소만 들고 있었습니다. 그런데 판 안에서 댓글을 열려면 <b>몇째 날 몇째
+    곳</b>인지가 있어야 합니다 — 댓글은 사본의 자리 번호에 달립니다. 줄만 알던
+    것이라 판까지 함께 넘깁니다.
+  */
+  const [looking, setLooking] = useState<{
+    place: ItineraryPlace;
+    at: { dayIndex: number; placeIndex: number };
+  } | null>(null);
 
   /** 사본의 장소를 지도에 얹을 모양으로. 자리(몇째 날 몇 번째)가 곧 이름표입니다. */
   const pins = useMemo<MapPlace[]>(
@@ -275,6 +295,31 @@ export default function Post() {
       });
     } catch (e) {
       setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
+    }
+  }
+
+  /**
+   * 올린 글에서 장소 하나를 뺍니다.
+   *
+   * <p>사본을 고치는 것입니다 — 원본 여행은 그대로입니다. 마지막 곳을 빼면
+   * 그 날이 없어지고, 하나도 안 남게 되는 것은 서버가 막습니다(그때 하려던
+   * 일은 고치기가 아니라 내리기입니다).
+   */
+  async function dropPlace(at: { dayIndex: number; placeIndex: number }) {
+    setFailed(null);
+    setBusy(true);
+    try {
+      await api.delete(`/api/posts/${id}/days/${at.dayIndex}/places/${at.placeIndex}`);
+      /* 판에서 보고 있던 곳일 수도 있습니다. 없어진 자리를 가리킨 채로 두면
+         판이 빈 곳을 들여다봅니다. */
+      setLooking(null);
+      setActiveId(null);
+      reload();
+      setNotice('글에서 뺐습니다.');
+    } catch (e) {
+      setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -460,10 +505,13 @@ export default function Post() {
           savedIds={savedIds}
           feedback={data.feedback}
           countAt={(placeIndex) => perPlace.get(`${i}:${placeIndex}`) ?? 0}
-          onComment={(placeIndex) => setAt({ dayIndex: i, placeIndex })}
           activeId={activeId}
           onFocus={(placeIndex) => setActiveId(`${i}:${placeIndex}`)}
-          onLook={setLooking}
+          onLook={(place, placeIndex) =>
+            setLooking({ place, at: { dayIndex: i, placeIndex } })
+          }
+          mine={data.mine}
+          onDrop={(placeIndex) => setDropping({ dayIndex: i, placeIndex })}
         />
       ))}
 
@@ -472,7 +520,8 @@ export default function Post() {
         달렸는지 표를 붙여 함께 둡니다 — 글 하나를 열었을 때 무슨 이야기가
         오갔는지는 한자리에서 훑을 수 있어야 합니다.
 
-        특정 장소에 대해 말하려면 그 장소 줄의 "댓글" 을 누릅니다.
+        특정 장소에 대해 말하려면 그 장소를 누르고 「자세히」 를 엽니다 —
+        댓글은 그 판 안에 있습니다.
       */}
       {data.feedback ? (
         <>
@@ -493,7 +542,17 @@ export default function Post() {
 
       <Row gap={Spacing.sm}>
         {data.mine ? (
-          <Button label="내리기" variant="danger" compact onPress={() => setRemoving(true)} />
+          <>
+            {/*
+              고치기가 내리기보다 앞입니다.
+
+              <p>내리는 길만 있었습니다. 그런데 제목을 잘못 적었거나 태그를
+              빼먹은 것 때문에 내리면 그동안 받은 추천과 조회수와 댓글이 함께
+              사라집니다 — 그 값이 너무 커서 대개 틀린 채로 둡니다.
+            */}
+            <Button label="고치기" variant="secondary" compact onPress={() => setEditing(true)} />
+            <Button label="내리기" variant="danger" compact onPress={() => setRemoving(true)} />
+          </>
         ) : (
           <Button
             label="신고"
@@ -575,16 +634,42 @@ export default function Post() {
         찾게 하면 방금 본 것을 잊습니다.
       */}
       <PlaceDetailSheet
-        place={looking}
+        place={looking?.place ?? null}
         onClose={() => setLooking(null)}
+        /*
+          댓글이 줄에서 판 안으로 들어왔습니다.
+
+          <p>내 여행 상세에서 「한 줄」이 같은 자리에 서는 것과 같습니다 — 남이
+          이 곳에 대해 무슨 말을 남겼는지는 "여기가 어떤 데지" 에 대한 답의
+          일부이고, 같은 일을 하는 자리가 화면마다 다를 이유가 없습니다.
+
+          <p>댓글을 안 받는 글에는 안 냅니다.
+        */
+        talk={
+          looking && data.feedback
+            ? {
+                noun: '댓글',
+                count: perPlace.get(`${looking.at.dayIndex}:${looking.at.placeIndex}`) ?? 0,
+                onOpen: () => {
+                  const at = looking.at;
+                  setLooking(null);
+                  if (user) {
+                    setAt(at);
+                  } else {
+                    needLogin('comment', `${at.dayIndex}:${at.placeIndex}`);
+                  }
+                },
+              }
+            : null
+        }
         actions={
           looking ? (
             <Button
-              label={savedIds.has(looking.name) ? UNKEEP : KEEP}
-              variant={savedIds.has(looking.name) ? 'secondary' : 'primary'}
+              label={savedIds.has(looking.place.name) ? UNKEEP : KEEP}
+              variant={savedIds.has(looking.place.name) ? 'secondary' : 'primary'}
               compact
               onPress={() => {
-                const target = looking;
+                const target = looking.place;
                 setLooking(null);
                 if (user) {
                   toggleSave(target);
@@ -595,6 +680,48 @@ export default function Post() {
             />
           ) : null
         }
+      />
+
+      {/* 댓글까지 함께 사라지는 일이라 먼저 묻습니다. */}
+      <ConfirmDialog
+        visible={dropping !== null}
+        title="이 장소를 글에서 뺄까요?"
+        message={
+          dropping
+            ? `${
+                data.itinerary.days[dropping.dayIndex]?.places[dropping.placeIndex]?.name ??
+                '이 장소'
+              } 이(가) 이 글에서 사라집니다. 여기 달린 댓글도 함께 사라집니다. 내 여행은 그대로 남습니다.`
+            : ''
+        }
+        confirmLabel="빼기"
+        danger
+        busy={busy}
+        onCancel={() => setDropping(null)}
+        onConfirm={() => {
+          const at = dropping;
+          setDropping(null);
+          if (at) {
+            dropPlace(at);
+          }
+        }}
+      />
+
+      <EditSheet
+        visible={editing}
+        postId={id}
+        now={{
+          title: data.title,
+          summary: data.summary ?? '',
+          region: data.region,
+          tags: data.tags,
+          feedback: data.feedback,
+        }}
+        onCancel={() => setEditing(false)}
+        onDone={() => {
+          setEditing(false);
+          reload();
+        }}
       />
 
       <SignUpGate intent={gate} onClose={() => setGate(null)} />
@@ -626,10 +753,11 @@ function DayBlock({
   savedIds,
   feedback,
   countAt,
-  onComment,
   activeId,
   onFocus,
   onLook,
+  mine,
+  onDrop,
 }: {
   day: ItineraryDay;
   index: number;
@@ -641,16 +769,20 @@ function DayBlock({
   /** 이미 담은 곳. 별을 채워 두면 두 번 누르지 않습니다. */
   /** 보석함에 이미 있는 것들. 이름 → 담아 둔 번호. */
   savedIds: Map<string, string>;
-  /** 댓글을 받는 글인지. 안 열었으면 댓글 단추를 두지 않습니다. */
+  /** 댓글을 받는 글인지. 안 열었으면 달린 것이 있다는 점도 안 찍습니다. */
   feedback: boolean;
   /** 이 장소에 달린 댓글 수. */
   countAt: (placeIndex: number) => number;
-  onComment: (placeIndex: number) => void;
   /** 지도에서 켜 둔 곳. 목록의 그 줄도 함께 켜집니다. */
   activeId: string | null;
   onFocus: (placeIndex: number) => void;
   /** 이 곳을 들여다보는 판을 엽니다. */
-  onLook: (place: ItineraryPlace) => void;
+  /** 들여다보는 판을 엽니다. 댓글도 그 판 안에 있습니다. */
+  onLook: (place: ItineraryPlace, placeIndex: number) => void;
+  /** 내가 올린 글인지. 그때만 장소를 뺄 수 있습니다. */
+  mine: boolean;
+  /** 이 장소를 글에서 빼려고 합니다. */
+  onDrop: (placeIndex: number) => void;
 }) {
   const color = day.color || dayColor(index);
 
@@ -755,29 +887,27 @@ function DayBlock({
           {activeId === `${index}:${i}` ? (
           <Row gap={0} style={styles.placeActs}>
             {[
-              feedback
-                ? {
-                    key: 'comment',
-                    name: 'message-square' as IconName,
-                    label: countAt(i) > 0 ? `댓글 ${countAt(i)}개 보기` : '댓글 남기기',
-                    /* 달린 것이 있다는 말은 점이 합니다. active 는 눌러 둔
-                       상태(보석함에 담김 같은)를 뜻하는데, 댓글이 달린 것은
-                       내가 켜 둔 것이 아닙니다 — 그렇게 쓰면 회색으로 채워져
-                       눌러 놓은 단추처럼 보입니다. */
-                    dot: countAt(i) > 0,
-                    onPress: () => onComment(i),
-                  }
-                : null,
               /*
                 남의 일정에서 한 곳을 보고 가져올지 정하려면 이름과 메모만으로는
                 모자랍니다. 평점이 몇인지 그날 문을 여는지가 있어야 고르는 일이
                 됩니다. 장소 찾기에서 쓰는 것과 같은 판을 엽니다.
+
+                <p>댓글도 그 판 안에 있습니다. 줄에 따로 세워 두었더니 같은 일을
+                하는 자리가 내 여행 상세와 달랐고, 무엇보다 <b>남이 무슨 말을
+                남겼는지</b>는 "여기가 어떤 데지" 에 대한 답의 일부입니다.
+
+                <p>달린 것이 있으면 점을 찍습니다. 댓글 단추가 줄에서 사라졌으니
+                그 말을 이 단추가 대신해야 합니다.
               */
               {
                 key: 'look',
                 name: 'info' as IconName,
-                label: `${place.name} 자세히 보기`,
-                onPress: () => onLook(place),
+                label:
+                  countAt(i) > 0
+                    ? `${place.name} 자세히 보기 · 댓글 ${countAt(i)}개`
+                    : `${place.name} 자세히 보기`,
+                dot: feedback && countAt(i) > 0,
+                onPress: () => onLook(place, i),
               },
               /* 일정을 통째로 가져오지 않고 이 집만 담을 수 있어야 합니다.
                  담긴 것은 눌러서 뺍니다 — 담는 길만 있으면 잘못 누른 뒤에
@@ -801,6 +931,22 @@ function DayBlock({
                 tone: 'brand' as const,
                 onPress: () => onSave(place, i),
               },
+              /*
+                내 글이면 여기서 뺄 수 있습니다.
+
+                <p>고치는 길이 「내리고 다시 올리기」 뿐이었습니다. 그런데
+                내리면 그동안 받은 추천과 댓글이 함께 사라집니다 — 가운데 한
+                곳이 틀렸다는 이유로 그것을 다 버리게 되니 대개 틀린 채로
+                둡니다.
+              */
+              mine
+                ? {
+                    key: 'drop',
+                    name: 'more-horizontal' as IconName,
+                    label: `${place.name} 이 글에서 빼기`,
+                    onPress: () => onDrop(i),
+                  }
+                : null,
             ]
               .filter((a) => a !== null)
               .map((a, at) => (
@@ -821,6 +967,88 @@ function DayBlock({
         </View>
           ))}
     </Card>
+  );
+}
+
+/**
+ * 올린 글의 겉을 고칩니다.
+ *
+ * <p>일정 자체는 여기서 안 고칩니다. 장소는 줄마다 점 세 개로 하나씩 빼고,
+ * 날을 다시 고르는 것은 고치기가 아니라 다시 올리기입니다.
+ *
+ * <p>올리는 판과 <b>같은 칸</b>을 씁니다(components/post-fields). 적는 것이
+ * 같은데 두 군데에 따로 적어 두면 한쪽만 고치는 날이 옵니다.
+ */
+function EditSheet({
+  visible,
+  postId,
+  now,
+  onDone,
+  onCancel,
+}: {
+  visible: boolean;
+  postId: string;
+  /** 지금 올라가 있는 값. 판을 열 때마다 여기서 시작합니다. */
+  now: PostShape;
+  onDone: () => void;
+  onCancel: () => void;
+}) {
+  const [shape, setShape] = useState<PostShape>(now);
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
+
+  /* 판은 닫혀도 화면에 남아 있습니다. 열 때마다 지금 올라가 있는 값으로
+     되돌려 놓지 않으면, 고치다 취소한 것이 다음에 열 때 그대로 남습니다. */
+  useEffect(() => {
+    if (visible) {
+      setShape(now);
+      setFailed(null);
+    }
+    /* now 는 새로 읽을 때마다 새 객체라 여기 넣으면 치는 동안 계속
+       되돌려집니다. 판이 열리는 순간만 봅니다. */
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
+
+  async function submit() {
+    if (busy) {
+      return;
+    }
+    if (!shape.title.trim()) {
+      setFailed('제목은 비울 수 없습니다. 목록에서 이것만 보입니다.');
+      return;
+    }
+    setFailed(null);
+    setBusy(true);
+    try {
+      await api.patch(`/api/posts/${postId}`, {
+        title: shape.title.trim(),
+        summary: shape.summary.trim(),
+        region: shape.region ?? '',
+        tags: shape.tags,
+        feedback: shape.feedback,
+      });
+      onDone();
+    } catch (e) {
+      setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <BottomSheet
+      visible={visible}
+      title="글 고치기"
+      onClose={onCancel}
+      footer={<Button label="고치기" onPress={submit} busy={busy} />}>
+      <Caption tone="secondary">
+        일정은 그대로입니다. 장소를 빼려면 그 장소를 누르고 점 세 개를 누릅니다.
+      </Caption>
+
+      <PostFields value={shape} onChange={setShape} />
+
+      {failed ? <ErrorNote message={failed} /> : null}
+    </BottomSheet>
   );
 }
 
