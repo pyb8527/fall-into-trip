@@ -4,8 +4,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { api, API_BASE } from '@/api/client';
-import type { Books, Companion, TripDetail } from '@/api/types';
+import type { Books, Companion, PlaceMark, TripDetail } from '@/api/types';
 import { useAsync } from '@/api/use-async';
+import { OurPhoto } from '@/components/our-photo';
 import { PublishForm } from '@/components/publish-form';
 import { TripMap } from '@/components/trip-map';
 import { Colors, dayColor, Radius, Spacing } from '@/constants/theme';
@@ -18,6 +19,7 @@ import {
   Caption,
   Chip,
   Divider,
+  Empty,
   ErrorNote,
   Loading,
   Panel,
@@ -44,11 +46,14 @@ import { TripTabs } from '@/ui/tab-bar';
  *       훨씬 가볍게 할 수 있습니다.</li>
  * </ul>
  */
-type Face = 'receipt' | 'replay';
+type Face = 'receipt' | 'replay' | 'album';
 
 const FACES: { value: Face; label: string }[] = [
   { value: 'receipt', label: '영수증' },
-  { value: 'replay', label: '다시 보기' },
+  /* 「다시 보기」 였습니다. 무엇을 다시 보는지가 이름에 없어서, 누르기
+     전에는 알 수 없었습니다. */
+  { value: 'replay', label: '동선' },
+  { value: 'album', label: '남긴 것' },
 ];
 
 export default function Card() {
@@ -102,8 +107,10 @@ export default function Card() {
 
       {face === 'receipt' ? (
         <Receipt trip={data} mates={mates?.members ?? []} books={spent?.books ?? []} />
-      ) : (
+      ) : face === 'replay' ? (
         <Replay trip={data} />
+      ) : (
+        <Album trip={data} />
       )}
 
       {/*
@@ -142,6 +149,66 @@ export default function Card() {
         }}
       />
     </Screen>
+  );
+}
+
+/**
+ * 다녀와서 남긴 것들.
+ *
+ * <h3>왜 여기 있는가</h3>
+ *
+ * <p>여행 중에 도장을 찍으며 남긴 사진·별점·한 줄은 그 자리에서만 보였습니다.
+ * 그런데 그것을 다시 보고 싶은 때는 <b>돌아온 뒤</b>이고, 돌아온 뒤에 여는
+ * 화면이 여기입니다.
+ *
+ * <p>영수증은 숫자로 말합니다 — 며칠, 몇 곳, 얼마. 이쪽은 그 여행이 어땠는지를
+ * 말합니다. 같은 여행의 두 얼굴이라 나란히 둡니다.
+ *
+ * <h3>날짜 차례로 섭니다</h3>
+ *
+ * <p>찍은 차례가 아니라 일정의 차례입니다. 남긴 것을 훑는 일은 "그 여행이
+ * 어떻게 흘렀나" 를 다시 밟는 일이고, 그것은 날짜 순입니다.
+ */
+function Album({ trip }: { trip: TripDetail }) {
+  const traceOf = useMemo(
+    () => new Map((trip.marks ?? []).map((m) => [m.placeId, m])),
+    [trip],
+  );
+
+  /* 남긴 것이 있는 곳만, 날짜 차례로. */
+  const rows = useMemo(() => {
+    const out: { day: string; place: { id: string; name: string }; mark: PlaceMark }[] = [];
+    for (const day of trip.days) {
+      for (const place of day.places) {
+        const mark = traceOf.get(place.id);
+        if (mark) {
+          out.push({ day: day.date || day.label, place, mark });
+        }
+      }
+    }
+    return out;
+  }, [trip, traceOf]);
+
+  if (rows.length === 0) {
+    return (
+      <Empty message="아직 남긴 것이 없어요. 여행 중에 도장을 찍으면서 사진과 한 줄을 남겨 보세요." />
+    );
+  }
+
+  return (
+    <View style={styles.album}>
+      {rows.map(({ day, place, mark }, i) => (
+        <Panel key={place.id}>
+          {/* 날짜는 바뀔 때만 적습니다. 줄마다 붙이면 같은 날이 몇 번씩
+              되풀이되어, 정작 언제 바뀌는지가 안 보입니다. */}
+          {i === 0 || rows[i - 1].day !== day ? <Caption tone="secondary">{day}</Caption> : null}
+          <Subtitle>{place.name}</Subtitle>
+          {mark.stars ? <Caption tone="brand">{'★'.repeat(mark.stars)}</Caption> : null}
+          {mark.photoId ? <OurPhoto id={mark.photoId} height={220} /> : null}
+          {mark.note ? <Body>{mark.note}</Body> : null}
+        </Panel>
+      ))}
+    </View>
   );
 }
 
@@ -525,6 +592,10 @@ function Replay({ trip }: { trip: TripDetail }) {
 }
 
 const styles = StyleSheet.create({
+  /* 남긴 것들. 판 사이를 넉넉히 띄웁니다 — 한 장 한 장이 다른 순간입니다. */
+  album: {
+    gap: Spacing.md,
+  },
   paper: {
     backgroundColor: Colors.surface,
     borderRadius: Radius.md,
