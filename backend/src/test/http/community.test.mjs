@@ -37,9 +37,32 @@ r = await call("POST", "/api/places", { token: author, body: { dayId, name: "도
 T("장소 넣기", r.status === 200, r.data);
 r = await call("POST", "/api/places", { token: author, body: { dayId, name: "구로몬 시장", lat: 34.6656, lng: 135.5061, time: "11:00" } });
 
-r = await call("POST", `/api/trips/${tripId}/publish`, { token: author, body: { summary: "먹으러만 다닌 일정" } });
+r = await call("POST", `/api/trips/${tripId}/publish`, { token: author,
+  /* 태그는 사람이 적는 것이라 제각각 옵니다 — 앞에 #, 뒤에 공백, 대문자,
+     같은 것 두 번. 다듬어서 하나로 모이는지 봅니다. */
+  body: { summary: "먹으러만 다닌 일정", tags: ["#먹방", " 먹방 ", "Osaka", "아이랑", ""] } });
 T("올라감", r.status === 200 && !!r.data.postId, r.data);
 const postId = r.data.postId;
+
+console.log("
+[3-1] 태그");
+r = await call("GET", "/api/posts");
+const mine = r.data.posts.find(p => p.id === postId);
+T("카드에 태그가 실림", Array.isArray(mine?.tags), mine);
+T("# 와 공백이 걷힘", mine?.tags.includes("먹방"), mine?.tags);
+T("같은 것은 하나로", mine?.tags.filter(t => t === "먹방").length === 1, mine?.tags);
+T("대문자는 내려감", mine?.tags.includes("osaka"), mine?.tags);
+T("빈 것은 버림", !mine?.tags.includes(""), mine?.tags);
+
+r = await call("GET", "/api/posts/tags");
+T("쓰인 태그 목록", r.status === 200 && r.data.tags.some(t => t.tag === "먹방"), r.data);
+
+r = await call("GET", "/api/posts?tag=먹방");
+T("태그로 걸러짐", r.data.posts.some(p => p.id === postId), r.data.posts?.length);
+r = await call("GET", "/api/posts?tag=없는태그");
+T("없는 태그면 안 나옴", !r.data.posts.some(p => p.id === postId), r.data.posts?.length);
+r = await call("GET", "/api/posts?sort=new&tag=아이랑");
+T("정렬을 바꿔도 같은 조건", r.data.posts.some(p => p.id === postId), r.data.posts?.length);
 
 r = await call("POST", `/api/trips/${tripId}/publish`, { token: reader, body: {} });
 T("남의 여행은 못 올림", r.status === 403 || r.status === 404, r.data);

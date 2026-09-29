@@ -54,6 +54,23 @@ public class TripPost {
     private String region;
 
     /**
+     * 무엇에 대한 여행인지. 올릴 때 글쓴이가 답니다.
+     *
+     * <h3>지역·기간으로는 못 찾던 것들</h3>
+     *
+     * <p>둘러보기에서 찾을 방법이 지역과 기간뿐이었습니다. 그런데 사람들이
+     * 실제로 찾는 것은 "도쿄 3박" 보다 <b>"아이랑", "혼자", "미술관",
+     * "비 올 때"</b> 같은 것들입니다 — 지역과 기간은 조건이지 주제가 아닙니다.
+     *
+     * <p>고르는 목록을 두지 않고 글쓴이가 직접 적습니다. 무엇으로 묶일지는
+     * 미리 알 수 없고, 목록을 만들어 두면 거기 없는 여행은 아무 데도 안
+     * 걸립니다. 대신 이미 쓰인 것을 먼저 보여 주어 저절로 모이게 합니다.
+     */
+    @Column(columnDefinition = "text[]")
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    private String[] tags = new String[0];
+
+    /**
      * 올릴 때의 일정 전체. 날짜와 장소가 그대로 들어 있습니다.
      *
      * <p>자바에서는 그냥 문자열이지만 데이터베이스에서는 jsonb 입니다. 이것을
@@ -103,7 +120,7 @@ public class TripPost {
 
     @Builder
     public TripPost(String tripId, String authorId, String title, String summary,
-                    String region, String snapshot, int dayCount, int placeCount,
+                    String region, String[] tags, String snapshot, int dayCount, int placeCount,
                     boolean feedback) {
         this.id = Ids.next();
         this.tripId = tripId;
@@ -111,6 +128,9 @@ public class TripPost {
         this.title = title;
         this.summary = summary;
         this.region = region;
+        /* 안 달았으면 빈 배열입니다. null 로 두면 칸이 NOT NULL 이라 들어가다
+           터지고, 무엇보다 "태그가 없다" 와 "모른다" 는 다른 말이 아닙니다. */
+        this.tags = tags == null ? new String[0] : tags;
         this.snapshot = snapshot;
         this.dayCount = dayCount;
         this.placeCount = placeCount;

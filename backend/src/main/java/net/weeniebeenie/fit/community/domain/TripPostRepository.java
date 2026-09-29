@@ -7,6 +7,8 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
+
 public interface TripPostRepository extends JpaRepository<TripPost, String> {
 
     Page<TripPost> findAllByAuthorIdOrderByCreatedAtDesc(String authorId, Pageable pageable);
@@ -45,17 +47,26 @@ public interface TripPostRepository extends JpaRepository<TripPost, String> {
      *
      * <p>글자는 제목과 소개에서만 찾습니다. 일정 안쪽(장소 이름)까지 뒤지려면
      * jsonb 를 훑어야 하는데, 그건 인덱스가 안 먹어 글이 늘수록 느려집니다.
+     *
+     * <p>태그는 <b>하나만</b> 받습니다. 여럿을 받으면 "그중 아무거나" 인지
+     * "전부 다" 인지를 화면이 정해 줘야 하는데, 둘러보기에서 좁히는 일은
+     * 대개 한 번이면 충분합니다. 필요해지면 그때 늘립니다.
+     *
+     * <p>array_position 을 씁니다 — 배열 안에 그 값이 있으면 자리를, 없으면
+     * NULL 을 줍니다. JPQL 에는 배열을 다루는 말이 없어서 함수로 넘깁니다.
      */
     @Query("""
            SELECT p FROM TripPost p
            WHERE p.hidden = false
              AND (:region = '' OR p.region = :region)
+             AND (:tag = '' OR FUNCTION('array_position', p.tags, :tag) IS NOT NULL)
              AND p.dayCount >= :minDays
              AND p.dayCount <= :maxDays
              AND (LOWER(p.title) LIKE :pattern
                   OR LOWER(COALESCE(p.summary, '')) LIKE :pattern)
            """)
     Page<TripPost> search(@Param("region") String region,
+                          @Param("tag") String tag,
                           @Param("minDays") int minDays,
                           @Param("maxDays") int maxDays,
                           @Param("pattern") String pattern,
@@ -82,6 +93,7 @@ public interface TripPostRepository extends JpaRepository<TripPost, String> {
            SELECT * FROM trip_posts p
            WHERE p.hidden = false
              AND (:region = '' OR p.region = :region)
+             AND (:tag = '' OR array_position(p.tags, :tag) IS NOT NULL)
              AND p.day_count >= :minDays
              AND p.day_count <= :maxDays
              AND (LOWER(p.title) LIKE :pattern
@@ -94,6 +106,7 @@ public interface TripPostRepository extends JpaRepository<TripPost, String> {
            SELECT count(*) FROM trip_posts p
            WHERE p.hidden = false
              AND (:region = '' OR p.region = :region)
+             AND (:tag = '' OR array_position(p.tags, :tag) IS NOT NULL)
              AND p.day_count >= :minDays
              AND p.day_count <= :maxDays
              AND (LOWER(p.title) LIKE :pattern
@@ -101,6 +114,7 @@ public interface TripPostRepository extends JpaRepository<TripPost, String> {
            """,
            nativeQuery = true)
     Page<TripPost> findHot(@Param("region") String region,
+                           @Param("tag") String tag,
                            @Param("minDays") int minDays,
                            @Param("maxDays") int maxDays,
                            @Param("pattern") String pattern,
@@ -131,4 +145,23 @@ public interface TripPostRepository extends JpaRepository<TripPost, String> {
     @Modifying
     @Query("UPDATE TripPost p SET p.viewCount = p.viewCount + 1 WHERE p.id = :id")
     void addView(@Param("id") String id);
+
+    /**
+     * 지금 쓰이고 있는 태그와 그 수.
+     *
+     * <p>배열을 줄로 펴서(unnest) 셉니다. 숨긴 글은 빼고요 — 내려간 글의
+     * 태그가 목록에 남아 있으면 눌러도 아무것도 안 나옵니다.
+     *
+     * <p>많이 쓰인 순서입니다. 같은 수면 이름 순으로 — 새로 고칠 때마다
+     * 차례가 바뀌면 방금 본 것을 다시 찾게 됩니다.
+     */
+    @Query(value = """
+           SELECT t AS tag, count(*) AS posts
+           FROM trip_posts p, unnest(p.tags) AS t
+           WHERE p.hidden = false
+           GROUP BY t
+           ORDER BY posts DESC, tag ASC
+           LIMIT :limit
+           """, nativeQuery = true)
+    List<Object[]> tagCounts(@Param("limit") int limit);
 }

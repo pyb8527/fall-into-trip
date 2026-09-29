@@ -107,6 +107,22 @@ export default function Community() {
   const [region, setRegion] = useState<string | null>(fromLink ?? null);
   const [days, setDays] = useState<PostDays | null>(null);
 
+  /*
+    태그.
+
+    <p>지역과 기간은 조건이지 주제가 아닙니다. "도쿄 3박" 으로는 좁혀지는데
+    "아이랑 갈 만한 데" 로는 못 좁혔습니다.
+
+    <p>고를 수 있는 값을 우리가 정하지 않습니다 — 글쓴이가 적은 것을 세어
+    많이 쓰인 순서로 내려받습니다. 목록이 저절로 뒤따라옵니다.
+  */
+  const [tag, setTag] = useState<string | null>(null);
+
+  const { data: tagList } = useAsync<{ tags: { tag: string; posts: number }[] }>(
+    (signal) => api.get('/api/posts/tags', signal),
+    [],
+  );
+
   /* 고를 수 있는 지역은 서버가 정합니다. 화면에 따로 적어 두면 언젠가
      어긋나고, 어긋나면 고른 값이 아무것도 안 걸립니다. */
   const { data: regionList } = useAsync<{ regions: string[] }>(
@@ -127,6 +143,7 @@ export default function Community() {
   const picked: { key: string; label: string; clear: () => void }[] = [
     q !== '' ? { key: 'q', label: `"${q}"`, clear: () => { setTyped(''); setQ(''); } } : null,
     region !== null ? { key: 'region', label: region, clear: () => setRegion(null) } : null,
+    tag !== null ? { key: 'tag', label: `#${tag}`, clear: () => setTag(null) } : null,
     days !== null
       ? {
           key: 'days',
@@ -143,8 +160,8 @@ export default function Community() {
     (signal) =>
       view === 'mine' || view === 'liked'
         ? api.get(`/api/posts/${view}${query({ page })}`, signal)
-        : api.get(`/api/posts${query({ sort, region, days, q, page })}`, signal),
-    [view, sort, page, region, days, q],
+        : api.get(`/api/posts${query({ sort, region, tag, days, q, page })}`, signal),
+    [view, sort, page, region, tag, days, q],
   );
 
   /** 조건을 바꾸면 첫 쪽부터 다시 봅니다. 3쪽에서 걸면 빈 화면이 됩니다. */
@@ -319,6 +336,38 @@ export default function Community() {
 
         <Divider />
 
+        {/*
+          태그.
+
+          <p>지역 다음입니다. 어디를 갔는지 다음에 오는 것이 무엇에 대한
+          여행인지고, 찾을 때도 그 순서로 좁힙니다.
+
+          <p>많이 쓰인 것만 냅니다. 한 번 쓰인 태그까지 다 늘어놓으면
+          고르는 것이 아니라 훑는 일이 됩니다.
+        */}
+        {(tagList?.tags.length ?? 0) > 0 ? (
+          <>
+            <Body small strong>
+              무엇
+            </Body>
+            <Row gap={Spacing.xs} style={styles.applied}>
+              <Chip
+                label="무엇이든"
+                selected={tag === null}
+                onPress={() => refilter(() => setTag(null))}
+              />
+              {tagList?.tags.map((t) => (
+                <Chip
+                  key={t.tag}
+                  label={t.tag}
+                  selected={tag === t.tag}
+                  onPress={() => refilter(() => setTag(tag === t.tag ? null : t.tag))}
+                />
+              ))}
+            </Row>
+          </>
+        ) : null}
+
         <Body small strong>
           며칠
         </Body>
@@ -362,6 +411,7 @@ export default function Community() {
           post={post}
           onOpen={() => router.push(`/community/${post.id}`)}
           onLike={() => toggleLike(post)}
+          onTag={(t) => refilter(() => setTag(t))}
         />
       ))}
 
@@ -380,10 +430,13 @@ function PostRow({
   post,
   onOpen,
   onLike,
+  onTag,
 }: {
   post: PostCard;
   onOpen: () => void;
   onLike: () => void;
+  /** 태그를 눌렀을 때. 그 태그로 좁힙니다. */
+  onTag: (tag: string) => void;
 }) {
   return (
     <Card>
@@ -404,6 +457,24 @@ function PostRow({
           {post.authorName} · {post.dayCount}일 · {post.placeCount}곳
         </Caption>
       </Pressable>
+
+      {/*
+        태그.
+
+        <p>누르는 자리 <b>밖</b>에 둡니다. 안에 넣으면 태그를 누르려다 글이
+        열립니다 — 지도와 하트를 갈라 둔 것과 같은 까닭입니다.
+
+        <p>눌러서 그 태그로 좁힙니다. 보여 주기만 하면 "아, 이런 게 있구나"
+        에서 끝나고, 정작 같은 것을 더 보려면 거르는 판을 열어 찾아야
+        합니다.
+      */}
+      {post.tags.length > 0 ? (
+        <Row gap={Spacing.xs} style={styles.applied}>
+          {post.tags.map((t) => (
+            <Chip key={t} label={t} selected={false} onPress={() => onTag(t)} />
+          ))}
+        </Row>
+      ) : null}
 
       <Split gap={Spacing.sm}>
         <Caption tone="secondary">조회 {post.viewCount.toLocaleString()}</Caption>

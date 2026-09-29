@@ -383,6 +383,8 @@ export type PostCard = {
   summary: string | null;
   /** 어느 지역 여행인지. 안 고르고 올린 예전 글에는 없습니다. */
   region: string | null;
+  /** 무엇에 대한 여행인지. 글쓴이가 직접 적습니다. 안 달았으면 빈 배열. */
+  tags: string[];
   authorName: string;
   dayCount: number;
   placeCount: number;

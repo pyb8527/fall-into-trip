@@ -1,3 +1,4 @@
+import { StyleSheet } from 'react-native';
 import { useEffect, useState } from 'react';
 
 import { api, ApiError, UNEXPECTED } from '@/api/client';
@@ -30,6 +31,35 @@ export function PublishForm({
   const [summary, setSummary] = useState('');
   const [region, setRegion] = useState<string | null>(null);
   const [feedback, setFeedback] = useState(false);
+
+  /*
+    태그.
+
+    <p>지역과 기간은 조건이지 주제가 아닙니다. 사람들이 실제로 찾는 것은
+    "도쿄 3박" 보다 "아이랑", "혼자", "미술관", "비 올 때" 같은 것들입니다.
+
+    <p>고르는 목록을 두지 않고 직접 적습니다 — 무엇으로 묶일지는 미리 알 수
+    없고, 목록을 만들어 두면 거기 없는 여행은 아무 데도 안 걸립니다. 대신
+    이미 쓰인 것을 아래 보여 주어 저절로 같은 말로 모이게 합니다.
+  */
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagging, setTagging] = useState('');
+
+  const { data: tagList } = useAsync<{ tags: { tag: string; posts: number }[] }>(
+    (signal) => api.get('/api/posts/tags', signal),
+    [],
+  );
+
+  /** 적은 것을 태그로 만듭니다. 서버가 다듬는 것과 같은 규칙입니다. */
+  function addTag(raw: string) {
+    const clean = raw.trim().replace(/^#+/, '').trim().toLowerCase();
+    if (!clean || clean.length > 20 || tags.includes(clean) || tags.length >= 8) {
+      setTagging('');
+      return;
+    }
+    setTags((was) => [...was, clean]);
+    setTagging('');
+  }
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
 
@@ -68,6 +98,7 @@ export function PublishForm({
         title: title.trim(),
         summary: summary.trim(),
         region,
+        tags,
         feedback,
       });
       onDone(res.postId);
@@ -114,6 +145,46 @@ export function PublishForm({
         ))}
       </Row>
 
+      {/*
+        태그.
+
+        <p>지역 아래에 둡니다. 어디를 다녀왔는지 다음에 오는 것이 무엇에
+        대한 여행인지이고, 둘은 함께 적는 것이 자연스럽습니다.
+      */}
+      <Caption tone="secondary">무엇에 대한 여행인가요?</Caption>
+      {tags.length > 0 ? (
+        <Row gap={Spacing.xs} style={styles.wrap}>
+          {tags.map((t) => (
+            /* 누르면 뺍니다. 지우는 단추를 따로 두면 태그 하나가 두 칸이
+               되어 여덟 개를 달면 줄이 넘칩니다. */
+            <Chip key={t} label={`${t} ✕`} selected onPress={() => setTags((was) => was.filter((x) => x !== t))} />
+          ))}
+        </Row>
+      ) : null}
+      {tags.length < 8 ? (
+        <Field
+          label="태그"
+          value={tagging}
+          onChangeText={setTagging}
+          placeholder="아이랑"
+          hint="여덟 개까지. 엔터로 답니다."
+          returnKeyType="done"
+          onSubmitEditing={() => addTag(tagging)}
+        />
+      ) : null}
+      {/* 이미 쓰인 것들. 누르면 그대로 달립니다 — 같은 뜻을 저마다 다르게
+          적으면 어느 것으로도 다 안 걸립니다. */}
+      {(tagList?.tags.length ?? 0) > 0 && tags.length < 8 ? (
+        <Row gap={Spacing.xs} style={styles.wrap}>
+          {tagList?.tags
+            .filter((t) => !tags.includes(t.tag))
+            .slice(0, 12)
+            .map((t) => (
+              <Chip key={t.tag} label={t.tag} selected={false} onPress={() => addTag(t.tag)} />
+            ))}
+        </Row>
+      ) : null}
+
       {/* 구경만 하라고 올린 글에 훈수가 달리면 반갑지 않습니다. 열어 둘
           때만 댓글칸이 생깁니다. */}
       <Caption tone="secondary">댓글을 받을까요?</Caption>
@@ -129,3 +200,11 @@ export function PublishForm({
     </BottomSheet>
   );
 }
+
+const styles = StyleSheet.create({
+  /* 태그가 여덟이면 한 줄에 안 섭니다. 접히게 둡니다 — 옆으로 흘리면
+     오른쪽에 뭐가 더 있는지 안 보입니다. */
+  wrap: {
+    flexWrap: 'wrap',
+  },
+});

@@ -25,6 +25,7 @@ import java.util.Locale;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -54,6 +55,12 @@ public class PostService {
      * <p>화면에도 이 목록을 그대로 씁니다. 두 곳에서 따로 적으면 언젠가
      * 어긋나고, 어긋나면 고른 값이 저장은 되는데 아무것도 안 걸립니다.
      */
+    /** 글 하나에 달 수 있는 태그 수. 이보다 많으면 분류가 아니라 검색 낚시입니다. */
+    private static final int MAX_TAGS = 8;
+
+    /** 태그 하나의 길이. 문장을 태그로 다는 것을 막습니다. */
+    private static final int MAX_TAG_LENGTH = 20;
+
     public static final List<String> REGIONS = List.of(
             "국내", "일본", "중화권", "동남아", "유럽", "미주", "오세아니아", "그 밖");
 
@@ -76,7 +83,7 @@ public class PostService {
 
     @Transactional
     public TripPost publish(AuthPrincipal me, String tripId, String title, String summary,
-                            String region, boolean feedback) {
+                            String region, List<String> tags, boolean feedback) {
         Trip trip = access.requireOwner(tripId, me.id());
 
         if (posts.findAllByAuthorIdOrderByCreatedAtDesc(me.id(), Pageable.ofSize(1))
@@ -98,6 +105,7 @@ public class PostService {
                 .summary(summary == null || summary.isBlank() ? null : summary.trim())
                 /* 목록에 없는 값이 들어오면 아무것도 안 걸리는 글이 됩니다. 버립니다. */
                 .region(known(region))
+                .tags(cleanTags(tags))
                 .snapshot(snapshotOf(clean, dayList, placeList))
                 .dayCount(dayList.size())
                 .placeCount(placeList.size())
@@ -173,10 +181,14 @@ public class PostService {
      * @param days 며칠짜리인지. "1" 은 당일치기, "2-4" 는 1~3박, "5" 는 그 이상.
      */
     @Transactional(readOnly = true)
-    public Page<TripPost> list(String sort, String region, String days, String q, Pageable pageable) {
+    public Page<TripPost> list(String sort, String region, String tag, String days, String q,
+                               Pageable pageable) {
         /* 비어 있는 조건에도 NULL 을 보내지 않습니다. 값이 NULL 로만 오면
            PostgreSQL 이 그 자리의 형을 알 수 없다고 거절합니다. */
         String cleanRegion = known(region) == null ? "" : region;
+        /* 태그는 아는 목록이 없습니다 — 사람이 직접 적는 것이라 미리 알 수가
+           없습니다. 대신 적힐 때와 같은 규칙으로 다듬어 맞춥니다. */
+        String cleanTag = tagOf(tag) == null ? "" : tagOf(tag);
         int minDays = 0;
         int maxDays = Integer.MAX_VALUE;
         if (days != null) {
@@ -200,8 +212,8 @@ public class PostService {
 
         /* 인기 순은 나이로 나눈 값이라 정렬을 질의 안에 박아 두었습니다. */
         return "new".equals(sort) || "top".equals(sort)
-                ? posts.search(cleanRegion, minDays, maxDays, likePattern(q), paged)
-                : posts.findHot(cleanRegion, minDays, maxDays, likePattern(q), pageable);
+                ? posts.search(cleanRegion, cleanTag, minDays, maxDays, likePattern(q), paged)
+                : posts.findHot(cleanRegion, cleanTag, minDays, maxDays, likePattern(q), pageable);
     }
 
     /**
@@ -228,6 +240,41 @@ public class PostService {
      */
     private static String known(String region) {
         return region != null && REGIONS.contains(region) ? region : null;
+    }
+
+    /** 태그 하나를 다듬습니다. 못 쓸 것이면 null. */
+    private static String tagOf(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        /*
+          앞뒤 공백과 앞의 # 를 걷고 소문자로.
+
+          <p>사람이 "#아이랑", "아이랑 ", "아이랑" 을 제각기 적습니다. 그대로
+          두면 같은 말이 세 갈래로 흩어져 어느 것으로도 다 안 걸립니다.
+          한글은 대소문자가 없지만 영어 태그가 섞이므로 같이 내립니다.
+        */
+        String clean = raw.strip().replaceFirst("^#+", "").strip().toLowerCase(Locale.ROOT);
+        return clean.isEmpty() || clean.length() > MAX_TAG_LENGTH ? null : clean;
+    }
+
+    /**
+     * 달아 온 태그를 다듬습니다.
+     *
+     * <p>같은 것이 두 번 오면 하나로 하고, 못 쓸 것은 버리고, 너무 많으면
+     * 앞에서부터 자릅니다. 글 하나에 태그가 스물이면 그것은 분류가 아니라
+     * 검색에 걸리려는 것입니다.
+     */
+    private static String[] cleanTags(List<String> raw) {
+        if (raw == null) {
+            return new String[0];
+        }
+        return raw.stream()
+                .map(PostService::tagOf)
+                .filter(Objects::nonNull)
+                .distinct()
+                .limit(MAX_TAGS)
+                .toArray(String[]::new);
     }
 
     private static Pageable withSort(Pageable page, Sort sort) {
@@ -451,16 +498,42 @@ public class PostService {
     }
 
     /** 목록 한 줄. 사본 전체는 싣지 않습니다 — 목록에서는 쓰지 않습니다. */
-    public record Card(String id, String title, String summary, String region, String authorName,
+    public record Card(String id, String title, String summary, String region,
+                       List<String> tags, String authorName,
                        int dayCount, int placeCount, int likeCount, int viewCount,
                        boolean liked, java.time.Instant createdAt) {
+    }
+
+    /**
+     * 지금 쓰이고 있는 태그들.
+     *
+     * <h3>고르는 목록을 안 두는 대신</h3>
+     *
+     * <p>태그는 사람이 직접 적습니다 — 무엇으로 묶일지는 미리 알 수 없고,
+     * 목록을 만들어 두면 거기 없는 여행은 아무 데도 안 걸립니다.
+     *
+     * <p>대신 <b>이미 쓰인 것</b>을 보여 줍니다. 적을 때는 옆에 뜨니까
+     * 저절로 같은 말로 모이고, 찾을 때는 무엇을 찾을 수 있는지 알게 됩니다.
+     * 목록을 우리가 정하지 않으면서 흩어지지는 않게 하는 길입니다.
+     *
+     * <p>많이 쓰인 순서로 자릅니다. 한 번 쓰인 태그까지 다 내면 그것은
+     * 목록이 아니라 남의 글 모음입니다.
+     */
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> tags(int limit) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Object[] r : posts.tagCounts(limit)) {
+            out.add(Map.of("tag", (String) r[0], "posts", ((Number) r[1]).intValue()));
+        }
+        return out;
     }
 
     public List<Card> cardsOf(List<TripPost> list, String userId) {
         Set<String> mine = likedBy(userId, list.stream().map(TripPost::getId).toList());
         List<Card> out = new ArrayList<>(list.size());
         for (TripPost p : list) {
-            out.add(new Card(p.getId(), p.getTitle(), p.getSummary(), p.getRegion(), authorNameOf(p),
+            out.add(new Card(p.getId(), p.getTitle(), p.getSummary(), p.getRegion(),
+                    List.of(p.getTags()), authorNameOf(p),
                     p.getDayCount(), p.getPlaceCount(), p.getLikeCount(), p.getViewCount(),
                     mine.contains(p.getId()), p.getCreatedAt()));
         }
