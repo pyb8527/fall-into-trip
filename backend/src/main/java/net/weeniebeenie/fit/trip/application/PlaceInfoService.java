@@ -58,6 +58,9 @@ public class PlaceInfoService {
     /** 풀어 둔 사진 주소를 들고 있는 동안. 구글이 주는 것이 잠깐만 삽니다. */
     private static final Duration PHOTO_KEEP = Duration.ofMinutes(20);
 
+    /** 못 받은 사진을 기억해 두는 동안. 할당량이 타 들어가지 않을 만큼만. */
+    private static final Duration PHOTO_MISS = Duration.ofMinutes(5);
+
     /**
      * 사진 이름의 모양.
      *
@@ -416,32 +419,58 @@ public class PlaceInfoService {
 
         Photo hit = photos.get(at);
         if (hit != null && hit.until().isAfter(Instant.now())) {
+            /* 못 받은 것도 기억해 둡니다. 아래를 보세요. */
             return hit.uri();
         }
 
+        /*
+          이름을 <b>토막으로</b> 넘깁니다.
+
+          <p>{@code build(name)} 는 경로 변수를 URL 인코딩합니다. 그래서 이름
+          안의 슬래시가 %2F 로 접히고, 나가는 주소가
+          {@code /v1/places%2F…%2Fphotos%2F…/media} 가 됩니다 — 구글은 그런
+          자원이 없다고 거절합니다. 슬래시가 경로 구분자로 남아 있어야 합니다.
+
+          <p>문자열을 그냥 이어 붙여도 돌긴 하지만, 위 정규식을 언젠가 느슨하게
+          고치는 날 그것이 구멍이 됩니다. 토막으로 넘기면 무엇을 넣든 한 칸을
+          넘어가지 못합니다.
+        */
+        String[] parts = name.split("/");
+        String placeId = parts[1];
+        String ref = parts[3];
+
         quota.spend(quotaKey.current(), 1);
+        String uri = null;
         try {
             JsonNode r = client.get()
-                    .uri(uri -> uri.path("/v1/{name}/media")
+                    .uri(u -> u.path("/v1/places/{place}/photos/{ref}/media")
                             .queryParam("maxWidthPx", width)
                             /* 그림을 우리 서버로 받아 오지 않습니다. 주소만
                                받아서 화면이 구글에서 바로 가져갑니다. */
                             .queryParam("skipHttpRedirect", true)
-                            .build(name))
+                            .build(placeId, ref))
                     .header("X-Goog-Api-Key", key)
                     .retrieve()
                     .body(JsonNode.class);
-            String uri = r == null ? null : text(r, "photoUri");
-            if (uri == null) {
-                return null;
-            }
-            photos.put(at, new Photo(uri, Instant.now().plus(PHOTO_KEEP)));
-            return uri;
+            uri = r == null ? null : text(r, "photoUri");
         } catch (Exception e) {
             /* 사진 한 장 때문에 화면이 멈출 이유는 없습니다. */
             log.warn("사진을 받지 못했어요: {}", e.getMessage());
-            return null;
         }
+
+        /*
+          못 받은 것도 잠깐 기억합니다.
+
+          <p>성공한 것만 기억하고 있었습니다. 그래서 어떤 이유로든 못 받는
+          사진은 <b>화면을 그릴 때마다</b> 다시 물었고, 할당량은 부르기 전에
+          깎이므로 그대로 타 들어갔습니다. 그 할당량은 지도와 검색이 함께
+          쓰는 것이라, 사진 하나가 안 되면 지도까지 같이 멈췄습니다.
+
+          <p>못 받은 것은 짧게 둡니다 — 잠깐 막혔던 것이면 곧 다시 물어봐야
+          하고, 아예 없는 사진이면 그 사이에 여러 번 안 묻는 것으로 충분합니다.
+        */
+        photos.put(at, new Photo(uri, Instant.now().plus(uri == null ? PHOTO_MISS : PHOTO_KEEP)));
+        return uri;
     }
 
     /**
@@ -521,6 +550,7 @@ public class PlaceInfoService {
     private record Cached(Raw raw, Instant until) {
     }
 
+    /** 풀어 둔 사진 주소. {@code uri} 가 null 이면 "물어봤는데 없더라" 입니다. */
     private record Photo(String uri, Instant until) {
     }
 }

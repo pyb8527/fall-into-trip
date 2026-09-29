@@ -105,6 +105,19 @@ public class SecurityConfig {
                         /* 이미 공개된 글을 세는 것이라 새로 드러나는 것이 없습니다.
                            가입하기 전에 볼 수 있어야 가입할 이유가 생깁니다. */
                         .requestMatchers(HttpMethod.GET, "/api/popular/**").permitAll()
+                        /*
+                          사진 보기.
+
+                          <p>여행기에 붙은 사진은 그 글을 보는 사람이 봐야 하고, 글은
+                          로그인 없이 열립니다. 올리고 지우는 것은 아래 규칙에 걸려
+                          로그인해야 합니다.
+
+                          <p>id 는 아홉 바이트 난수라 찍어서 맞힐 수 있는 값이 아닙니다.
+                          다만 "공개 글에 붙은 사진" 이라는 전제가 깔려 있으니, 나만
+                          보는 여행기를 만들 때는 여기에 볼 수 있는지 묻는 자리가 하나
+                          생겨야 합니다.
+                        */
+                        .requestMatchers(HttpMethod.GET, "/api/photos/*").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().denyAll())

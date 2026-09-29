@@ -25,8 +25,10 @@ class PlaceStatusTest {
 
     /** 영업시간 말고는 볼 것이 없는 장소 하나. */
     private static Info withStatus(String status) {
+        /* 사진은 이 묶음이 보는 것과 무관합니다. 영업 상태만 봅니다. */
         return new Info("p1", "월요일: 09:00~18:00", false, List.of(), List.of(),
-                null, null, null, null, "CLOSED_PERMANENTLY".equals(status), status, null);
+                null, null, null, null, "CLOSED_PERMANENTLY".equals(status), status, null,
+                null, null);
     }
 
     @Test

@@ -90,6 +90,16 @@ services:
       # 시각(timestamptz)은 이 값과 무관하게 정확합니다 — 달라지는 것은
       # "오늘이 며칠인가" 와 "몇 시에 도는가" 입니다.
       TZ: ${TZ:-Asia/Seoul}
+
+      # 올라온 사진이 놓이는 자리. 아래 볼륨과 같은 곳을 가리켜야 합니다.
+      PHOTOS_DIR: /var/lib/fit/photos
+    # 사진은 볼륨에 둡니다.
+    #
+    # 컨테이너 안의 폴더에 두면 up -d --build 할 때마다 통째로 사라집니다.
+    # DB 와 달리 이쪽은 없어져도 서버가 멀쩡히 뜨기 때문에, 없어진 줄도
+    # 모르고 지나갑니다 — 글에 붙은 사진만 하나씩 깨집니다.
+    volumes:
+      - fit-photos:/var/lib/fit/photos
     # 포트를 밖으로 열지 않습니다. web 이 대신 받습니다.
     expose:
       - "8080"
@@ -148,3 +158,6 @@ services:
 
 volumes:
   fit-db:
+  # 올라온 사진. DB 와 함께 백업 대상입니다 — 이것만 날아가면 글은 남고
+  # 사진만 하나씩 깨집니다.
+  fit-photos:

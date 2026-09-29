@@ -24,6 +24,16 @@ spring:
   jackson:
     default-property-inclusion: non_null
 
+  # 사진 한 장의 크기.
+  #
+  # 스프링의 기본값은 1MB 라, 이것을 안 올리면 폰 사진이 서버에 닿기도 전에
+  # 잘립니다. 서비스 쪽 한도(12MB)보다 조금 넉넉히 둡니다 — 여기서 걸리면
+  # 우리 문구가 아니라 톰캣의 오류가 나갑니다.
+  servlet:
+    multipart:
+      max-file-size: 14MB
+      max-request-size: 14MB
+
 server:
   port: ${PORT:8080}
   # nginx·Cloudflare 뒤에 있으므로 원래 프로토콜·주소를 헤더에서 읽습니다.
@@ -42,6 +52,18 @@ fit:
   cors:
     allowed-origins: ${CORS_ORIGINS:http://localhost:5173}
   setup-token: ${SETUP_TOKEN:}
+
+  # 올라온 사진이 놓이는 폴더.
+  #
+  # 그림은 DB 에 안 넣습니다 — 몇 메가짜리를 줄마다 넣으면 백업이 그만큼
+  # 무거워지고, 백업이 무거워지면 안 하게 됩니다.
+  #
+  # 도커에서는 반드시 볼륨을 가리켜야 합니다. 컨테이너 안의 폴더에 두면 다시
+  # 올릴 때마다 사진이 통째로 사라집니다(docker-compose.yml 참고).
+  #
+  # 비워 두면 서버를 띄운 자리 옆의 photos 폴더입니다. 개발할 때 편합니다.
+  photos:
+    dir: ${PHOTOS_DIR:}
 
   google:
     # 장소 검색용 서버 키. 웹에서 쓰는 키와 달라야 합니다 — 그쪽은 리퍼러로

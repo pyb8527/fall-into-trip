@@ -62,6 +62,18 @@ public class GoogleQuotaFilter extends OncePerRequestFilter {
                 || path.endsWith("/route/compare")
                 || path.endsWith("/route")
                 || path.endsWith("/info")
+                /*
+                  사진 주소 풀기(/api/places/photo).
+
+                  <p>이 길은 할당량을 <b>쓰기만 하고 지켜지지는 않고</b> 있었습니다.
+                  그래서 사진이 어떤 이유로든 안 풀리면 화면을 그릴 때마다 다시
+                  물었고, 그만큼 한도가 타 들어가 <b>지도가 먼저 멈췄습니다</b> —
+                  같은 한도를 나눠 쓰기 때문입니다.
+
+                  <p>쓰는 길은 지켜지는 길이어야 합니다. 우리가 올린 사진을 보는
+                  길(/api/photos/…)은 구글과 무관하므로 여기 안 걸립니다.
+                */
+                || path.endsWith("/places/photo")
                 || path.endsWith("/map");
     }
 
