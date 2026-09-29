@@ -16,6 +16,7 @@ import {
   useComments,
 } from '@/components/comment-list';
 import type { MapPlace } from '@/components/map-types';
+import { OurPhoto } from '@/components/our-photo';
 import { PlaceDetailSheet } from '@/components/place-detail-sheet';
 import { PostFields, type PostShape } from '@/components/post-fields';
 import { formatNights } from '@/lib/countdown';
@@ -492,6 +493,10 @@ export default function Post() {
             </Row>
           </View>
         }>
+        {/* 표지. 제목 바로 아래입니다 — 글을 열었을 때 가장 먼저 보이는
+            것이 그 여행이 어땠는지여야 합니다. */}
+        {data.coverPhotoId ? <OurPhoto id={data.coverPhotoId} height={200} /> : null}
+
         {data.summary ? <Body tone="secondary">{data.summary}</Body> : null}
 
       {notice ? <Body tone="success">{notice}</Body> : null}
@@ -734,6 +739,8 @@ export default function Post() {
           region: data.region,
           tags: data.tags,
           feedback: data.feedback,
+          coverPhotoId: data.coverPhotoId,
+          visibility: data.visibility,
         }}
         onCancel={() => setEditing(false)}
         onDone={() => {
@@ -875,6 +882,29 @@ function DayBlock({
               <Caption tone="secondary" numberOfLines={2}>
                 {place.note}
               </Caption>
+            ) : null}
+
+            {/*
+              그 자리에서 남긴 것.
+
+              <p>메모는 <b>가기 전에</b> 적어 둔 것이고 이것은 <b>다녀와서</b>
+              남긴 것입니다. 둘을 같은 회색 글로 붙여 두면 어느 것이 계획이고
+              어느 것이 겪은 일인지 안 갈립니다 — 별과 사진이 그것을 가릅니다.
+            */}
+            {place.photo || place.stars || place.review ? (
+              <Row gap={Spacing.sm} style={styles.markRow}>
+                {place.photo ? <OurPhoto id={place.photo} height={56} width={56} /> : null}
+                <View style={styles.grow}>
+                  {place.stars ? (
+                    <Caption tone="brand">{'★'.repeat(place.stars)}</Caption>
+                  ) : null}
+                  {place.review ? (
+                    <Body small numberOfLines={2}>
+                      {place.review}
+                    </Body>
+                  ) : null}
+                </View>
+              </Row>
             ) : null}
             {place.cat || place.cost ? (
               <Row gap={Spacing.sm}>
@@ -1049,6 +1079,10 @@ function EditSheet({
         region: shape.region ?? '',
         tags: shape.tags,
         feedback: shape.feedback,
+        /* 빈 문자열이 표지 지우기입니다. null 은 "그대로 두기" 라서, 뺀 것을
+           서버에 알리려면 빈 값을 보내야 합니다. */
+        coverPhotoId: shape.coverPhotoId ?? '',
+        visibility: shape.visibility,
       });
       onDone();
     } catch (e) {
@@ -1275,6 +1309,11 @@ const styles = StyleSheet.create({
   placeText: {
     flex: 1,
     gap: 2,
+  },
+  /* 다녀와서 남긴 것. 사진과 글이 나란히 섭니다. */
+  markRow: {
+    alignItems: 'center',
+    paddingTop: 2,
   },
   order: {
     width: 22,

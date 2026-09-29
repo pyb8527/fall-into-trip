@@ -418,6 +418,8 @@ export type PostCard = {
   /** 내가 추천했는지. 로그인 안 했으면 항상 false 입니다. */
   liked: boolean;
   createdAt: string;
+  /** 표지 사진. 없으면 동선 그림이 그 자리를 맡습니다. */
+  coverPhotoId: string | null;
 };
 
 /**
@@ -457,17 +459,39 @@ export type ItineraryPlace = {
   placeId: string | null;
   /** 사본에 함께 담긴 핀 그림. 가져오면 그대로 따라갑니다. */
   icon?: string | null;
+  /**
+   * 그 자리에서 남긴 것.
+   *
+   * <p>올린 사람이 도장을 찍으며 남긴 사진·별점·한 줄입니다. 이 칸이 생기기
+   * 전에 올린 글에는 없습니다.
+   *
+   * <p>가져올 때는 안 따라갑니다 — 남의 감상이지 일정이 아닙니다.
+   */
+  photo?: Maybe<string>;
+  stars?: Maybe<number>;
+  review?: Maybe<string>;
 };
 
 export type PostDetail = Omit<PostCard, 'summary'> & {
   summary: string | null;
   /** 내가 쓴 글인지. 내릴 수 있는지를 이걸로 정합니다. */
   mine: boolean;
+  /** 어디까지 보이는지. */
+  visibility: Visibility;
   /** 댓글을 받는 글인지. 열어 둔 글에만 댓글칸이 생깁니다. */
   feedback: boolean;
   commentCount: number;
   itinerary: Itinerary;
 };
+
+/**
+ * 글이 어디까지 보이는지.
+ *
+ * <p>여행기를 쓰는 까닭이 셋으로 갈립니다 — 남에게 보여 주려고, 같이 간
+ * 사람에게만, 나중에 내가 다시 보려고. 셋째가 없으면 "다녀온 것을 정리해
+ * 두기" 가 곧 "남에게 내놓기" 가 되고, 그러면 대충 쓰거나 아예 안 씁니다.
+ */
+export type Visibility = 'LISTED' | 'LINK' | 'PRIVATE';
 
 /**
  * 일정에 달린 댓글.

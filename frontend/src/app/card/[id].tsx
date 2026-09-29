@@ -1,4 +1,4 @@
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { PathTitle } from '@/ui/nav';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
@@ -6,6 +6,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { api, API_BASE } from '@/api/client';
 import type { Books, Companion, TripDetail } from '@/api/types';
 import { useAsync } from '@/api/use-async';
+import { PublishForm } from '@/components/publish-form';
 import { TripMap } from '@/components/trip-map';
 import { Colors, dayColor, Radius, Spacing } from '@/constants/theme';
 import { iconOf } from '@/constants/place-icons';
@@ -19,6 +20,7 @@ import {
   Divider,
   ErrorNote,
   Loading,
+  Panel,
   Row,
   Screen,
   SegmentedTabs,
@@ -68,6 +70,10 @@ export default function Card() {
     [id],
   );
 
+  const router = useRouter();
+  /* 여행기 판을 열어 두었는지. */
+  const [publishing, setPublishing] = useState(false);
+
   if (loading && !data) {
     return (
       <Screen scroll={false}>
@@ -100,10 +106,40 @@ export default function Card() {
         <Replay trip={data} />
       )}
 
+      {/*
+        여행기로 남기기.
+
+        <p>여행이 끝난 자리에 둡니다. 이 화면을 여는 때가 대개 돌아온 뒤이고,
+        그때가 "정리해 둘까" 가 드는 유일한 순간입니다. 여행 상세의 「글 올리기」
+        는 여행을 짜는 동안 보는 자리라 그 생각이 안 듭니다.
+
+        <p>다녀온 곳이 하나도 없으면 안 냅니다 — 도장도 안 찍은 여행을
+        여행기로 남기라고 하는 것은 아직 이릅니다.
+      */}
+      {data.visited.length > 0 ? (
+        <Panel>
+          <Subtitle>여행기로 남길까요?</Subtitle>
+          <Caption tone="secondary">
+            도장 찍으며 남긴 사진과 한 줄이 그대로 따라가요. 나만 볼 수도 있어요.
+          </Caption>
+          <Button label="여행기 쓰기" onPress={() => setPublishing(true)} />
+        </Panel>
+      ) : null}
+
       <Button
         label="링크 보내기"
         variant="secondary"
         onPress={() => shareLink(sharableUrl(id), data.trip.title)}
+      />
+      <PublishForm
+        visible={publishing}
+        tripId={id}
+        tripTitle={data.trip.title}
+        onCancel={() => setPublishing(false)}
+        onDone={(postId) => {
+          setPublishing(false);
+          router.push(`/community/${postId}`);
+        }}
       />
     </Screen>
   );

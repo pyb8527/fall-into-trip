@@ -6,6 +6,7 @@ import { api, query } from '@/api/client';
 import type { PostCard, PostDays, PostPage, PostSort } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
+import { OurPhoto } from '@/components/our-photo';
 import { PostMap } from '@/components/post-map';
 import { SignUpGate } from '@/components/signup-gate';
 import { Spacing } from '@/constants/theme';
@@ -447,7 +448,18 @@ function PostRow({
       {/* 글자만 늘어놓으면 어떤 동선인지 열어 봐야 압니다. 지도 한 장이면
           어디를 어떻게 도는지가 한눈에 보입니다. */}
       <Pressable onPress={onOpen} accessibilityRole="button" style={styles.tap}>
-        <PostMap postId={post.id} title={post.title} height={150} />
+        {/*
+          표지가 있으면 표지, 없으면 동선 그림.
+
+          <p>둘 다 "이 글이 무엇인가" 를 한눈에 말하는 자리입니다. 사진이
+          더 빨리 말하지만, 안 올린 글도 많고 동선 그림은 그것대로 쓸모가
+          있습니다 — 오사카를 도는 선과 제주를 도는 선은 생김새가 다릅니다.
+        */}
+        {post.coverPhotoId ? (
+          <OurPhoto id={post.coverPhotoId} height={150} />
+        ) : (
+          <PostMap postId={post.id} title={post.title} height={150} />
+        )}
         <Subtitle>{post.title}</Subtitle>
         {post.summary ? (
           <Body small tone="secondary" numberOfLines={2}>

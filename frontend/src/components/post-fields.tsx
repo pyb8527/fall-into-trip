@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import { StyleSheet } from 'react-native';
 
-import { api } from '@/api/client';
+import { api, ApiError } from '@/api/client';
+import type { Visibility } from '@/api/types';
 import { useAsync } from '@/api/use-async';
+import { OurPhoto } from '@/components/our-photo';
+import { pickAndUpload } from '@/lib/pick-photo';
 import { Spacing } from '@/constants/theme';
-import { Caption, Chip, Field, Row } from '@/ui';
+import { Button, Caption, Chip, ErrorNote, Field, Row } from '@/ui';
 
 /**
  * 글의 겉.
@@ -30,12 +33,31 @@ import { Caption, Chip, Field, Row } from '@/ui';
 export type PostShape = {
   title: string;
   summary: string;
+  /** 표지 사진. 없으면 지도 그림이 그 자리를 맡습니다. */
+  coverPhotoId: string | null;
+  /** 어디까지 보이는지. */
+  visibility: Visibility;
   /** 고른 지역. 안 골라도 올라갑니다 — 다만 지역으로 거를 때 안 걸립니다. */
   region: string | null;
   tags: string[];
   /** 댓글을 받을지. */
   feedback: boolean;
 };
+
+/** 고를 수 있는 공개 범위. 값은 서버의 Visibility 와 같아야 합니다. */
+const SEEN: { value: Visibility; label: string; hint: string }[] = [
+  {
+    value: 'LISTED',
+    label: '둘러보기에',
+    hint: '누구나 찾아볼 수 있어요. 남의 여행에 밑그림이 돼요.',
+  },
+  {
+    value: 'LINK',
+    label: '주소 아는 사람만',
+    hint: '목록과 찾기에는 안 떠요. 주소를 보낸 사람만 볼 수 있어요.',
+  },
+  { value: 'PRIVATE', label: '나만', hint: '나만 볼 수 있어요. 다녀온 것을 정리해 둘 때.' },
+];
 
 /** 글 하나에 달 수 있는 태그 수. 서버와 같은 값입니다(PostService.MAX_TAGS). */
 export const MAX_TAGS = 8;
@@ -69,6 +91,8 @@ export function PostFields({
 }) {
   /** 지금 치고 있는 태그. 아직 달리지 않은 것이라 밖으로 안 내보냅니다. */
   const [typing, setTyping] = useState('');
+  const [picking, setPicking] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
 
   /* 고를 수 있는 지역은 서버가 정합니다. 여기 따로 적어 두면 언젠가 어긋나고,
      어긋나면 고른 값이 저장은 되는데 목록에서 아무것도 안 걸립니다. */
@@ -94,8 +118,50 @@ export function PostFields({
     set('tags', [...value.tags, clean]);
   }
 
+  async function chooseCover() {
+    setFailed(null);
+    setPicking(true);
+    try {
+      const got = await pickAndUpload();
+      if (got) {
+        set('coverPhotoId', got);
+      }
+    } catch (e) {
+      setFailed(e instanceof ApiError ? e.message : '사진을 올리지 못했어요.');
+    } finally {
+      setPicking(false);
+    }
+  }
+
   return (
     <>
+      {/*
+        표지.
+
+        <p>목록에서 이 글이 무엇인지 가장 빨리 말하는 것입니다. 없어도 올라가고,
+        그때는 동선 그림 한 장이 그 자리를 맡습니다 — 오사카를 도는 선과 제주를
+        도는 선은 생김새가 다릅니다.
+      */}
+      {value.coverPhotoId ? <OurPhoto id={value.coverPhotoId} height={180} /> : null}
+      <Row gap={Spacing.sm}>
+        <Button
+          label={value.coverPhotoId ? '표지 바꾸기' : '표지 고르기'}
+          variant="secondary"
+          compact
+          busy={picking}
+          onPress={chooseCover}
+        />
+        {value.coverPhotoId ? (
+          <Button
+            label="표지 빼기"
+            variant="ghost"
+            compact
+            onPress={() => set('coverPhotoId', null)}
+          />
+        ) : null}
+      </Row>
+      {failed ? <ErrorNote message={failed} /> : null}
+
       <Field
         label="제목"
         value={value.title}
@@ -187,6 +253,25 @@ export function PostFields({
       <Caption tone="secondary">
         받으면 다른 사람이 일정 전체에, 또는 장소 하나하나에 댓글을 달 수 있어요.
       </Caption>
+
+      {/*
+        어디까지 보일지.
+
+        <p>맨 아래입니다 — 무엇을 올릴지 다 정한 다음에 정하는 것이고, 무엇보다
+        <b>내놓기 직전에 한 번 더 보게</b> 하고 싶은 값입니다.
+      */}
+      <Caption tone="secondary">누가 볼 수 있나요?</Caption>
+      <Row gap={Spacing.xs} style={styles.wrap}>
+        {SEEN.map((s) => (
+          <Chip
+            key={s.value}
+            label={s.label}
+            selected={value.visibility === s.value}
+            onPress={() => set('visibility', s.value)}
+          />
+        ))}
+      </Row>
+      <Caption tone="muted">{SEEN.find((s) => s.value === value.visibility)?.hint}</Caption>
     </>
   );
 }

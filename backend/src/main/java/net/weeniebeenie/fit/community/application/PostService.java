@@ -885,7 +885,9 @@ public class PostService {
     public record Card(String id, String title, String summary, String region,
                        List<String> tags, String authorName,
                        int dayCount, int placeCount, int likeCount, int viewCount,
-                       boolean liked, java.time.Instant createdAt) {
+                       boolean liked, java.time.Instant createdAt,
+                       /** 표지 사진. 목록에서 이 글이 무엇인지 가장 빨리 말하는 것입니다. */
+                       String coverPhotoId) {
     }
 
     /**
@@ -919,7 +921,7 @@ public class PostService {
             out.add(new Card(p.getId(), p.getTitle(), p.getSummary(), p.getRegion(),
                     List.of(p.getTags()), authorNameOf(p),
                     p.getDayCount(), p.getPlaceCount(), p.getLikeCount(), p.getViewCount(),
-                    mine.contains(p.getId()), p.getCreatedAt()));
+                    mine.contains(p.getId()), p.getCreatedAt(), p.getCoverPhotoId()));
         }
         return out;
     }

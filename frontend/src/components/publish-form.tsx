@@ -41,6 +41,10 @@ export function PublishForm({
     region: null,
     tags: [],
     feedback: false,
+    coverPhotoId: null,
+    /* 안 고르면 둘러보기입니다 — 지금까지의 동작이고, 「내놓기」 를 누른
+       사람이 바라는 것도 대개 그것입니다. */
+    visibility: 'LISTED',
   });
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
@@ -74,7 +78,15 @@ export function PublishForm({
     if (!visible) {
       return;
     }
-    setShape({ title: tripTitle, summary: '', region: null, tags: [], feedback: false });
+    setShape({
+      title: tripTitle,
+      summary: '',
+      region: null,
+      tags: [],
+      feedback: false,
+      coverPhotoId: null,
+      visibility: 'LISTED',
+    });
     setFailed(null);
     setBusy(false);
   }, [visible, tripTitle]);
@@ -97,6 +109,8 @@ export function PublishForm({
         tags: shape.tags,
         days: pickedDays,
         feedback: shape.feedback,
+        coverPhotoId: shape.coverPhotoId,
+        visibility: shape.visibility,
       });
       onDone(res.postId);
     } catch (e) {
