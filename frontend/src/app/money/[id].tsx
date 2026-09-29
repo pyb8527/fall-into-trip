@@ -21,8 +21,9 @@ import {
   ErrorNote,
   Field,
   Loading,
-  Row,
+  Picker,
   Press,
+  Row,
   Screen,
   SegmentedTabs,
   Snack,
@@ -587,23 +588,32 @@ function SpendSheet({
         </View>
       ) : null}
 
+      {/*
+        날과 곳은 <b>고르는 칸</b>으로 둡니다.
+
+        <p>칩으로 늘어놓고 있었습니다. 닷새짜리면 날이 다섯이고 하루에 스무
+        곳을 넣은 날도 있어, 돈 하나 적으려고 칩 스물다섯을 지나야 했습니다.
+        적는 칸(금액·무엇에)이 그만큼 아래로 밀립니다.
+
+        <p>칩으로 남긴 것들(통화·누가 냈나)은 고를 것이 두셋뿐이라 한 번에
+        다 보이고 한 번에 눌립니다. 그쪽이 낫습니다.
+      */}
       {days.length > 0 ? (
         <View style={styles.pick}>
           <Caption tone="secondary">어느 날</Caption>
           <Row gap={Spacing.xs} style={styles.chips}>
-            <Chip label="아직 모름" selected={dayId === null} onPress={() => setDayId(null)} />
-            {days.map((d) => (
-              <Chip
-                key={d.id}
-                label={d.date || d.label}
-                selected={dayId === d.id}
-                onPress={() => {
-                  const next = dayId === d.id ? null : d.id;
-                  setDayId(next);
-                  setPlaceId(null);
-                }}
-              />
-            ))}
+            <Picker
+              label="날"
+              allLabel="아직 모름"
+              value={dayId}
+              options={days.map((d) => ({ value: d.id, label: d.date || d.label }))}
+              onChange={(next) => {
+                setDayId(next);
+                /* 곳은 날에 딸려 있습니다. 날을 바꾸면 앞서 고른 곳은 그
+                   날의 것이 아닙니다. */
+                setPlaceId(null);
+              }}
+            />
           </Row>
         </View>
       ) : null}
@@ -622,15 +632,13 @@ function SpendSheet({
         <View style={styles.pick}>
           <Caption tone="secondary">어디서</Caption>
           <Row gap={Spacing.xs} style={styles.chips}>
-            <Chip label="어디랄 것 없이" selected={placeId === null} onPress={() => setPlaceId(null)} />
-            {dayPlaces.map((p) => (
-              <Chip
-                key={p.id}
-                label={p.name}
-                selected={placeId === p.id}
-                onPress={() => setPlaceId(placeId === p.id ? null : p.id)}
-              />
-            ))}
+            <Picker
+              label="곳"
+              allLabel="어디랄 것 없이"
+              value={placeId}
+              options={dayPlaces.map((p) => ({ value: p.id, label: p.name }))}
+              onChange={setPlaceId}
+            />
           </Row>
         </View>
       ) : null}

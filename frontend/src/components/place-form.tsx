@@ -32,12 +32,20 @@ import {
 export function PlaceForm({
   visible,
   dayId,
+  after,
   place,
   onDone,
   onCancel,
 }: {
   visible: boolean;
   dayId: string;
+  /**
+   * 이 장소 다음에 넣습니다. 안 주면 그 날 맨 뒤입니다.
+   *
+   * <p>날짜의 ＋ 로 넣을 때는 맨 뒤가 맞습니다. 장소 하나를 고르고 "여기
+   * 다음에" 로 넣을 때만 이 값이 옵니다.
+   */
+  after?: string;
   /** 있으면 고치기, 없으면 새로 넣기. */
   place?: Place;
   onDone: () => void;
@@ -137,6 +145,7 @@ export function PlaceForm({
     try {
       const body = {
         dayId,
+        after,
         name: name.trim(),
         lat: latNum,
         lng: lngNum,

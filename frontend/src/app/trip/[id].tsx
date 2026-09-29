@@ -2069,6 +2069,9 @@ function DayCard({
   touchedOf: (place: Place) => string | null;
 }) {
   const [adding, setAdding] = useState(false);
+  /* 어느 장소 다음에 넣는 중인지. null 이면 안 넣고 있는 것이고, 값이 있으면
+     그 장소 바로 다음 자리입니다. */
+  const [addingAfter, setAddingAfter] = useState<string | null>(null);
   const [editing, setEditing] = useState<Place | null>(null);
   const [folded, setFolded] = useState(false);
   /*
@@ -2406,6 +2409,7 @@ function DayCard({
                     onToggle={() => onToggle(place.id)}
                     onFocus={() => onFocus(place.id)}
                     onEdit={() => setEditing(place)}
+                    onAddAfter={() => setAddingAfter(place.id)}
                     onRemove={() => onRemove(place.id)}
                     info={infoOf.get(place.id)}
                     alsoOn={
@@ -2489,6 +2493,19 @@ function DayCard({
           onChanged();
         }}
         onCancel={() => setAdding(false)}
+      />
+
+      {/* 고른 장소 다음에. 날짜의 ＋ 와 같은 칸을 쓰지만 들어가는 자리가
+          다릅니다. */}
+      <PlaceForm
+        visible={addingAfter !== null}
+        dayId={day.id}
+        after={addingAfter ?? undefined}
+        onDone={() => {
+          setAddingAfter(null);
+          onChanged();
+        }}
+        onCancel={() => setAddingAfter(null)}
       />
       <SavedPicker
         visible={digging}
@@ -2583,6 +2600,7 @@ function PlaceRow({
   onToggle,
   onFocus,
   onEdit,
+  onAddAfter,
   onRemove,
   gap,
   gapping,
@@ -2616,6 +2634,8 @@ function PlaceRow({
   onToggle: () => void;
   onFocus: () => void;
   onEdit: () => void;
+  /** 이 장소 다음에 새 장소를 넣습니다. */
+  onAddAfter: () => void;
   onRemove: () => void;
   /** 다음 장소까지의 이동. 마지막 장소 뒤에는 없습니다. */
   gap?: Gap;
@@ -2846,6 +2866,23 @@ function PlaceRow({
               },
               canEdit
                 ? { key: 'edit', name: 'edit-2' as IconName, label: '장소 고치기', onPress: onEdit }
+                : null,
+              /*
+                여기 다음에 넣기.
+
+                <p>넣는 길이 날짜의 ＋ 하나뿐이라 무엇을 넣든 그 날 맨 뒤에
+                붙었습니다. 그런데 일정을 짜다 보면 "이치란 다음에 커피 한 잔"
+                처럼 <b>어느 곳 다음</b>이 정해져 있는 때가 훨씬 많습니다.
+                맨 뒤에 붙여 놓고 끌어서 올리는 것은 스무 곳짜리 날에서 할
+                짓이 아닙니다.
+              */
+              canEdit
+                ? {
+                    key: 'after',
+                    name: 'plus' as IconName,
+                    label: `${place.name} 다음에 장소 넣기`,
+                    onPress: onAddAfter,
+                  }
                 : null,
               canEdit
                 ? {

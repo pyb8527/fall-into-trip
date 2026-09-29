@@ -44,8 +44,7 @@ r = await call("POST", `/api/trips/${tripId}/publish`, { token: author,
 T("올라감", r.status === 200 && !!r.data.postId, r.data);
 const postId = r.data.postId;
 
-console.log("
-[3-1] 태그");
+console.log("\n[3-1] 태그");
 r = await call("GET", "/api/posts");
 const mine = r.data.posts.find(p => p.id === postId);
 T("카드에 태그가 실림", Array.isArray(mine?.tags), mine);

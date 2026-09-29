@@ -62,7 +62,7 @@ public class PlaceService {
 
         Place place = places.save(Place.builder()
                 .dayId(day.getId())
-                .sort(places.findAllByDayIdOrderBySortAsc(day.getId()).size())
+                .sort(slotFor(day.getId(), draft.after()))
                 .name(name)
                 .ja(blankToNull(draft.ja()))
                 .en(blankToNull(draft.en()))
@@ -228,6 +228,49 @@ public class PlaceService {
      * 바뀌었을 때, 날짜를 옮겼을 때뿐입니다. 메모나 비용만 고쳤는데 순서가
      * 흔들리면 고친 사람은 자기가 무엇을 건드렸는지 모릅니다.
      */
+    /**
+     * 새 장소가 들어갈 자리.
+     *
+     * <h3>왜 맨 뒤가 아닌가</h3>
+     *
+     * <p>넣는 길이 날짜마다의 <b>＋</b> 하나뿐이라, 무엇을 넣든 그 날 맨
+     * 뒤에 붙었습니다. 그런데 일정을 짜다 보면 "이치란 다음에 커피 한 잔"
+     * 처럼 <b>어느 곳 다음</b>이 정해져 있는 때가 훨씬 많습니다. 맨 뒤에
+     * 붙여 놓고 끌어서 올리는 것은 스무 곳짜리 날에서 할 짓이 아닙니다.
+     *
+     * <h3>뒤를 한 칸씩 밉니다</h3>
+     *
+     * <p>이 날의 순서는 시각이 정합니다(PlaceOrder). 시간을 안 적은 곳은
+     * <b>앞의 시간 있는 곳을 따라다니므로</b>, 끼워 넣을 자리 뒤를 한 칸씩
+     * 밀어 두면 arrange 가 그 자리를 지켜 줍니다.
+     *
+     * @param after 이 장소 다음에. 없거나 이 날의 것이 아니면 맨 뒤
+     */
+    private int slotFor(String dayId, String after) {
+        List<Place> here = places.findAllByDayIdOrderBySortAsc(dayId);
+        if (after == null || after.isBlank()) {
+            return here.size();
+        }
+        int at = -1;
+        for (int i = 0; i < here.size(); i++) {
+            if (here.get(i).getId().equals(after)) {
+                at = i;
+                break;
+            }
+        }
+        if (at < 0) {
+            /* 가리킨 곳이 이 날에 없습니다. 지워졌거나 다른 날의 것입니다.
+               맨 뒤에 둡니다 — 엉뚱한 자리에 끼우는 것보다 낫습니다. */
+            return here.size();
+        }
+        /* 뒤에 있는 것들을 한 칸씩 밉니다. 안 밀면 같은 번호가 둘이 되어
+           둘 중 어느 것이 먼저인지 정해지지 않습니다. */
+        for (int i = at + 1; i < here.size(); i++) {
+            here.get(i).setSort(here.get(i).getSort() + 1);
+        }
+        return here.get(at).getSort() + 1;
+    }
+
     private void resort(String dayId) {
         List<Place> sorted = PlaceOrder.arrange(places.findAllByDayIdOrderBySortAsc(dayId));
         for (int i = 0; i < sorted.size(); i++) {
@@ -291,6 +334,13 @@ public class PlaceService {
                              String ja, String en, String cat, String time, String cost,
                              Integer costAmount, String costCurrency,
                              String note, String url, Integer radius, Boolean fit, String move,
-                             String placeId, String icon, Long version) {
+                             String placeId, String icon, Long version,
+                             /**
+                              * 이 장소 다음에 넣습니다. 넣을 때만 씁니다.
+                              *
+                              * <p>없으면 그 날 맨 뒤입니다 — 지금까지의
+                              * 동작이고, 날짜의 ＋ 로 넣을 때가 그렇습니다.
+                              */
+                             String after) {
     }
 }
