@@ -30,6 +30,7 @@ public class PublishController {
                 req == null ? null : req.summary(),
                 req == null ? null : req.region(),
                 req == null ? null : req.tags(),
+                req == null ? null : req.days(),
                 req != null && Boolean.TRUE.equals(req.feedback()));
         return Map.of("postId", post.getId());
     }
@@ -42,8 +43,13 @@ public class PublishController {
      *                무엇으로 묶일지는 미리 알 수 없고, 목록을 만들어 두면
      *                거기 없는 여행은 아무 데도 안 걸립니다. 다듬는 것과 수를
      *                줄이는 것은 서비스가 합니다
+     * @param days    올릴 날의 id. 비우면 전부입니다 — 지금까지의 동작입니다.
+     *                닷새 중 잘 짜인 하루만 올리고 싶을 때가 흔한데, 그
+     *                하루를 보여 주려고 닷새를 통째로 올리면 보는 사람은
+     *                나흘을 지나쳐야 합니다
      */
     public record PublishRequest(String title, String summary, String region,
-                                 java.util.List<String> tags, Boolean feedback) {
+                                 java.util.List<String> tags,
+                                 java.util.List<String> days, Boolean feedback) {
     }
 }

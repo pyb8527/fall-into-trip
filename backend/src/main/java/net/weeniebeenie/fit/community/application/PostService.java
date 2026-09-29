@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 일정을 남에게 보여 주고, 남의 일정을 가져오는 곳.
@@ -83,7 +84,8 @@ public class PostService {
 
     @Transactional
     public TripPost publish(AuthPrincipal me, String tripId, String title, String summary,
-                            String region, List<String> tags, boolean feedback) {
+                            String region, List<String> tags, List<String> dayIds,
+                            boolean feedback) {
         Trip trip = access.requireOwner(tripId, me.id());
 
         if (posts.findAllByAuthorIdOrderByCreatedAtDesc(me.id(), Pageable.ofSize(1))
@@ -91,8 +93,13 @@ public class PostService {
             throw ApiException.badRequest("올릴 수 있는 글의 수를 넘었습니다. 예전 글을 내리고 다시 올려 주세요.");
         }
 
-        List<Day> dayList = days.findAllByTripIdOrderBySortAsc(tripId);
-        List<Place> placeList = places.findAllOfTrip(tripId);
+        List<Day> dayList = pickDays(days.findAllByTripIdOrderBySortAsc(tripId), dayIds);
+        Set<String> picked = dayList.stream().map(Day::getId).collect(Collectors.toSet());
+        /* 고른 날의 장소만 싣습니다. 안 거르면 하루만 올린다고 해 놓고 일정
+           전체가 딸려 갑니다. */
+        List<Place> placeList = places.findAllOfTrip(tripId).stream()
+                .filter(pl -> picked.contains(pl.getDayId()))
+                .toList();
         if (placeList.isEmpty()) {
             throw ApiException.badRequest("장소가 하나도 없는 일정은 올릴 수 없습니다.");
         }
@@ -242,6 +249,36 @@ public class PostService {
         return region != null && REGIONS.contains(region) ? region : null;
     }
 
+    /**
+     * 올릴 날들.
+     *
+     * <h3>왜 하루만 올리고 싶은가</h3>
+     *
+     * <p>올리는 것이 <b>여행 전체</b>뿐이었습니다. 그런데 닷새 중 하루만
+     * 잘 짜인 날이 있고, 나머지는 이동과 쉬는 날인 경우가 흔합니다. 그
+     * 하루를 보여 주려고 닷새를 통째로 올리면 보는 사람은 나흘을 지나쳐야
+     * 합니다.
+     *
+     * <p>고른 날만 싣습니다. 하루씩 따로 올리면 글도 하나씩 따로 섭니다 —
+     * 「오사카 먹부림 하루」 같은 것이 이렇게 생깁니다.
+     *
+     * @param want 올릴 날의 id. 비어 있으면 전부입니다 — 지금까지의 동작이고,
+     *             날을 고르지 않고 올릴 때가 그렇습니다
+     */
+    private static List<Day> pickDays(List<Day> all, List<String> want) {
+        if (want == null || want.isEmpty()) {
+            return all;
+        }
+        Set<String> keep = Set.copyOf(want);
+        /* 넘어온 차례가 아니라 <b>일정의 차례</b>를 지킵니다. 화면이 거꾸로
+           골라 보내도 3일차가 1일차보다 앞에 서지는 않습니다. */
+        List<Day> out = all.stream().filter(d -> keep.contains(d.getId())).toList();
+        if (out.isEmpty()) {
+            throw ApiException.badRequest("올릴 날을 하나도 못 찾았습니다.");
+        }
+        return out;
+    }
+
     /** 태그 하나를 다듬습니다. 못 쓸 것이면 null. */
     private static String tagOf(String raw) {
         if (raw == null) {
@@ -353,7 +390,15 @@ public class PostService {
      * 지나간 일정이 됩니다. 첫날을 정하면 나머지가 따라 붙습니다.
      */
     @Transactional
-    public Trip copy(AuthPrincipal me, String postId, String startIso) {
+    /**
+     * 남의 글을 내 여행으로.
+     *
+     * @param wantDays 가져올 날의 번호(0부터). 비어 있으면 전부입니다.
+     *                 <p>닷새짜리 글에서 이틀만 쓰고 싶을 때가 있습니다 —
+     *                 다른 날은 이미 내 계획이 있거나 안 갈 곳입니다. 통째로
+     *                 가져와 지우게 하면 지우는 일이 곧 남습니다.
+     */
+    public Trip copy(AuthPrincipal me, String postId, String startIso, List<Integer> wantDays) {
         TripPost post = read(postId);
         JsonNode snap = snapshotOf(post);
 
@@ -364,8 +409,26 @@ public class PostService {
                 .build());
         members.save(new TripMember(trip.getId(), me.id(), TripRole.EDITOR));
 
+        /*
+          고른 날만 가져옵니다.
+
+          <p>번호는 <b>글 안에서의 차례</b>입니다. 글은 올릴 때 뜬 사본이라
+          원본 여행의 날짜 id 와는 무관합니다 — 원본이 지워져도 글은 남으므로
+          id 로 가리킬 수가 없습니다.
+
+          <p>가져온 뒤의 번호는 다시 0부터입니다. 3·5일차만 가져왔으면 내
+          여행에서는 1·2일차입니다. 남의 일정의 몇째 날이었는지는 내 여행에
+          남길 것이 아닙니다.
+        */
+        Set<Integer> keep = wantDays == null || wantDays.isEmpty() ? null : Set.copyOf(wantDays);
+
         int index = 0;
+        int at = -1;
         for (JsonNode d : snap.path("days")) {
+            at++;
+            if (keep != null && !keep.contains(at)) {
+                continue;
+            }
             LocalDate date = start.plusDays(index);
             Day day = days.save(Day.builder()
                     .tripId(trip.getId())

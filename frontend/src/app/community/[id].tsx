@@ -30,21 +30,22 @@ import {
   Button,
   Caption,
   Card,
+  Chip,
   ConfirmDialog,
   Divider,
   DragSheet,
-  Snack,
-  useUndo,
   ErrorNote,
   Icon,
   IconButton,
-  type IconName,
   Loading,
   Press,
   Row,
   Screen,
+  Snack,
   Subtitle,
   Title,
+  type IconName,
+  useUndo,
 } from '@/ui';
 import { DateField } from '@/ui/date-field';
 import { KEEP, UNKEEP } from '@/constants/words';
@@ -525,6 +526,7 @@ export default function Post() {
         }}
         postId={id}
         title={data.title}
+        days={data.itinerary.days}
       />
 
       {at ? (
@@ -823,16 +825,30 @@ function CopySheet({
   visible,
   postId,
   title,
+  days,
   onDone,
   onCancel,
 }: {
   visible: boolean;
   postId: string;
   title: string;
+  /** 이 글의 날들. 골라 가져올 수 있게 이름을 보여 줍니다. */
+  days: { label: string | null; date?: string | null }[];
   onDone: (tripId: string) => void;
   onCancel: () => void;
 }) {
   const [startIso, setStartIso] = useState(today());
+
+  /*
+    어느 날을 가져올지.
+
+    <p>닷새짜리 글에서 이틀만 쓰고 싶을 때가 있습니다 — 다른 날은 이미 내
+    계획이 있거나 안 갈 곳입니다. 통째로 가져와 지우게 하면 지우는 일이 곧
+    남습니다.
+
+    <p>기본은 전부입니다. 남의 일정을 통째로 본떠 오는 것이 더 흔합니다.
+  */
+  const [pickedDays, setPickedDays] = useState<number[]>([]);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
 
@@ -840,7 +856,10 @@ function CopySheet({
     setFailed(null);
     setBusy(true);
     try {
-      const res = await api.post<{ tripId: string }>(`/api/posts/${postId}/copy`, { startIso });
+      const res = await api.post<{ tripId: string }>(`/api/posts/${postId}/copy`, {
+        startIso,
+        days: pickedDays,
+      });
       onDone(res.tripId);
     } catch (e) {
       setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
@@ -860,6 +879,41 @@ function CopySheet({
         뒤에는 마음대로 고칠 수 있습니다.
       </Caption>
       <DateField label="떠나는 날" value={startIso} onChange={setStartIso} />
+
+      {/*
+        어느 날을 가져올지.
+
+        <p>날이 둘 이상일 때만 냅니다. 고른 것들은 <b>가져온 차례가 아니라
+        글의 차례</b>로 서고, 내 여행에서는 다시 1일차부터 셉니다 — 남의
+        일정의 몇째 날이었는지는 내 여행에 남길 것이 아닙니다.
+      */}
+      {days.length > 1 ? (
+        <>
+          <Caption tone="secondary">어느 날을 가져올까요?</Caption>
+          <Row gap={Spacing.xs} style={styles.wrap}>
+            <Chip
+              label="전부"
+              selected={pickedDays.length === 0}
+              onPress={() => setPickedDays([])}
+            />
+            {days.map((d, at) => (
+              <Chip
+                key={at}
+                /* 둘 다 비어 있는 날이 있을 수 있습니다 — 올린 사람이 이름도
+                   날짜도 안 적은 경우입니다. 그때는 몇째 날인지로 부릅니다. */
+                label={d.date || d.label || `${at + 1}일차`}
+                selected={pickedDays.includes(at)}
+                onPress={() =>
+                  setPickedDays((was) =>
+                    was.includes(at) ? was.filter((x) => x !== at) : [...was, at],
+                  )
+                }
+              />
+            ))}
+          </Row>
+        </>
+      ) : null}
+
       {failed ? <ErrorNote message={failed} /> : null}
     </BottomSheet>
   );
@@ -876,6 +930,10 @@ const styles = StyleSheet.create({
   /* 지도가 바탕입니다. 판이 아직 안 깔린 자리는 지도 색으로 둡니다 —
      흰 판이 비치면 판이 두 겹인 것처럼 보입니다. */
   /* 떠 있는 띠가 서는 자리. 하단 띠 위로 올립니다. */
+  /* 날이 닷새면 칩이 한 줄에 안 섭니다. 접히게 둡니다. */
+  wrap: {
+    flexWrap: 'wrap',
+  },
   snackRail: {
     position: 'absolute',
     left: 0,

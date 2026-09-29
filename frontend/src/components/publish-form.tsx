@@ -65,6 +65,28 @@ export function PublishForm({
 
   /* 고를 수 있는 지역은 서버가 정합니다. 여기 따로 적어 두면 언젠가 어긋나고,
      어긋나면 고른 값이 저장은 되는데 목록에서 아무것도 안 걸립니다. */
+  /*
+    어느 날을 올릴지.
+
+    <p>올리는 것이 여행 전체뿐이었습니다. 그런데 닷새 중 하루만 잘 짜인
+    날이 있고 나머지는 이동과 쉬는 날인 경우가 흔합니다. 그 하루를 보여
+    주려고 닷새를 통째로 올리면 보는 사람은 나흘을 지나쳐야 합니다.
+
+    <p>기본은 전부입니다 — 지금까지의 동작이고, 대개 그것이 맞습니다.
+  */
+  const [pickedDays, setPickedDays] = useState<string[]>([]);
+
+  const { data: tripDays } = useAsync<{ days: { id: string; label: string; date: string | null }[] }>(
+    (signal) =>
+      api
+        .get<{ days: { id: string; label: string; date: string | null }[] }>(
+          `/api/trip?trip=${encodeURIComponent(tripId)}`,
+          signal,
+        )
+        .then((t) => ({ days: t.days })),
+    [tripId],
+  );
+
   const { data: regionList } = useAsync<{ regions: string[] }>(
     (signal) => api.get('/api/posts/regions', signal),
     [],
@@ -99,6 +121,7 @@ export function PublishForm({
         summary: summary.trim(),
         region,
         tags,
+        days: pickedDays,
         feedback,
       });
       onDone(res.postId);
@@ -131,6 +154,37 @@ export function PublishForm({
         placeholder="먹으러만 다닌 일정입니다"
         hint="목록에서 이 줄이 보입니다. 비워도 됩니다."
       />
+
+      {/*
+        어느 날을 올릴지.
+
+        <p>날이 둘 이상일 때만 냅니다. 하루짜리 여행에 "전부" 와 "1일차" 를
+        나란히 두면 고를 것이 없는 줄이 하나 생깁니다.
+      */}
+      {(tripDays?.days.length ?? 0) > 1 ? (
+        <>
+          <Caption tone="secondary">어느 날을 올릴까요?</Caption>
+          <Row gap={Spacing.xs} style={styles.wrap}>
+            <Chip
+              label="전부"
+              selected={pickedDays.length === 0}
+              onPress={() => setPickedDays([])}
+            />
+            {tripDays?.days.map((d) => (
+              <Chip
+                key={d.id}
+                label={d.date || d.label}
+                selected={pickedDays.includes(d.id)}
+                onPress={() =>
+                  setPickedDays((was) =>
+                    was.includes(d.id) ? was.filter((x) => x !== d.id) : [...was, d.id],
+                  )
+                }
+              />
+            ))}
+          </Row>
+        </>
+      ) : null}
 
       {/* 지역은 안 골라도 올라갑니다. 다만 지역으로 거를 때 안 걸립니다. */}
       <Caption tone="secondary">어디로 다녀오셨나요?</Caption>

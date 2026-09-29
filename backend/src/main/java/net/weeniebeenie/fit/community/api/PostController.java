@@ -155,7 +155,7 @@ public class PostController {
         if (req == null || req.startIso() == null || req.startIso().isBlank()) {
             throw ApiException.badRequest("언제 떠날지 정해 주세요.");
         }
-        Trip trip = posts.copy(me, postId, req.startIso());
+        Trip trip = posts.copy(me, postId, req.startIso(), req.days());
         return Map.of("tripId", trip.getId());
     }
 
@@ -173,7 +173,12 @@ public class PostController {
         return Map.of("ok", true);
     }
 
-    public record CopyRequest(String startIso) {
+    /**
+     * @param days 가져올 날의 번호(0부터). 비우면 전부입니다.
+     *             <p>닷새짜리 글에서 이틀만 쓰고 싶을 때가 있습니다. 통째로
+     *             가져와 지우게 하면 지우는 일이 곧 남습니다.
+     */
+    public record CopyRequest(String startIso, java.util.List<Integer> days) {
     }
 
     public record ReportRequest(String reason) {
