@@ -116,16 +116,40 @@ function clusterIcon(color: string, count: number) {
   return { url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg), box, center: c, r };
 }
 
-function pinIcon(color: string, active: boolean, visited: boolean, emoji: boolean) {
+function pinIcon(
+  color: string,
+  active: boolean,
+  visited: boolean,
+  emoji: boolean,
+  order: number,
+) {
   const face = visited ? color : '#FFFFFF';
 
   if (emoji) {
     const r = active ? 17 : 14.5;
     const ring = active ? 3 : 2.4;
-    const box = Math.ceil((r + ring) * 2);
+    /*
+      몇 번째인지.
+
+      <p>그림을 고른 장소는 <b>몇 번째인지가 화면 어디에도 없었습니다.</b>
+      그림이 지도에서도 목록에서도 번호 자리를 차지했기 때문입니다. 그런데
+      지도에서 가장 알고 싶은 것은 어디서 시작해 어디로 도는지입니다.
+
+      <p>그림을 빼앗지 않고 번호를 함께 답니다. 글자 자리(label)는 이모지가
+      쓰고 있어서 그림 안에 같이 그립니다.
+    */
+    const tag = active ? 8.5 : 7.5;
+    const off = r * 0.72;
+    /* 뱃지가 판 밖으로 나오는 만큼 상자를 넓힙니다. 안 넓히면 잘립니다. */
+    const half = Math.max(r + ring, off + tag + 1.6);
+    const box = Math.ceil(half * 2);
     const c = box / 2;
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${box}" height="${box}" viewBox="0 0 ${box} ${box}">
 <circle cx="${c}" cy="${c}" r="${r}" fill="${face}" stroke="${color}" stroke-width="${ring}"/>
+<circle cx="${c + off}" cy="${c + off}" r="${tag}" fill="${color}" stroke="#FFFFFF" stroke-width="1.6"/>
+<text x="${c + off}" y="${c + off}" fill="#FFFFFF" font-family="sans-serif" font-size="${
+      active ? 11 : 10
+    }" font-weight="700" text-anchor="middle" dominant-baseline="central">${order}</text>
 </svg>`;
     return {
       url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
@@ -284,7 +308,7 @@ function markerIcon(
     };
   }
 
-  const made = pinIcon(place.color, active, place.detail.visited, !!place.emoji);
+  const made = pinIcon(place.color, active, place.detail.visited, !!place.emoji, place.order);
 
   if (place.emoji) {
     return {

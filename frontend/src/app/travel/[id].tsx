@@ -298,8 +298,10 @@ function StampBook({
                 transform: [{ rotate: on ? `${tilt(place.id) / 2}deg` : '0deg' }],
               },
             ]}>
+            {/* 여기는 몇 번째까지 왔는지를 보는 띠입니다. 그림을 찍으면
+                열여섯 개가 늘어섰을 때 지금 어디쯤인지 셀 수가 없습니다. */}
             <Body small strong style={{ color: on ? ink : Colors.textDisabled }}>
-              {iconOf(place.icon) || i + 1}
+              {i + 1}
             </Body>
           </Pressable>
         );

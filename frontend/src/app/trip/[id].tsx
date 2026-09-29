@@ -2739,16 +2739,20 @@ function PlaceRow({
               남은 것은 테두리 스물여덟 개뿐이었습니다. 걷어 냅니다. 자리
               너비는 그대로 두어 이름들이 한 줄로 섭니다.
             */}
+            {/*
+              번호는 언제나 있습니다.
+
+              <p>그림이 있으면 그림을, 없으면 번호를 찍고 있었습니다. 그래서
+              그림을 고른 장소는 <b>그 날 몇 번째인지가 화면 어디에도 없었습니다</b> —
+              지도도 같은 규칙이었기 때문입니다.
+
+              <p>번호는 이 자리가 맡고, 그림은 이름 옆으로 갑니다. 지도의 번호와
+              같은 번호라 둘이 눈으로 이어집니다.
+            */}
             <View style={styles.order}>
-              {emoji ? (
-                <Body small style={styles.orderEmoji}>
-                  {emoji}
-                </Body>
-              ) : (
-                <Caption tone={visited ? 'muted' : 'default'} strong>
-                  {order}
-                </Caption>
-              )}
+              <Caption tone={visited ? 'muted' : 'default'} strong>
+                {order}
+              </Caption>
             </View>
 
             <View style={styles.placeText}>
@@ -2756,6 +2760,11 @@ function PlaceRow({
                 {place.time ? (
                   <Body small strong tone="accent">
                     {place.time}
+                  </Body>
+                ) : null}
+                {emoji ? (
+                  <Body small style={styles.orderEmoji}>
+                    {emoji}
                   </Body>
                 ) : null}
                 <Body strong numberOfLines={2}>

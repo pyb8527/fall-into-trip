@@ -1017,23 +1017,52 @@ function Pin({
   */
   if (place.emoji) {
     const r = active ? 34 : 29;
+    /* 번호를 다는 작은 판. 그림 판 크기를 따라갑니다. */
+    const tag = active ? 17 : 15;
     return (
-      <View
-        style={[
-          styles.chip,
-          {
-            width: r,
-            height: r,
-            borderRadius: r / 2,
-            borderWidth: active ? 3 : 2.4,
-            borderColor: place.color,
-            backgroundColor: visited ? place.color : '#FFFFFF',
-            /* 고른 것만 한 뼘 더 띄웁니다. 나머지는 핀의 기본값
-               (Elevation.pin)을 그대로 씁니다. */
-            ...(active ? { elevation: 6, shadowOpacity: 0.32 } : null),
-          },
-        ]}>
-        <Body style={[styles.pinEmoji, { fontSize: active ? 20 : 17 }]}>{place.emoji}</Body>
+      <View>
+        <View
+          style={[
+            styles.chip,
+            {
+              width: r,
+              height: r,
+              borderRadius: r / 2,
+              borderWidth: active ? 3 : 2.4,
+              borderColor: place.color,
+              backgroundColor: visited ? place.color : '#FFFFFF',
+              /* 고른 것만 한 뼘 더 띄웁니다. 나머지는 핀의 기본값
+                 (Elevation.pin)을 그대로 씁니다. */
+              ...(active ? { elevation: 6, shadowOpacity: 0.32 } : null),
+            },
+          ]}>
+          <Body style={[styles.pinEmoji, { fontSize: active ? 20 : 17 }]}>{place.emoji}</Body>
+        </View>
+
+        {/*
+          몇 번째인지.
+
+          <p>그림을 고른 장소는 <b>몇 번째인지가 화면 어디에도 없었습니다.</b>
+          그림이 지도에서도 목록에서도 번호 자리를 차지했기 때문입니다. 그런데
+          지도에서 가장 알고 싶은 것은 어디서 시작해 어디로 도는지입니다.
+
+          <p>그림을 빼앗지 않고 번호를 함께 답니다. 목록의 번호와 같은 번호라
+          둘이 눈으로 이어집니다.
+        */}
+        <View
+          style={[
+            styles.pinTag,
+            {
+              width: tag,
+              height: tag,
+              borderRadius: tag / 2,
+              backgroundColor: place.color,
+            },
+          ]}>
+          <Body strong style={[styles.pinTagText, { fontSize: active ? 11 : 10 }]}>
+            {place.order}
+          </Body>
+        </View>
       </View>
     );
   }
@@ -1233,6 +1262,21 @@ const styles = StyleSheet.create({
   },
   pinEmoji: {
     /* 이모지는 글꼴이 제 높이를 갖고 있어, 줄 높이를 두면 아래로 처집니다. */
+    lineHeight: undefined,
+  },
+  /* 그림 판 오른쪽 아래에 걸칩니다. 판 밖으로 조금 나와야 겹쳐도 가려지지
+     않고, 흰 테두리가 그림과 번호를 갈라 줍니다. */
+  pinTag: {
+    position: 'absolute',
+    right: -2,
+    bottom: -2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.6,
+    borderColor: '#FFFFFF',
+  },
+  pinTagText: {
+    color: Colors.onDay,
     lineHeight: undefined,
   },
   face: {

@@ -850,9 +850,11 @@ function DayBlock({
             style={styles.placeTap}>
           {/* 같은 이유로 여기도 상자를 걷습니다. 날짜는 위 제목 줄의
               점이 말하고 있습니다. */}
+          {/* 번호는 언제나 있습니다. 그림은 이름 옆으로 — 내 여행 상세와
+              같은 규칙입니다. */}
           <View style={styles.order}>
             <Body small style={styles.orderText}>
-              {iconOf(place.icon) || i + 1}
+              {i + 1}
             </Body>
           </View>
           <View style={styles.placeText}>
@@ -861,6 +863,9 @@ function DayBlock({
                 <Body small strong tone="accent">
                   {place.time}
                 </Body>
+              ) : null}
+              {iconOf(place.icon) ? (
+                <Body small>{iconOf(place.icon)}</Body>
               ) : null}
               <Body strong numberOfLines={2}>
                 {place.name}
