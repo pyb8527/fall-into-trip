@@ -25,6 +25,7 @@ public interface TripPostRepository extends JpaRepository<TripPost, String> {
     @Query("""
            SELECT p FROM TripPost p
            WHERE p.hidden = false
+             AND p.visibility = net.weeniebeenie.fit.community.domain.Visibility.LISTED
              AND p.id IN (SELECT l.postId FROM PostLike l WHERE l.userId = :userId)
            ORDER BY p.createdAt DESC
            """)
@@ -63,6 +64,7 @@ public interface TripPostRepository extends JpaRepository<TripPost, String> {
     @Query("""
            SELECT p FROM TripPost p
            WHERE p.hidden = false
+             AND p.visibility = net.weeniebeenie.fit.community.domain.Visibility.LISTED
              AND (:region = '' OR p.region = :region)
              AND (:tag = '' OR FUNCTION('array_position', p.tags, :tag) IS NOT NULL)
              AND p.dayCount >= :minDays
@@ -98,6 +100,7 @@ public interface TripPostRepository extends JpaRepository<TripPost, String> {
     @Query(value = """
            SELECT * FROM trip_posts p
            WHERE p.hidden = false
+             AND p.visibility = 'LISTED'
              AND (:region = '' OR p.region = :region)
              AND (:tag = '' OR array_position(p.tags, :tag) IS NOT NULL)
              AND p.day_count >= :minDays
@@ -112,6 +115,7 @@ public interface TripPostRepository extends JpaRepository<TripPost, String> {
            countQuery = """
            SELECT count(*) FROM trip_posts p
            WHERE p.hidden = false
+             AND p.visibility = 'LISTED'
              AND (:region = '' OR p.region = :region)
              AND (:tag = '' OR array_position(p.tags, :tag) IS NOT NULL)
              AND p.day_count >= :minDays
@@ -167,6 +171,7 @@ public interface TripPostRepository extends JpaRepository<TripPost, String> {
            SELECT t AS tag, count(*) AS posts
            FROM trip_posts p, unnest(p.tags) AS t
            WHERE p.hidden = false
+             AND p.visibility = 'LISTED'
            GROUP BY t
            ORDER BY posts DESC, tag ASC
            LIMIT :limit

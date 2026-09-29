@@ -31,7 +31,9 @@ public class PublishController {
                 req == null ? null : req.region(),
                 req == null ? null : req.tags(),
                 req == null ? null : req.days(),
-                req != null && Boolean.TRUE.equals(req.feedback()));
+                req != null && Boolean.TRUE.equals(req.feedback()),
+                req == null ? null : req.coverPhotoId(),
+                seen(req == null ? null : req.visibility()));
         return Map.of("postId", post.getId());
     }
 
@@ -48,8 +50,20 @@ public class PublishController {
      *                하루를 보여 주려고 닷새를 통째로 올리면 보는 사람은
      *                나흘을 지나쳐야 합니다
      */
+    /* 공개 범위를 읽는 규칙은 PostController 와 같아야 합니다 — 올릴 때와
+       고칠 때가 다르면 그 자체가 버그입니다. */
+    private static net.weeniebeenie.fit.community.domain.Visibility seen(String raw) {
+        return PostController.seen(raw);
+    }
+
+    /**
+     * @param coverPhotoId 표지 사진. 내가 올린 것이어야 합니다
+     * @param visibility   LISTED(둘러보기에 뜸) · LINK(주소 아는 사람만) ·
+     *                     PRIVATE(나만). 안 주면 LISTED — 지금까지의 동작입니다
+     */
     public record PublishRequest(String title, String summary, String region,
                                  java.util.List<String> tags,
-                                 java.util.List<String> days, Boolean feedback) {
+                                 java.util.List<String> days, Boolean feedback,
+                                 String coverPhotoId, String visibility) {
     }
 }

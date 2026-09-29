@@ -6,6 +6,7 @@ import net.weeniebeenie.fit.account.infrastructure.security.CurrentUser;
 import net.weeniebeenie.fit.community.application.CommentService;
 import net.weeniebeenie.fit.community.application.PostService;
 import net.weeniebeenie.fit.community.domain.TripPost;
+import net.weeniebeenie.fit.community.domain.Visibility;
 import net.weeniebeenie.fit.shared.error.ApiException;
 import net.weeniebeenie.fit.trip.domain.Trip;
 import org.springframework.data.domain.Page;
@@ -118,7 +119,7 @@ public class PostController {
 
     @GetMapping("/{postId}")
     public Map<String, Object> read(@CurrentUser AuthPrincipal me, @PathVariable String postId) {
-        TripPost post = posts.read(postId);
+        TripPost post = posts.read(postId, me == null ? null : me.id());
         if (me != null) {
             posts.countView(postId, me.id());
         }
@@ -132,6 +133,8 @@ public class PostController {
            값을 채워 넣을 수도 없었습니다. */
         out.put("region", post.getRegion());
         out.put("tags", post.getTags());
+        out.put("coverPhotoId", post.getCoverPhotoId());
+        out.put("visibility", post.getVisibility().name());
         out.put("authorName", posts.authorNameOf(post));
         out.put("dayCount", post.getDayCount());
         out.put("placeCount", post.getPlaceCount());
@@ -183,7 +186,8 @@ public class PostController {
                                     @PathVariable String postId,
                                     @RequestBody EditRequest req) {
         TripPost post = posts.edit(me, postId, req.title(), req.summary(),
-                req.region(), req.tags(), req.feedback());
+                req.region(), req.tags(), req.feedback(),
+                req.coverPhotoId(), seen(req.visibility()));
         return Map.of("ok", true, "postId", post.getId());
     }
 
@@ -229,6 +233,24 @@ public class PostController {
      * 쓰게 하면 그건 고치기가 아니라 다시 올리기입니다.
      */
     public record EditRequest(String title, String summary, String region,
-                              java.util.List<String> tags, Boolean feedback) {
+                              java.util.List<String> tags, Boolean feedback,
+                              String coverPhotoId, String visibility) {
+    }
+
+    /**
+     * 화면이 보내 온 공개 범위를 우리 값으로.
+     *
+     * <p>모르는 값이 오면 거절합니다. 조용히 기본값으로 두면 "나만 보기" 로
+     * 올리려던 글이 둘러보기에 뜹니다 — 틀린 쪽으로 넘어가면 안 되는 값입니다.
+     */
+    static Visibility seen(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        try {
+            return Visibility.valueOf(raw.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw ApiException.badRequest("공개 범위를 알 수 없어요.");
+        }
     }
 }

@@ -2,6 +2,8 @@ package net.weeniebeenie.fit.community.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
+import net.weeniebeenie.fit.account.infrastructure.security.AuthPrincipal;
+import net.weeniebeenie.fit.account.infrastructure.security.CurrentUser;
 import net.weeniebeenie.fit.community.application.PostService;
 import net.weeniebeenie.fit.trip.application.StaticMapService;
 import net.weeniebeenie.fit.trip.application.StaticMapService.Point;
@@ -33,8 +35,8 @@ public class PostMapController {
     private final StaticMapService maps;
 
     @GetMapping(value = "/api/posts/{postId}/map", produces = MediaType.IMAGE_PNG_VALUE)
-    public ResponseEntity<byte[]> map(@PathVariable String postId) {
-        JsonNode snapshot = posts.snapshotOf(posts.read(postId));
+    public ResponseEntity<byte[]> map(@CurrentUser AuthPrincipal me, @PathVariable String postId) {
+        JsonNode snapshot = posts.snapshotOf(posts.read(postId, me == null ? null : me.id()));
 
         /* 날짜를 묶어 둔 채로 넘깁니다. 한 줄로 이어 붙이면 닷새치가 한 색
            실뭉치가 되어, 목록에서 어느 것이 짧은 여행이고 어느 것이 긴

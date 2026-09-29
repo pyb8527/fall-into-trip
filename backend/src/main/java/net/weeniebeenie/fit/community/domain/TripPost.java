@@ -117,6 +117,20 @@ public class TripPost {
     @Column(nullable = false)
     private boolean feedback;
 
+    /**
+     * 표지 사진.
+     *
+     * <p>목록에서 이 글이 무엇인지 가장 빨리 말하는 것입니다. 사진이 지워지면
+     * 글은 남고 표지만 떨어집니다.
+     */
+    @Column(name = "cover_photo_id", length = 16)
+    private String coverPhotoId;
+
+    /** 어디까지 보이는지. */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 12)
+    private Visibility visibility = Visibility.LISTED;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -126,7 +140,7 @@ public class TripPost {
     @Builder
     public TripPost(String tripId, String authorId, String title, String summary,
                     String region, String[] tags, String snapshot, int dayCount, int placeCount,
-                    boolean feedback) {
+                    boolean feedback, String coverPhotoId, Visibility visibility) {
         this.id = Ids.next();
         this.tripId = tripId;
         this.authorId = authorId;
@@ -136,6 +150,9 @@ public class TripPost {
         /* 안 달았으면 빈 배열입니다. null 로 두면 칸이 NOT NULL 이라 들어가다
            터지고, 무엇보다 "태그가 없다" 와 "모른다" 는 다른 말이 아닙니다. */
         this.tags = tags == null ? new String[0] : tags;
+        this.coverPhotoId = coverPhotoId;
+        /* 안 정하면 둘러보기에 뜹니다 — 지금까지의 동작입니다. */
+        this.visibility = visibility == null ? Visibility.LISTED : visibility;
         this.snapshot = snapshot;
         this.dayCount = dayCount;
         this.placeCount = placeCount;

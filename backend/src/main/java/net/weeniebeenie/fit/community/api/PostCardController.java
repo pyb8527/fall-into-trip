@@ -2,6 +2,8 @@ package net.weeniebeenie.fit.community.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
+import net.weeniebeenie.fit.account.infrastructure.security.AuthPrincipal;
+import net.weeniebeenie.fit.account.infrastructure.security.CurrentUser;
 import net.weeniebeenie.fit.community.application.PostService;
 import net.weeniebeenie.fit.community.domain.TripPost;
 import net.weeniebeenie.fit.trip.application.StaticMapService;
@@ -64,8 +66,8 @@ public class PostCardController {
      * 화면을 보지 않도록 본문에 원래 자리로 가는 줄을 하나 둡니다.
      */
     @GetMapping(value = "/api/posts/{postId}/card", produces = MediaType.TEXT_HTML_VALUE)
-    public ResponseEntity<String> card(@PathVariable String postId) {
-        TripPost post = posts.read(postId);
+    public ResponseEntity<String> card(@CurrentUser AuthPrincipal me, @PathVariable String postId) {
+        TripPost post = posts.read(postId, me == null ? null : me.id());
 
         String origin = ServletUriComponentsBuilder.fromCurrentContextPath().build().toUriString();
         String page = origin + "/community/" + postId;

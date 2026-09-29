@@ -32,7 +32,8 @@ public interface PopularRepository extends JpaRepository<TripPost, String> {
                   coalesce(sum(like_count), 0) AS likes,
                   coalesce(sum(view_count), 0) AS views
            FROM trip_posts
-           WHERE hidden = false AND region IS NOT NULL AND region <> ''
+           WHERE hidden = false AND visibility = 'LISTED'
+             AND region IS NOT NULL AND region <> ''
            GROUP BY region
            ORDER BY posts DESC, likes DESC, region ASC
            LIMIT :limit
@@ -69,7 +70,7 @@ public interface PopularRepository extends JpaRepository<TripPost, String> {
                FROM trip_posts p,
                     jsonb_array_elements(p.snapshot -> 'days') AS d,
                     jsonb_array_elements(d -> 'places') AS pl
-               WHERE p.hidden = false
+               WHERE p.hidden = false AND p.visibility = 'LISTED'
                  AND pl->>'name' IS NOT NULL
                  AND (:kind IS NULL OR pl->>'icon' = :kind)
                  AND (:region IS NULL OR p.region = :region)
@@ -95,7 +96,8 @@ public interface PopularRepository extends JpaRepository<TripPost, String> {
            FROM trip_posts p,
                 jsonb_array_elements(p.snapshot -> 'days') AS d,
                 jsonb_array_elements(d -> 'places') AS pl
-           WHERE p.hidden = false AND nullif(pl->>'icon', '') IS NOT NULL
+           WHERE p.hidden = false AND p.visibility = 'LISTED'
+             AND nullif(pl->>'icon', '') IS NOT NULL
            GROUP BY icon
            ORDER BY n DESC
            """, nativeQuery = true)

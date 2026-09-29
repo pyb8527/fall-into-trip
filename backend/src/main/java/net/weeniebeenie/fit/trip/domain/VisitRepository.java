@@ -35,4 +35,13 @@ public interface VisitRepository extends JpaRepository<Visit, VisitId> {
                  WHERE p.dayId IN (SELECT d.id FROM Day d WHERE d.tripId = :tripId))
            """)
     List<Visit> findAllOfTrip(@Param("userId") String userId, @Param("tripId") String tripId);
+
+    /**
+     * 이 사람이 찍은 도장 전부.
+     *
+     * <p>글을 올릴 때 씁니다 — 올리는 날짜가 여행의 일부일 수 있어서 여행
+     * 번호로 좁히면 고른 날 밖의 도장이 빠집니다. 부르는 쪽이 장소 번호로
+     * 다시 거릅니다.
+     */
+    List<Visit> findAllByIdUserId(String userId);
 }

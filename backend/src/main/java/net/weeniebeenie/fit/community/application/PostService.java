@@ -79,6 +79,9 @@ public class PostService {
     private final TripAccessPolicy access;
     private final UserRepository users;
 
+    private final VisitRepository visits;
+    private final net.weeniebeenie.fit.photo.domain.PhotoRepository photos;
+
     private final AuditService audit;
     private final ObjectMapper mapper;
 
@@ -87,7 +90,7 @@ public class PostService {
     @Transactional
     public TripPost publish(AuthPrincipal me, String tripId, String title, String summary,
                             String region, List<String> tags, List<String> dayIds,
-                            boolean feedback) {
+                            boolean feedback, String coverPhotoId, Visibility visibility) {
         Trip trip = access.requireOwner(tripId, me.id());
 
         if (posts.findAllByAuthorIdOrderByCreatedAtDesc(me.id(), Pageable.ofSize(1))
@@ -115,7 +118,19 @@ public class PostService {
                 /* 목록에 없는 값이 들어오면 아무것도 안 걸리는 글이 됩니다. 버립니다. */
                 .region(known(region))
                 .tags(cleanTags(tags))
-                .snapshot(snapshotOf(clean, dayList, placeList))
+                .coverPhotoId(myPhoto(me, coverPhotoId))
+                .visibility(visibility)
+                /*
+                  도장에 남긴 것을 함께 싣습니다.
+
+                  <p>여행기의 알맹이가 이것입니다 — 어디를 갔는지는 일정이
+                  말하고, <b>어땠는지</b>는 그 자리에서 남긴 사진과 한 줄이
+                  말합니다. 돌아와서 다시 쓰라고 하면 안 씁니다.
+
+                  <p>올린 사람 것만 봅니다. 같이 간 사람이 각자 찍은 도장은
+                  그 사람 것이고, 남의 감상을 내 글에 실을 일이 아닙니다.
+                */
+                .snapshot(snapshotOf(clean, dayList, placeList, marksOf(me, placeList)))
                 .dayCount(dayList.size())
                 .placeCount(placeList.size())
                 .feedback(feedback)
@@ -132,7 +147,31 @@ public class PostService {
      * (updatedBy), 동행자가 누구인지는 그 여행을 같이 간 사람들의 것이지
      * 일정의 일부가 아닙니다. 남이 복제해 갈 때 따라가면 안 됩니다.
      */
-    private String snapshotOf(String title, List<Day> dayList, List<Place> placeList) {
+    /**
+     * 올린 사람이 그 장소들에 찍어 둔 도장.
+     *
+     * <p>장소 번호 → 도장. 아무것도 안 남긴 도장은 뺍니다 — 사본에 빈 칸만
+     * 늘어납니다.
+     */
+    private Map<String, Visit> marksOf(AuthPrincipal me, List<Place> placeList) {
+        if (placeList.isEmpty()) {
+            return Map.of();
+        }
+        Set<String> want = placeList.stream().map(Place::getId).collect(Collectors.toSet());
+        Map<String, Visit> out = new java.util.HashMap<>();
+        for (Visit v : visits.findAllByIdUserId(me.id())) {
+            if (!want.contains(v.getId().getPlaceId())) {
+                continue;
+            }
+            if (v.getPhotoId() != null || v.getStars() != null || v.getNote() != null) {
+                out.put(v.getId().getPlaceId(), v);
+            }
+        }
+        return out;
+    }
+
+    private String snapshotOf(String title, List<Day> dayList, List<Place> placeList,
+                              Map<String, Visit> marks) {
         ObjectNode root = mapper.createObjectNode();
         root.put("title", title);
 
@@ -192,6 +231,21 @@ public class PostService {
                 /* 구글이 붙인 번호는 그 가게의 사실이라 함께 갑니다.
                    복제한 사람도 영업시간을 볼 수 있어야 합니다. */
                 n.put("placeId", p.getPlaceId());
+
+                /*
+                  그 자리에서 남긴 것.
+
+                  <p>사진 번호가 그대로 갑니다 — 사진 자체는 우리 서버에
+                  있고, 보는 사람은 /api/photos/… 로 가져갑니다. 글이 공개면
+                  그 사진도 함께 공개되는 셈이라, 올릴 때 무엇이 함께 가는지
+                  화면이 보여 주어야 합니다.
+                */
+                Visit mark = marks.get(p.getId());
+                if (mark != null) {
+                    n.put("photo", mark.getPhotoId());
+                    n.put("stars", mark.getStars() == null ? null : mark.getStars().intValue());
+                    n.put("review", mark.getNote());
+                }
             }
         }
         return root.toString();
@@ -299,6 +353,22 @@ public class PostService {
         return out;
     }
 
+    /**
+     * 내가 올린 사진인지.
+     *
+     * <p>안 보면 남의 사진 번호를 표지로 박아 넣을 수 있습니다. 번호는
+     * 난수라 찍어서 맞히기 어렵지만, 어렵다는 것이 막았다는 뜻은 아닙니다.
+     */
+    private String myPhoto(AuthPrincipal me, String photoId) {
+        if (photoId == null || photoId.isBlank()) {
+            return null;
+        }
+        return photos.findById(photoId)
+                .filter(p -> p.getOwnerId().equals(me.id()))
+                .map(p -> p.getId())
+                .orElseThrow(() -> ApiException.badRequest("그런 사진이 없어요."));
+    }
+
     /** 태그 하나를 다듬습니다. 못 쓸 것이면 null. */
     private static String tagOf(String raw) {
         if (raw == null) {
@@ -339,11 +409,29 @@ public class PostService {
     }
 
     @Transactional(readOnly = true)
-    public TripPost read(String postId) {
+    /**
+     * 글 하나.
+     *
+     * @param viewerId 보는 사람. 로그인 안 했으면 null
+     */
+    public TripPost read(String postId, String viewerId) {
         TripPost post = posts.findById(postId)
                 .orElseThrow(() -> ApiException.notFound("글을 찾을 수 없어요."));
         if (post.isHidden()) {
             /* 내려간 글이 있다는 것 자체를 알릴 이유가 없습니다. */
+            throw ApiException.notFound("글을 찾을 수 없어요.");
+        }
+        /*
+          나만 보는 글.
+
+          <p>없다고 답합니다 — "볼 수 없습니다" 는 <b>있다는 말</b>입니다.
+          번호를 하나씩 넣어 보면 어느 것이 있는 글인지 가려낼 수 있습니다.
+
+          <p>주소를 아는 사람만(LINK) 은 여기서 안 막습니다. 그것이 그 갈래의
+          뜻입니다 — 목록과 검색에서 빠질 뿐입니다.
+        */
+        if (post.getVisibility() == Visibility.PRIVATE
+                && !post.getAuthorId().equals(viewerId)) {
             throw ApiException.notFound("글을 찾을 수 없어요.");
         }
         return post;
@@ -388,7 +476,7 @@ public class PostService {
 
     @Transactional
     public boolean like(AuthPrincipal me, String postId, boolean on) {
-        TripPost post = read(postId);
+        TripPost post = read(postId, me.id());
         boolean already = likes.existsByPostIdAndUserId(postId, me.id());
 
         if (on && !already) {
@@ -419,7 +507,7 @@ public class PostService {
      *                 가져와 지우게 하면 지우는 일이 곧 남습니다.
      */
     public Trip copy(AuthPrincipal me, String postId, String startIso, List<Integer> wantDays) {
-        TripPost post = read(postId);
+        TripPost post = read(postId, me.id());
         JsonNode snap = snapshotOf(post);
 
         LocalDate start = DayLabels.parse(startIso);
@@ -526,7 +614,8 @@ public class PostService {
      */
     @Transactional
     public TripPost edit(AuthPrincipal me, String postId, String title, String summary,
-                         String region, List<String> tags, Boolean feedback) {
+                         String region, List<String> tags, Boolean feedback,
+                         String coverPhotoId, Visibility visibility) {
         TripPost post = mine(me, postId);
 
         if (title != null && !title.isBlank()) {
@@ -555,6 +644,13 @@ public class PostService {
         }
         if (feedback != null) {
             post.setFeedback(feedback);
+        }
+        if (coverPhotoId != null) {
+            /* 빈 값은 표지 지우기입니다. */
+            post.setCoverPhotoId(coverPhotoId.isBlank() ? null : myPhoto(me, coverPhotoId));
+        }
+        if (visibility != null) {
+            post.setVisibility(visibility);
         }
 
         audit.log(me.id(), "post.edit", postId);
@@ -724,7 +820,7 @@ public class PostService {
      */
     @Transactional
     public void report(AuthPrincipal me, String postId, String reason) {
-        TripPost post = read(postId);
+        TripPost post = read(postId, me.id());
         if (post.getAuthorId().equals(me.id())) {
             throw ApiException.badRequest("내 글은 신고할 수 없어요.");
         }
