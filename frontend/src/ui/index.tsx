@@ -384,14 +384,18 @@ export function Card({ children, style, ...rest }: ViewProps) {
 /**
  * 눌러서 들어가는 줄.
  *
- * 줄 전체가 눌리는 자리입니다. 안에 작은 버튼을 넣으면 어디를 누르는지
- * 헷갈리므로, 곁다리 동작은 right 에 표시만 두고 상세 화면에서 다룹니다.
+ * <p>줄 전체가 눌리는 자리입니다. {@code right} 는 <b>표시만</b> 두는 곳이라
+ * 누르는 것을 넣지 않습니다 — 누르는 자리 안에 누르는 자리를 넣으면 어디를
+ * 누르는 것인지 알 수 없습니다.
+ *
+ * <p>줄에서 바로 해야 하는 곁다리가 있으면 {@code action} 입니다.
  */
 export function ListRow({
   title,
   subtitle,
   left,
   right,
+  action,
   onPress,
 }: {
   title: React.ReactNode;
@@ -399,10 +403,24 @@ export function ListRow({
   /** 제목 앞에 서는 것. 갈래를 나타내는 {@link Mark} 가 대개 옵니다. */
   left?: React.ReactNode;
   right?: React.ReactNode;
+  /**
+   * 줄에서 바로 하는 곁다리. 대개 점 세 개입니다.
+   *
+   * <h3>판 밖에 두면 판이 짧아 보입니다</h3>
+   *
+   * <p>화면마다 {@code <Row><ListRow/><IconButton/></Row>} 로 옆에 붙이고
+   * 있었습니다. 그런데 {@link ListRow} 자체가 흰 판이라, 옆에 붙인 단추는
+   * <b>판 밖</b>에 섭니다 — 단추가 붙은 줄만 판이 그만큼 짧아져서, 목록의
+   * 오른쪽 끝이 들쭉날쭉했습니다.
+   *
+   * <p>여기로 넘기면 판 안에 섭니다. 누르는 자리와는 갈라 두므로 점 세 개를
+   * 눌러도 줄이 열리지 않습니다.
+   */
+  action?: React.ReactNode;
   onPress: () => void;
 }) {
-  return (
-    <Press onPress={onPress} scale={0.985} style={styles.listRow}>
+  const inside = (
+    <>
       {left}
       <View style={styles.listRowText}>
         <Text style={styles.listRowTitle} numberOfLines={1}>
@@ -411,7 +429,26 @@ export function ListRow({
         {subtitle ? <Text style={styles.listRowSubtitle}>{subtitle}</Text> : null}
       </View>
       {right}
-    </Press>
+    </>
+  );
+
+  if (!action) {
+    return (
+      <Press onPress={onPress} scale={0.985} style={styles.listRow}>
+        {inside}
+      </Press>
+    );
+  }
+
+  /* 판은 겉껍데기가 쓰고, 누르는 자리는 그 안에서 남는 폭을 다 먹습니다.
+     여백도 안쪽이 가집니다 — 겉이 가지면 곁다리가 판 가장자리에 붙습니다. */
+  return (
+    <View style={styles.listRowHeld}>
+      <Press onPress={onPress} scale={0.985} style={styles.listRowTap}>
+        {inside}
+      </Press>
+      {action}
+    </View>
   );
 }
 
@@ -1525,7 +1562,14 @@ export function IconButton({
   label: string;
   onPress: () => void;
   tone?: Tone;
-  /** 켜진 상태(예: 다녀옴). 눌러 둔 것처럼 보이게 합니다. */
+  /**
+   * 켜진 상태(예: 다녀옴). 눌러 둔 것처럼 보이게 합니다.
+   *
+   * <p>켜진 것이 <b>보여야 하는</b> 자리에 {@code tone="accent"} 를 쓰지
+   * 마세요 — 이 앱에서 글자와 그림의 accent 는 검정입니다(toneColor 참고).
+   * bare 와 함께 쓰면 회색에서 검정으로만 바뀌어 아무 말도 안 합니다.
+   * 코랄로 물들여야 하는 자리는 {@code tone="brand"} 입니다.
+   */
   active?: boolean;
   disabled?: boolean;
   /**
@@ -2466,6 +2510,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: Spacing.md,
+  },
+  /* 곁다리가 있는 줄. 판은 여기가 쓰고 여백은 안쪽이 가집니다. */
+  listRowHeld: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.md,
+    minHeight: Tap.min + Spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    /* 곁다리는 판 오른쪽 끝에서 한 눈금 안쪽에 섭니다. */
+    paddingRight: Spacing.sm,
+  },
+  listRowTap: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.md,
+    paddingVertical: Spacing.lg,
+    paddingLeft: Spacing.xl,
+    /* 오른쪽은 곁다리와의 사이만큼만. 판 여백은 겉껍데기가 안 가집니다. */
+    paddingRight: Spacing.md,
   },
   listRowText: {
     flex: 1,

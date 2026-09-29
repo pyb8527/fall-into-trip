@@ -122,7 +122,7 @@ export default function Saved() {
    */
   const applied: { key: string; label: string; clear: () => void }[] = [
     kind !== null
-      ? { key: 'kind', label: labelOf(kind) || '갈래', clear: () => setKind(null) }
+      ? { key: 'kind', label: labelOf(kind) || '어떤 곳', clear: () => setKind(null) }
       : null,
     by !== 'given' ? { key: 'by', label: '이름순', clear: () => setBy('given') } : null,
   ].filter(Boolean) as { key: string; label: string; clear: () => void }[];
@@ -420,7 +420,7 @@ export default function Saved() {
         {kinds.length > 1 ? (
           <>
             <Body small strong>
-              갈래
+              어떤 곳
             </Body>
             <Row gap={Spacing.xs} style={styles.applied}>
               <Chip label="전체" selected={kind === null} onPress={() => setKind(null)} />
@@ -457,7 +457,7 @@ export default function Saved() {
       {data && all.length > 0 && shown.length === 0 ? (
         <Empty
           message={
-            q.trim() ? `"${q.trim()}" 로는 찾은 것이 없습니다.` : '이 갈래에는 아직 없습니다.'
+            q.trim() ? `"${q.trim()}" 로는 찾은 것이 없습니다.` : '이런 곳은 아직 담아 둔 것이 없습니다.'
           }
         />
       ) : null}

@@ -786,10 +786,19 @@ function DayBlock({
                 key: 'keep',
                 name: 'bookmark' as IconName,
                 label: savedIds.has(place.name) ? UNKEEP : KEEP,
-                /* 담긴 것은 그림에 색이 듭니다. 회색 네모가 돋아나는 것보다
-                   담겼다는 말에 가깝습니다. */
+                /*
+                  담긴 것은 그림에 색이 듭니다. 회색 네모가 돋아나는 것보다
+                  담겼다는 말에 가깝습니다.
+
+                  <p>accent 가 아니라 brand 입니다. 글자와 그림의 "accent" 는
+                  이 앱에서 <b>검정</b>입니다(ui/index toneColor 참고) — 강조색을
+                  코랄로 들이면서 그것까지 코랄로 돌리면 한 화면에 코랄이 열
+                  군데씩 생기기 때문입니다. 그래서 tone="accent" 로는 회색에서
+                  검정으로만 바뀌어, 담겼는지 안 담겼는지 알 수 없었습니다.
+                  코랄을 그림 색으로 써야 하는 자리가 brand 입니다.
+                */
                 active: savedIds.has(place.name),
-                tone: 'accent' as const,
+                tone: 'brand' as const,
                 onPress: () => onSave(place, i),
               },
             ]
@@ -889,7 +898,12 @@ function CopySheet({
       */}
       {days.length > 1 ? (
         <>
-          <Caption tone="secondary">어느 날을 가져올까요?</Caption>
+          {/* 흐린 작은 글씨로 두었더니 날짜 칸 밑에 붙은 설명처럼 읽혀,
+              고를 수 있는 것이 있다는 것을 못 보고 지나쳤습니다. 다른 판의
+              묶음 이름과 같은 무게로 적습니다. */}
+          <Body small strong>
+            어느 날을 가져올까요?
+          </Body>
           <Row gap={Spacing.xs} style={styles.wrap}>
             <Chip
               label="전부"
@@ -938,6 +952,18 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
+    /*
+      판과 아래 띠보다 위에 섭니다.
+
+      <p>둘 다 zIndex 2 를 쓰는데 이 띠에는 층이 없었습니다. 웹에서 zIndex 는
+      쌓임 문맥을 만들어서, <b>나중에 그려지든 말든</b> 2 가 0 위에 깔립니다 —
+      「보석함에 담았습니다」 가 판 뒤에서 뜨고 5초 뒤에 사라졌습니다. 담은
+      사람에게는 아무 일도 안 일어난 것으로 보였습니다.
+
+      <p>여행 상세에서는 같은 띠가 판 높이만큼 위에 서기 때문에 겹치지 않아
+      드러나지 않았습니다.
+    */
+    zIndex: 3,
   },
   stage: {
     flex: 1,

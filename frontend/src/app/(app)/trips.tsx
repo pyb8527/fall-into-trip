@@ -402,22 +402,17 @@ function TripRow({
   onFolder?: () => void;
 }) {
   return (
-    <Row style={styles.row}>
-      <View style={styles.grow}>
-        <ListRow
-          left={<TripMark theme={trip.theme} emoji={trip.emoji} />}
-          title={trip.title}
-          subtitle={`${formatSpan(trip.startIso, trip.endIso)} · ${formatNights(trip.dayCount)} · 장소 ${trip.placeCount}곳`}
-          right={
-            <Row gap={Spacing.xs}>
-              {countdownBadge(trip.startIso, trip.endIso)}
-              {mine ? null : <Badge label="동행" tone="muted" />}
-            </Row>
-          }
-          onPress={onOpen}
-        />
-      </View>
-      {/*
+    <ListRow
+      left={<TripMark theme={trip.theme} emoji={trip.emoji} />}
+      title={trip.title}
+      subtitle={`${formatSpan(trip.startIso, trip.endIso)} · ${formatNights(trip.dayCount)} · 장소 ${trip.placeCount}곳`}
+      right={
+        <Row gap={Spacing.xs}>
+          {countdownBadge(trip.startIso, trip.endIso)}
+          {mine ? null : <Badge label="동행" tone="muted" />}
+        </Row>
+      }
+      /*
         줄마다 답니다.
 
         <p>폴더별로 볼 때만 냈었습니다. 그런데 "이 여행 폴더에 넣어야지" 는
@@ -427,16 +422,22 @@ function TripRow({
 
         <p>폴더 그림 대신 점 세 개입니다. 폴더 그림은 "이미 폴더에 들어
         있다" 로도 읽혀서, 안 넣은 여행 옆에 서 있으면 헷갈립니다.
-      */}
-      {onFolder ? (
-        <IconButton
-          name="more-horizontal"
-          label={`${trip.title} 폴더에 넣기`}
-          bare
-          onPress={onFolder}
-        />
-      ) : null}
-    </Row>
+
+        <p>판 <b>안</b>에 섭니다. 옆에 붙여 두었더니 점 세 개가 붙은 줄만
+        판이 그만큼 짧아져서 목록 오른쪽 끝이 들쭉날쭉했습니다.
+      */
+      action={
+        onFolder ? (
+          <IconButton
+            name="more-horizontal"
+            label={`${trip.title} 폴더에 넣기`}
+            bare
+            onPress={onFolder}
+          />
+        ) : null
+      }
+      onPress={onOpen}
+    />
   );
 }
 
@@ -532,12 +533,5 @@ const styles = StyleSheet.create({
   },
   section: {
     gap: Spacing.sm,
-  },
-  row: {
-    alignItems: 'center',
-    gap: Spacing.xs,
-  },
-  grow: {
-    flex: 1,
   },
 });

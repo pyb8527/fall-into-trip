@@ -120,7 +120,10 @@ export default function Popular() {
           <Row gap={Spacing.xs} style={styles.chips}>
             {(kinds?.kinds.length ?? 0) > 1 ? (
               <Picker
-                label="갈래"
+                /* "갈래" 는 일상에서 잘 안 쓰는 말이라 무엇을 고르는 칸인지
+                   한 번 생각해야 했습니다. 옆 칸이 "지역" 이니 같은 무게의
+                   쉬운 말로 맞춥니다. */
+                label="어떤 곳"
                 value={kind}
                 onChange={setKind}
                 options={(kinds?.kinds ?? []).map((k) => ({
@@ -150,7 +153,7 @@ export default function Popular() {
             <Empty
               message={
                 kind
-                  ? '이 갈래로는 아직 올라온 곳이 없습니다.'
+                  ? '이런 곳은 아직 올라온 것이 없습니다.'
                   : '아직 올라온 일정이 없습니다. 첫 번째가 되어 보세요.'
               }
             />
