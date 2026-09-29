@@ -30,7 +30,7 @@ const tripId = r.data.trip.id;
 r = await call("GET", "/api/trip?trip=" + tripId, { token: admin });
 T("날짜 4개 자동 생성", r.data?.days?.length === 4, r.data?.days?.length);
 T("첫날 2026-10-08", r.data.days[0].iso === "2026-10-08", r.data.days[0]);
-T("요일 계산 정확 (10/08=목)", r.data.days[0].date === "10.08 (목)", r.data.days[0].date);
+T("요일 계산 정확 (10/08=목)", r.data.days[0].date === "10.08(목)", r.data.days[0].date);
 T("마지막날 2026-10-11", r.data.days[3].iso === "2026-10-11", r.data.days[3].iso);
 T("날짜별 색이 다름", new Set(r.data.days.map(d => d.color)).size === 4);
 T("내 역할 EDITOR", r.data.myRole === "EDITOR", r.data.myRole);
@@ -148,7 +148,7 @@ r = await call("PATCH", "/api/trips/" + tripId, { token: admin, body: { startIso
 T("시작일 변경", r.status === 200, r.data);
 r = await call("GET", "/api/trip?trip=" + tripId, { token: admin });
 T("모든 날짜가 같이 이동", r.data.days.map(d => d.iso).join() === "2026-11-01,2026-11-02,2026-11-03,2026-11-04", r.data.days.map(d=>d.iso));
-T("표시 문자열도 갱신", r.data.days[0].date === "11.01 (일)", r.data.days[0].date);
+T("표시 문자열도 갱신", r.data.days[0].date === "11.01(일)", r.data.days[0].date);
 
 console.log("\n[3-2] 비용 — 글자 칸과 셈할 수 있는 칸");
 r = await call("POST", "/api/places", { token: admin, body: { dayId: day1, name: "이치란", lat: 34.6687, lng: 135.5013, costAmount: 1200, costCurrency: "JPY" } });

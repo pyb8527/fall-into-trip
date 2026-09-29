@@ -79,13 +79,20 @@ public final class DayLabels {
         }
     }
 
-    /** "10.08 (목)" */
+    /**
+     * "10.08(목)"
+     *
+     * <p>괄호 앞을 붙입니다. 여기는 띄우고 화면 쪽(lib/countdown)은 붙여
+     * 있어서, 같은 날짜가 한 화면에 "10.08 (목)" 과 "10.8(목)" 두 모양으로
+     * 나왔습니다. 붙이는 쪽으로 맞춥니다 — 요일은 날짜에 딸린 것이지 따로
+     * 서는 항목이 아닙니다.
+     */
     public static String display(LocalDate date) {
         if (date == null) {
             return null;
         }
         DayOfWeek dow = date.getDayOfWeek();
-        return "%02d.%02d (%s)".formatted(
+        return "%02d.%02d(%s)".formatted(
                 date.getMonthValue(), date.getDayOfMonth(), WEEK[dow.getValue() - 1]);
     }
 

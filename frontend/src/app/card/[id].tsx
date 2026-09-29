@@ -105,10 +105,6 @@ export default function Card() {
         variant="secondary"
         onPress={() => shareLink(sharableUrl(id), data.trip.title)}
       />
-      <Caption tone="muted">
-        그림으로 저장하는 것은 다음 앱 빌드에서 열립니다. 지금은 링크를 보내거나 화면을 찍어
-        주세요.
-      </Caption>
     </Screen>
   );
 }

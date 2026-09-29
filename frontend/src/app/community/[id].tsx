@@ -18,6 +18,7 @@ import {
 import type { MapPlace } from '@/components/map-types';
 import { PlaceDetailSheet } from '@/components/place-detail-sheet';
 import { PostFields, type PostShape } from '@/components/post-fields';
+import { formatNights } from '@/lib/countdown';
 import { PostMap } from '@/components/post-map';
 import { SignUpGate } from '@/components/signup-gate';
 import { TripMap } from '@/components/trip-map';
@@ -450,10 +451,24 @@ export default function Post() {
             style={styles.head}
             onLayout={(e) => setHeadTall(e.nativeEvent.layout.height)}>
             <Title>{data.title}</Title>
+            {/*
+              지역 → 기간 → 장소 수 → 쓴 사람 → 반응 순서로 적습니다. 목록
+              카드와 같은 순서여야 같은 것을 읽고 있다는 것이 보입니다.
+
+              <p>0 인 것은 뺍니다 — "댓글 0" 은 댓글이 없다는 말을 굳이 자리를
+              차지하며 하는 것이고, 조회수는 아예 안 냅니다(목록과 같은
+              까닭입니다).
+            */}
             <Caption tone="secondary">
-              {data.authorName} · {data.dayCount}일 · {data.placeCount}곳 · 조회{' '}
-              {data.viewCount.toLocaleString()}
-              {data.feedback ? ` · 댓글 ${data.commentCount}` : ''}
+              {[
+                data.region,
+                formatNights(data.dayCount),
+                `${data.placeCount}곳`,
+                data.authorName,
+                data.feedback && data.commentCount > 0 ? `댓글 ${data.commentCount}` : null,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
             </Caption>
             {/* 판을 내려 두어도 이 둘은 누를 수 있어야 합니다. 이 화면에
                 들어온 까닭이 대개 둘 중 하나입니다. */}
@@ -465,9 +480,12 @@ export default function Post() {
                 onPress={toggleLike}
               />
               <View style={styles.grow}>
+                {/* 이 화면에 들어온 까닭입니다. 옅은 코랄로 두었더니 흰 판
+                    위에서 못 누르는 단추처럼 보였습니다. */}
                 <Button
                   label="내 여행으로 가져오기"
                   compact
+                  strong
                   onPress={() => (user ? setCopying(true) : needLogin('copy'))}
                 />
               </View>

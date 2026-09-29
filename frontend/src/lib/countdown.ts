@@ -138,15 +138,27 @@ export function formatDay(iso: string | null | undefined): string {
     return '';
   }
   const week = ['일', '월', '화', '수', '목', '금', '토'][at.getDay()];
-  const head = at.getFullYear() === new Date().getFullYear() ? '' : `${at.getFullYear()}. `;
-  return `${head}${at.getMonth() + 1}.${at.getDate()}(${week})`;
+  const head = at.getFullYear() === new Date().getFullYear() ? '' : `${at.getFullYear()}.`;
+  /*
+    두 자리로 맞춥니다.
+
+    <p>"10.8" 과 "10.08" 이 한 화면에 함께 있었습니다 — 앞의 것은 이 함수가,
+    뒤의 것은 서버가 만든 것입니다. 목록에서 날짜가 세로로 늘어설 때 자릿수가
+    다르면 줄이 안 맞고, 무엇보다 <b>같은 것이 두 모양</b>입니다.
+
+    <p>두 자리 쪽으로 맞춥니다. 8일을 "08" 로 적는 것이 어색해 보여도, 09.30
+    바로 아래 10.01 이 서는 목록에서는 이쪽이 읽힙니다.
+  */
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${head}${pad(at.getMonth() + 1)}.${pad(at.getDate())}(${week})`;
 }
 
 /**
- * 하루부터 하루까지. "9.14(월) – 9.18(금)".
+ * 하루부터 하루까지. "09.14(월) ~ 09.18(금)".
  *
- * <p>가운데는 하이픈이 아니라 엔 대시입니다. 하이픈은 글자에 붙어 "9.14-9.18"
- * 처럼 한 덩어리로 읽히는데, 이것은 두 날짜 사이의 <b>동안</b>입니다.
+ * <p>가운데는 물결표입니다. 엔 대시를 쓰고 있었는데, 한국어에서 기간을 적는
+ * 기호는 물결표고 대시는 잘 안 씁니다 — 게다가 폰트에 따라 하이픈과 구별이
+ * 안 되어 "9.14-9.18" 처럼 한 덩어리로 읽혔습니다.
  */
 export function formatSpan(start: string | null, end: string | null): string {
   if (!start) {
@@ -155,7 +167,7 @@ export function formatSpan(start: string | null, end: string | null): string {
   if (!end || end === start) {
     return formatDay(start);
   }
-  return `${formatDay(start)} – ${formatDay(end)}`;
+  return `${formatDay(start)} ~ ${formatDay(end)}`;
 }
 
 /**

@@ -40,7 +40,7 @@ const SAY: Record<ComebackDo, { title: string; why: string }> = {
   },
   like: {
     title: '눌러 둔 것을 다시 찾으려면',
-    why: '하트를 누른 글은 「내가 누른」 에 모입니다. 계정이 없으면 모아 둘 자리가 없습니다.',
+    why: '하트를 누른 글은 「좋아요」 에 모입니다. 계정이 없으면 모아 둘 자리가 없습니다.',
   },
   comment: {
     title: '누가 쓴 말인지 남아야 해요',
