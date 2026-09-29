@@ -5,6 +5,7 @@ import { api } from '@/api/client';
 import type { PlaceInfo, TravelMode } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import type { MapPlace } from '@/components/map-types';
+import { PlacePhoto } from '@/components/place-photo';
 import { TripMap } from '@/components/trip-map';
 import { iconOf, labelOf } from '@/constants/place-icons';
 import { Colors, Spacing } from '@/constants/theme';
@@ -158,7 +159,18 @@ export function PlaceDetailSheet({
 
   return (
     <BottomSheet visible title={place.name} onClose={onClose}>
-      {/* 어디쯤인지가 먼저입니다. 이름만 읽어서는 그 동네인지 알 수 없습니다. */}
+      {/*
+        사진이 먼저입니다.
+
+        <p>여행 앱에서 "여기가 어떤 곳인지" 에 가장 빨리 답하는 것은 사진
+        한 장입니다. 이름과 평점만으로는 골목 안 작은 집인지 큰 건물인지
+        알 수 없습니다.
+
+        <p>지도는 그 다음입니다 — 어떤 곳인지 보고 나서 어디쯤인지 봅니다.
+      */}
+      <PlacePhoto name={info?.photoName} by={info?.photoBy} height={200} big />
+
+      {/* 어디쯤인지. 이름만 읽어서는 그 동네인지 알 수 없습니다. */}
       <TripMap places={[pin]} activeId="looked" onSelect={() => {}} link={false} height={200} />
 
       {place.address ? <Caption tone="secondary">{place.address}</Caption> : null}

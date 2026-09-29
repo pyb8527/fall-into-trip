@@ -55,6 +55,18 @@ public class PlaceInfoService {
      */
     private static final Duration KEEP = Duration.ofHours(1);
 
+    /** 풀어 둔 사진 주소를 들고 있는 동안. 구글이 주는 것이 잠깐만 삽니다. */
+    private static final Duration PHOTO_KEEP = Duration.ofMinutes(20);
+
+    /**
+     * 사진 이름의 모양.
+     *
+     * <p>화면이 보내 온 글자를 그대로 주소에 붙이면, 우리 열쇠를 달고 구글의
+     * 아무 데나 부르게 만들 수 있습니다. 구글이 주는 모양만 통과시킵니다.
+     */
+    private static final java.util.regex.Pattern PHOTO_NAME =
+            java.util.regex.Pattern.compile("^places/[A-Za-z0-9_-]+/photos/[A-Za-z0-9_-]+$");
+
     /** 들고 있을 답의 개수. 넘으면 오래 안 쓴 것부터 버립니다. */
     private static final int CACHE_MAX = 1000;
 
@@ -128,7 +140,18 @@ public class PlaceInfoService {
             "rating",
             "userRatingCount",
             "businessStatus",
-            "googleMapsUri");
+            "googleMapsUri",
+            /*
+              사진.
+
+              <p>이름(photos.name)만 받아 둡니다. 실제 그림 주소는 따로 물어야
+              하고 잠깐만 살아 있어서 캐시에 둘 것이 못 됩니다.
+
+              <p>찍은 사람도 함께 받습니다 — 구글은 사진을 쓸 때 찍은 사람을
+              밝히라고 합니다. 이름을 못 받으면 사진을 안 씁니다.
+            */
+            "photos.name",
+            "photos.authorAttributions.displayName");
 
     private final GoogleQuota quota;
     private final GoogleQuotaKey quotaKey;
@@ -153,6 +176,21 @@ public class PlaceInfoService {
             new LinkedHashMap<String, Cached>(128, 0.75f, true) {
                 @Override
                 protected boolean removeEldestEntry(Map.Entry<String, Cached> eldest) {
+                    return size() > CACHE_MAX;
+                }
+            });
+
+    /**
+     * 풀어 둔 사진 주소.
+     *
+     * <p>구글이 주는 주소는 잠깐만 삽니다. 오래 들고 있으면 죽은 주소를
+     * 내주게 되므로 짧게 둡니다 — 그래도 한 화면을 그리는 동안은 다시 묻지
+     * 않습니다.
+     */
+    private final Map<String, Photo> photos = Collections.synchronizedMap(
+            new LinkedHashMap<String, Photo>(128, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<String, Photo> eldest) {
                     return size() > CACHE_MAX;
                 }
             });
@@ -254,7 +292,8 @@ public class PlaceInfoService {
 
         return new Info(placeId, text, closed, spans, raw.hours(),
                 raw.phone(), raw.website(), raw.rating(), raw.ratingCount(),
-                CLOSED_PERMANENTLY.equals(raw.status()), raw.status(), raw.mapUrl());
+                CLOSED_PERMANENTLY.equals(raw.status()), raw.status(), raw.mapUrl(),
+                raw.photoName(), raw.photoBy());
     }
 
     /**
@@ -315,7 +354,94 @@ public class PlaceInfoService {
                 r.hasNonNull("rating") ? r.path("rating").asDouble() : null,
                 r.hasNonNull("userRatingCount") ? r.path("userRatingCount").asInt() : null,
                 text(r, "businessStatus"),
-                text(r, "googleMapsUri"));
+                text(r, "googleMapsUri"),
+                firstPhoto(r),
+                firstPhotoBy(r));
+    }
+
+    /**
+     * 첫 사진의 이름.
+     *
+     * <p>한 장만 씁니다. 여러 장을 받아 두면 화면마다 몇 장을 쓸지 정해야 하고,
+     * 그림 주소는 한 장마다 따로 물어야 해서 그만큼 값이 듭니다. 목록과 상세에
+     * 필요한 것은 <b>여기가 어떤 곳인지</b>를 알려 주는 한 장입니다.
+     *
+     * <p>찍은 사람을 못 받은 사진은 건너뜁니다 — 밝히지 못할 사진은 안 씁니다.
+     */
+    private static String firstPhoto(JsonNode r) {
+        for (JsonNode p : r.path("photos")) {
+            if (p.hasNonNull("name") && !byOf(p).isBlank()) {
+                return p.path("name").asText();
+            }
+        }
+        return null;
+    }
+
+    private static String firstPhotoBy(JsonNode r) {
+        for (JsonNode p : r.path("photos")) {
+            if (p.hasNonNull("name") && !byOf(p).isBlank()) {
+                return byOf(p);
+            }
+        }
+        return null;
+    }
+
+    private static String byOf(JsonNode photo) {
+        JsonNode who = photo.path("authorAttributions");
+        return who.isArray() && !who.isEmpty() ? who.get(0).path("displayName").asText("") : "";
+    }
+
+    /* ------------------------------------------------------------- 사진 */
+
+    /**
+     * 사진 한 장의 그림 주소.
+     *
+     * <h3>왜 서버가 풀어 주는가</h3>
+     *
+     * <p>그림을 받으려면 우리 열쇠가 있어야 합니다. 화면에서 바로 부르면 그
+     * 열쇠가 남의 손에 들어가고, 그러면 남이 우리 사용량을 태웁니다.
+     *
+     * <p>돌아오는 주소는 잠깐만 삽니다. 그래서 오래 들고 있을 수 없고, 대신
+     * 잠깐 들고 있습니다 — 한 화면에서 같은 사진을 여러 번 그릴 때마다 구글에
+     * 다시 묻는 것은 그대로 값입니다.
+     *
+     * @param name 구글이 준 사진 이름. {@code places/…/photos/…} 모양입니다
+     * @return 못 받으면 null
+     */
+    public String photoUri(String name, int width) {
+        if (!enabled() || name == null || !PHOTO_NAME.matcher(name).matches()) {
+            return null;
+        }
+        String at = name + "@" + width;
+
+        Photo hit = photos.get(at);
+        if (hit != null && hit.until().isAfter(Instant.now())) {
+            return hit.uri();
+        }
+
+        quota.spend(quotaKey.current(), 1);
+        try {
+            JsonNode r = client.get()
+                    .uri(uri -> uri.path("/v1/{name}/media")
+                            .queryParam("maxWidthPx", width)
+                            /* 그림을 우리 서버로 받아 오지 않습니다. 주소만
+                               받아서 화면이 구글에서 바로 가져갑니다. */
+                            .queryParam("skipHttpRedirect", true)
+                            .build(name))
+                    .header("X-Goog-Api-Key", key)
+                    .retrieve()
+                    .body(JsonNode.class);
+            String uri = r == null ? null : text(r, "photoUri");
+            if (uri == null) {
+                return null;
+            }
+            photos.put(at, new Photo(uri, Instant.now().plus(PHOTO_KEEP)));
+            return uri;
+        } catch (Exception e) {
+            /* 사진 한 장 때문에 화면이 멈출 이유는 없습니다. */
+            log.warn("사진을 받지 못했어요: {}", e.getMessage());
+            return null;
+        }
     }
 
     /**
@@ -377,16 +503,24 @@ public class PlaceInfoService {
     public record Info(String id, String onDay, boolean closedOnDay, List<Span> spans,
                        List<String> hours, String phone, String website,
                        Double rating, Integer ratingCount,
-                       boolean permanentlyClosed, String status, String mapUrl) {
+                       boolean permanentlyClosed, String status, String mapUrl,
+                       /** 사진의 이름. 그림 주소는 /api/places/photo 가 풀어 줍니다. */
+                       String photoName,
+                       /** 찍은 사람. 사진을 쓰려면 함께 적어야 합니다. */
+                       String photoBy) {
     }
 
     /** 구글에서 받은 주간 원본. 날짜에 매이지 않아 캐시에 둘 수 있습니다. */
     private record Raw(List<String> hours, Map<Integer, List<Span>> spansByDay,
                        Integer utcOffsetMinutes, String phone, String website,
                        Double rating, Integer ratingCount,
-                       String status, String mapUrl) {
+                       String status, String mapUrl,
+                       String photoName, String photoBy) {
     }
 
     private record Cached(Raw raw, Instant until) {
+    }
+
+    private record Photo(String uri, Instant until) {
     }
 }

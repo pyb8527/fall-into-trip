@@ -372,6 +372,16 @@ export type PlaceInfo = {
   /** 아예 문을 닫은 가게 */
   permanentlyClosed: boolean;
   mapUrl: Maybe<string>;
+  /**
+   * 사진의 이름.
+   *
+   * <p>그림 주소가 아닙니다. 구글이 주는 그림 주소는 잠깐만 살아서 이 응답에
+   * 실어 두면 화면을 그릴 때쯤 죽어 있습니다. 필요할 때 /api/places/photo 가
+   * 풀어 줍니다.
+   */
+  photoName: Maybe<string>;
+  /** 찍은 사람. 사진을 쓰려면 함께 적어야 합니다 — 구글이 그렇게 요구합니다. */
+  photoBy: Maybe<string>;
 };
 
 /* -------------------------------------------------------------- 게시판 */

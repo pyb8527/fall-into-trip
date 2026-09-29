@@ -132,6 +132,37 @@ public class PlaceController {
         return out;
     }
 
+    /**
+     * 사진 한 장을 어디서 가져올지.
+     *
+     * <h3>왜 주소만 내주는가</h3>
+     *
+     * <p>그림을 우리 서버로 받아서 넘겨주면 그 그림이 오갈 때마다 우리 쪽
+     * 통신량입니다. 주소만 풀어 주고 그림은 화면이 구글에서 바로 가져갑니다.
+     *
+     * <p>푸는 일을 서버가 하는 까닭은 열쇠 때문입니다. 화면에서 바로 부르면
+     * 열쇠가 남의 손에 들어가고, 그러면 남이 우리 사용량을 태웁니다.
+     *
+     * <h3>넓이는 우리가 정합니다</h3>
+     *
+     * <p>아무 숫자나 받으면 같은 사진을 넓이마다 따로 물어야 해서, 들고 있는
+     * 것이 늘고 값도 그만큼 듭니다. 목록용과 상세용 둘이면 됩니다.
+     *
+     * @param name 구글이 준 사진 이름. 장소 정보(/info)에 실려 옵니다
+     * @param w    가로 픽셀. 400(목록) 또는 1000(상세)
+     */
+    @GetMapping("/photo")
+    public Map<String, Object> photo(@RequestParam String name,
+                                     @RequestParam(defaultValue = "400") int w) {
+        int width = w >= 1000 ? 1000 : 400;
+        String uri = infos.photoUri(name, width);
+        /* 못 받아도 오류가 아닙니다 — 사진이 없는 곳이거나 구글이 안 주는
+           경우입니다. 화면은 사진 자리를 비웁니다. */
+        Map<String, Object> out = new java.util.HashMap<>();
+        out.put("url", uri);
+        return out;
+    }
+
     @GetMapping("/tidy")
     public Map<String, Object> tidy(@CurrentUser AuthPrincipal me, @RequestParam String dayId) {
         RouteTidy.Tidied made = places.tidy(me, dayId);
