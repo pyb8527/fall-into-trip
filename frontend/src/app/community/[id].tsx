@@ -885,37 +885,6 @@ function DayBlock({
               </Caption>
             ) : null}
 
-            {/*
-              그 자리에서 남긴 것.
-
-              <p>메모는 <b>가기 전에</b> 적어 둔 것이고 이것은 <b>다녀와서</b>
-              남긴 것입니다. 둘을 같은 회색 글로 붙여 두면 어느 것이 계획이고
-              어느 것이 겪은 일인지 안 갈립니다 — 별과 사진이 그것을 가릅니다.
-            */}
-            {/*
-              사진이 먼저, 크게.
-
-              <h3>곁다리로 붙어 있었습니다</h3>
-
-              <p>56픽셀 네모로 글 옆에 서 있었습니다. 그 크기로는 무엇이
-              찍혔는지 알 수가 없어서, 사진이 있으나 없으나 같았습니다.
-
-              <p>여기는 남의 여행기를 <b>읽는</b> 자리입니다. 어디를 갔는지는
-              위의 이름이 말하고, 거기가 어땠는지는 사진이 말합니다 — 그러면
-              사진이 글보다 커야 합니다.
-
-              <p>한 줄도 자르지 않습니다. 두 줄에서 끊어 놓고 "더 보기" 도
-              없으면, 쓴 사람은 썼는데 읽는 사람은 못 읽습니다.
-            */}
-            <PhotoStrip ids={place.photos} height={220} style={styles.shot} />
-            {place.stars || place.review ? (
-              <View style={styles.said}>
-                {place.stars ? (
-                  <Caption tone="brand">{'★'.repeat(place.stars)}</Caption>
-                ) : null}
-                {place.review ? <Body small>{place.review}</Body> : null}
-              </View>
-            ) : null}
             {place.cat || place.cost ? (
               <Row gap={Spacing.sm}>
                 {place.cat ? <Caption>{place.cat}</Caption> : null}
@@ -924,6 +893,35 @@ function DayBlock({
             ) : null}
           </View>
           </Press>
+
+          {/*
+            그 자리에서 남긴 것.
+
+            <p>메모는 <b>가기 전에</b> 적어 둔 것이고 이것은 <b>다녀와서</b>
+            남긴 것입니다. 둘을 같은 회색 글로 붙여 두면 어느 것이 계획이고
+            어느 것이 겪은 일인지 안 갈립니다 — 별과 사진이 그것을 가릅니다.
+
+            <h3>왜 이름 칸 밖인가</h3>
+
+            <p>이름·메모와 같은 칸에 있었습니다. 그 칸은 번호 열과 좌우 여백을
+            뺀 나머지라, 가로로 긴 사진이 그만큼 좁은 자리에 들어갔습니다.
+            여기는 남의 여행기를 <b>읽는</b> 자리이고, 어디를 갔는지는 위의
+            이름이 말하고 거기가 어땠는지는 사진이 말합니다 — 그러면 사진이
+            제 폭을 다 써야 합니다.
+
+            <p>누르는 자리 밖으로 나오면서 눌렀을 때 지도가 움직이는 대신
+            사진이 크게 열립니다. 내 여행 상세와 같은 모양입니다.
+
+            <p>한 줄도 자르지 않습니다. 두 줄에서 끊어 놓고 "더 보기" 도
+            없으면, 쓴 사람은 썼는데 읽는 사람은 못 읽습니다.
+          */}
+          <PhotoStrip ids={place.photos} height={220} style={styles.shot} />
+          {place.stars || place.review ? (
+            <View style={styles.said}>
+              {place.stars ? <Caption tone="brand">{'★'.repeat(place.stars)}</Caption> : null}
+              {place.review ? <Body small>{place.review}</Body> : null}
+            </View>
+          ) : null}
 
           {/*
             내 여행 상세와 같은 모양으로 둡니다.
@@ -1320,14 +1318,23 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 2,
   },
-  /* 다녀와서 남긴 사진. 이름 바로 아래에 붙여 그 장소의 것임을 보입니다. */
+  /*
+    다녀와서 남긴 사진.
+
+    <p>카드의 자식이라 좌우 여백을 스스로 챙깁니다. 누르는 자리(placeTap)
+    안에 있을 때는 그쪽 여백을 얻어 썼습니다. 여백은 글 쪽보다 좁습니다 —
+    글은 가장자리에 바짝 붙으면 읽기 불편하지만 사진은 넓을수록 잘 보입니다.
+  */
   shot: {
     marginTop: Spacing.xs,
+    marginHorizontal: Spacing.xs,
   },
-  /* 사진 아래의 별과 한 줄. */
+  /* 사진 아래의 별과 한 줄. 사진과 같은 자리에 섭니다. */
   said: {
     gap: 2,
     paddingTop: Spacing.xs,
+    paddingBottom: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
   },
   order: {
     width: 22,

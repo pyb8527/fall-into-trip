@@ -2886,31 +2886,6 @@ function PlaceRow({
                 <p>둘러보기 상세와 같은 모양입니다. 내 여행에서 보는 것과 남의
                 글에서 보는 것이 같은 것이라 다르게 그릴 이유가 없습니다.
               */}
-              {/*
-                사진은 늘 크게.
-
-                <p>한동안 고른 줄에서만 펼쳤습니다. 목록이 길어지는 것을 걱정해서
-                였는데, 44픽셀 네모로는 무엇이 찍혔는지 알 수가 없어서 <b>사진이
-                있으나 없으나 같았습니다.</b> 그럴 바에는 안 넣는 것과 다르지
-                않습니다.
-
-                <p>다녀온 뒤에 이 화면을 여는 까닭이 그 사진입니다. 짤 때는
-                애초에 남긴 것이 없으니 길어질 일도 없습니다 — 길어지는 것은
-                다녀온 뒤뿐이고, 그때는 그것을 보러 옵니다.
-              */}
-              {(trace ?? []).map((one, at) => (
-                <View key={at} style={styles.traceOpen}>
-                  <Row gap={Spacing.xs}>
-                    {/* 내 것에는 이름을 안 답니다 — 내가 쓴 것을 나에게 이름
-                        붙여 보여 줄 이유가 없습니다. */}
-                    {one.mine ? null : <Caption tone="secondary">{one.authorName}</Caption>}
-                    {one.stars ? <Caption tone="brand">{'★'.repeat(one.stars)}</Caption> : null}
-                  </Row>
-                  <PhotoStrip ids={one.photoIds} height={220} />
-                  {one.note ? <Body small>{one.note}</Body> : null}
-                </View>
-              ))}
-
               {info ? <PlaceHours info={info} at={place.time} /> : null}
               {/* 실수로 두 번 넣었을 수도, 일부러 또 가려는 것일 수도 있습니다.
                   어느 쪽인지는 넣은 사람만 아니까 지우지 않고 알려만 줍니다. */}
@@ -2971,6 +2946,36 @@ function PlaceRow({
           />
         ) : null}
         </Row>
+
+        {/*
+          다녀와서 남긴 것.
+
+          <h3>왜 이름 옆이 아니라 여기인가</h3>
+
+          <p>이름·메모와 같은 칸에 두었었습니다. 그 칸은 왼쪽으로는 누르는
+          자리의 여백을, 오른쪽으로는 손잡이 한 칸을 빼고 남은 폭이라, 사진이
+          제 폭의 삼분의 이밖에 못 썼습니다. <b>가로로 긴 사진이 세로로 긴
+          자리에</b> 들어가 있었습니다.
+
+          <p>손잡이 열 바깥으로 내리면 카드 폭을 다 씁니다. 덤으로 사진이
+          누르는 자리 밖으로 나와서, 눌렀을 때 줄이 골라지는 대신 사진이
+          크게 열립니다 — 옆으로 넘기는 손짓도 줄을 고르는 것과 안 다툽니다.
+
+          <p>짤 때는 애초에 남긴 것이 없으니 아무것도 안 붙습니다. 길어지는
+          것은 다녀온 뒤뿐이고, 그때는 그것을 보러 옵니다.
+        */}
+        {(trace ?? []).map((one, at) => (
+          <View key={at} style={styles.traceOpen}>
+            <Row gap={Spacing.xs}>
+              {/* 내 것에는 이름을 안 답니다 — 내가 쓴 것을 나에게 이름
+                  붙여 보여 줄 이유가 없습니다. */}
+              {one.mine ? null : <Caption tone="secondary">{one.authorName}</Caption>}
+              {one.stars ? <Caption tone="brand">{'★'.repeat(one.stars)}</Caption> : null}
+            </Row>
+            <PhotoStrip ids={one.photoIds} height={220} />
+            {one.note ? <Body small>{one.note}</Body> : null}
+          </View>
+        ))}
 
         {/*
           손대는 단추는 고른 줄에서만 펼칩니다.
@@ -4294,10 +4299,19 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: Spacing.xs,
   },
-  /* 다녀와서 남긴 것. 사진이 제 폭을 다 씁니다. */
+  /*
+    다녀와서 남긴 것.
+
+    <p>카드의 자식이라 좌우 여백을 스스로 챙깁니다. 누르는 자리(placeTap)
+    안에 있을 때는 그쪽 여백을 얻어 썼습니다.
+
+    <p>여백을 이름 쪽보다 좁게 둡니다 — 글은 가장자리에 바짝 붙으면 읽기
+    불편하지만 사진은 넓을수록 잘 보입니다.
+  */
   traceOpen: {
     gap: Spacing.xs,
-    paddingTop: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
+    paddingBottom: Spacing.sm,
   },
   /*
     고른 줄의 단추들.
