@@ -1,5 +1,7 @@
+import { File, Paths } from 'expo-file-system';
 import * as Location from 'expo-location';
 import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 import { Share } from 'react-native';
 
 import { googleIdToken } from '@/shell/sign-in';
@@ -74,6 +76,37 @@ export async function answer(ask: Ask): Promise<unknown> {
     case 'letMeLocate': {
       const { status } = await Location.requestForegroundPermissionsAsync();
       return status === 'granted';
+    }
+
+    /*
+      파일 내려받기.
+
+      <p>웹뷰는 내려받기를 제가 처리하지 않고 그냥 무시합니다. 그래서 웹이
+      만든 파일을 받아 우리가 기기에 넘깁니다.
+
+      <p>폰에는 "내려받기 폴더" 라는 것이 앱마다 있는 것이 아닙니다. 파일을
+      우리 자리에 써 두고 <b>공유 판</b>을 엽니다 — 거기서 드라이브에 올리든
+      메일로 보내든 파일 앱에 넣든 받는 사람이 정합니다. 어디에 저장할지를
+      우리가 정해 버리면 그 다음에 그것을 찾는 일이 남습니다.
+    */
+    case 'saveFile': {
+      /* 캐시에 둡니다. 공유가 끝나면 쓸 일이 없는 것이고, 안 지워도 폰이
+         자리가 모자랄 때 알아서 치웁니다. */
+      const file = new File(Paths.cache, ask.name);
+      /* 같은 여행을 같은 날 두 번 받으면 이름이 겹칩니다. 덮어씁니다 —
+         둘 다 같은 내용입니다. */
+      file.create({ overwrite: true });
+      file.write(ask.base64, { encoding: 'base64' });
+
+      if (!(await Sharing.isAvailableAsync())) {
+        throw new Error('이 기기에서는 파일을 넘길 수 없습니다');
+      }
+      await Sharing.shareAsync(file.uri, {
+        mimeType: ask.mime,
+        /* iOS 는 MIME 이 아니라 제 이름표로 무엇인지 가립니다. */
+        UTI: 'com.microsoft.excel.xlsx',
+      });
+      return null;
     }
   }
 }

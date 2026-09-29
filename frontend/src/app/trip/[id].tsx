@@ -673,6 +673,36 @@ export default function TripScreen() {
   const lastGaps = useRef<Map<string, string> | null>(null);
   const [changedGaps, setChangedGaps] = useState<Set<string>>(() => new Set());
 
+  /*
+    엑셀로 빼 가기.
+
+    <p>일정과 가계부를 함께 담습니다. 빼 가는 까닭의 절반이 정산이라
+    일정만으로는 반쪽입니다. 지출은 이 화면이 이미 받아 두고 있어서
+    따로 부르지 않습니다.
+
+    <p>굽는 라이브러리만 누를 때 받습니다. 그것 하나가 이 앱에서 제일
+    무거운 짐이라, 엑셀을 한 번도 안 받는 사람까지 늘 지고 다닐 이유가
+    없습니다.
+  */
+  const [booking, setBooking] = useState(false);
+
+  const takeBook = useCallback(async () => {
+    if (!data || booking) {
+      return;
+    }
+    setBooking(true);
+    try {
+      const { downloadTripBook } = await import('@/lib/book.web');
+      /* 지출은 이 화면이 이미 받아 두었습니다. 못 받았으면 일정만 내보냅니다 —
+         가계부 하나 때문에 일정까지 못 받는 것이 더 나쁩니다. */
+      await downloadTripBook(data, spending?.expenses ?? null);
+    } catch {
+      setActionError('엑셀로 만들지 못했습니다. 잠시 뒤 다시 눌러 보세요.');
+    } finally {
+      setBooking(false);
+    }
+  }, [data, booking, spending]);
+
   useEffect(() => {
     if (!gaps) {
       return;
@@ -1508,6 +1538,23 @@ export default function TripScreen() {
             onPress={() => printItinerary(data)}
           />
         ) : null}
+
+        {/*
+          엑셀로 빼 가기.
+
+          <p>인쇄와 나란히 두지만 쓰임이 다릅니다. 종이는 <b>읽는 것</b>이고
+          이쪽은 <b>고치려는 것</b>입니다 — 정산을 다시 셈해 보거나, 회사에
+          낼 양식에 옮겨 붙이거나, 다음 여행의 밑그림으로 씁니다.
+
+          <p>굽는 라이브러리는 누를 때 받습니다. 그래서 처음 한 번은 잠깐
+          걸리는데, 그동안 단추가 도는 것을 보여 줍니다.
+        */}
+        <Button
+          label="엑셀로 받기"
+          variant="secondary"
+          busy={booking}
+          onPress={takeBook}
+        />
 
         {/* 되돌릴 수 없는 일이라 맨 아래, 손이 잘 닿지 않는 자리에 둡니다. */}
         {mine ? (
