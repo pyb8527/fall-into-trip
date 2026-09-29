@@ -257,6 +257,14 @@ export default function Home() {
               계정 설정은 늘 같은 자리에 둡니다. 메뉴 사이에 끼워 두면
               쓸 일이 드문 것이 자주 쓰는 것들과 자리를 다툽니다. */}
           <Row gap={0}>
+            {/* 찾기가 화면마다 흩어져 있었습니다 — 장소는 여행 안에서,
+                남의 일정은 둘러보기에서. 여행을 짜기 전에 하는 일이라
+                홈에서 바로 닿아야 합니다. */}
+            <IconButton
+              name="search"
+              label="찾기"
+              onPress={() => router.push('/(app)/search')}
+            />
             <IconButton
               name="bell"
               label={news?.unseen ? `소식 ${news.unseen}건` : '소식'}
