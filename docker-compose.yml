@@ -98,8 +98,18 @@ services:
     # 컨테이너 안의 폴더에 두면 up -d --build 할 때마다 통째로 사라집니다.
     # DB 와 달리 이쪽은 없어져도 서버가 멀쩡히 뜨기 때문에, 없어진 줄도
     # 모르고 지나갑니다 — 글에 붙은 사진만 하나씩 깨집니다.
+    #
+    # 자리를 직접 고르고 싶으면 .env 에 PHOTOS_DIR_HOST 를 넣습니다.
+    #
+    #   안 넣으면   도커가 잡는 자리 (/var/lib/docker/volumes/…_fit-photos/_data)
+    #   넣으면      그 폴더. 큰 디스크에 두거나 백업이 보는 자리에 둘 때
+    #
+    #   PHOTOS_DIR_HOST=/srv/fit/photos
+    #
+    # 컨테이너 <b>안</b>의 자리(:/var/lib/fit/photos)는 안 바꿉니다 — 서버가
+    # 그 자리를 보도록 위 PHOTOS_DIR 에 적혀 있습니다.
     volumes:
-      - fit-photos:/var/lib/fit/photos
+      - ${PHOTOS_DIR_HOST:-fit-photos}:/var/lib/fit/photos
     # 포트를 밖으로 열지 않습니다. web 이 대신 받습니다.
     expose:
       - "8080"
