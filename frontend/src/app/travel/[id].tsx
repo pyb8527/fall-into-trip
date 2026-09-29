@@ -123,8 +123,10 @@ export default function Travel() {
   );
   const infoOf = useMemo(() => new Map((info ?? []).map((i) => [i.id, i])), [info]);
   /* 장소 번호 → 그 자리에서 남긴 것. 남긴 것이 있는 곳만 옵니다. */
+  /* 고치는 판에는 내 것만 넣습니다 — 남이 남긴 것을 내가 고칠 수는
+     없습니다. 보는 것은 여행 상세와 요약이 맡습니다. */
   const markOf = useMemo(
-    () => new Map((data?.marks ?? []).map((m) => [m.placeId, m])),
+    () => new Map((data?.marks ?? []).filter((m) => m.mine).map((m) => [m.placeId, m])),
     [data],
   );
 

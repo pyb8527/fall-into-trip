@@ -29,6 +29,9 @@ public class VisitController {
     public Map<String, Object> mark(@CurrentUser AuthPrincipal me,
                                     @PathVariable String placeId,
                                     @RequestBody(required = false) MarkRequest req) {
+        /* 도장이 먼저입니다. 남기는 것은 찍은 자리에 붙는 일이라, 아직 안
+           찍혔으면 찍고 나서 붙입니다. */
+        visits.stamp(me, placeId);
         Visit got = visits.mark(me, placeId, req == null ? null
                 : new VisitService.Mark(req.photoId(), req.stars(), req.note()));
         Map<String, Object> out = new java.util.HashMap<>();
@@ -49,8 +52,18 @@ public class VisitController {
     public record MarkRequest(String photoId, Integer stars, String note) {
     }
 
+    /**
+     * 도장을 뺍니다.
+     *
+     * <p>같이 간 사람 누구나 뺄 수 있습니다. 찍은 사람만 뺄 수 있게 두면 그
+     * 사람이 앱을 안 열면 영영 찍힌 채로 남습니다.
+     *
+     * <p>내가 남긴 것도 함께 갑니다 — 도장이 없는데 그 자리의 감상만 남아
+     * 있으면 어디에도 안 붙습니다. 남이 남긴 것은 그대로 둡니다.
+     */
     @DeleteMapping("/{placeId}")
     public Map<String, Object> unmark(@CurrentUser AuthPrincipal me, @PathVariable String placeId) {
+        visits.unstamp(me, placeId);
         visits.unmark(me, placeId);
         return Map.of("ok", true, "visited", false);
     }

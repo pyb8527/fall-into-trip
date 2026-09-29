@@ -10,31 +10,20 @@ import java.util.List;
 
 public interface VisitRepository extends JpaRepository<Visit, VisitId> {
 
-    /** 내가 다녀온 곳만. 방문 체크는 사람마다 따로입니다. */
-    @Query("""
-           SELECT v.id.placeId FROM Visit v
-           WHERE v.id.userId = :userId
-             AND v.id.placeId IN (
-                 SELECT p.id FROM Place p
-                 WHERE p.dayId IN (SELECT d.id FROM Day d WHERE d.tripId = :tripId))
-           """)
-    List<String> findPlaceIdsOfTrip(@Param("userId") String userId, @Param("tripId") String tripId);
-
     /**
-     * 도장 줄 통째로.
+     * 이 여행에서 남긴 것 전부.
      *
-     * <p>사진·별점·한 줄이 붙으면서 "다녀왔다" 만으로는 모자라게 됐습니다.
-     * 번호만 세는 쪽(위)은 그대로 둡니다 — 여행 중 화면은 몇 군데 찍었는지만
-     * 보는 자리가 있고, 그때 사진까지 읽어 올 이유가 없습니다.
+     * <p><b>사람을 안 가립니다.</b> 같은 일정을 같이 다녔으니 서로 무엇을
+     * 남겼는지 볼 수 있어야 합니다 — 안 보이면 셋이 간 여행의 기록이 셋으로
+     * 흩어져 아무 데도 온전한 것이 없습니다.
      */
     @Query("""
            SELECT v FROM Visit v
-           WHERE v.id.userId = :userId
-             AND v.id.placeId IN (
+           WHERE v.id.placeId IN (
                  SELECT p.id FROM Place p
                  WHERE p.dayId IN (SELECT d.id FROM Day d WHERE d.tripId = :tripId))
            """)
-    List<Visit> findAllOfTrip(@Param("userId") String userId, @Param("tripId") String tripId);
+    List<Visit> findAllOfTrip(@Param("tripId") String tripId);
 
     /**
      * 이 사람이 찍은 도장 전부.

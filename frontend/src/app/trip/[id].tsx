@@ -486,10 +486,20 @@ export default function TripScreen() {
     <p>위 marks 와 이름이 비슷하지만 다른 것입니다. 저쪽은 "다녀왔는가" 고
     이쪽은 "무엇을 남겼는가" 입니다.
   */
-  const traceOf = useMemo(
-    () => new Map((data?.marks ?? []).map((m) => [m.placeId, m])),
-    [data],
-  );
+  const traceOf = useMemo(() => {
+    /* 한 장소에 같이 간 사람 수만큼 붙을 수 있습니다 — 도장은 하나지만
+       감상은 사람마다입니다. */
+    const by = new Map<string, PlaceMark[]>();
+    for (const m of data?.marks ?? []) {
+      const list = by.get(m.placeId);
+      list ? list.push(m) : by.set(m.placeId, [m]);
+    }
+    /* 내 것을 맨 앞에. 내가 남긴 것을 찾으려고 훑게 하지 않습니다. */
+    for (const list of by.values()) {
+      list.sort((a, b) => Number(b.mine) - Number(a.mine));
+    }
+    return by;
+  }, [data]);
 
   /* 매 렌더마다 새 배열이 되면 이것을 보는 useMemo·useEffect 가 전부 매번 다시
      돕니다. 서버를 부르는 것이 끼어 있으면 요청이 끝없이 나갑니다. */
@@ -2118,8 +2128,8 @@ function DayCard({
   twiceIn: Map<string, string[]>;
   /** 구글 번호별 최근 팁 수. 줄에서는 점으로만 알립니다. */
   tipCounts: Record<string, number>;
-  /** 장소 번호 → 다녀와서 남긴 것. 남긴 곳만 들어 있습니다. */
-  traceOf: Map<string, PlaceMark>;
+  /** 장소 번호 → 다녀와서 남긴 것들. 같이 간 사람 것까지 옵니다. */
+  traceOf: Map<string, PlaceMark[]>;
   /** 이 날 실제로 쓴 돈. 통화마다 하나씩. 아직 안 적었으면 비어 있습니다. */
   spent: Map<string, { sum: number; decimals: number }> | null;
   /** 장소마다 거기서 쓴 돈. 여행 전체 것이라 줄마다 꺼내 씁니다. */
@@ -2698,8 +2708,8 @@ function PlaceRow({
   onLook: (place: Place, mode: TravelMode | null) => void;
   /** 이 곳에 달린 한 줄의 개수. 판을 열기 전에는 점으로만 알립니다. */
   tipCount: number;
-  /** 다녀와서 남긴 것. 안 남겼으면 비어 있습니다. */
-  trace?: PlaceMark;
+  /** 다녀와서 남긴 것들. 안 남겼으면 비어 있습니다. */
+  trace?: PlaceMark[];
   /** 이 날의 마지막 줄인지. 세로선을 여기서 끊습니다. */
   last: boolean;
   /** 지금 이 줄을 끌고 있는지. 끌고 있는 동안에는 조금 들어 올립니다. */
@@ -2876,23 +2886,28 @@ function PlaceRow({
                 <p>둘러보기 상세와 같은 모양입니다. 내 여행에서 보는 것과 남의
                 글에서 보는 것이 같은 것이라 다르게 그릴 이유가 없습니다.
               */}
-              {trace && (trace.photoId || trace.stars || trace.note) ? (
-                <Row gap={Spacing.sm} style={styles.traceRow}>
-                  {trace.photoId ? (
-                    <OurPhoto id={trace.photoId} height={56} width={56} />
-                  ) : null}
+              {(trace ?? []).map((one, at) => (
+                <Row key={at} gap={Spacing.sm} style={styles.traceRow}>
+                  {one.photoId ? <OurPhoto id={one.photoId} height={56} width={56} /> : null}
                   <View style={styles.placeText}>
-                    {trace.stars ? (
-                      <Caption tone="brand">{'★'.repeat(trace.stars)}</Caption>
-                    ) : null}
-                    {trace.note ? (
+                    <Row gap={Spacing.xs}>
+                      {/* 내 것에는 이름을 안 답니다 — 내가 쓴 것을 나에게
+                          이름 붙여 보여 줄 이유가 없습니다. */}
+                      {one.mine ? null : (
+                        <Caption tone="secondary">{one.authorName}</Caption>
+                      )}
+                      {one.stars ? (
+                        <Caption tone="brand">{'★'.repeat(one.stars)}</Caption>
+                      ) : null}
+                    </Row>
+                    {one.note ? (
                       <Body small numberOfLines={2}>
-                        {trace.note}
+                        {one.note}
                       </Body>
                     ) : null}
                   </View>
                 </Row>
-              ) : null}
+              ))}
 
               {info ? <PlaceHours info={info} at={place.time} /> : null}
               {/* 실수로 두 번 넣었을 수도, 일부러 또 가려는 것일 수도 있습니다.

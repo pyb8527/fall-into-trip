@@ -170,19 +170,27 @@ export default function Card() {
  * 어떻게 흘렀나" 를 다시 밟는 일이고, 그것은 날짜 순입니다.
  */
 function Album({ trip }: { trip: TripDetail }) {
-  const traceOf = useMemo(
-    () => new Map((trip.marks ?? []).map((m) => [m.placeId, m])),
-    [trip],
-  );
+  /* 한 장소에 같이 간 사람 수만큼 붙을 수 있습니다. */
+  const traceOf = useMemo(() => {
+    const by = new Map<string, PlaceMark[]>();
+    for (const m of trip.marks ?? []) {
+      const list = by.get(m.placeId);
+      list ? list.push(m) : by.set(m.placeId, [m]);
+    }
+    for (const list of by.values()) {
+      list.sort((a, b) => Number(b.mine) - Number(a.mine));
+    }
+    return by;
+  }, [trip]);
 
   /* 남긴 것이 있는 곳만, 날짜 차례로. */
   const rows = useMemo(() => {
-    const out: { day: string; place: { id: string; name: string }; mark: PlaceMark }[] = [];
+    const out: { day: string; place: { id: string; name: string }; marks: PlaceMark[] }[] = [];
     for (const day of trip.days) {
       for (const place of day.places) {
-        const mark = traceOf.get(place.id);
-        if (mark) {
-          out.push({ day: day.date || day.label, place, mark });
+        const marks = traceOf.get(place.id);
+        if (marks) {
+          out.push({ day: day.date || day.label, place, marks });
         }
       }
     }
@@ -197,15 +205,23 @@ function Album({ trip }: { trip: TripDetail }) {
 
   return (
     <View style={styles.album}>
-      {rows.map(({ day, place, mark }, i) => (
+      {rows.map(({ day, place, marks }, i) => (
         <Panel key={place.id}>
           {/* 날짜는 바뀔 때만 적습니다. 줄마다 붙이면 같은 날이 몇 번씩
               되풀이되어, 정작 언제 바뀌는지가 안 보입니다. */}
           {i === 0 || rows[i - 1].day !== day ? <Caption tone="secondary">{day}</Caption> : null}
           <Subtitle>{place.name}</Subtitle>
-          {mark.stars ? <Caption tone="brand">{'★'.repeat(mark.stars)}</Caption> : null}
-          {mark.photoId ? <OurPhoto id={mark.photoId} height={220} /> : null}
-          {mark.note ? <Body>{mark.note}</Body> : null}
+
+          {marks.map((mark, at) => (
+            <View key={at} style={styles.albumOne}>
+              <Row gap={Spacing.xs}>
+                {mark.mine ? null : <Caption tone="secondary">{mark.authorName}</Caption>}
+                {mark.stars ? <Caption tone="brand">{'★'.repeat(mark.stars)}</Caption> : null}
+              </Row>
+              {mark.photoId ? <OurPhoto id={mark.photoId} height={220} /> : null}
+              {mark.note ? <Body>{mark.note}</Body> : null}
+            </View>
+          ))}
         </Panel>
       ))}
     </View>
@@ -595,6 +611,10 @@ const styles = StyleSheet.create({
   /* 남긴 것들. 판 사이를 넉넉히 띄웁니다 — 한 장 한 장이 다른 순간입니다. */
   album: {
     gap: Spacing.md,
+  },
+  /* 한 장소에 여럿이 남겼을 때, 사람 사이를 띄웁니다. */
+  albumOne: {
+    gap: Spacing.xs,
   },
   paper: {
     backgroundColor: Colors.surface,

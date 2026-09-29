@@ -27,6 +27,8 @@ public class TripController {
     private final TripQueryService query;
     private final ObjectMapper mapper;
     private final RecommendService recommend;
+    /* 남긴 것에 누가 남겼는지를 붙이려고 이름만 읽습니다. */
+    private final net.weeniebeenie.fit.account.domain.UserRepository users;
 
     /** 내가 볼 수 있는 여행 목록. */
     @GetMapping("/trips")
@@ -161,6 +163,14 @@ public class TripController {
           <p>아무것도 안 남긴 도장은 빼고 보냅니다 — 대개 그냥 찍고 지나가므로,
           다 실으면 장소 수만큼 빈 줄이 오갑니다.
         */
+        /*
+          누가 남겼는지도 함께 보냅니다.
+
+          <p>같이 간 사람 것까지 오므로, 이름이 없으면 한 장소에 두 사람의
+          감상이 붙었을 때 누구 말인지 알 수 없습니다. 사진은 여행의 것이
+          아니라 그 사람의 것입니다.
+        */
+        Map<String, String> who = new java.util.HashMap<>();
         List<Map<String, Object>> marks = d.marks().stream()
                 .filter(v -> v.getPhotoId() != null || v.getStars() != null || v.getNote() != null)
                 .map(v -> {
@@ -169,6 +179,9 @@ public class TripController {
                     one.put("photoId", v.getPhotoId());
                     one.put("stars", v.getStars());
                     one.put("note", v.getNote());
+                    one.put("mine", v.getId().getUserId().equals(me.id()));
+                    one.put("authorName", who.computeIfAbsent(v.getId().getUserId(),
+                            id -> users.findById(id).map(u -> u.getName()).orElse("알 수 없음")));
                     return one;
                 })
                 .toList();

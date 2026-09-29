@@ -39,8 +39,10 @@ public class TripQueryService {
                 trip,
                 dayList,
                 byDay,
-                visits.visitedPlaceIds(me.id(), trip.getId()),
-                visits.marksOf(me.id(), trip.getId()),
+                /* 도장은 여행의 것이라 누가 보든 같습니다. 남긴 것도 같이 간
+                   사람 것까지 옵니다 — 누가 남겼는지는 줄에 붙어 옵니다. */
+                visits.visitedPlaceIds(trip.getId()),
+                visits.marksOf(trip.getId()),
                 access.roleOf(trip.getId(), me.id()));
     }
 

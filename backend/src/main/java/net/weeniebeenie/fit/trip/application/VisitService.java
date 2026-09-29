@@ -8,6 +8,7 @@ import net.weeniebeenie.fit.trip.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.List;
 
 /**
@@ -26,15 +27,32 @@ public class VisitService {
     private final DayRepository days;
     private final TripAccessPolicy access;
 
+    /**
+     * 이 여행에서 다녀온 곳.
+     *
+     * <p>누가 찍었는지는 안 봅니다 — 도장은 여행의 것입니다.
+     */
     @Transactional(readOnly = true)
-    public List<String> visitedPlaceIds(String userId, String tripId) {
-        return visits.findPlaceIdsOfTrip(userId, tripId);
+    public List<String> visitedPlaceIds(String tripId) {
+        return places.findAllOfTrip(tripId).stream()
+                .filter(p -> p.getVisitedAt() != null)
+                .map(Place::getId)
+                .toList();
     }
 
-    /** 도장에 남긴 것까지. 여행 상세가 장소마다 붙여 보여 줍니다. */
+    /**
+     * 그 자리에서 남긴 것들.
+     *
+     * <p><b>같이 간 사람 것까지</b> 옵니다. 같은 일정을 같이 다녔으니 서로
+     * 무엇을 남겼는지 볼 수 있어야 합니다 — 안 보이면 셋이 간 여행의 기록이
+     * 셋으로 흩어져 아무 데도 온전한 것이 없습니다.
+     *
+     * <p>누가 남겼는지는 함께 옵니다. 사진은 여행의 것이 아니라 그 사람의
+     * 것이라, 이름 없이 섞어 두면 누구의 감상인지 알 수 없습니다.
+     */
     @Transactional(readOnly = true)
-    public List<Visit> marksOf(String userId, String tripId) {
-        return visits.findAllOfTrip(userId, tripId);
+    public List<Visit> marksOf(String tripId) {
+        return visits.findAllOfTrip(tripId);
     }
 
     /**
@@ -44,6 +62,37 @@ public class VisitService {
      * 먼저 찍고 나중에 사진을 붙이는 것이 실제 순서입니다. 지우려면 빈
      * 문자열을 보냅니다(null 은 "그대로 두기" 입니다).
      */
+    /**
+     * 도장을 찍습니다.
+     *
+     * <p>이미 찍혀 있으면 그대로 둡니다 — 누가 먼저 찍었는지를 나중에 누른
+     * 사람이 덮어쓸 이유가 없습니다.
+     */
+    @Transactional
+    public void stamp(AuthPrincipal me, String placeId) {
+        Place place = requireReadable(me, placeId);
+        if (place.getVisitedAt() == null) {
+            place.setVisitedAt(Instant.now());
+            place.setVisitedBy(me.id());
+        }
+    }
+
+    /**
+     * 도장을 뺍니다.
+     *
+     * <p>같이 간 사람 누구나 뺄 수 있습니다. 잘못 찍은 것을 찍은 사람만 뺄 수
+     * 있게 두면, 그 사람이 앱을 안 열면 영영 찍힌 채로 남습니다.
+     *
+     * <p>남긴 것은 안 지웁니다 — 도장을 잘못 눌렀다고 사진까지 사라지면
+     * 되돌릴 수 없는 일이 됩니다.
+     */
+    @Transactional
+    public void unstamp(AuthPrincipal me, String placeId) {
+        Place place = requireReadable(me, placeId);
+        place.setVisitedAt(null);
+        place.setVisitedBy(null);
+    }
+
     @Transactional
     public Visit mark(AuthPrincipal me, String placeId, Mark mark) {
         requireReadable(me, placeId);
@@ -88,18 +137,20 @@ public class VisitService {
     public record Mark(String photoId, Integer stars, String note) {
     }
 
+    /** 내가 남긴 것을 지웁니다. 도장은 그대로입니다. */
     @Transactional
     public void unmark(AuthPrincipal me, String placeId) {
         requireReadable(me, placeId);
         visits.deleteById(new VisitId(me.id(), placeId));
     }
 
-    /** 볼 수 있는 여행의 장소여야 체크할 수 있습니다. */
-    private void requireReadable(AuthPrincipal me, String placeId) {
+    /** 볼 수 있는 여행의 장소여야 찍을 수 있습니다. */
+    private Place requireReadable(AuthPrincipal me, String placeId) {
         Place place = places.findById(placeId)
                 .orElseThrow(() -> ApiException.notFound("장소를 찾을 수 없어요."));
         Day day = days.findById(place.getDayId())
                 .orElseThrow(() -> ApiException.notFound("날짜를 찾을 수 없어요."));
         access.requireCanRead(day.getTripId(), me.id());
+        return place;
     }
 }
