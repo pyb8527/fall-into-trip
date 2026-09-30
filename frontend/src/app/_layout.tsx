@@ -97,8 +97,9 @@ export default function RootLayout() {
                 여기서 알 수 없으므로 화면이 받아 온 뒤에 스스로 답니다
                 (각 화면의 Stack.Screen). 여기 적는 것은 아직 못 받았을
                 때 잠깐 보일 이름입니다. */}
-            <Stack.Screen name="trip/[id]" options={stackHeader('일정')} />
-            <Stack.Screen name="travel/[id]" options={stackHeader('여행 중', { toTrip: true })} />
+            {/* 일정의 위층은 여행 목록입니다. 여기만 「내 여행」이 맞습니다. */}
+            <Stack.Screen name="trip/[id]" options={stackHeader('일정', { up: '/(app)/trips' })} />
+            <Stack.Screen name="travel/[id]" options={stackHeader('여행 피드', { toTrip: true })} />
             <Stack.Screen name="vote/[id]" options={stackHeader(WANT, { toTrip: true })} />
             <Stack.Screen name="card/[id]" options={stackHeader('여행 카드', { toTrip: true })} />
             <Stack.Screen name="money/[id]" options={stackHeader('가계부', { toTrip: true })} />

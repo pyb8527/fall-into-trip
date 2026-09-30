@@ -76,7 +76,17 @@ export function TabBar({ items, onBack }: { items: TabItem[]; onBack?: () => voi
         {items.map((item) => (
           <Press
             key={item.key}
-            onPress={item.onPress}
+            /*
+              지금 이 화면이면 아무 일도 안 합니다.
+
+              <p>칸마다 스스로 막게 두었더니 여행 쪽만 막고 바깥 갈래는
+              안 막혔습니다. 그래서 「홈」에서 홈을 다시 누르면 같은 화면이
+              한 겹 더 쌓이고, 뒤로가기가 한 번 헛돌았습니다 — 눌렀는데
+              아무 일도 안 일어나는 것으로 보입니다.
+
+              <p>여기서 한 번 막으면 칸을 더 만들어도 같이 지켜집니다.
+            */
+            onPress={item.active ? () => {} : item.onPress}
             accessibilityLabel={item.label}
             accessibilityState={{ selected: !!item.active }}
             scale={0.94}
@@ -114,6 +124,19 @@ export function AppTabs() {
   const router = useRouter();
   const here = usePathname();
 
+  /*
+    갈래를 옮기는 것은 쌓는 일이 아닙니다.
+
+    <p>push 로 쌓고 있었습니다. 그래서 홈 → 내 여행 → 보석함 → 둘러보기로
+    돌아다닌 뒤 뒤로가기를 누르면 지나온 갈래를 거꾸로 되밟아야 했고, 네 번을
+    눌러야 갈래 밖으로 나갔습니다. 여행 안의 갈래(TripTabs)는 처음부터
+    replace 였으니, 같은 몸짓이 <b>바깥과 속에서 다르게</b> 굴었습니다.
+
+    <p>안 쌓습니다. 한 번 누르면 갈래 밖으로 나가고, 폰 어플에서 아래 띠가
+    하는 일과 같아집니다.
+  */
+  const go = (path: string) => () => router.replace(path as never);
+
   return (
     <TabBar
       items={[
@@ -122,28 +145,28 @@ export function AppTabs() {
           label: '홈',
           icon: 'home',
           active: here === '/home' || here === '/',
-          onPress: () => router.push('/(app)/home'),
+          onPress: go('/(app)/home'),
         },
         {
           key: 'trips',
           label: '내 여행',
           icon: 'calendar',
           active: here.startsWith('/trips'),
-          onPress: () => router.push('/(app)/trips'),
+          onPress: go('/(app)/trips'),
         },
         {
           key: 'saved',
           label: '보석함',
           icon: 'bookmark',
           active: here.startsWith('/saved'),
-          onPress: () => router.push('/(app)/saved'),
+          onPress: go('/(app)/saved'),
         },
         {
           key: 'community',
           label: '둘러보기',
           icon: 'compass',
           active: here.startsWith('/community'),
-          onPress: () => router.push('/community'),
+          onPress: go('/community'),
         },
         {
           key: 'money',
@@ -153,7 +176,7 @@ export function AppTabs() {
           /* 여행 목록을 빌려 쓰고 있었습니다. 그래서 가계부를 눌렀는데
              주소가 /trips 가 되고, 띠는 그것을 보고 「내 여행」에 불을
              켰습니다. 가계부만의 목록을 둡니다. */
-          onPress: () => router.push('/(app)/money'),
+          onPress: go('/(app)/money'),
         },
       ]}
     />
@@ -199,15 +222,11 @@ export function TripTabs({
 }) {
   const router = useRouter();
 
-  const go = (path: string) => () => {
-    if (active === 'plan' && path === '/trip/[id]') {
-      return;
-    }
-    /* replace 입니다. 갈래끼리 오가는 것은 <b>같은 층에서 자리를 옮기는
-       일</b>이라, push 로 쌓으면 뒤로가기를 다섯 번 눌러야 여행 밖으로
-       나갑니다. */
+  /* replace 입니다. 갈래끼리 오가는 것은 <b>같은 층에서 자리를 옮기는
+     일</b>이라, push 로 쌓으면 뒤로가기를 다섯 번 눌러야 여행 밖으로
+     나갑니다. 지금 화면을 다시 누르는 것은 띠가 막습니다(TabBar). */
+  const go = (path: string) => () =>
     router.replace({ pathname: path as never, params: { id: tripId } as never });
-  };
 
   return (
     <TabBar
@@ -218,36 +237,36 @@ export function TripTabs({
           label: '일정',
           icon: 'calendar',
           active: active === 'plan',
-          onPress: active === 'plan' ? () => {} : go('/trip/[id]'),
+          onPress: go('/trip/[id]'),
         },
         {
           key: 'travel',
-          label: '여행 중',
+          label: '여행 피드',
           icon: 'flag',
           active: active === 'travel',
           dot: onTrip && active !== 'travel',
-          onPress: active === 'travel' ? () => {} : go('/travel/[id]'),
+          onPress: go('/travel/[id]'),
         },
         {
           key: 'vote',
           label: WANT,
           icon: 'thumbs-up',
           active: active === 'vote',
-          onPress: active === 'vote' ? () => {} : go('/vote/[id]'),
+          onPress: go('/vote/[id]'),
         },
         {
           key: 'money',
           label: '가계부',
           icon: 'credit-card',
           active: active === 'money',
-          onPress: active === 'money' ? () => {} : go('/money/[id]'),
+          onPress: go('/money/[id]'),
         },
         {
           key: 'card',
           label: '요약',
           icon: 'book-open',
           active: active === 'card',
-          onPress: active === 'card' ? () => {} : go('/card/[id]'),
+          onPress: go('/card/[id]'),
         },
       ]}
     />

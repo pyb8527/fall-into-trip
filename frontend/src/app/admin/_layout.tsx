@@ -41,10 +41,10 @@ export default function AdminLayout() {
 
   return (
     <Stack>
-      <Stack.Screen name="index" options={stackHeader('운영')} />
-      <Stack.Screen name="users" options={stackHeader('계정 관리')} />
-      <Stack.Screen name="audit" options={stackHeader('감사 로그')} />
-      <Stack.Screen name="posts" options={stackHeader('신고된 것')} />
+      <Stack.Screen name="index" options={stackHeader('운영', { up: '/(app)/settings' })} />
+      <Stack.Screen name="users" options={stackHeader('계정 관리', { up: '/admin' })} />
+      <Stack.Screen name="audit" options={stackHeader('감사 로그', { up: '/admin' })} />
+      <Stack.Screen name="posts" options={stackHeader('신고된 것', { up: '/admin' })} />
     </Stack>
   );
 }

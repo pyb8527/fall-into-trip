@@ -41,13 +41,16 @@ export default function AppLayout() {
     <Stack>
       {/* 첫 화면은 제목 대신 로고를 본문 안에 두므로 막대를 감춥니다. */}
       <Stack.Screen name="home" options={{ headerShown: false }} />
-      <Stack.Screen name="trips" options={stackHeader('내 여행')} />
-      <Stack.Screen name="saved" options={stackHeader('보석함')} />
+      {/* 갈래에서 바로 열리는 화면들입니다. 위층은 홈입니다 — 여기서
+          뒤로를 눌러 「내 여행」이 뜨면, 보석함을 보다가 엉뚱한 데로
+          옮겨진 셈이 됩니다. */}
+      <Stack.Screen name="trips" options={stackHeader('내 여행', { up: '/(app)/home' })} />
+      <Stack.Screen name="saved" options={stackHeader('보석함', { up: '/(app)/home' })} />
       {/* 제목을 화면 안에 두므로 막대를 감춥니다 — 홈과 같은 방식입니다. */}
       <Stack.Screen name="money" options={{ headerShown: false }} />
-      <Stack.Screen name="popular" options={stackHeader('여럿이 간 곳')} />
-      <Stack.Screen name="news" options={stackHeader('소식')} />
-      <Stack.Screen name="settings" options={stackHeader('내 계정')} />
+      <Stack.Screen name="popular" options={stackHeader('여럿이 간 곳', { up: '/(app)/home' })} />
+      <Stack.Screen name="news" options={stackHeader('소식', { up: '/(app)/home' })} />
+      <Stack.Screen name="settings" options={stackHeader('내 계정', { up: '/(app)/home' })} />
     </Stack>
   );
 }

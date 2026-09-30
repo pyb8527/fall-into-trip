@@ -20,8 +20,16 @@ import { IconButton, Row } from '@/ui';
  * <h3>돌아갈 데가 없을 때</h3>
  *
  * <p>주소를 새로고침하거나 링크로 곧장 들어오면 밑에 쌓인 것이 없어 화살표가
- * 아무 데도 데려가지 못합니다. 그때는 이 화면이 속한 자리로 돌려보냅니다 —
- * 여행에 딸린 화면이면 그 일정으로, 아니면 처음으로.
+ * 아무 데도 데려가지 못합니다. 그때는 이 화면이 속한 자리로 돌려보냅니다.
+ *
+ * <p>그 자리를 <b>한 군데로 못박아 두고 있었습니다</b> — 「내 여행」이었습니다.
+ * 그래서 여행기를 읽다가 뒤로를 누르면 둘러보기가 아니라 내 여행 목록이
+ * 떴고, 보석함에서도 운영 화면에서도 마찬가지였습니다. 어디에 있었든 한
+ * 군데로 튀니까 <b>처음으로 밀려난 것처럼</b> 느껴집니다.
+ *
+ * <p>화면마다 위층을 적어 줍니다(stackHeader 의 up). 여행에 딸린 화면이면
+ * 그 여행의 일정, 여행기면 둘러보기, 운영 화면이면 운영 첫 장입니다. 안
+ * 적으면 처음(홈)입니다.
  *
  * <h3>"처음" 은 사람마다 다릅니다</h3>
  *
@@ -37,10 +45,18 @@ export function NavLeft({
   route,
   /** 돌아갈 데가 없을 때 이 화면이 딸린 여행의 일정으로 보낼지. */
   toTrip = false,
+  /**
+   * 돌아갈 데가 없을 때 갈 위층.
+   *
+   * <p>안 주면 처음(홈)입니다. toTrip 이 있으면 그쪽이 먼저입니다 — 여행에
+   * 딸린 화면의 위층은 늘 그 여행입니다.
+   */
+  up,
 }: {
   navigation: { canGoBack: () => boolean; goBack: () => void };
   route?: { params?: object };
   toTrip?: boolean;
+  up?: string;
 }) {
   const router = useRouter();
   const { user } = useAuth();
@@ -59,8 +75,13 @@ export function NavLeft({
       router.replace({ pathname: '/trip/[id]', params: { id: tripId } });
       return;
     }
-    /* 계정이 없는 사람을 내 여행으로 보내면 로그인 화면이 뜹니다. */
-    router.replace(user ? '/(app)/trips' : '/(auth)/welcome');
+    /* 계정이 없는 사람을 로그인 뒤에만 열리는 곳으로 보내면 로그인 화면이
+       뜹니다. 그럴 때는 문으로 보냅니다 — 둘러보기는 계정 없이도 열립니다. */
+    if (up && (user || up === '/community')) {
+      router.replace(up as never);
+      return;
+    }
+    router.replace(user ? '/(app)/home' : '/(auth)/welcome');
   }
 
   return (
@@ -121,7 +142,15 @@ const pathStyles = StyleSheet.create({
  * <p>화살표를 직접 그립니다. 네비게이션이 만들어 주는 것을 쓰면 그 옆에
  * 무언가를 나란히 둘 수가 없습니다.
  */
-export function stackHeader(title: string, opts?: { toTrip?: boolean; parent?: string }) {
+export function stackHeader(
+  title: string,
+  opts?: {
+    toTrip?: boolean;
+    parent?: string;
+    /** 돌아갈 데가 없을 때 갈 위층. 안 주면 처음(홈)입니다. */
+    up?: string;
+  },
+) {
   return ({
     navigation,
     route,
@@ -134,6 +163,8 @@ export function stackHeader(title: string, opts?: { toTrip?: boolean; parent?: s
     headerTitle: opts?.parent
       ? () => <PathTitle parent={opts.parent as string} title={title} />
       : undefined,
-    headerLeft: () => <NavLeft navigation={navigation} route={route} toTrip={opts?.toTrip} />,
+    headerLeft: () => (
+      <NavLeft navigation={navigation} route={route} toTrip={opts?.toTrip} up={opts?.up} />
+    ),
   });
 }
