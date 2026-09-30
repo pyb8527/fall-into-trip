@@ -16,7 +16,6 @@ import {
   useComments,
 } from '@/components/comment-list';
 import type { MapPlace } from '@/components/map-types';
-import { OurPhoto } from '@/components/our-photo';
 import { PhotoStrip } from '@/components/photo-strip';
 import { PlaceDetailSheet } from '@/components/place-detail-sheet';
 import { PostFields, type PostShape } from '@/components/post-fields';
@@ -496,7 +495,9 @@ export default function Post() {
         }>
         {/* 표지. 제목 바로 아래입니다 — 글을 열었을 때 가장 먼저 보이는
             것이 그 여행이 어땠는지여야 합니다. */}
-        {data.coverPhotoId ? <OurPhoto id={data.coverPhotoId} height={200} /> : null}
+        {data.coverPhotoId ? (
+          <PhotoStrip ids={[data.coverPhotoId]} height={200} />
+        ) : null}
 
         {data.summary ? <Body tone="secondary">{data.summary}</Body> : null}
 
