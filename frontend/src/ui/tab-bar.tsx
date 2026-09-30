@@ -2,7 +2,16 @@ import { usePathname, useRouter } from 'expo-router';
 import { Platform, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Colors, Radius, Spacing, TabDock, Tap, Type, Weight } from '@/constants/theme';
+import {
+  Colors,
+  Elevation,
+  Radius,
+  Spacing,
+  TabDock,
+  Tap,
+  Type,
+  Weight,
+} from '@/constants/theme';
 import { Icon, type IconName, Press } from '@/ui';
 import { WANT } from '@/constants/words';
 
@@ -67,6 +76,8 @@ export function TabBar({ items, onBack }: { items: TabItem[]; onBack?: () => voi
         },
       ]}>
       {onBack ? (
+        /* 띠와 같은 재질입니다. 하나만 꽉 막힌 흰 동그라미면 둘이 다른
+           층에 있는 것처럼 보입니다. */
         <Press onPress={onBack} accessibilityLabel="나가기" style={styles.back}>
           <Icon name="chevron-left" size={26} />
         </Press>
@@ -277,17 +288,26 @@ const styles = StyleSheet.create({
   /*
     띠가 앉는 자리.
 
-    <h3>뒤로 지도가 비쳤습니다</h3>
+    <h3>바탕색을 깔았다가 걷었습니다</h3>
 
-    <p>일정 화면은 지도가 바탕이라, 떠 있는 띠 뒤로 <b>지도가 그대로
-    보였습니다.</b> 흰 판 위에서는 떠 있는 것으로 읽히던 모양이 지도 위에서는
-    지도에 얹힌 조각으로 보입니다.
+    <p>일정 화면은 지도가 바탕이라 떠 있는 띠 뒤로 지도가 그대로 보였습니다.
+    지도에 얹힌 조각처럼 보여서, 띠가 앉는 자리에 회색 바탕을 깔았습니다.
 
-    <p>띠가 앉는 자리에 바탕색을 깝니다. 화면 아래 한 자락이 지도가 아니라
-    <b>앱의 바닥</b>이라는 것이 보여야, 띠가 그 위에 놓인 것으로 읽힙니다.
+    <p>그런데 그것은 <b>화면 아래 한 자락을 통째로 회색으로 막는</b> 일이라,
+    어느 화면에서든 내용이 그 선에서 끊겼습니다. 띄운 알약 하나를 살리려고
+    82픽셀을 버린 셈입니다.
+
+    <p>자리는 그대로 두고 색만 걷습니다. 위에 있던 내용이 띠 뒤로 그대로
+    이어지고, 띠는 그 위에 떠 있습니다. 지도 위에서도 떨어져 보이게 하는 일은
+    바탕색이 아니라 <b>알약 스스로</b>가 맡습니다 — 반투명한 흰 판, 머리카락
+    한 올 테두리, 그리고 그림자.
+
+    <p>자리를 없애지는 않습니다. 높이가 0 이 되면 판(DragSheet)이 믿고 있는
+    TabDock 과 어긋나고, 굴러가는 화면의 마지막 줄이 띠 뒤로 들어가 아무리
+    굴려도 안 보입니다.
   */
   dock: {
-    backgroundColor: Colors.background,
+    backgroundColor: 'transparent',
     /*
       웹에서는 fixed 입니다.
 
@@ -318,6 +338,22 @@ const styles = StyleSheet.create({
     <p>화면 끝까지 붙인 네모가 아니라 둥근 알약으로 띄웁니다. 이 앱은
     회색 바닥에 흰 판을 얹어 층을 만드는데, 아래를 흰 띠로 꽉 채우면
     바닥과 띠가 한 덩어리가 되어 층이 무너집니다.
+
+    <h3>비쳐 보입니다</h3>
+
+    <p>아래에 회색 바탕을 깔지 않으므로, 떠 있다는 것을 알약이 혼자
+    말해야 합니다. 셋이 함께 그 일을 합니다.
+
+    <p>첫째, 속이 조금 비칩니다. 꽉 막힌 흰 판은 <b>그 자리에 원래 있던
+    것</b>처럼 보이고, 아주 투명하면 글자가 뒤엣것과 겹쳐 안 읽힙니다.
+    0.86은 뒤가 비치는 것이 보이면서 글자는 또렷한 자리입니다.
+
+    <p>둘째, 웹에서는 뒤엣것을 흐립니다(backdropFilter). 흐리지 않으면
+    지도의 글씨와 띠의 글씨가 나란히 읽혀 어느 쪽이 위인지 헷갈립니다.
+    앱에는 이 성질이 없지만, 폰에서 보는 것도 결국 웹입니다(껍데기).
+
+    <p>셋째, 그림자. 이 앱에서 그림자를 쓰는 몇 안 되는 자리인데, 바탕색을
+    걷은 지금은 그림자가 유일하게 「위에 있다」를 말합니다.
   */
   bar: {
     flex: 1,
@@ -326,7 +362,12 @@ const styles = StyleSheet.create({
     borderRadius: Radius.full,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: Colors.border,
-    backgroundColor: Colors.surface,
+    backgroundColor: 'rgba(255, 255, 255, 0.86)',
+    ...Elevation.float,
+    ...Platform.select({
+      web: { backdropFilter: 'saturate(180%) blur(18px)' } as object,
+      default: {},
+    }),
     paddingVertical: Spacing.xs,
     paddingHorizontal: Spacing.xs,
   },
@@ -365,6 +406,8 @@ const styles = StyleSheet.create({
   /* 나가는 길. 띠 바깥에 따로 둡니다 — 갈래 중 하나가 아니라 이 갈래
      전체에서 빠져나가는 것이라, 같은 줄 안에 두면 여섯 번째 갈래로
      읽힙니다. */
+  /* 띠와 같은 재질입니다. 하나만 꽉 막힌 흰 동그라미면 둘이 다른 층에
+     있는 것처럼 보입니다. */
   back: {
     width: Tap.min,
     height: Tap.min,
@@ -373,6 +416,11 @@ const styles = StyleSheet.create({
     borderRadius: Radius.full,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: Colors.border,
-    backgroundColor: Colors.surface,
+    backgroundColor: 'rgba(255, 255, 255, 0.86)',
+    ...Elevation.float,
+    ...Platform.select({
+      web: { backdropFilter: 'saturate(180%) blur(18px)' } as object,
+      default: {},
+    }),
   },
 });
