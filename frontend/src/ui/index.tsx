@@ -2056,7 +2056,24 @@ export const DragSheet = forwardRef<DragSheetHandle, DragSheetProps>(function Dr
   const top = at >= stops.length - 1;
 
   return (
-    <Animated.View style={[styles.dragSheet, { height: tall }, lift ? { bottom: lift } : null]}>
+    /*
+      판은 바닥까지 내려갑니다.
+
+      <h3>띠 뒤로 지도가 비쳤습니다</h3>
+
+      <p>아래 갈래 띠만큼 띄워 두었습니다(bottom: lift). 판과 띠가 안 겹치게
+      하려던 것인데, 그러면 <b>띠 뒤에 남는 것이 지도</b>입니다. 띠가 반투명
+      해지자 그 지도가 그대로 비쳤습니다 — 일정을 보고 있는데 띠 뒤에서만
+      지도가 나타납니다.
+
+      <p>띄우는 대신 바닥까지 내리고, 띄웠던 만큼 높이를 늘립니다. 보이는
+      자리(띠 위쪽)의 크기는 그대로이고, 띠 뒤에 있는 것이 지도가 아니라
+      <b>일정</b>이 됩니다.
+
+      <p>겹치는 자리는 띠가 이깁니다(띠의 zIndex 가 한 칸 위입니다). 마지막
+      줄이 띠 뒤로 들어가는 것은 아래의 여백이 막습니다.
+    */
+    <Animated.View style={[styles.dragSheet, { height: Animated.add(tall, lift) }]}>
       {/* 손잡이와 그 옆 줄까지가 끄는 자리입니다. 손잡이만 잡게 하면
           손가락으로는 잘 안 맞습니다. */}
       <View
@@ -2080,9 +2097,12 @@ export const DragSheet = forwardRef<DragSheetHandle, DragSheetProps>(function Dr
       <ScrollView
         ref={scroller}
         style={styles.dragBody}
+        /* 아래 여백은 띠 높이만큼입니다. 안 비우면 마지막 줄이 띠 뒤로
+           들어가 아무리 굴려도 안 보입니다. 띠가 없는 화면에서는 지금까지처럼
+           안전영역만 비웁니다. */
         contentContainerStyle={[
           styles.dragBodyOuter,
-          { paddingBottom: insets.bottom + Spacing.huge },
+          { paddingBottom: Math.max(lift, insets.bottom) + Spacing.huge },
         ]}
         /*
           언제나 굴러갑니다.

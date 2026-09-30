@@ -320,9 +320,17 @@ const styles = StyleSheet.create({
     */
     position: 'absolute',
     ...Platform.select({ web: { position: 'fixed' as 'absolute' }, default: {} }),
-    /* 판(dragSheet)과 같은 층에 둡니다. 둘 다 지도보다 위여야 하고, 서로는
-       겹치지 않습니다 — 판이 띠 높이만큼 떠 있기 때문입니다. */
-    zIndex: 2,
+    /*
+      판(dragSheet)보다 한 칸 위입니다.
+
+      <p>둘이 같은 층이었습니다. 판이 띠 높이만큼 떠 있어서 서로 안 겹쳤기
+      때문인데, 지금은 판이 바닥까지 내려와 띠 뒤로 지나갑니다 — 띠 뒤에
+      지도가 아니라 일정이 보이게 하려고 그렇게 했습니다.
+
+      <p>겹치면 띠가 이겨야 합니다. 안 그러면 판의 마지막 줄이 띠를 덮어
+      갈래를 누를 수가 없습니다.
+    */
+    zIndex: 3,
     left: 0,
     right: 0,
     bottom: 0,
