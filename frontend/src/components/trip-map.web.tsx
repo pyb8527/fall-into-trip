@@ -345,6 +345,7 @@ export function TripMap({
   notes,
   height = 300,
   chrome = true,
+  full: canFull = true,
   bleed = false,
   link = true,
   bottomInset = 0,
@@ -1127,11 +1128,13 @@ export function TripMap({
       {chrome ? (
         <View style={styles.overlay}>
           {here ? <IconButton name="crosshair" label="내 위치로" onPress={goHere} /> : null}
-          <IconButton
-            name={full ? 'minimize' : 'maximize'}
-            label={full ? '전체화면 닫기' : '전체화면으로 보기'}
-            onPress={toggleFull}
-          />
+          {canFull ? (
+            <IconButton
+              name={full ? 'minimize' : 'maximize'}
+              label={full ? '전체화면 닫기' : '전체화면으로 보기'}
+              onPress={toggleFull}
+            />
+          ) : null}
         </View>
       ) : null}
 

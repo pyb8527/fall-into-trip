@@ -217,6 +217,7 @@ export function TripMap({
   dayFilter = false,
   height = 300,
   chrome = true,
+  full: canFull = true,
   bleed = false,
   link = true,
   fitAt,
@@ -848,7 +849,13 @@ export function TripMap({
         {full || !chrome ? null : (
           <View style={styles.overlay}>
             {here ? <IconButton name="crosshair" label="내 위치로" onPress={goHere} /> : null}
-            <IconButton name="maximize" label="전체화면으로 보기" onPress={() => setFull(true)} />
+            {canFull ? (
+              <IconButton
+                name="maximize"
+                label="전체화면으로 보기"
+                onPress={() => setFull(true)}
+              />
+            ) : null}
           </View>
         )}
       </View>

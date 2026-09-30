@@ -18,7 +18,21 @@ import { api } from '@/api/client';
  *
  * <p>아이폰이 찍는 HEIC 를 우리가 풀 수는 없습니다. 브라우저가 그림으로
  * 그려 줄 수 있으면 여기서 JPEG 으로 다시 그려져 나가고, 못 그리면 고를 때
- * 실패합니다 — 그때는 그렇다고 말합니다.
+ * 실패합니다.
+ *
+ * <p><b>크롬과 안드로이드 웹뷰는 HEIC 를 못 풉니다.</b> 사파리만 됩니다.
+ * 그런데 실패하는 모습이 「사진을 열지 못했어요」 한 줄이라, 받는 사람은
+ * 파일이 깨진 줄 알고 같은 사진을 몇 번씩 다시 고릅니다 — 몇 번을 해도
+ * 안 됩니다.
+ *
+ * <p>그래서 앞부분을 보고 HEIC 인지 먼저 가립니다. 맞으면 <b>무엇을 하면
+ * 되는지</b>를 말합니다. 아이폰에서 「가장 호환성 높게」로 내보내거나 설정을
+ * 바꾸면 JPEG 으로 나오고, 그러면 그대로 올라갑니다.
+ *
+ * <p>여기서 풀어 주는 길도 있습니다(libheif 를 wasm 으로). 그런데 그것
+ * 하나가 웹 묶음을 1~2MB 늘리고, 그 값은 HEIC 를 안 올리는 사람까지 함께
+ * 냅니다. 필요해지면 그때 <b>HEIC 를 만났을 때만</b> 받아 오게 붙이는 것이
+ * 맞습니다.
  */
 
 /** 긴 쪽을 이만큼으로. 서버가 다시 굽는 크기와 같습니다. */
@@ -57,6 +71,17 @@ export async function pickAndUpload(room = 1): Promise<Pick> {
     return { ids: [], skipped: 0, failed: 0 };
   }
 
+  /* 풀 수 없는 것은 올려 보지도 않습니다. 앞부분만 읽으므로 큰 파일에도
+     값이 안 듭니다. */
+  for (const file of files.slice(0, Math.max(1, room))) {
+    if (await looksHeic(file)) {
+      throw new PickError(
+        '아이폰 사진(HEIC)은 이 기기에서 못 열어요. ' +
+          '사진 앱에서 공유 → 「옵션」 → 「가장 호환성 높게」로 내보낸 뒤 올려 주세요.',
+      );
+    }
+  }
+
   const taking = files.slice(0, Math.max(1, room));
   const ids: string[] = [];
   let failed = 0;
@@ -75,6 +100,41 @@ export async function pickAndUpload(room = 1): Promise<Pick> {
     }
   }
   return { ids, skipped: files.length - taking.length, failed };
+}
+
+/**
+ * 고르다 생긴 일. 화면이 이 말을 그대로 보여 줍니다.
+ *
+ * <p>ApiError 가 아니므로 부르는 쪽의 `e instanceof ApiError` 에 안 걸립니다.
+ * 그쪽은 걸리지 않으면 「사진을 올리지 못했어요」로 뭉개므로, 이것도 같이
+ * 보게 해야 합니다.
+ */
+export class PickError extends Error {}
+
+/**
+ * 아이폰 사진인지.
+ *
+ * <p>ISO 기반 미디어 파일은 앞 네 바이트가 크기이고 그다음 네 바이트가
+ * 'ftyp' 입니다. 그 뒤의 넉 자가 무엇인지를 봅니다 — heic·heix·hevc·mif1·msf1
+ * 이 HEIC 무리입니다. 확장자는 안 봅니다. 사람이 바꿔 붙일 수 있고, 아이폰이
+ * 보내 온 것에는 아예 없는 때도 있습니다.
+ */
+async function looksHeic(file: File): Promise<boolean> {
+  try {
+    const head = new Uint8Array(await file.slice(0, 12).arrayBuffer());
+    if (head.length < 12) {
+      return false;
+    }
+    const tag = String.fromCharCode(head[4], head[5], head[6], head[7]);
+    if (tag !== 'ftyp') {
+      return false;
+    }
+    const kind = String.fromCharCode(head[8], head[9], head[10], head[11]).toLowerCase();
+    return ['heic', 'heix', 'hevc', 'hevx', 'mif1', 'msf1'].includes(kind);
+  } catch {
+    /* 못 읽으면 지나갑니다. 그리다 실패하면 그때 말해 줍니다. */
+    return false;
+  }
 }
 
 /** 고른 결과. 못 넣은 것이 왜 안 들어갔는지를 화면이 말해 줘야 합니다. */

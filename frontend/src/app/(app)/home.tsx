@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { api } from '@/api/client';
@@ -13,6 +13,7 @@ import type {
 } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
+import { PlaceDetailSheet, type Looked } from '@/components/place-detail-sheet';
 import { TripMark } from '@/components/trip-mark';
 import { TripThumb } from '@/components/trip-thumb';
 import { iconOf, labelOf } from '@/constants/place-icons';
@@ -67,6 +68,8 @@ import { AppTabs } from '@/ui/tab-bar';
  */
 export default function Home() {
   const router = useRouter();
+  /* 「여기가 그렇게 핫하대요!」에서 누른 곳. 판이 이걸로 열립니다. */
+  const [looking, setLooking] = useState<Looked | null>(null);
   const { user } = useAuth();
 
   /* 여행이 하나도 없는 사람에게는 메뉴만으로 부족합니다. 그 판단에 필요한
@@ -88,7 +91,7 @@ export default function Home() {
   const { data: news } = useAsync<News>((signal) => api.get('/api/news', signal), []);
 
   /*
-    남들이 다녀온 길, 그리고 여럿이 간 곳.
+    남들이 다녀온 길, 그리고 지금 뜨는 여행지.
 
     둘 다 로그인 없이 열리는 것이라 갓 들어온 사람에게도 보입니다. 못 받아
     와도 조용히 넘어갑니다 — 구역이 통째로 안 뜰 뿐 홈은 멉니다.
@@ -243,8 +246,20 @@ export default function Home() {
   }, [mine, next]);
 
   return (
-    <Screen safeTop tabs={<AppTabs />}>
-      <View style={styles.head}>
+    /*
+      로고와 단추 줄은 고정합니다.
+
+      <p>굴러가는 본문 안에 있었습니다. 그래서 목록을 조금만 내려도 로고가
+      화면 밖으로 나가고, 찾기·소식·내 계정이 <b>어느 화면에도 없는 것</b>이
+      되었습니다 — 다시 맨 위로 올라와야 눌렀습니다.
+
+      <p>인사말은 같이 안 올립니다. 그건 한 번 읽는 것이고, 늘 붙어 있으면
+      화면 위 한 자락을 계속 먹습니다.
+    */
+    <Screen
+      safeTop
+      tabs={<AppTabs />}
+      header={
         <Split>
           <LogoMark size={34} />
           {/* 오른쪽 위에 둘입니다.
@@ -278,6 +293,8 @@ export default function Home() {
             />
           </Row>
         </Split>
+      }>
+      <View style={styles.head}>
         {/*
           여행이 있으면 그 여행 이야기를, 없으면 이름을 부릅니다.
 
@@ -471,7 +488,7 @@ export default function Home() {
             {/* 「다양한 경험들」 은 무엇이 들어 있는지 말하지 않습니다.
                 여기 있는 것은 남이 짜 둔 여행이고, 보는 사람이 여기서 얻는
                 것은 <b>내 여행의 밑그림</b>입니다. */}
-            <Subtitle>여행 아이디어</Subtitle>
+            <Subtitle>이런 여행은 어때요?</Subtitle>
             {/* 「둘러보기」 는 아래 띠의 탭 이름과 같아서, 구역을 넘기는
                 것인지 탭을 옮기는 것인지 알 수 없었습니다. */}
             <Button
@@ -533,31 +550,68 @@ export default function Home() {
       */}
       {top && top.places.length > 0 ? (
         <View style={styles.section}>
-          {/* 「핫플레이스」 는 장소를 세는 말이고, 여기 있는 것은 여럿이
-              다녀온 <b>여행지</b>입니다. 누르면 그 곳을 담습니다. */}
-          <Subtitle>지금 뜨는 여행지</Subtitle>
+          {/* 「지금 뜨는 여행지」 는 이제 화면 이름입니다(더 보러가기로
+              들어가는 곳). 홈에서는 같은 말을 두 번 쓰지 않고 한마디로
+              건넵니다. */}
+          <Subtitle>여기가 그렇게 핫하대요!</Subtitle>
           <Card style={styles.listCard}>
-            {top.places.slice(0, 5).map((place, i) => (
-              <View key={place.key}>
-                {i > 0 ? <Divider /> : null}
-                <Row gap={Spacing.md} style={styles.rankRow}>
-                  <Body small strong={i < 3} tone={i < 3 ? 'default' : 'muted'} style={styles.at}>
-                    {i + 1}
-                  </Body>
-                  <Mark emoji={iconOf(place.icon)} fallback="📍" />
-                  <Grow gap={1}>
-                    <Body small strong numberOfLines={1}>
-                      {place.name}
-                    </Body>
-                    <Caption tone="muted">
-                      {[labelOf(place.icon), `여행 ${place.posts}개에 담김`]
-                        .filter(Boolean)
-                        .join(' · ')}
-                    </Caption>
-                  </Grow>
-                </Row>
-              </View>
-            ))}
+            {top.places.slice(0, 5).map((place, i) => {
+              /*
+                누르면 그 곳이 어떤 데인지 봅니다.
+
+                <p>이름 다섯 줄만 세워 두었습니다. 그런데 「담김 32」 만 보고
+                갈지 말지를 정할 사람은 없습니다 — 사진도 평점도 영업시간도
+                없이 이름만 있으면, 궁금해도 여기서 할 수 있는 일이 없습니다.
+
+                <p>「지금 뜨는 여행지」 화면에서 쓰는 것과 같은 판입니다. 같은
+                줄을 누르는 일이 두 화면에서 다르게 굴 이유가 없습니다.
+
+                <p>좌표가 없으면 안 엽니다. 판이 하는 일의 절반이 지도와
+                영업시간인데, 그 둘이 다 좌표에서 나옵니다.
+              */
+              const canLook = place.lat != null && place.lng != null;
+              return (
+                <View key={place.key}>
+                  {i > 0 ? <Divider /> : null}
+                  <Press
+                    onPress={
+                      canLook
+                        ? () =>
+                            setLooking({
+                              name: place.name,
+                              lat: place.lat as number,
+                              lng: place.lng as number,
+                              placeId: place.placeId,
+                              icon: place.icon,
+                            })
+                        : undefined
+                    }
+                    scale={0.99}
+                    accessibilityLabel={canLook ? `${place.name} 자세히 보기` : place.name}>
+                    <Row gap={Spacing.md} style={styles.rankRow}>
+                      <Body
+                        small
+                        strong={i < 3}
+                        tone={i < 3 ? 'default' : 'muted'}
+                        style={styles.at}>
+                        {i + 1}
+                      </Body>
+                      <Mark emoji={iconOf(place.icon)} fallback="📍" />
+                      <Grow gap={1}>
+                        <Body small strong numberOfLines={1}>
+                          {place.name}
+                        </Body>
+                        <Caption tone="muted">
+                          {[labelOf(place.icon), `여행 ${place.posts}개에 담김`]
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </Caption>
+                      </Grow>
+                    </Row>
+                  </Press>
+                </View>
+              );
+            })}
             <Button
               label="더 보러가기"
               variant="secondary"
@@ -574,6 +628,8 @@ export default function Home() {
           onPress={() => router.push('/admin')}
         />
       ) : null}
+
+      <PlaceDetailSheet place={looking} onClose={() => setLooking(null)} />
     </Screen>
   );
 }

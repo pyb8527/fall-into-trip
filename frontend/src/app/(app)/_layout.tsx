@@ -48,7 +48,16 @@ export default function AppLayout() {
       <Stack.Screen name="saved" options={stackHeader('보석함', { up: '/(app)/home' })} />
       {/* 제목을 화면 안에 두므로 막대를 감춥니다 — 홈과 같은 방식입니다. */}
       <Stack.Screen name="money" options={{ headerShown: false }} />
-      <Stack.Screen name="popular" options={stackHeader('여럿이 간 곳', { up: '/(app)/home' })} />
+      {/* 「여럿이 간 곳」 이었습니다. 무엇이 있는지는 말해 주는데 왜
+          봐야 하는지는 안 말합니다 — 여럿이 갔다는 것은 셈이고, 지금
+          뜬다는 것은 갈 만하다는 뜻입니다. */}
+      <Stack.Screen
+        name="popular"
+        options={stackHeader('지금 뜨는 여행지', { up: '/(app)/home' })}
+      />
+      {/* 적어 두지 않으면 머리글에 길 이름이 그대로 뜹니다 — 「search」
+          라고 적혀 있었습니다. */}
+      <Stack.Screen name="search" options={stackHeader('검색', { up: '/(app)/home' })} />
       <Stack.Screen name="news" options={stackHeader('소식', { up: '/(app)/home' })} />
       <Stack.Screen name="settings" options={stackHeader('내 계정', { up: '/(app)/home' })} />
     </Stack>

@@ -35,7 +35,7 @@ const TABS: { value: Tab; label: string }[] = [
 ];
 
 /**
- * 여럿이 간 곳.
+ * 지금 뜨는 여행지.
  *
  * <h3>왜 필요한가</h3>
  *

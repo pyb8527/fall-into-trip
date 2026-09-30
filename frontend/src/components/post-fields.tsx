@@ -5,7 +5,7 @@ import { api, ApiError } from '@/api/client';
 import type { Visibility } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { OurPhoto } from '@/components/our-photo';
-import { pickAndUpload } from '@/lib/pick-photo';
+import { PickError, pickAndUpload } from '@/lib/pick-photo';
 import { Spacing } from '@/constants/theme';
 import { Button, Caption, Chip, ErrorNote, Field, Row } from '@/ui';
 
@@ -131,7 +131,11 @@ export function PostFields({
         setFailed('사진을 올리지 못했어요. 다시 해 보세요.');
       }
     } catch (e) {
-      setFailed(e instanceof ApiError ? e.message : '사진을 올리지 못했어요.');
+      setFailed(
+        e instanceof ApiError || e instanceof PickError
+          ? e.message
+          : '사진을 올리지 못했어요.',
+      );
     } finally {
       setPicking(false);
     }

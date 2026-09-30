@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { api, ApiError, UNEXPECTED } from '@/api/client';
 import { OurPhoto } from '@/components/our-photo';
 import { Spacing } from '@/constants/theme';
-import { pickAndUpload } from '@/lib/pick-photo';
+import { PickError, pickAndUpload } from '@/lib/pick-photo';
 import { BottomSheet, Button, Caption, ErrorNote, Icon } from '@/ui';
 
 /** 서버와 같은 수입니다(VisitService.MAX_PHOTOS). */
@@ -76,7 +76,13 @@ export function RefSheet({
         setFailed(`한 곳에 ${MAX_PHOTOS}장까지라 ${got.skipped}장은 안 넣었어요.`);
       }
     } catch (e) {
-      setFailed(e instanceof ApiError ? e.message : '사진을 올리지 못했어요.');
+      /* PickError 는 무엇을 하면 되는지까지 담은 말입니다. 뭉개면 그 말이
+         사라지고 「사진을 올리지 못했어요」만 남습니다. */
+      setFailed(
+        e instanceof ApiError || e instanceof PickError
+          ? e.message
+          : '사진을 올리지 못했어요.',
+      );
     } finally {
       setPicking(false);
     }

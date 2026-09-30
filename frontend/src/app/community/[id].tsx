@@ -433,6 +433,9 @@ export default function Post() {
              남습니다. 날짜를 고르면 그 하루만 봅니다. */
           dayFilter
           bleed
+          /* 읽는 자리라 전체화면은 안 냅니다. 펼쳐도 할 일이 없고, 펼치면
+             정작 읽던 글이 가려집니다. */
+          full={false}
           /* 판이 덮는 만큼 지도가 알아서 비켜 담습니다. */
           bottomInset={covered + dock}
         />

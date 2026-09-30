@@ -17,6 +17,8 @@ export async function pickAndUpload(room = 1): Promise<Pick> {
 }
 
 /** 웹 쪽 {@link import('./pick-photo.web').Pick} 와 같은 모양이어야 합니다. */
+export class PickError extends Error {}
+
 export type Pick = {
   ids: string[];
   skipped: number;
