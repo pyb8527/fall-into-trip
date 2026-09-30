@@ -1,15 +1,17 @@
 import { Image } from 'expo-image';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   useWindowDimensions,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Radius, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 import { Caption, Icon } from '@/ui';
 
 /**
@@ -25,16 +27,28 @@ import { Caption, Icon } from '@/ui';
  * <p>그래서 주소만 받습니다. 어디서 온 사진인지는 부르는 쪽이 알고, 여기는
  * 그것을 크게 보여 주는 일만 합니다.
  *
- * <h3>안 자릅니다</h3>
+ * <h3>단추를 사진 위에 얹지 않습니다</h3>
  *
- * <p>목록에서는 잘라서 줄을 맞추는 것이 맞지만, 크게 볼 때 가장자리가 잘려
- * 있으면 그건 다른 사진입니다.
+ * <p>닫는 단추를 사진 위 오른쪽 모서리에 동그라미로 띄워 두었습니다. 그런데
+ * 사진은 무엇이 찍혔을지 모르는 것이라, 그 자리가 흰 하늘이면 <b>단추가
+ * 통째로 사라집니다.</b> 반투명 바탕을 깔아도 밝은 사진 위에서는 옅은 회색
+ * 얼룩으로만 보입니다.
  *
- * <h3>닫는 길을 셋 둡니다</h3>
+ * <p>위아래에 띠를 둡니다. 띠는 사진 밖이라 무엇이 찍혔든 상관이 없고,
+ * 닫는 단추와 몇 번째인지가 늘 같은 자리에 섭니다. 사진은 그만큼 좁아지는데,
+ * 어차피 안 자르고 맞추므로 대개 위아래에 남던 검은 자리입니다.
  *
- * <p>바탕 누르기, 오른쪽 위 ✕, 그리고 기기의 뒤로 가기(onRequestClose).
- * 마지막 것이 없으면 안드로이드에서 뒤로 가기가 판이 아니라 <b>앱</b>을
- * 닫습니다.
+ * <h3>기기의 뒤로가기가 판을 닫습니다</h3>
+ *
+ * <p>안 그러면 뒤로가기가 <b>판이 아니라 화면</b>을 물립니다 — 사진을 닫으려
+ * 눌렀는데 보고 있던 여행기에서 튕겨 나갑니다.
+ *
+ * <p>웹에서는 판을 열 때 기록에 한 칸을 넣어 둡니다. 그러면 뒤로가기가 그
+ * 칸을 먼저 걷고, 화면은 제자리에 남습니다. 화면에서 ✕ 로 닫을 때는 넣어 둔
+ * 칸을 우리가 걷습니다 — 안 걷으면 앞으로 가기가 판을 다시 엽니다.
+ *
+ * <p>앱(웹뷰)도 이 기록을 그대로 씁니다. 순수 앱에서는 Modal 의
+ * onRequestClose 가 같은 일을 합니다.
  */
 export function PhotoViewer({
   uris,
@@ -52,21 +66,67 @@ export function PhotoViewer({
   /** 찍은 사람. 구글 사진은 밝혀야 합니다(구글 약관). */
   by?: string | null;
 }) {
+  const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const [at, setAt] = useState(from);
   const rail = useRef<ScrollView>(null);
+
+  /* 닫는 함수가 매 렌더마다 새로 오므로, 아래 효과가 그것 때문에 다시
+     돌지 않게 붙들어 둡니다 — 다시 돌면 기록 칸이 계속 쌓입니다. */
+  const close = useRef(onClose);
+  close.current = onClose;
+
+  useEffect(() => {
+    if (!visible || Platform.OS !== 'web' || typeof window === 'undefined') {
+      return;
+    }
+    window.history.pushState({ fitViewer: true }, '');
+    const popped = () => close.current();
+    window.addEventListener('popstate', popped);
+    return () => {
+      window.removeEventListener('popstate', popped);
+      /*
+        우리가 넣어 둔 칸이 아직 남아 있으면(=✕ 나 바탕을 눌러 닫은 경우)
+        걷습니다. 뒤로가기로 닫혔을 때는 이미 걷힌 뒤라 여기서 또 물리면
+        화면이 한 칸 더 뒤로 갑니다.
+      */
+      if ((window.history.state as { fitViewer?: boolean } | null)?.fitViewer) {
+        window.history.back();
+      }
+    };
+  }, [visible]);
 
   if (!visible || uris.length === 0) {
     return null;
   }
 
+  /* 띠가 먹는 높이. 사진은 그 사이를 씁니다 — 띠 아래로 사진이 들어가면
+     닫는 단추가 다시 사진 위에 얹힌 것과 같아집니다. */
+  const barTop = 52 + insets.top;
+  const barBottom = (by ? 44 : 0) + Math.max(insets.bottom, Spacing.md);
+
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.dark}>
-        {/* 바탕을 눌러 닫습니다. 사진 뒤에 깔아 두어, 사진 위를 누르는 것과
-            바탕을 누르는 것이 안 다툽니다. */}
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="닫기" />
+        {/* 위 띠. 닫는 단추와 몇 번째인지가 늘 같은 자리에 섭니다. */}
+        <View style={[styles.top, { height: barTop, paddingTop: insets.top }]}>
+          <Pressable style={styles.close} onPress={onClose} accessibilityLabel="닫기">
+            <Icon name="x" size={26} tone="inverse" />
+          </Pressable>
+          {uris.length > 1 ? (
+            <Caption tone="inverse">
+              {at + 1} / {uris.length}
+            </Caption>
+          ) : null}
+        </View>
 
+        {/*
+          사진.
+
+          <p>바탕을 눌러도 닫히게 두었었는데, 넘기려고 쓸어내다 손가락이
+          멈추면 그것이 누름으로 읽혀 판이 닫혔습니다. 닫는 길은 위의 ✕ 와
+          기기의 뒤로가기, 둘로 충분합니다.
+        */}
         <ScrollView
           ref={rail}
           horizontal
@@ -98,7 +158,7 @@ export function PhotoViewer({
             <Image
               key={`${uri}-${i}`}
               source={{ uri }}
-              style={{ width, height }}
+              style={{ width, height: Math.max(1, height - barTop - barBottom) }}
               contentFit="contain"
               transition={120}
               accessibilityLabel="사진"
@@ -106,23 +166,12 @@ export function PhotoViewer({
           ))}
         </ScrollView>
 
+        {/* 아래 띠. 찍은 사람이 있을 때만 섭니다 — 구글 사진은 밝혀야 합니다. */}
         {by ? (
-          <View style={styles.by} pointerEvents="none">
+          <View style={[styles.bottom, { paddingBottom: Math.max(insets.bottom, Spacing.md) }]}>
             <Caption tone="inverse">{by}</Caption>
           </View>
         ) : null}
-
-        {uris.length > 1 ? (
-          <View style={styles.count} pointerEvents="none">
-            <Caption tone="inverse">
-              {at + 1}/{uris.length}
-            </Caption>
-          </View>
-        ) : null}
-
-        <Pressable style={styles.close} onPress={onClose} accessibilityLabel="닫기">
-          <Icon name="x" size={24} tone="inverse" />
-        </Pressable>
       </View>
     </Modal>
   );
@@ -131,36 +180,24 @@ export function PhotoViewer({
 const styles = StyleSheet.create({
   dark: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.94)',
-    justifyContent: 'center',
+    /* 완전한 검정입니다. 사진을 볼 때 주위가 밝으면 눈이 그쪽에 맞춰져
+       사진의 어두운 부분이 안 보입니다. */
+    backgroundColor: '#000000',
   },
-  count: {
-    position: 'absolute',
-    bottom: Spacing.xl,
-    alignSelf: 'center',
+  top: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderRadius: Radius.sm,
-    backgroundColor: 'rgba(0, 0, 0, 0.55)',
-  },
-  by: {
-    position: 'absolute',
-    bottom: Spacing.xl,
-    left: Spacing.md,
-    paddingHorizontal: Spacing.xs,
-    paddingVertical: 2,
-    borderRadius: Radius.sm,
-    backgroundColor: 'rgba(0, 0, 0, 0.55)',
   },
   close: {
-    position: 'absolute',
-    top: Spacing.xl,
-    right: Spacing.md,
     width: 44,
     height: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: Radius.sm,
-    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+  },
+  bottom: {
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.sm,
   },
 });

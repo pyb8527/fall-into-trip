@@ -2,7 +2,15 @@ import * as Linking from 'expo-linking';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { BackHandler, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  BackHandler,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  ToastAndroid,
+  View,
+} from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView, type WebViewNavigation } from 'react-native-webview';
 
@@ -59,12 +67,22 @@ export function Shell() {
   );
 }
 
+/**
+ * 뒤로가기 두 번을 "한 벌" 로 보는 시간.
+ *
+ * <p>방금 누른 것과 이어진 것으로 느껴지면서, 주머니에서 잘못 스친 것이
+ * 이어지지 않을 만큼은 짧아야 합니다.
+ */
+const TWICE = 2000;
+
 function Inside() {
   const insets = useSafeAreaInsets();
   const web = useRef<WebView>(null);
 
   /* 뒤로갈 데가 있는지. 웹뷰가 화면을 옮길 때마다 알려 줍니다. */
   const canBack = useRef(false);
+  /* 마지막으로 뒤로가기를 누른 때. 두 번 눌러야 나가게 하는 데 씁니다. */
+  const lastBack = useRef(0);
   const [broken, setBroken] = useState<string | null>(null);
   /* 다시 열기를 누를 때마다 웹뷰를 새로 세웁니다. reload 는 망가진 자리에서
      다시 망가지는 일이 잦습니다. */
@@ -76,6 +94,16 @@ function Inside() {
     <p>앱을 닫는 대신 웹 안에서 한 칸 물러납니다. 안 그러면 여행 상세에서
     뒤로가기를 눌렀을 때 목록이 아니라 앱이 닫힙니다 — 폰에서 제일
     당황스러운 일입니다.
+
+    <h3>한 번에 안 나갑니다</h3>
+
+    <p>물러날 데가 없으면 그대로 닫았습니다. 그런데 아래 띠의 갈래는 기록을
+    쌓지 않으므로(TabBar) 홈·내 여행·보석함·둘러보기·가계부에서는 늘 물러날
+    데가 없습니다 — <b>갈래를 보다 뒤로가기를 한 번 누르면 앱이 사라졌습니다.</b>
+
+    <p>두 번 눌러야 나갑니다. 첫 번째에는 그렇다고 말해 주고(토스트), 2초
+    안에 또 누르면 닫습니다. 2초는 "방금 누른 것과 한 벌" 로 느껴지는 길이
+    이면서, 주머니에서 잘못 스친 것이 이어지지 않을 만큼은 짧습니다.
   */
   useEffect(() => {
     if (Platform.OS !== 'android') {
@@ -86,8 +114,13 @@ function Inside() {
         web.current?.goBack();
         return true;
       }
-      /* 물러날 데가 없습니다. 폰이 하던 대로 앱을 닫습니다. */
-      return false;
+      /* 두 번째입니다. 우리가 안 받으면 폰이 하던 대로 앱을 닫습니다. */
+      if (Date.now() - lastBack.current < TWICE) {
+        return false;
+      }
+      lastBack.current = Date.now();
+      ToastAndroid.show('한 번 더 누르면 나가요', ToastAndroid.SHORT);
+      return true;
     });
     return () => sub.remove();
   }, []);
