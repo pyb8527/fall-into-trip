@@ -10,12 +10,18 @@
     "backgroundColor": "#FFFFFF",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "net.weeniebeenie.fit"
+      "bundleIdentifier": "net.weeniebeenie.fit",
+      "icon": {
+        "light": "./assets/images/icon.png",
+        "dark": "./assets/images/icon-dark.png",
+        "tinted": "./assets/images/icon-tinted.png"
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundColor": "#0E0E0E"
+        "monochromeImage": "./assets/images/android-icon-foreground.png",
+        "backgroundColor": "#6D5BF6"
       },
       "predictiveBackGestureEnabled": false,
       "package": "net.weeniebeenie.fit"
@@ -35,16 +41,16 @@
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 160,
+          "imageWidth": 120,
           "resizeMode": "contain",
-          "backgroundColor": "#FFFFFF"
+          "backgroundColor": "#6D5BF6"
         }
       ],
       [
         "expo-notifications",
         {
           "icon": "./assets/images/android-icon-foreground.png",
-          "color": "#0E0E0E"
+          "color": "#6D5BF6"
         }
       ],
       [
