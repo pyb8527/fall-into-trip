@@ -39,6 +39,16 @@ public class Trip {
     @Column(length = 16)
     private String emoji;
 
+    /**
+     * 어느 모임의 여행인지. 비어 있으면 혼자 여행입니다.
+     *
+     * <p>모임이 지워져도 여행은 남습니다(ON DELETE SET NULL). 방을 정리하려다
+     * 지난 여행이 통째로 사라지면 안 됩니다 — 그때는 만든 사람의 혼자 여행이
+     * 됩니다.
+     */
+    @Column(name = "group_id", length = 16)
+    private String groupId;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
@@ -47,10 +57,11 @@ public class Trip {
     private long version;
 
     @Builder
-    public Trip(String title, String ownerId) {
+    public Trip(String title, String ownerId, String groupId) {
         this.id = Ids.next();
         this.title = title;
         this.ownerId = ownerId;
+        this.groupId = groupId;
         this.createdAt = Instant.now();
     }
 }

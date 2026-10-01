@@ -15,6 +15,17 @@ async function call(method, path, { body, token } = {}) {
   return { status: r.status, data };
 }
 
+/* 모임을 만들고 사람을 부릅니다. 여행은 그 모임 안에서 생깁니다. */
+async function makeGroup(ownerToken, name, mates = []) {
+  const g = await call("POST", "/api/groups", { token: ownerToken, body: { name } });
+  const gid = g.data.group.id;
+  for (const who of mates) {
+    const inv = await call("POST", `/api/groups/${gid}/invites`, { token: ownerToken, body: {} });
+    await call("POST", `/api/group-invites/${inv.data.invite.token}/accept`, { token: who });
+  }
+  return gid;
+}
+
 const TAG = Date.now().toString(36);
 let r;
 
@@ -108,23 +119,25 @@ await call("PATCH", `/api/places/${copyPlace.id}`, { token: host, body: { name: 
 r = await call("GET", `/api/trip?trip=${tripId}`, { token: host });
 T("원본은 그대로", !r.data.days[0].places.some((p) => p.name === "사본에서 고침"), r.data.days[0].places.map((p) => p.name));
 
-console.log("\n[6] 복제해도 동행자는 따라오지 않는다");
-r = await call("POST", `/api/trips/${tripId}/invites`, { token: host, body: { role: "EDITOR" } });
-await call("POST", `/api/invites/${r.data.invite.token}/accept`, { token: mate });
-r = await call("GET", `/api/trips/${tripId}/members`, { token: host });
-T("원본에는 둘", r.data.members.length === 2, r.data.members?.length);
+console.log("\n[6] 복제해도 모임은 따라오지 않는다");
+const groupId = await makeGroup(host, "둘이서", [mate]);
+r = await call("PATCH", `/api/trips/${tripId}/group`, { token: host, body: { groupId } });
+T("원본을 모임 것으로", r.status === 200, r.data);
+r = await call("GET", `/api/trip?trip=${tripId}`, { token: mate });
+T("모임 사람이 원본을 봄", r.status === 200, r.data);
 
 r = await call("POST", `/api/trips/${tripId}/copy`, { token: host, body: { title: "둘이 갔던 길 다시", startIso: "2027-05-01" } });
 const secondCopy = r.data.trip.id;
-r = await call("GET", `/api/trips/${secondCopy}/members`, { token: host });
-T("사본에는 나 혼자", r.data.members.length === 1, r.data.members);
+T("사본은 혼자 여행", r.data.trip.groupId == null, r.data.trip);
+r = await call("GET", `/api/trip?trip=${secondCopy}`, { token: mate });
+T("모임 사람도 사본은 못 봄", r.status === 404, r.data);
 T("이름을 준 대로", (await call("GET", `/api/trip?trip=${secondCopy}`, { token: host })).data.trip.title === "둘이 갔던 길 다시");
 
 console.log("\n[7] 동행자도 자기 것으로 떠 갈 수 있다");
 r = await call("POST", `/api/trips/${tripId}/copy`, { token: mate, body: { startIso: "2027-06-01" } });
 T("된다", r.status === 200, r.data);
 r = await call("GET", `/api/trip?trip=${r.data.trip.id}`, { token: mate });
-T("동행자 것이 된다", r.data.myRole === "EDITOR", r.data.myRole);
+T("떠 간 사람 것이 된다", r.data.owner === true, r.data);
 
 r = await call("POST", `/api/trips/${tripId}/copy`, { token: stranger, body: { startIso: "2027-06-01" } });
 T("남은 못 떠 간다", r.status === 403 || r.status === 404, r.data);

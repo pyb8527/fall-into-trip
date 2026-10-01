@@ -45,8 +45,32 @@ public class TripController {
     @PostMapping("/trips")
     public Map<String, Object> create(@CurrentUser AuthPrincipal me,
                                       @Valid @RequestBody CreateTripRequest req) {
-        Trip trip = trips.create(me, req.title(), req.startIso(), req.nightsOrZero());
+        Trip trip = trips.create(me, req.title(), req.startIso(), req.nightsOrZero(), req.groupId());
         return Map.of("trip", TripView.of(trip));
+    }
+
+    /**
+     * 이 여행의 사람들.
+     *
+     * <p>만든 사람과, 모임 여행이면 그 모임 사람 전부입니다. 화면 셋이
+     * 이것을 씁니다 — 일정의 이름표, 챙길 것의 맡은 사람, 정산의 "누가 냈나".
+     * 모임을 따로 묻게 하면 혼자 여행에서는 물을 모임이 없습니다.
+     */
+    @GetMapping("/trips/{id}/people")
+    public Map<String, Object> people(@CurrentUser AuthPrincipal me, @PathVariable String id) {
+        return Map.of("people", trips.peopleOf(me, id));
+    }
+
+    /** 혼자 여행을 모임으로 옮기거나 다시 뺍니다. 만든 사람만 합니다. */
+    @PatchMapping("/trips/{id}/group")
+    public Map<String, Object> group(@CurrentUser AuthPrincipal me,
+                                     @PathVariable String id,
+                                     @RequestBody GroupRequest req) {
+        trips.moveToGroup(me, id, req.groupId());
+        return Map.of("ok", true);
+    }
+
+    public record GroupRequest(String groupId) {
     }
 
     /**
@@ -187,6 +211,8 @@ public class TripController {
                 "trip", TripView.of(d.trip()),
                 "days", days,
                 "refs", aids,
-                "myRole", d.myRole() == null ? "NONE" : d.myRole().name());
+                /* 볼 수 있으면 고칠 수 있습니다. 「보기만」을 없앴습니다. */
+                "canEdit", true,
+                "owner", d.owner());
     }
 }

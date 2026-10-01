@@ -12,6 +12,12 @@ public interface TripRepository extends JpaRepository<Trip, String> {
 
     List<Trip> findAllByOrderByCreatedAtAsc();
 
+    /** 내가 만든 여행. 혼자 여행과 내가 만든 모임 여행이 다 옵니다. */
+    List<Trip> findAllByOwnerId(String ownerId);
+
+    /** 이 모임들의 여행. */
+    List<Trip> findAllByGroupIdIn(List<String> groupIds);
+
     Optional<Trip> findFirstByOrderByCreatedAtAsc();
 
     /* 계정을 지우기 전에 확인합니다. 주인이 있는 여행은 그냥 지울 수 없습니다. */

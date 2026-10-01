@@ -33,7 +33,7 @@ T("첫날 2026-10-08", r.data.days[0].iso === "2026-10-08", r.data.days[0]);
 T("요일 계산 정확 (10/08=목)", r.data.days[0].date === "10.08(목)", r.data.days[0].date);
 T("마지막날 2026-10-11", r.data.days[3].iso === "2026-10-11", r.data.days[3].iso);
 T("날짜별 색이 다름", new Set(r.data.days.map(d => d.color)).size === 4);
-T("내 역할 EDITOR", r.data.myRole === "EDITOR", r.data.myRole);
+T("고칠 수 있음", r.data.canEdit === true && r.data.owner === true, r.data);
 const day1 = r.data.days[0].id;
 
 r = await call("POST", "/api/trips", { token: admin, body: { title: "", startIso: "2026-10-08", nights: 3 } });

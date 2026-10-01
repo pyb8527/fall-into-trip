@@ -5,7 +5,7 @@ import net.weeniebeenie.fit.account.domain.User;
 import net.weeniebeenie.fit.account.domain.UserRepository;
 import net.weeniebeenie.fit.account.infrastructure.security.AuthPrincipal;
 import net.weeniebeenie.fit.shared.error.ApiException;
-import net.weeniebeenie.fit.trip.domain.TripMemberRepository;
+import net.weeniebeenie.fit.trip.domain.TripAccessPolicy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -73,7 +73,7 @@ public class NewsService {
     private static final int LIMIT = 30;
 
     private final NewsFeed feed;
-    private final TripMemberRepository members;
+    private final TripAccessPolicy access;
     private final UserRepository users;
 
     /**
@@ -114,9 +114,7 @@ public class NewsService {
         Instant since = Instant.now().minus(WINDOW);
         Instant seenAt = users.findById(me.id()).map(User::getNewsSeenAt).orElse(null);
 
-        List<String> tripIds = members.findAllByIdUserId(me.id()).stream()
-                .map(m -> m.getId().getTripId())
-                .toList();
+        List<String> tripIds = access.tripIdsOf(me.id());
 
         List<Item> rows = new ArrayList<>();
         for (PlaceRow r : feed.places(tripIds, me.id(), since, LIMIT)) {

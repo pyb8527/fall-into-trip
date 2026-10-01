@@ -7,7 +7,7 @@ import net.weeniebeenie.fit.trip.domain.TripFolder;
 import net.weeniebeenie.fit.trip.domain.TripFolderItem;
 import net.weeniebeenie.fit.trip.domain.TripFolderItemRepository;
 import net.weeniebeenie.fit.trip.domain.TripFolderRepository;
-import net.weeniebeenie.fit.trip.domain.TripMemberRepository;
+import net.weeniebeenie.fit.trip.domain.TripAccessPolicy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,7 +36,7 @@ public class FolderService {
 
     private final TripFolderRepository folders;
     private final TripFolderItemRepository items;
-    private final TripMemberRepository members;
+    private final TripAccessPolicy access;
 
     @Transactional(readOnly = true)
     public List<TripFolder> listOf(AuthPrincipal me) {
@@ -102,9 +102,7 @@ public class FolderService {
     public void place(AuthPrincipal me, String tripId, String folderId) {
         /* 내가 볼 수 있는 여행만 정리할 수 있습니다. 남의 여행 id 를 넣어
            내 폴더에 담아 두는 길을 열어 둘 이유가 없습니다. */
-        if (members.findByIdTripIdAndIdUserId(tripId, me.id()).isEmpty()) {
-            throw ApiException.notFound("여행을 찾을 수 없어요.");
-        }
+        access.requireCanRead(tripId, me.id());
 
         if (folderId == null || folderId.isBlank()) {
             items.deleteByUserIdAndTripId(me.id(), tripId);

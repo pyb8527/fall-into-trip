@@ -15,6 +15,17 @@ async function call(method, path, { body, token } = {}) {
   return { status: r.status, data };
 }
 
+/* 모임을 만들고 사람을 부릅니다. 여행은 그 모임 안에서 생깁니다. */
+async function makeGroup(ownerToken, name, mates = []) {
+  const g = await call("POST", "/api/groups", { token: ownerToken, body: { name } });
+  const gid = g.data.group.id;
+  for (const who of mates) {
+    const inv = await call("POST", `/api/groups/${gid}/invites`, { token: ownerToken, body: {} });
+    await call("POST", `/api/group-invites/${inv.data.invite.token}/accept`, { token: who });
+  }
+  return gid;
+}
+
 const TAG = Date.now().toString(36);
 let r;
 
@@ -33,13 +44,10 @@ const cId = r.data.user.id;
 r = await call("POST", "/api/auth/register", { body: { email: `x-${TAG}@local.test`, name: "남", password: "other-test-1234" } });
 const X = r.data.accessToken;
 
-r = await call("POST", "/api/trips", { token: A, body: { title: "셋이 오사카", startIso: "2026-11-02", nights: 1 } });
+const groupId = await makeGroup(A, "셋이서", [B, C]);
+r = await call("POST", "/api/trips", { token: A, body: { title: "셋이 오사카", startIso: "2026-11-02", nights: 1, groupId } });
 const tripId = r.data.trip.id;
-for (const who of [B, C]) {
-  r = await call("POST", `/api/trips/${tripId}/invites`, { token: A, body: { role: "EDITOR" } });
-  await call("POST", `/api/invites/${r.data.invite.token}/accept`, { token: who });
-}
-r = await call("GET", `/api/trips/${tripId}/members`, { token: A });
+r = await call("GET", `/api/groups/${groupId}`, { token: A });
 T("셋이 됨", r.data.members.length === 3, r.data.members?.length);
 
 r = await call("GET", `/api/trip?trip=${tripId}`, { token: A });
@@ -71,7 +79,7 @@ T("음수는 거절", r.status === 400, r.data);
 r = await call("POST", `/api/trips/${tripId}/expenses`, { token: A, body: { name: "뭔가", amount: 100, currency: "달러" } });
 T("모르는 통화는 거절", r.status === 400 && /통화/.test(r.data.error), r.data);
 r = await call("POST", `/api/trips/${tripId}/expenses`, { token: A, body: { name: "뭔가", amount: 100, payerId: "없는사람" } });
-T("동행자가 아니면 거절", r.status === 400 && /동행자/.test(r.data.error), r.data);
+T("같이 보는 사람이 아니면 거절", r.status === 400 && /같이 보는/.test(r.data.error), r.data);
 
 console.log("\n[3] 셋이 9000엔을 나누면");
 /* 가가 9000 을 냈고 셋이 나눈다. 각자 3000. 가는 6000 을 받아야 하고
@@ -108,12 +116,8 @@ T("총액에는 들어간다", r.data.books[0].total === 12000, r.data.books[0].
 console.log("\n[5] 나누어떨어지지 않을 때");
 /* 100엔을 셋이 나누면 34·33·33. 버리지 않고 총액을 지켜야 한다 */
 r = await call("POST", `/api/trips/${tripId}/trips`, { token: A });
-r = await call("POST", "/api/trips", { token: A, body: { title: "나누기 시험", startIso: "2026-12-01", nights: 0 } });
+r = await call("POST", "/api/trips", { token: A, body: { title: "나누기 시험", startIso: "2026-12-01", nights: 0, groupId } });
 const oddTrip = r.data.trip.id;
-for (const who of [B, C]) {
-  r = await call("POST", `/api/trips/${oddTrip}/invites`, { token: A, body: { role: "EDITOR" } });
-  await call("POST", `/api/invites/${r.data.invite.token}/accept`, { token: who });
-}
 await call("POST", `/api/trips/${oddTrip}/expenses`, { token: A,
   body: { name: "100엔", amount: 100, currency: "JPY" } });
 r = await call("GET", `/api/trips/${oddTrip}/settlement`, { token: A });
@@ -198,7 +202,7 @@ T("안 맡은 것은 비어 있다", !r.data.items[0].ownerId, r.data.items[0]);
 r = await call("POST", `/api/trips/${tripId}/items`, { token: A, body: { name: "  " } });
 T("빈 이름은 거절", r.status === 400 && /무엇을/.test(r.data.error), r.data);
 r = await call("POST", `/api/trips/${tripId}/items`, { token: A, body: { name: "약", ownerId: "없는사람" } });
-T("동행자가 아니면 거절", r.status === 400 && /동행자/.test(r.data.error), r.data);
+T("같이 보는 사람이 아니면 거절", r.status === 400 && /같이 보는/.test(r.data.error), r.data);
 r = await call("POST", `/api/trips/${tripId}/items`, { token: X, body: { name: "남의 것" } });
 T("남은 못 적는다", r.status === 403 || r.status === 404, r.data);
 

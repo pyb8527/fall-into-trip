@@ -2,6 +2,9 @@ package net.weeniebeenie.fit.trip.application;
 
 import lombok.RequiredArgsConstructor;
 import net.weeniebeenie.fit.account.infrastructure.security.AuthPrincipal;
+import net.weeniebeenie.fit.group.application.GroupService;
+import net.weeniebeenie.fit.group.domain.Group;
+import net.weeniebeenie.fit.group.domain.GroupRepository;
 import net.weeniebeenie.fit.shared.error.ApiException;
 import net.weeniebeenie.fit.support.audit.AuditService;
 import net.weeniebeenie.fit.trip.domain.*;
@@ -25,20 +28,37 @@ public class TripService {
     private static final int MAX_NIGHTS = 30;
 
     private final TripRepository trips;
-    private final TripMemberRepository members;
     private final DayRepository days;
     private final PlaceRepository places;
     private final TripAccessPolicy access;
+    private final net.weeniebeenie.fit.account.domain.UserRepository users;
+    private final GroupService groups;
+    private final GroupRepository groupBook;
     private final AuditService audit;
 
-    /** 내가 볼 수 있는 여행 목록. 관리자는 전부 봅니다. */
+    /**
+     * 내가 볼 수 있는 여행 목록.
+     *
+     * <p>어느 모임의 것인지를 함께 냅니다. 화면이 「혼자」와 「모임」 두 칸으로
+     * 갈라 보여 주는데, 모임 이름이 없으면 모임 칸에 여행 이름만 늘어서 어느
+     * 모임의 것인지 알 수 없습니다. 모임 이름은 여행마다 묻지 않고 한 번에
+     * 받아 짝지읍니다 — 여행 수만큼 질의가 붙을 자리입니다.
+     */
     @Transactional(readOnly = true)
     public List<TripSummary> listFor(AuthPrincipal me) {
-        List<Trip> visible = members.findAllByIdUserId(me.id()).stream()
-                .map(m -> trips.findById(m.getTripId()).orElse(null))
-                .filter(java.util.Objects::nonNull)
+        List<Trip> visible = access.tripsOf(me.id()).stream()
                 .sorted(java.util.Comparator.comparing(Trip::getCreatedAt))
                 .toList();
+
+        Map<String, String> groupNames = new java.util.HashMap<>();
+        List<String> groupIds = visible.stream()
+                .map(Trip::getGroupId)
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .toList();
+        if (!groupIds.isEmpty()) {
+            groupBook.findAllById(groupIds).forEach(g -> groupNames.put(g.getId(), g.getName()));
+        }
 
         return visible.stream().map(trip -> {
             List<Day> dayList = days.findAllByTripIdOrderBySortAsc(trip.getId());
@@ -48,7 +68,9 @@ public class TripService {
                     dayList.isEmpty() ? null : dayList.get(0).getIso(),
                     dayList.isEmpty() ? null : dayList.get(dayList.size() - 1).getIso(),
                     dayList.size(),
-                    (int) places.countOfTrip(trip.getId()));
+                    (int) places.countOfTrip(trip.getId()),
+                    trip.getGroupId(),
+                    trip.getGroupId() == null ? null : groupNames.get(trip.getGroupId()));
         }).toList();
     }
 
@@ -84,8 +106,9 @@ public class TripService {
         }
         LocalDate start = DayLabels.parse(startIso);
 
+        /* 사본은 베낀 사람의 혼자 여행입니다. 모임까지 물려받으면 모임
+           사람들 모두의 목록에 말없이 여행 하나가 더 생깁니다. */
         Trip made = trips.save(Trip.builder().title(cleanTitle).ownerId(me.id()).build());
-        members.save(new TripMember(made.getId(), me.id(), TripRole.EDITOR));
 
         List<Day> originDays = days.findAllByTripIdOrderBySortAsc(tripId);
         for (int i = 0; i < originDays.size(); i++) {
@@ -149,15 +172,21 @@ public class TripService {
             return trips.findById(tripId)
                     .orElseThrow(() -> ApiException.notFound("여행을 찾을 수 없어요."));
         }
-        return members.findAllByIdUserId(me.id()).stream()
-                .map(m -> trips.findById(m.getTripId()).orElse(null))
-                .filter(java.util.Objects::nonNull)
+        return access.tripsOf(me.id()).stream()
                 .min(java.util.Comparator.comparing(Trip::getCreatedAt))
                 .orElseThrow(() -> ApiException.notFound("아직 여행이 없어요."));
     }
 
+    /**
+     * 여행을 만듭니다.
+     *
+     * <p>{@code groupId} 를 주면 그 모임의 여행이 됩니다 — 모임 사람들 모두의
+     * 목록에 함께 뜨고 모두가 고칠 수 있습니다. 안 주면 혼자 여행입니다.
+     * 모임 사람이 아니면 404 입니다. 남의 모임에 여행을 꽂아 넣는 길을 열어 둘
+     * 이유가 없습니다.
+     */
     @Transactional
-    public Trip create(AuthPrincipal me, String title, String startIso, int nights) {
+    public Trip create(AuthPrincipal me, String title, String startIso, int nights, String groupId) {
         String cleanTitle = title == null ? "" : title.trim();
         if (cleanTitle.isEmpty()) {
             throw ApiException.badRequest("여행 이름을 지어 주세요.");
@@ -165,8 +194,16 @@ public class TripService {
         LocalDate start = DayLabels.parse(startIso);
         int nightCount = Math.max(0, Math.min(MAX_NIGHTS, nights));
 
-        Trip trip = trips.save(Trip.builder().title(cleanTitle).ownerId(me.id()).build());
-        members.save(new TripMember(trip.getId(), me.id(), TripRole.EDITOR));
+        String inGroup = groupId == null || groupId.isBlank() ? null : groupId;
+        if (inGroup != null) {
+            groups.requireMember(inGroup, me.id());
+        }
+
+        Trip trip = trips.save(Trip.builder()
+                .title(cleanTitle)
+                .ownerId(me.id())
+                .groupId(inGroup)
+                .build());
 
         /* 0박이면 당일치기라 하루, 3박이면 나흘입니다. */
         for (int i = 0; i <= nightCount; i++) {
@@ -182,7 +219,8 @@ public class TripService {
         }
 
         audit.log(me.id(), "trip.create", trip.getId(),
-                Map.of("title", cleanTitle, "startIso", startIso, "nights", nightCount));
+                Map.of("title", cleanTitle, "startIso", startIso, "nights", nightCount,
+                        "group", String.valueOf(inGroup)));
         return trip;
     }
 
@@ -250,9 +288,55 @@ public class TripService {
         audit.log(me.id(), "trip.delete", trip.getId(), Map.of("title", trip.getTitle()));
     }
 
+    /**
+     * 이 여행의 사람들. 만든 사람이 맨 앞입니다.
+     *
+     * <p>이름을 붙여 냅니다 — 화면이 id 만 받으면 사람마다 또 물어야 합니다.
+     */
+    @Transactional(readOnly = true)
+    public List<Person> peopleOf(AuthPrincipal me, String tripId) {
+        Trip trip = access.mine(tripId, me.id());
+        return access.peopleOf(trip).stream()
+                .map(id -> users.findById(id)
+                        .map(u -> new Person(u.getId(), u.getName(), u.getMark(),
+                                u.getId().equals(trip.getOwnerId())))
+                        .orElse(null))
+                .filter(java.util.Objects::nonNull)
+                .toList();
+    }
+
+    /** @param owner 이 여행을 만든 사람인지. 이름 옆에 표를 다는 데 씁니다. */
+    public record Person(String id, String name, String mark, boolean owner) {
+    }
+
+    /**
+     * 혼자 만든 여행을 모임으로 옮기거나, 다시 혼자 것으로 뺍니다.
+     *
+     * <p>만든 사람만 합니다. 모임 사람 아무나 할 수 있게 하면 내 여행이 내가
+     * 모르는 사이에 남들이 보는 것이 됩니다.
+     *
+     * <p>{@code groupId} 를 비우면 모임에서 뺍니다 — 그 뒤로는 만든 사람만
+     * 봅니다. 기록은 지우지 않습니다.
+     */
+    @Transactional
+    public void moveToGroup(AuthPrincipal me, String tripId, String groupId) {
+        Trip trip = access.requireOwner(tripId, me.id());
+        String to = groupId == null || groupId.isBlank() ? null : groupId;
+        if (to != null) {
+            groups.requireMember(to, me.id());
+        }
+        trip.setGroupId(to);
+        audit.log(me.id(), "trip.group", tripId, Map.of("group", String.valueOf(to)));
+    }
+
+    /**
+     * @param groupId   모임 여행이면 그 모임. 혼자 여행이면 비어 있습니다.
+     * @param groupName 모임 이름. 화면이 「모임」 칸을 모임별로 묶는 데 씁니다.
+     */
     public record TripSummary(String id, String title, String ownerId,
                               String theme, String emoji,
                               LocalDate startIso, LocalDate endIso,
-                              int dayCount, int placeCount) {
+                              int dayCount, int placeCount,
+                              String groupId, String groupName) {
     }
 }

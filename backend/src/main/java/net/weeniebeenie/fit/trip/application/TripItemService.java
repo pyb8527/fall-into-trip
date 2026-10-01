@@ -32,7 +32,6 @@ public class TripItemService {
     private static final int MAX_PER_TRIP = 100;
 
     private final TripItemRepository items;
-    private final TripMemberRepository members;
     private final UserRepository users;
     private final TripAccessPolicy access;
 
@@ -104,17 +103,15 @@ public class TripItemService {
         if (ownerId == null || ownerId.isBlank()) {
             return null;
         }
-        boolean member = members.findAllByIdTripId(tripId).stream()
-                .anyMatch(m -> m.getId().getUserId().equals(ownerId));
-        if (!member) {
-            throw ApiException.badRequest("이 여행의 동행자가 아니에요.");
+        if (!access.peopleOf(tripId).contains(ownerId)) {
+            throw ApiException.badRequest("이 여행을 같이 보는 사람이 아니에요.");
         }
         return ownerId;
     }
 
     private Map<String, String> namesOf(String tripId) {
         Map<String, String> out = new LinkedHashMap<>();
-        members.findAllByIdTripId(tripId).forEach(m -> users.findById(m.getId().getUserId())
+        access.peopleOf(tripId).forEach(id -> users.findById(id)
                 .ifPresent(u -> out.put(u.getId(), u.getName())));
         return out;
     }

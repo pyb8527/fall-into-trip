@@ -41,7 +41,7 @@ public class TripReminder {
     private final DayRepository days;
     private final PlaceRepository places;
     private final TripRepository trips;
-    private final TripMemberRepository members;
+    private final TripAccessPolicy access;
     private final PushService push;
 
     /**
@@ -63,9 +63,7 @@ public class TripReminder {
             }
 
             trips.findById(day.getTripId()).ifPresent(trip -> {
-                List<String> people = members.findAllByIdTripId(trip.getId()).stream()
-                        .map(m -> m.getId().getUserId())
-                        .toList();
+                List<String> people = access.peopleOf(trip);
 
                 /*
                   고친 사람에게는 안 보내는 규칙(tell)이 여기서는 걸리면

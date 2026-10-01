@@ -1,4 +1,4 @@
-package net.weeniebeenie.fit.trip.domain;
+package net.weeniebeenie.fit.group.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
@@ -12,10 +12,10 @@ import java.io.Serializable;
 @NoArgsConstructor
 @AllArgsConstructor
 @EqualsAndHashCode
-public class TripMemberId implements Serializable {
+public class GroupMemberId implements Serializable {
 
-    @Column(name = "trip_id", length = 16)
-    private String tripId;
+    @Column(name = "group_id", length = 16)
+    private String groupId;
 
     @Column(name = "user_id", length = 16)
     private String userId;

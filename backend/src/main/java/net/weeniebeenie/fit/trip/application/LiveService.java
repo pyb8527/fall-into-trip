@@ -58,7 +58,6 @@ public class LiveService {
 
     private final TripPinRepository pins;
     private final TripLocationRepository locations;
-    private final TripMemberRepository members;
     private final UserRepository users;
     private final TripAccessPolicy access;
 

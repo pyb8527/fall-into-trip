@@ -32,7 +32,6 @@ public class CandidateService {
 
     private final TripCandidateRepository candidates;
     private final CandidateVoteRepository votes;
-    private final TripMemberRepository members;
     private final SavedPlaceRepository saved;
     private final PlaceRepository places;
     private final DayRepository days;
@@ -46,7 +45,7 @@ public class CandidateService {
         if (found.isEmpty()) {
             return List.of();
         }
-        int memberCount = (int) members.findAllByIdTripId(tripId).size();
+        int memberCount = access.peopleOf(tripId).size();
 
         Map<String, int[]> tally = new HashMap<>();          // [찬성, 반대]
         Map<String, Boolean> mine = new HashMap<>();

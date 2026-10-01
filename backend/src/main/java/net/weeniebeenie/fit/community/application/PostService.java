@@ -75,7 +75,6 @@ public class PostService {
     private final TripRepository trips;
     private final DayRepository days;
     private final PlaceRepository places;
-    private final TripMemberRepository members;
     private final TripAccessPolicy access;
     private final UserRepository users;
 
@@ -497,7 +496,6 @@ public class PostService {
                 .title(snap.path("title").asText(post.getTitle()))
                 .ownerId(me.id())
                 .build());
-        members.save(new TripMember(trip.getId(), me.id(), TripRole.EDITOR));
 
         /*
           고른 날만 가져옵니다.

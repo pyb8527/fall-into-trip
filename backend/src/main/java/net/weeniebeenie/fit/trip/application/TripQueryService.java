@@ -41,12 +41,17 @@ public class TripQueryService {
                 byDay,
                 /* 다니면서 볼 사진. 여행의 것이라 누가 보든 같습니다. */
                 visits.photosOfTrip(trip.getId()),
-                access.roleOf(trip.getId(), me.id()));
+                trip.getOwnerId().equals(me.id()));
     }
 
+    /**
+     * @param owner 내가 만든 여행인지. 지우기와 모임 옮기기가 여기에 걸립니다.
+     *              <p>고치기는 안 걸립니다 — 볼 수 있으면 고칠 수 있습니다.
+     *              모임에 구경꾼을 두지 않기로 했기 때문입니다.
+     */
     public record TripDetail(Trip trip, List<Day> days, Map<String, List<Place>> placesByDay,
                              /** 장소마다 챙겨 둔 사진들. 다니면서 볼 것입니다. */
                              List<net.weeniebeenie.fit.trip.domain.PlacePhoto> photos,
-                             TripRole myRole) {
+                             boolean owner) {
     }
 }

@@ -14,6 +14,17 @@ async function call(method, path, { body, token } = {}) {
   let data = null; try { data = await r.json(); } catch {}
   return { status: r.status, data };
 }
+
+/* 모임을 만들고 사람을 부릅니다. 여행은 그 모임 안에서 생깁니다. */
+async function makeGroup(ownerToken, name, mates = []) {
+  const g = await call("POST", "/api/groups", { token: ownerToken, body: { name } });
+  const gid = g.data.group.id;
+  for (const who of mates) {
+    const inv = await call("POST", `/api/groups/${gid}/invites`, { token: ownerToken, body: {} });
+    await call("POST", `/api/group-invites/${inv.data.invite.token}/accept`, { token: who });
+  }
+  return gid;
+}
 const stamp = Date.now();
 const reg = (who, name) => call("POST", "/api/auth/register",
   { body: { email: `${who}-${stamp}@test.com`, name, password: "pw-12345678" } });
@@ -39,13 +50,13 @@ r = await call("GET", "/api/news");
 T("로그인 없이는 401", r.status === 401 || r.status === 403, r.status);
 
 console.log("\n[2] 가의 여행에 나를 부릅니다");
-r = await call("POST", "/api/trips", { token: a, body: { title: "오사카 3박 4일", startIso: "2026-11-02", nights: 3 } });
+const groupId = await makeGroup(a, "오사카 모임", [b]);
+r = await call("POST", "/api/trips", { token: a, body: { title: "오사카 3박 4일", startIso: "2026-11-02", nights: 3, groupId } });
 const trip = r.data.trip.id;
 T("여행 생김", r.status === 200 && !!trip, r.data);
 
-r = await call("POST", `/api/trips/${trip}/invites`, { token: a, body: { role: "EDITOR" } });
-r = await call("POST", `/api/invites/${r.data.invite.token}/accept`, { token: b });
-T("나가 들어옴", r.status === 200, r.data);
+r = await call("GET", "/api/trip?trip=" + trip, { token: b });
+T("나가 여행을 봄", r.status === 200, r.data);
 
 r = await call("GET", "/api/trip?trip=" + trip, { token: a });
 const day = r.data.days[0].id;

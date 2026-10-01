@@ -52,7 +52,10 @@ public final class TripDtos {
 
             @Min(value = 0, message = "숙박일은 0 이상이어야 해요.")
             @Max(value = 30, message = "숙박일이 너무 길어요.")
-            Integer nights) {
+            Integer nights,
+
+            /** 모임 안에서 만들면 그 모임. 혼자 만들면 비어 있습니다. */
+            String groupId) {
 
         public int nightsOrZero() {
             return nights == null ? 0 : nights;
@@ -91,21 +94,23 @@ public final class TripDtos {
     public record TripSummaryView(String id, String title, String ownerId, String folderId,
                                   String theme, String emoji,
                                   LocalDate startIso, LocalDate endIso,
-                                  int dayCount, int placeCount) {
+                                  int dayCount, int placeCount,
+                                  String groupId, String groupName) {
 
         public static TripSummaryView of(TripService.TripSummary s, String folderId) {
             return new TripSummaryView(s.id(), s.title(), s.ownerId(), folderId,
                     s.theme(), s.emoji(),
-                    s.startIso(), s.endIso(), s.dayCount(), s.placeCount());
+                    s.startIso(), s.endIso(), s.dayCount(), s.placeCount(),
+                    s.groupId(), s.groupName());
         }
     }
 
     public record TripView(String id, String title, String ownerId,
-                           String theme, String emoji, Instant createdAt) {
+                           String theme, String emoji, String groupId, Instant createdAt) {
 
         public static TripView of(Trip t) {
             return new TripView(t.getId(), t.getTitle(), t.getOwnerId(),
-                    t.getTheme(), t.getEmoji(), t.getCreatedAt());
+                    t.getTheme(), t.getEmoji(), t.getGroupId(), t.getCreatedAt());
         }
     }
 

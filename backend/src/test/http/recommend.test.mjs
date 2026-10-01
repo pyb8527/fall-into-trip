@@ -22,6 +22,17 @@ async function call(method, path, { body, token } = {}) {
   return { status: r.status, data };
 }
 
+/* 모임을 만들고 사람을 부릅니다. 여행은 그 모임 안에서 생깁니다. */
+async function makeGroup(ownerToken, name, mates = []) {
+  const g = await call("POST", "/api/groups", { token: ownerToken, body: { name } });
+  const gid = g.data.group.id;
+  for (const who of mates) {
+    const inv = await call("POST", `/api/groups/${gid}/invites`, { token: ownerToken, body: {} });
+    await call("POST", `/api/group-invites/${inv.data.invite.token}/accept`, { token: who });
+  }
+  return gid;
+}
+
 const TAG = Date.now().toString(36);
 let r;
 
@@ -53,8 +64,8 @@ T("남은 못 부른다", r.status === 403 || r.status === 404, r.data);
 r = await ask({ query: "조용한 카페" }, undefined);
 T("로그인 없이는 못 부른다", r.status === 401, r.data);
 
-r = await call("POST", `/api/trips/${tripId}/invites`, { token: host, body: { role: "EDITOR" } });
-await call("POST", `/api/invites/${r.data.invite.token}/accept`, { token: mate });
+const groupId = await makeGroup(host, "추천 모임", [mate]);
+await call("PATCH", `/api/trips/${tripId}/group`, { token: host, body: { groupId } });
 
 console.log("\n[2] 무엇을 거절하는가");
 r = await ask({ query: "" }, host);

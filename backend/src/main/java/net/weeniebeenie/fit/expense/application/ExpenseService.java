@@ -13,7 +13,6 @@ import net.weeniebeenie.fit.trip.domain.DayRepository;
 import net.weeniebeenie.fit.trip.domain.Place;
 import net.weeniebeenie.fit.trip.domain.PlaceRepository;
 import net.weeniebeenie.fit.trip.domain.TripAccessPolicy;
-import net.weeniebeenie.fit.trip.domain.TripMemberRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -50,7 +49,6 @@ public class ExpenseService {
     private static final int MAX_PER_TRIP = 500;
 
     private final ExpenseRepository expenses;
-    private final TripMemberRepository members;
     private final DayRepository days;
     private final PlaceRepository places;
     private final UserRepository users;
@@ -81,9 +79,7 @@ public class ExpenseService {
     public List<Books> settle(AuthPrincipal me, String tripId) {
         access.requireCanRead(tripId, me.id());
 
-        List<String> memberIds = members.findAllByIdTripId(tripId).stream()
-                .map(m -> m.getId().getUserId())
-                .toList();
+        List<String> memberIds = access.peopleOf(tripId);
         Map<String, String> names = namesOf(tripId);
 
         /* 통화별로 갈라 놓고 각각 셉니다. */
@@ -133,7 +129,7 @@ public class ExpenseService {
                 ? me.id()
                 : draft.payerId();
         if (!memberIds.contains(payer)) {
-            throw ApiException.badRequest("이 여행의 동행자가 아니에요.");
+            throw ApiException.badRequest("이 여행을 같이 보는 사람이 아니에요.");
         }
 
         Expense made = expenses.save(Expense.builder()
@@ -188,7 +184,7 @@ public class ExpenseService {
         }
         if (draft.payerId() != null) {
             if (!memberIds.contains(draft.payerId())) {
-                throw ApiException.badRequest("이 여행의 동행자가 아니에요.");
+                throw ApiException.badRequest("이 여행을 같이 보는 사람이 아니에요.");
             }
             expense.setPayerId(draft.payerId());
         }
@@ -227,14 +223,12 @@ public class ExpenseService {
     }
 
     private List<String> memberIdsOf(String tripId) {
-        return members.findAllByIdTripId(tripId).stream()
-                .map(m -> m.getId().getUserId())
-                .toList();
+        return access.peopleOf(tripId);
     }
 
     private Map<String, String> namesOf(String tripId) {
         Map<String, String> out = new LinkedHashMap<>();
-        members.findAllByIdTripId(tripId).forEach(m -> users.findById(m.getId().getUserId())
+        access.peopleOf(tripId).forEach(id -> users.findById(id)
                 .ifPresent(u -> out.put(u.getId(), u.getName())));
         return out;
     }

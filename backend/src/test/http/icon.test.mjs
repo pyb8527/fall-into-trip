@@ -154,8 +154,11 @@ r = await call("PATCH", "/api/auth/mark", { body: { mark: "cat" } });
 T("로그인 없이는 못 바꿈", r.status === 401, r.data);
 
 await call("PATCH", "/api/auth/mark", { token: me, body: { mark: "fox" } });
-r = await call("GET", `/api/trips/${tripId}/members`, { token: me });
-T("동행자 목록에 그림이 옴", r.data.members.some(m => m.mark === "fox"), r.data.members);
+r = await call("POST", "/api/groups", { token: me, body: { name: "그림 모임" } });
+r = await call("GET", `/api/groups/${r.data.group.id}`, { token: me });
+T("모임 사람 목록에 그림이 옴", r.data.members.some(m => m.mark === "fox"), r.data.members);
+r = await call("GET", `/api/trips/${tripId}/people`, { token: me });
+T("여행 사람 목록에도 그림이 옴", r.data.people.some(p => p.mark === "fox"), r.data.people);
 
 console.log(`\n결과: ${pass} 통과 / ${fail} 실패`);
 process.exit(fail ? 1 : 0);

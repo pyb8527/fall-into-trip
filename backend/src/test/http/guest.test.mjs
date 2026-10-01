@@ -35,7 +35,9 @@ const postId = r.data.postId;
 await call("POST", `/api/posts/${postId}/comments`, { token: host, body: { text: "둘째 날은 좀 여유롭게" } });
 await call("POST", `/api/places/${PLACE}/tips`, { token: host, body: { text: "아침 일찍 가야 한산합니다" } });
 
-r = await call("POST", "/api/trips/" + tripId + "/invites", { token: host, body: { role: "EDITOR", days: 7 } });
+r = await call("POST", "/api/groups", { token: host, body: { name: "교토 모임" } });
+const groupId = r.data.group.id;
+r = await call("POST", `/api/groups/${groupId}/invites`, { token: host, body: { days: 7 } });
 const inviteToken = r.data.invite.token;
 T("초대 링크", typeof inviteToken === "string", r.data);
 
@@ -59,8 +61,8 @@ r = await call("GET", `/api/posts/${postId}/comments`);
 T("댓글 읽기", r.status === 200 && r.data.comments.length === 1, r.data);
 r = await call("GET", `/api/places/${PLACE}/tips`);
 T("장소 팁 읽기", r.status === 200 && r.data.tips.length === 1, r.data);
-r = await call("GET", "/api/invites/" + inviteToken + "/preview");
-T("초대 미리보기", r.status === 200 && r.data.invite.tripTitle === "교토 2박 3일", r.data);
+r = await call("GET", "/api/group-invites/" + inviteToken + "/preview");
+T("초대 미리보기", r.status === 200 && r.data.invite.name === "교토 모임", r.data);
 r = await call("GET", "/api/push/key");
 T("알림 공개키", r.status === 200, r.data);
 
@@ -77,7 +79,7 @@ for (const [name, method, path, body] of [
   ["신고",        "POST",   `/api/posts/${postId}/report`, { reason: "" }],
   ["댓글 남기기", "POST",   `/api/posts/${postId}/comments`, { text: "익명으로" }],
   ["팁 남기기",   "POST",   `/api/places/${PLACE}/tips`, { text: "익명으로" }],
-  ["초대 수락",   "POST",   `/api/invites/${inviteToken}/accept`, undefined],
+  ["초대 수락",   "POST",   `/api/group-invites/${inviteToken}/accept`, undefined],
   ["내 여행",     "GET",    "/api/trips", undefined],
   ["보석함",      "GET",    "/api/saved", undefined],
   ["폴더",        "GET",    "/api/folders", undefined],

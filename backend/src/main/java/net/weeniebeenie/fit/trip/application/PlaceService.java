@@ -27,7 +27,6 @@ public class PlaceService {
 
     private final PlaceRepository places;
     private final DayRepository days;
-    private final TripMemberRepository members;
     private final TripAccessPolicy access;
     private final AuditService audit;
     private final PushService push;
@@ -42,9 +41,7 @@ public class PlaceService {
      * 고치는 일이 막히면 앞뒤가 바뀝니다.
      */
     private void announce(AuthPrincipal me, String tripId, String what) {
-        List<String> people = members.findAllByIdTripId(tripId).stream()
-                .map(m -> m.getId().getUserId())
-                .toList();
+        List<String> people = access.peopleOf(tripId);
         push.tell(people, me.id(), tripId, me.name() + " 님이 일정을 고쳤어요", what,
                 "/trip/" + tripId);
     }
