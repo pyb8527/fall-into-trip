@@ -28,8 +28,29 @@ export default function Document({ children }: PropsWithChildren) {
       <head>
         <meta charSet="utf-8" />
         <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
-        {/* 폰에서 손가락으로 벌려 확대하는 것은 막지 않되, 처음 배율은 1 로. */}
-        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+        {/*
+          손가락으로 벌려 확대하는 것을 막습니다.
+
+          <p>열어 두었었습니다 — 글자가 작게 보이는 사람에게 막으면 길이
+          없어진다고 봤습니다.
+
+          <p>그런데 이 화면들은 <b>앱으로 쓰는 것</b>입니다. 굴리다 손가락이
+          스치면 전체가 커지고, 되돌리려면 다시 정확히 오므려야 합니다.
+          폰에서 그 몸짓은 지도와 사진 위에서 특히 자주 걸립니다 — 그 둘이
+          화면의 절반입니다.
+
+          <p>글자를 키워야 하는 사람에게는 더 나은 길이 있습니다. 폰과
+          브라우저의 글꼴 크기 설정은 이 화면에도 그대로 먹고, 레이아웃이
+          따라 늘어나며, 무엇보다 <b>한 번 정해 두면 계속 그대로</b>입니다.
+          벌려서 키운 것은 화면을 옮길 때마다 다시 해야 합니다.
+
+          <p>iOS 사파리는 이 값을 무시합니다. 거기서는 지금처럼 벌려 볼 수
+          있습니다 — 애플이 일부러 그렇게 두었고, 우리가 막을 길이 없습니다.
+        */}
+        <meta
+          name="viewport"
+          content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, shrink-to-fit=no"
+        />
 
         {/*
           아이콘 글꼴이 깊은 주소에서 엉뚱한 곳으로 새는 것을 막습니다.
