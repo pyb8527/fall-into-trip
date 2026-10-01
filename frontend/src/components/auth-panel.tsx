@@ -7,7 +7,17 @@ import { useAuth } from '@/auth/auth-provider';
 import { Spacing } from '@/constants/theme';
 import { GoogleButton } from '@/components/google-button';
 import { canSignInWithGoogle } from '@/lib/google-signin';
-import { Body, Button, Caption, ErrorNote, Field, Screen, SegmentedTabs, Title } from '@/ui';
+import {
+  Body,
+  Button,
+  Caption,
+  Card,
+  ErrorNote,
+  Field,
+  Screen,
+  SegmentedTabs,
+  Title,
+} from '@/ui';
 import { LogoLockup } from '@/ui/logo';
 
 /** 서버의 AuthService.PASSWORD_MIN 과 같아야 합니다. */
@@ -135,17 +145,28 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
         <LogoLockup size={104} />
       </View>
 
-      <SegmentedTabs items={TABS} value={mode} onChange={switchTo} />
+      {/*
+        띠와 그 아래가 한 장입니다.
 
-      <View style={styles.head}>
-        <Title>{isRegister ? '여행을 시작해요' : '다시 오셨네요'}</Title>
-        <Body tone="secondary">
-          {isRegister ? '계정을 만들면 바로 일정을 짤 수 있어요.' : '여행을 이어서 짜 봅시다.'}
-        </Body>
-      </View>
+        <p>띠만 흰 바닥을 갖고 인사말과 칸들은 회색 위에 떠 있었습니다. 그래서
+        <b>띠가 그 아래와 다른 것</b>처럼 보였습니다 — 「로그인」을 눌러 바뀌는
+        것이 바로 아래 칸들인데요.
 
-      {/* 칸이 줄로 바뀌었으니 그것을 다시 상자에 담지 않습니다. */}
-      <View style={styles.form}>
+        <p>한 판에 담습니다. 띠는 판의 머리가 되고, 고른 것이 무엇을 바꾸는지가
+        같은 종이 안에서 보입니다.
+      */}
+      <Card style={styles.panel}>
+        <SegmentedTabs items={TABS} value={mode} onChange={switchTo} />
+
+        <View style={styles.head}>
+          <Title>{isRegister ? '여행을 시작해요' : '다시 오셨네요'}</Title>
+          <Body tone="secondary">
+            {isRegister ? '계정을 만들면 바로 일정을 짤 수 있어요.' : '여행을 이어서 짜 봅시다.'}
+          </Body>
+        </View>
+
+        {/* 칸이 줄로 바뀌었으니 그것을 다시 상자에 담지 않습니다. */}
+        <View style={styles.form}>
         <Field
           label="이메일"
           value={email}
@@ -200,7 +221,8 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
           "또는" 이 아무것도 안 가리킵니다.
         */}
         <GoogleBlock onDone={withGoogle} />
-      </View>
+        </View>
+      </Card>
     </Screen>
   );
 }
@@ -234,6 +256,10 @@ function GoogleBlock({ onDone }: { onDone: (credential: string) => void }) {
 }
 
 const styles = StyleSheet.create({
+  /* 띠부터 단추까지가 한 장입니다. */
+  panel: {
+    gap: Spacing.md,
+  },
   social: {
     gap: Spacing.md,
     alignItems: 'center',

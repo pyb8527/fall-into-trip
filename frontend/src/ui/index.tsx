@@ -1415,8 +1415,61 @@ export function SegmentedTabs<T extends string>({
   value: T;
   onChange: (value: T) => void;
 }) {
+  /* 알약 한 칸의 너비를 알아야 미끄러뜨릴 수 있습니다. 칸은 고르게 나누므로
+     전체를 재서 수로 나눕니다. */
+  const [wide, setWide] = useState(0);
+  const at = Math.max(0, items.findIndex((item) => item.value === value));
+  const slide = useRef(new Animated.Value(at)).current;
+
+  useEffect(() => {
+    Animated.spring(slide, {
+      toValue: at,
+      damping: Motion.spring.damping,
+      stiffness: Motion.spring.stiffness,
+      mass: Motion.spring.mass,
+      useNativeDriver: true,
+    }).start();
+  }, [at, slide]);
+
+  const cell = wide > 0 ? (wide - SEGMENT_PAD * 2) / items.length : 0;
+
   return (
-    <View style={styles.segment} accessibilityRole="tablist">
+    <View
+      style={styles.segment}
+      onLayout={(e) => setWide(e.nativeEvent.layout.width)}
+      accessibilityRole="tablist">
+      {/*
+        고른 칸을 덮는 알약.
+
+        <p>칸마다 바탕을 켜고 끄면 <b>꺼지고 켜지는</b> 것으로 보입니다.
+        하나짜리 알약이 옮겨 가면 <b>같은 것이 움직인</b> 것으로 보이고,
+        그래야 둘이 한 벌이라는 것이 읽힙니다.
+
+        <p>글자 뒤에 깔립니다. 위에 얹으면 글자를 가립니다.
+
+        <p>칸이 하나뿐이면 안 그립니다 — 옮겨 갈 데가 없고, 보간에는 눈금이
+        둘 이상 있어야 합니다.
+      */}
+      {cell > 0 && items.length > 1 ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.segmentPill,
+            {
+              width: cell,
+              transform: [
+                {
+                  translateX: slide.interpolate({
+                    inputRange: items.map((_, i) => i),
+                    outputRange: items.map((_, i) => i * cell),
+                  }),
+                },
+              ],
+            },
+          ]}
+        />
+      ) : null}
+
       {items.map((item) => {
         const selected = item.value === value;
         return (
@@ -1425,7 +1478,7 @@ export function SegmentedTabs<T extends string>({
             onPress={() => onChange(item.value)}
             accessibilityRole="tab"
             accessibilityState={{ selected }}
-            style={[styles.segmentItem, selected && styles.segmentItemOn]}>
+            style={styles.segmentItem}>
             <Text style={[styles.segmentLabel, selected && styles.segmentLabelOn]}>
               {item.label}
             </Text>
@@ -1435,6 +1488,9 @@ export function SegmentedTabs<T extends string>({
     </View>
   );
 }
+
+/** 띠 가장자리와 알약 사이. 알약이 테두리에 붙으면 눌린 것처럼 보입니다. */
+const SEGMENT_PAD = 4;
 
 /**
  * 판 위에 있는가.
@@ -3035,45 +3091,45 @@ const styles = StyleSheet.create({
   },
 
   /*
-    띠는 상자가 아니라 밑줄입니다.
+    띠는 밑줄이 아니라 알약입니다.
 
-    전에는 회색 상자 안에 칸을 넣고 고른 칸만 더 밝게 두었습니다. 색을
-    걷어 내니 그 두 밝기가 거의 같아져 어느 것이 켜졌는지 보이지
-    않았습니다. 그리고 상자가 하나 줄면 화면의 도형도 하나 줍니다.
+    <h3>밑줄이었던 까닭과 그만둔 까닭</h3>
 
-    이제 고른 칸 아래에만 굵은 선이 그어집니다. 밝기가 아니라 있고 없음
-    이라 흑백에서도 한눈에 갈립니다.
-  */
-  /*
-    띠도 판 위에 섭니다.
+    <p>한동안 고른 칸 아래에만 굵은 선을 그었습니다. 밝기가 아니라 있고 없음
+    이라 한눈에 갈린다고 봤습니다.
 
-    <p>회색 바탕에 밑줄만 그어 두었습니다. 누르는 것이라 판에 안 넣었는데,
-    그러면 <b>어디까지가 고르는 자리이고 어디부터가 결과인지</b> 안 보입니다.
+    <p>그런데 밑줄은 <b>칸이 아니라 경계</b>를 말합니다. 그래서 띠가 아래
+    내용의 머리처럼 읽혔고, 무엇보다 고른 칸이 <b>움직이지 않았습니다</b> —
+    여기 켜졌다 저기 켜졌다 할 뿐이라 둘이 한 벌이라는 것이 안 보입니다.
     화면 맨 위에 서는 것이라 더 그렇습니다.
 
-    <p>밑줄은 그대로 둡니다. 고른 칸을 말하는 것이 밑줄이고, 판은 그 밑줄이
-    놓일 바닥을 줄 뿐입니다.
+    <p>이제 바탕을 깔고 그 위에서 알약 하나가 미끄러집니다. 같은 것이 옮겨
+    가므로 둘이 한 벌이고, 지금 어느 쪽인지가 모양으로 남습니다.
+
+    <p>바탕은 회색입니다. 흰 판 위에 서든 회색 화면에 서든 제 바닥을 갖고,
+    그 위의 흰 알약이 「지금 여기」를 말합니다.
   */
   segment: {
     flexDirection: 'row',
+    backgroundColor: Colors.fill,
+    borderRadius: Radius.full,
+    padding: SEGMENT_PAD,
+  },
+  /* 고른 칸을 덮는 흰 알약. 글자 뒤에 깝니다. */
+  segmentPill: {
+    position: 'absolute',
+    top: SEGMENT_PAD,
+    bottom: SEGMENT_PAD,
+    left: SEGMENT_PAD,
+    borderRadius: Radius.full,
     backgroundColor: Colors.surface,
-    borderRadius: Radius.md,
-    paddingHorizontal: Spacing.xs,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.border,
+    ...Elevation.stamp,
   },
   segmentItem: {
     flex: 1,
     height: Tap.min,
     alignItems: 'center',
     justifyContent: 'center',
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
-    /* 컨테이너의 가는 선 위에 겹쳐 그어야 두 줄로 보이지 않습니다. */
-    marginBottom: -StyleSheet.hairlineWidth,
-  },
-  segmentItemOn: {
-    borderBottomColor: Colors.text,
   },
   segmentLabel: {
     ...Type.bodySmall,
