@@ -89,6 +89,7 @@ public class PostService {
     private final net.weeniebeenie.fit.trip.application.VisitService visits;
     private final net.weeniebeenie.fit.photo.domain.PhotoRepository photos;
     /* 여행기에 같이 실을 피드 글. 글쓴이가 고른 것만 담습니다. */
+    private final net.weeniebeenie.fit.trip.domain.PlacePhotoRepository placePhotos;
     private final net.weeniebeenie.fit.feed.domain.PostRepository stories;
     private final net.weeniebeenie.fit.feed.domain.PostPhotoRepository storyPhotos;
 
@@ -101,7 +102,7 @@ public class PostService {
     public TripPost publish(AuthPrincipal me, String tripId, String title, String summary,
                             String region, List<String> tags, List<String> dayIds,
                             boolean feedback, String coverPhotoId, Visibility visibility,
-                            List<String> storyIds) {
+                            List<String> storyIds, List<String> placePhotoIds) {
         Trip trip = access.requireOwner(tripId, me.id());
 
         if (posts.findAllByAuthorIdOrderByCreatedAtDesc(me.id(), Pageable.ofSize(1))
@@ -141,7 +142,9 @@ public class PostService {
                   <p>올린 사람 것만 봅니다. 같이 간 사람이 각자 찍은 도장은
                   그 사람 것이고, 남의 감상을 내 글에 실을 일이 아닙니다.
                 */
-                .snapshot(snapshotOf(clean, dayList, placeList, storiesOf(me, trip, dayList, storyIds)))
+                .snapshot(snapshotOf(clean, dayList, placeList,
+                        storiesOf(me, trip, dayList, storyIds),
+                        shownPhotos(placeList, placePhotoIds)))
                 .dayCount(dayList.size())
                 .placeCount(placeList.size())
                 .feedback(feedback)
@@ -159,7 +162,7 @@ public class PostService {
      * 일정의 일부가 아닙니다. 남이 복제해 갈 때 따라가면 안 됩니다.
      */
     private String snapshotOf(String title, List<Day> dayList, List<Place> placeList,
-                              List<Story> storyList) {
+                              List<Story> storyList, Map<String, List<String>> shownByPlace) {
         ObjectNode root = mapper.createObjectNode();
         root.put("title", title);
 
@@ -256,17 +259,25 @@ public class PostService {
                   화면이 보여 주어야 합니다.
                 */
                 /*
-                  장소에 붙은 사진은 사본에 안 담습니다.
+                  장소에 붙은 사진 — <b>고른 것만</b> 담습니다.
 
-                  <p>여기 남은 것은 「다니면서 볼 사진」뿐입니다 — 메뉴판,
-                  예매 화면, 가는 길 지도. 그건 다니려고 넣어 둔 것이지 남에게
-                  보이려고 넣은 것이 아닙니다. 담으면 <b>남의 여행기에 내 예매
-                  QR 이 실립니다.</b>
+                  <p>한동안 하나도 안 담았습니다. 여기 남은 것이 「다니면서 볼
+                  사진」이라서입니다 — 메뉴판, 예매 화면, 가는 길 지도. 통째로
+                  담으면 <b>남의 여행기에 내 예매 QR 이 실립니다.</b>
 
-                  <p>「그 자리에서 남긴 것」은 걷었습니다. 그래서 지금 사본에는
-                  사진이 안 실립니다 — 피드 글을 골라 싣는 길이 3단계에 들어
-                  옵니다(docs/groups/plan.md).
+                  <p>그래서 안 담는 쪽을 택했는데, 그러면 <b>장소마다 찍어 둔
+                  진짜 사진도 같이 묻힙니다.</b> 여행기를 읽는 사람이 가장 보고
+                  싶은 것이 그것인데 말입니다.
+
+                  <p>올릴 때 고르게 합니다. 기본은 아무것도 안 고름입니다 —
+                  공개로 돌리는 것은 한 장씩 고르는 일이어야 하고, 그래야 예매
+                  화면이 섞여 나갈 일이 없습니다.
                 */
+                List<String> picked = shownByPlace.get(p.getId());
+                if (picked != null && !picked.isEmpty()) {
+                    ArrayNode shotNodes = n.putArray("photos");
+                    picked.forEach(shotNodes::add);
+                }
             }
         }
         return root.toString();
@@ -341,6 +352,36 @@ public class PostService {
         /* 올린 차례대로. 고른 차례는 화면이 어떻게 늘어놓았느냐에 달렸는데,
            읽는 사람에게 뜻이 있는 것은 시간입니다. */
         out.sort(java.util.Comparator.comparing(Story::at));
+        return out;
+    }
+
+    /**
+     * 여행기에 실을 장소 사진을 골라 담습니다.
+     *
+     * <p>고른 번호가 <b>이 여행의 장소에 실제로 붙어 있는지</b>를 봅니다.
+     * 안 보면 남의 사진 번호를 넣어 공개 글에 실을 수 있습니다 — 번호는
+     * 난수라 찍어서 맞히기 어렵지만, 어렵다는 것이 막았다는 뜻은 아닙니다.
+     *
+     * <p>차례는 장소에 붙어 있던 차례 그대로입니다. 고른 차례는 화면이
+     * 어떻게 늘어놓았느냐에 달렸는데, 읽는 사람에게 뜻이 있는 것은 그 장소에
+     * 놓인 차례입니다.
+     *
+     * @return 장소 번호 → 그 장소에 실을 사진들
+     */
+    private Map<String, List<String>> shownPhotos(List<Place> placeList, List<String> want) {
+        if (want == null || want.isEmpty()) {
+            return Map.of();
+        }
+        Set<String> wanted = Set.copyOf(want);
+        List<String> placeIds = placeList.stream().map(Place::getId).toList();
+
+        Map<String, List<String>> out = new java.util.HashMap<>();
+        for (net.weeniebeenie.fit.trip.domain.PlacePhoto pp :
+                placePhotos.findAllByPlaceIdInOrderByPlaceIdAscSortAsc(placeIds)) {
+            if (wanted.contains(pp.getPhotoId())) {
+                out.computeIfAbsent(pp.getPlaceId(), k -> new ArrayList<>()).add(pp.getPhotoId());
+            }
+        }
         return out;
     }
 

@@ -10,6 +10,9 @@ public interface PlacePhotoRepository extends JpaRepository<PlacePhoto, PlacePho
 
     List<PlacePhoto> findAllByPlaceIdOrderBySortAsc(String placeId);
 
+    /** 여러 장소의 것을 한 번에. 여행기에 실을 사진을 고를 때 씁니다. */
+    List<PlacePhoto> findAllByPlaceIdInOrderByPlaceIdAscSortAsc(List<String> placeIds);
+
     /** 이 여행에 챙겨 둔 사진 전부. */
     @Query("""
            SELECT pp FROM PlacePhoto pp

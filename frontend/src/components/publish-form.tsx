@@ -2,7 +2,7 @@ import { StyleSheet, View } from 'react-native';
 import { useEffect, useState } from 'react';
 
 import { api, ApiError, UNEXPECTED } from '@/api/client';
-import type { FeedPost } from '@/api/types';
+import type { FeedPost, TripDetail } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { OurPhoto } from '@/components/our-photo';
 import { PostFields, type PostShape } from '@/components/post-fields';
@@ -17,6 +17,9 @@ import { BottomSheet, Button, Caption, Checkbox, Chip, ErrorNote, Grow, Press, R
  * 내리고 다시 올려야 합니다. 화면에 그렇게 적어 둡니다 — 안 적으면 고쳤는데
  * 왜 글이 그대로냐는 말이 나옵니다.
  */
+/** 고른 사진을 늘어놓는 네모의 한 변. */
+const THUMB = 64;
+
 export function PublishForm({
   visible,
   tripId,
@@ -76,6 +79,16 @@ export function PublishForm({
   */
   const [pickedStories, setPickedStories] = useState<string[]>([]);
 
+  /*
+    장소마다 실을 사진.
+
+    <p>기본은 <b>아무것도 안 고름</b>입니다. 여기 쌓인 것은 「다니면서 볼
+    사진」이라 — 메뉴판, 예매 화면, 가는 길 지도 — 통째로 실으면 남의
+    여행기에 내 예매 QR 이 올라갑니다. 공개로 돌리는 것은 한 장씩 고르는
+    일이어야 합니다.
+  */
+  const [pickedShots, setPickedShots] = useState<string[]>([]);
+
   const { data: storyData } = useAsync<{ posts: FeedPost[] }>(
     (signal) =>
       visible
@@ -85,15 +98,26 @@ export function PublishForm({
   );
   const stories = (storyData?.posts ?? []).filter((p) => p.mine);
 
-  const { data: tripDays } = useAsync<{ days: { id: string; label: string; date: string | null }[] }>(
-    (signal) =>
-      api
-        .get<{ days: { id: string; label: string; date: string | null }[] }>(
-          `/api/trip?trip=${encodeURIComponent(tripId)}`,
-          signal,
-        )
-        .then((t) => ({ days: t.days })),
+  /*
+    날짜와, 장소마다 챙겨 둔 사진.
+
+    <p>둘 다 같은 한 번에 옵니다 — 날을 고르는 칸과 사진을 고르는 칸이 따로
+    묻게 두면 같은 것을 두 번 받아 옵니다.
+  */
+  const { data: trip } = useAsync<TripDetail>(
+    (signal) => api.get(`/api/trip?trip=${encodeURIComponent(tripId)}`, signal),
     [tripId],
+  );
+  const tripDays = trip ? { days: trip.days } : null;
+
+  /** 장소 번호 → 그 장소에 챙겨 둔 사진들. */
+  const shotsOf = new Map((trip?.refs ?? []).map((r) => [r.placeId, r.photoIds]));
+
+  /** 사진이 있는 장소만, 날짜 차례대로. */
+  const withShots = (trip?.days ?? []).flatMap((d) =>
+    d.places
+      .filter((p) => (shotsOf.get(p.id)?.length ?? 0) > 0)
+      .map((p) => ({ day: d, place: p, shots: shotsOf.get(p.id) ?? [] })),
   );
 
   /* 판은 닫혀도 화면에 남아 있어 처음 잡은 값이 다음에 열 때도 그대로입니다. */
@@ -113,6 +137,7 @@ export function PublishForm({
     setFailed(null);
     setBusy(false);
     setPickedStories([]);
+    setPickedShots([]);
   }, [visible, tripTitle]);
 
   async function submit() {
@@ -136,6 +161,7 @@ export function PublishForm({
         coverPhotoId: shape.coverPhotoId,
         visibility: shape.visibility,
         storyIds: pickedStories,
+        placePhotoIds: pickedShots,
       });
       onDone(res.postId);
     } catch (e) {
@@ -242,6 +268,50 @@ export function PublishForm({
         </>
       ) : null}
 
+      {/*
+        장소마다 챙겨 둔 사진.
+
+        <p>한동안 여행기에 사진이 한 장도 안 실렸습니다. 여기 쌓인 것이
+        「다니면서 볼 사진」이라 통째로 담으면 예매 화면이 섞여 나가기
+        때문인데, 그러느라 <b>장소마다 찍어 둔 진짜 사진도 같이 묻혔습니다</b> —
+        읽는 사람이 가장 보고 싶은 것이 그것인데 말입니다.
+
+        <p>한 장씩 고릅니다. 고른 것만 올라갑니다.
+      */}
+      {withShots.length > 0 ? (
+        <>
+          <Caption tone="secondary">
+            장소에 챙겨 둔 사진을 같이 실을까요? 고른 것만 공개돼요.
+          </Caption>
+          {withShots.map(({ day, place, shots }) => (
+            <View key={place.id} style={styles.spot}>
+              <Caption tone="muted" numberOfLines={1}>
+                {day.date || day.label} · {place.name}
+              </Caption>
+              <Row gap={Spacing.s2} style={styles.wrap}>
+                {shots.map((id) => {
+                  const on = pickedShots.includes(id);
+                  return (
+                    <Press
+                      key={id}
+                      onPress={() =>
+                        setPickedShots((was) =>
+                          was.includes(id) ? was.filter((x) => x !== id) : [...was, id],
+                        )
+                      }
+                      accessibilityLabel={`${place.name} 사진 같이 싣기`}
+                      accessibilityState={{ selected: on }}
+                      style={[styles.shot, on ? styles.shotOn : null]}>
+                      <OurPhoto id={id} width={THUMB} height={THUMB} />
+                    </Press>
+                  );
+                })}
+              </Row>
+            </View>
+          ))}
+        </>
+      ) : null}
+
       <PostFields value={shape} onChange={setShape} />
 
       {failed ? <ErrorNote message={failed} /> : null}
@@ -257,6 +327,20 @@ const styles = StyleSheet.create({
   },
   stories: {
     gap: Spacing.s2,
+  },
+  spot: {
+    gap: Spacing.s1,
+  },
+  /* 고른 사진은 테두리가 말합니다. 체크를 얹으면 작은 그림이 가립니다. */
+  shot: {
+    borderRadius: Radius.r2,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: 'transparent',
+    backgroundColor: 'transparent',
+  },
+  shotOn: {
+    borderColor: Colors.accent,
   },
   /*
     고른 것이 보이게 테두리를 둡니다. 체크만으로는 줄이 여럿일 때 어느 것을
