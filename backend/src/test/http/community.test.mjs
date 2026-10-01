@@ -62,6 +62,12 @@ r = await call("GET", "/api/posts?tag=없는태그");
 T("없는 태그면 안 나옴", !r.data.posts.some(p => p.id === postId), r.data.posts?.length);
 r = await call("GET", "/api/posts?sort=new&tag=아이랑");
 T("정렬을 바꿔도 같은 조건", r.data.posts.some(p => p.id === postId), r.data.posts?.length);
+/* 「있는 태그로 찾으면 나온다」만 보면 거름망이 아예 없어도 통과합니다.
+   정렬마다 「없는 태그로 찾으면 안 나온다」를 봐야 합니다. */
+for (const how of ["new", "top", "hot"]) {
+  r = await call("GET", `/api/posts?sort=${how}&tag=없는태그`);
+  T(`${how} 에서도 없는 태그면 안 나옴`, !r.data.posts.some(p => p.id === postId), r.data.posts?.length);
+}
 
 r = await call("POST", `/api/trips/${tripId}/publish`, { token: reader, body: {} });
 T("남의 여행은 못 올림", r.status === 403 || r.status === 404, r.data);

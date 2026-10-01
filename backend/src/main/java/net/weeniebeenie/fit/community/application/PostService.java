@@ -784,6 +784,9 @@ public class PostService {
         if (!mine && me.role() != Role.ADMIN) {
             throw ApiException.forbidden("내 글만 내릴 수 있어요.");
         }
+        /* 댓글을 코드가 지웁니다. post_comments.post_id 는 이제 두 표를
+           가리켜 외래키가 없습니다(CommentKind) — DB 가 안 데려갑니다. */
+        comments.deleteAllByPostId(postId);
         posts.delete(post);
         audit.log(me.id(), mine ? "post.remove" : "post.remove.admin", postId);
     }

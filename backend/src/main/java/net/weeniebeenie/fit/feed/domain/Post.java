@@ -1,0 +1,99 @@
+package net.weeniebeenie.fit.feed.domain;
+
+import jakarta.persistence.*;
+import lombok.*;
+import net.weeniebeenie.fit.shared.domain.Ids;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
+import java.time.Instant;
+
+/**
+ * 피드 글 한 편 — 사진 몇 장과 글 한 줄.
+ *
+ * <h3>장소에서 떼어 냈습니다</h3>
+ *
+ * <p>장소마다 기록을 남기게 했던 자리가 있었는데 아무도 안 썼습니다. 이유는
+ * 분명했습니다 — 무엇을 남기려면 <b>장소를 먼저 골라야</b> 해서, 숙소에서 찍은
+ * 단체 사진은 올릴 데가 없었습니다. 여행에서 가장 남기고 싶은 사진이 정작 갈
+ * 곳이 없는 셈이었습니다.
+ *
+ * <h3>여행기와 다릅니다</h3>
+ *
+ * <p>{@code TripPost}(여행기)는 제목·지역·사본·공개 범위를 가집니다. 남에게
+ * 내놓는 글이라 그렇습니다. 이쪽은 하나도 안 가집니다 — 아는 사람들끼리 보는
+ * 것이고, 그래서 올리는 데 드는 품이 사진 고르기 하나여야 합니다.
+ *
+ * <h3>그룹이 이 글의 주인이 아닙니다</h3>
+ *
+ * <p>{@code groupId} 가 비어 있으면 내 피드입니다. 그래서 표 이름도
+ * {@code group_posts} 가 아니라 {@code posts} 입니다.
+ */
+@Entity
+@Table(name = "posts")
+@Getter
+@Setter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+public class Post {
+
+    @Id
+    @Column(length = 16)
+    private String id;
+
+    @Column(name = "author_id", nullable = false, length = 16)
+    private String authorId;
+
+    /** 비어 있으면 내 피드입니다. */
+    @Column(name = "group_id", length = 16)
+    private String groupId;
+
+    /**
+     * 어느 여행 이야기인지. 안 골라도 됩니다.
+     *
+     * <p>여행을 지워도 글은 남습니다(ON DELETE SET NULL). 글은 그 여행이
+     * 아니라 <b>그때 있었던 일</b>에 대한 것입니다.
+     */
+    @Column(name = "trip_id", length = 16)
+    private String tripId;
+
+    /** 사진만 올려도 됩니다. 그때는 비어 있습니다. */
+    @Column(length = 2000)
+    private String text;
+
+    /**
+     * 자유 태그.
+     *
+     * <p>고르는 목록을 두지 않습니다. 무엇으로 묶일지는 미리 알 수 없고,
+     * 목록을 만들어 두면 거기 없는 이야기는 아무 데도 안 걸립니다.
+     */
+    @Column(columnDefinition = "text[]")
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    private String[] tags = new String[0];
+
+    /** 신고를 받아 운영자가 내린 것. 지우지 않고 감춥니다. */
+    @Column(nullable = false)
+    private boolean hidden;
+
+    @Column(name = "created_at", nullable = false)
+    private Instant createdAt;
+
+    @Column(name = "updated_at", nullable = false)
+    private Instant updatedAt;
+
+    @Builder
+    public Post(String authorId, String groupId, String tripId, String text, String[] tags) {
+        this.id = Ids.next();
+        this.authorId = authorId;
+        this.groupId = groupId;
+        this.tripId = tripId;
+        this.text = text;
+        this.tags = tags == null ? new String[0] : tags;
+        this.createdAt = Instant.now();
+        this.updatedAt = this.createdAt;
+    }
+
+    /** 고친 때를 지금으로. 고치는 자리마다 적는 것을 잊지 않으려고 둡니다. */
+    public void touch() {
+        this.updatedAt = Instant.now();
+    }
+}

@@ -4,6 +4,8 @@ import lombok.RequiredArgsConstructor;
 import net.weeniebeenie.fit.account.domain.User;
 import net.weeniebeenie.fit.account.domain.UserRepository;
 import net.weeniebeenie.fit.account.infrastructure.security.AuthPrincipal;
+import net.weeniebeenie.fit.community.domain.PostCommentRepository;
+import net.weeniebeenie.fit.feed.domain.PostRepository;
 import net.weeniebeenie.fit.group.domain.*;
 import net.weeniebeenie.fit.shared.error.ApiException;
 import net.weeniebeenie.fit.support.audit.AuditService;
@@ -53,6 +55,10 @@ public class GroupService {
     private final GroupRepository groups;
     private final GroupMemberRepository members;
     private final TripRepository trips;
+    /* 모임을 지울 때 그 안의 글에 달린 댓글을 치웁니다. FeedService 를 부르면
+       콩이 서로를 물어(FeedService 가 이쪽을 씁니다) 스프링이 못 뜹니다. */
+    private final PostRepository posts;
+    private final PostCommentRepository comments;
     private final UserRepository users;
     private final AuditService audit;
 
@@ -157,6 +163,20 @@ public class GroupService {
     public void delete(AuthPrincipal me, String groupId) {
         requireOwner(groupId, me.id());
         trips.findAllByGroupIdIn(List.of(groupId)).forEach(t -> t.setGroupId(null));
+
+        /*
+          글에 달린 댓글을 먼저 치웁니다.
+
+          <p>글 자체는 posts.group_id 의 ON DELETE CASCADE 가 데려갑니다.
+          댓글은 post_id 에 외래키가 없어(CommentKind) 안 따라갑니다 —
+          여기서 안 치우면 열어 볼 글이 없는 댓글이 운영 화면에 영영
+          남습니다.
+        */
+        List<String> written = posts.idsOfGroup(groupId);
+        if (!written.isEmpty()) {
+            comments.deleteAllByPostIdIn(written);
+        }
+
         groups.deleteById(groupId);
         audit.log(me.id(), "group.delete", groupId);
     }
@@ -213,6 +233,12 @@ public class GroupService {
     public GroupMember requireMember(String groupId, String userId) {
         return members.findByIdGroupIdAndIdUserId(groupId, userId)
                 .orElseThrow(() -> ApiException.notFound("모임을 찾을 수 없어요."));
+    }
+
+    /** 묻기만 합니다. 아니면 false — 오류를 던지지 않습니다. */
+    public boolean isMember(String groupId, String userId) {
+        return groupId != null && userId != null
+                && members.findByIdGroupIdAndIdUserId(groupId, userId).isPresent();
     }
 
     public Group requireOwner(String groupId, String userId) {

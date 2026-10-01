@@ -30,6 +30,16 @@ public class PostComment {
     @Column(name = "post_id", nullable = false, length = 16)
     private String postId;
 
+    /**
+     * 여행기에 달린 것인지, 피드 글에 달린 것인지.
+     *
+     * <p>이 한 칸 때문에 {@code post_id} 에 외래키가 없습니다. 자세한 것은
+     * {@link CommentKind}.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 8)
+    private CommentKind kind = CommentKind.JOURNAL;
+
     @Column(name = "user_id", nullable = false, length = 16)
     private String userId;
 
@@ -51,10 +61,11 @@ public class PostComment {
     private Instant createdAt;
 
     @Builder
-    public PostComment(String postId, String userId, String text,
+    public PostComment(String postId, CommentKind kind, String userId, String text,
                        Integer dayIndex, Integer placeIndex) {
         this.id = Ids.next();
         this.postId = postId;
+        this.kind = kind == null ? CommentKind.JOURNAL : kind;
         this.userId = userId;
         this.text = text;
         this.dayIndex = dayIndex;

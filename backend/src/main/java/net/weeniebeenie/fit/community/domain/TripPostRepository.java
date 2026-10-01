@@ -60,13 +60,19 @@ public interface TripPostRepository extends JpaRepository<TripPost, String> {
      *
      * <p>array_position 을 씁니다 — 배열 안에 그 값이 있으면 자리를, 없으면
      * NULL 을 줍니다. JPQL 에는 배열을 다루는 말이 없어서 함수로 넘깁니다.
+     *
+     * <p>있는지를 {@code > 0} 으로 묻습니다. {@code IS NOT NULL} 로 물으면
+     * <b>안 걸러집니다</b> — 하이버네이트가 모르는 함수의 값을 못 비어 있는
+     * int 로 보고 {@code coalesce(..., 0)} 으로 감싸서, 그 값이 영영 NULL 이
+     * 아니게 됩니다. 아래 findHot 은 날 SQL 이라 감싸지 않지만, 둘을 같은
+     * 말로 두면 한쪽만 고치는 날이 옵니다.
      */
     @Query("""
            SELECT p FROM TripPost p
            WHERE p.hidden = false
              AND p.visibility = net.weeniebeenie.fit.community.domain.Visibility.LISTED
              AND (:region = '' OR p.region = :region)
-             AND (:tag = '' OR FUNCTION('array_position', p.tags, :tag) IS NOT NULL)
+             AND (:tag = '' OR FUNCTION('array_position', p.tags, :tag) > 0)
              AND p.dayCount >= :minDays
              AND p.dayCount <= :maxDays
              AND (LOWER(p.title) LIKE :pattern

@@ -25,6 +25,19 @@ import java.util.List;
  *
  * <p>특정 장소를 가리킬 수 있습니다. "둘째 날 이 집 말고 옆집이 낫다" 는 어디에
  * 대한 말인지가 붙어 있어야 뜻이 통합니다.
+ *
+ * <h3>피드 글의 댓글도 여기 있습니다</h3>
+ *
+ * <p>표 하나를 둘이 나눠 씁니다({@link CommentKind}). 신고·숨김·운영 화면이
+ * 이미 이 표를 보고 있어서, 표를 또 파면 그 셋이 두 벌이 됩니다.
+ *
+ * <p>규칙은 갈립니다. 여행기 댓글은 <b>글쓴이가 열어 둔 글에만</b> 달리고
+ * 장소를 가리킬 수 있습니다. 피드 댓글은 <b>그 글을 볼 수 있으면</b> 달리고
+ * 가리킬 장소가 없습니다 — 모임에 올린 사진에 한마디 하는 자리라, 열고 닫는
+ * 것을 물으면 그 물음 자체가 거추장스럽습니다.
+ *
+ * <p>누가 볼 수 있는지는 여기서 안 봅니다. 부르는 쪽(FeedController)이 글을
+ * 집으면서 이미 보았고, 그 규칙은 피드가 가지고 있어야 할 것입니다.
  */
 @Service
 @RequiredArgsConstructor
@@ -41,13 +54,27 @@ public class CommentService {
     private final PostCommentRepository comments;
     private final CommentReportRepository reports;
     private final TripPostRepository posts;
+    /* 피드 글의 글쓴이를 찾을 때만 씁니다 — 제 마당의 댓글을 지우는 자리. */
+    private final net.weeniebeenie.fit.feed.domain.PostRepository feedPosts;
     private final UserRepository users;
     private final AuditService audit;
 
+    /** 여행기 댓글. */
     @Transactional(readOnly = true)
     public List<Card> listOf(String postId, String meId) {
+        return listOf(postId, CommentKind.JOURNAL, meId);
+    }
+
+    /** 피드 글 댓글. */
+    @Transactional(readOnly = true)
+    public List<Card> listOfFeed(String postId, String meId) {
+        return listOf(postId, CommentKind.FEED, meId);
+    }
+
+    private List<Card> listOf(String postId, CommentKind kind, String meId) {
         List<Card> out = new ArrayList<>();
-        for (PostComment c : comments.findAllByPostIdAndHiddenFalseOrderByCreatedAtAsc(postId)) {
+        for (PostComment c :
+                comments.findAllByPostIdAndKindAndHiddenFalseOrderByCreatedAtAsc(postId, kind)) {
             out.add(cardOf(c, meId));
         }
         return out;
@@ -76,6 +103,7 @@ public class CommentService {
 
         PostComment comment = comments.save(PostComment.builder()
                 .postId(postId)
+                .kind(CommentKind.JOURNAL)
                 .userId(me.id())
                 .text(clean)
                 /* 어느 장소인지 둘 다 있어야 뜻이 있습니다. 하나만 오면 버립니다. */
@@ -86,15 +114,51 @@ public class CommentService {
         return comment;
     }
 
+    /**
+     * 피드 글에 한마디.
+     *
+     * <p>열고 닫는 것을 안 묻습니다. 모임에 올린 사진에 한마디 하는 자리라,
+     * 그 물음 자체가 거추장스럽습니다. 볼 수 있으면 답니다 — 그것을 본
+     * 자리는 부르는 쪽입니다.
+     *
+     * <p>가리킬 장소도 없습니다. 글 한 편이 통째로 하나의 이야기입니다.
+     */
+    @Transactional
+    public PostComment addToFeed(AuthPrincipal me, String postId, String text) {
+        String clean = text == null ? "" : text.trim();
+        if (clean.isEmpty()) {
+            throw ApiException.badRequest("남길 말을 적어 주세요.");
+        }
+        if (clean.length() > MAX_LENGTH) {
+            throw ApiException.badRequest("댓글은 " + MAX_LENGTH + "자까지예요.");
+        }
+        if (comments.countByUserIdAndPostId(me.id(), postId) >= MAX_PER_POST) {
+            throw ApiException.badRequest("한 글에는 " + MAX_PER_POST + "개까지 남길 수 있어요.");
+        }
+
+        PostComment comment = comments.save(PostComment.builder()
+                .postId(postId)
+                .kind(CommentKind.FEED)
+                .userId(me.id())
+                .text(clean)
+                .build());
+        audit.log(me.id(), "feed.comment.add", comment.getId());
+        return comment;
+    }
+
     /** 글쓴이도 자기 글에 달린 것을 지울 수 있습니다. 자기 마당이기 때문입니다. */
     @Transactional
     public void remove(AuthPrincipal me, String commentId) {
         PostComment comment = comments.findById(commentId)
                 .orElseThrow(() -> ApiException.notFound("댓글을 찾을 수 없어요."));
         boolean mine = comment.getUserId().equals(me.id());
-        boolean host = posts.findById(comment.getPostId())
-                .map(p -> p.getAuthorId().equals(me.id()))
-                .orElse(false);
+        /* 어느 표의 글인지 보고 그 글쓴이를 찾습니다. 한 칸이 두 표를
+           가리키므로(CommentKind) 종류를 안 보면 엉뚱한 표를 뒤집니다. */
+        boolean host = comment.getKind() == CommentKind.FEED
+                ? feedPosts.findById(comment.getPostId())
+                        .map(p -> p.getAuthorId().equals(me.id())).orElse(false)
+                : posts.findById(comment.getPostId())
+                        .map(p -> p.getAuthorId().equals(me.id())).orElse(false);
         if (!mine && !host && me.role() != Role.ADMIN) {
             throw ApiException.forbidden("내가 남긴 것만 지울 수 있어요.");
         }
@@ -122,7 +186,7 @@ public class CommentService {
     }
 
     public long countOf(String postId) {
-        return comments.countByPostIdAndHiddenFalse(postId);
+        return comments.countByPostIdAndKindAndHiddenFalse(postId, CommentKind.JOURNAL);
     }
 
     /* ------------------------------------------------------------- 운영 */
