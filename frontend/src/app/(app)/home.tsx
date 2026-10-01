@@ -39,11 +39,11 @@ import {
   IconButton,
   Mark,
   MenuCard,
-  Panel,
   Press,
   Rise,
   Row,
   Screen,
+  Section,
   Split,
   Subtitle,
   Title,
@@ -376,23 +376,24 @@ export default function Home() {
         <p>맨 위로 올라오면서 셋에서 다섯으로 늘렸습니다. 첫머리에 셋만
         있으면 그 아래가 곧바로 남의 여행이라, 내 것이 곁다리처럼 보입니다.
       */}
+      {/* 전체보기를 카드 안 맨 아래 큰 단추로 두었었습니다. 그런데 그것은
+          이 카드에서 제일 굵은 것이 아닌데 제일 커 보였습니다. 제목 옆,
+          작은 글자 단추로 둡니다. */}
       {mine && mine.trips.length > 0 ? (
-        <View style={styles.section}>
-          {/* 전체보기를 카드 안 맨 아래 큰 단추로 두었었습니다. 그런데 그것은
-              이 카드에서 제일 굵은 것이 아닌데 제일 커 보였습니다. 아래
-              「다양한 경험들」과 같은 자리, 같은 크기로 맞춥니다. */}
-          <Split align="baseline">
-            <Subtitle>내 여행</Subtitle>
-            {mine.trips.length > shortlist.length ? (
+        <Section
+          title="내 여행"
+          flush
+          action={
+            mine.trips.length > shortlist.length ? (
               <Button
                 label="전체보기"
                 variant="ghost"
                 compact
                 onPress={() => router.push('/(app)/trips')}
               />
-            ) : null}
-          </Split>
-          <Card style={styles.listCard}>
+            ) : null
+          }>
+          <View style={styles.listBody}>
             {shortlist.map((trip, i) => {
               /* 가장 가까운 여행인지. 그 줄만 한 마디 더 답니다 — 전에는
                  이 말을 하려고 카드 하나가 따로 서 있었습니다. */
@@ -458,8 +459,8 @@ export default function Home() {
               </View>
               );
             })}
-          </Card>
-        </View>
+          </View>
+        </Section>
       ) : null}
 
       {/*
@@ -482,25 +483,25 @@ export default function Home() {
         이 구역만 가로로 흘립니다. 그림이 붙는 것은 줄로 세울 수 없고,
         "이런 것도 있다" 를 보이는 자리이지 고르는 자리가 아닙니다.
       */}
+      {/* 「다양한 경험들」 은 무엇이 들어 있는지 말하지 않습니다. 여기
+          있는 것은 남이 짜 둔 여행이고, 보는 사람이 여기서 얻는 것은
+          <b>내 여행의 밑그림</b>입니다.
+
+          「둘러보기」 는 아래 띠의 탭 이름과 같아서, 구역을 넘기는 것인지
+          탭을 옮기는 것인지 알 수 없었습니다. */}
       {shared && shared.posts.length > 0 ? (
-        <View style={styles.section}>
-          <Split align="baseline">
-            {/* 「다양한 경험들」 은 무엇이 들어 있는지 말하지 않습니다.
-                여기 있는 것은 남이 짜 둔 여행이고, 보는 사람이 여기서 얻는
-                것은 <b>내 여행의 밑그림</b>입니다. */}
-            <Subtitle>이런 여행은 어때요?</Subtitle>
-            {/* 「둘러보기」 는 아래 띠의 탭 이름과 같아서, 구역을 넘기는
-                것인지 탭을 옮기는 것인지 알 수 없었습니다. */}
+        <Section
+          title="이런 여행은 어때요?"
+          flush
+          action={
             <Button
               label="더보기 ›"
               variant="ghost"
               compact
               onPress={() => router.push('/community')}
             />
-          </Split>
-          {/* 이것도 한 장 위에 놓습니다. 회색 바닥에 그림 카드가 그냥
-              떠 있으면 어디까지가 이 구역인지 안 보입니다. */}
-          <Panel style={styles.stripPanel}>
+          }>
+          <View style={styles.stripPanel}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <Row gap={Spacing.md} style={styles.strip}>
                 {shared.posts.slice(0, 6).map((post) => (
@@ -529,8 +530,8 @@ export default function Home() {
                 ))}
               </Row>
             </ScrollView>
-          </Panel>
-        </View>
+          </View>
+        </Section>
       ) : null}
 
       {/*
@@ -548,13 +549,12 @@ export default function Home() {
         여행을 짜는 것들과 같은 자리에 두면 같은 무게로 읽힙니다. 관리자만
         보이는 데다 자주 쓸 것도 아니라, 쓸 일이 있을 때 찾아 내려오면 됩니다.
       */}
+      {/* 「지금 뜨는 여행지」 는 이제 화면 이름입니다(더 보러가기로
+          들어가는 곳). 홈에서는 같은 말을 두 번 쓰지 않고 한마디로
+          건넵니다. */}
       {top && top.places.length > 0 ? (
-        <View style={styles.section}>
-          {/* 「지금 뜨는 여행지」 는 이제 화면 이름입니다(더 보러가기로
-              들어가는 곳). 홈에서는 같은 말을 두 번 쓰지 않고 한마디로
-              건넵니다. */}
-          <Subtitle>여기가 그렇게 핫하대요!</Subtitle>
-          <Card style={styles.listCard}>
+        <Section title="여기가 그렇게 핫하대요!" flush>
+          <View style={styles.listBody}>
             {top.places.slice(0, 5).map((place, i) => {
               /*
                 누르면 그 곳이 어떤 데인지 봅니다.
@@ -617,8 +617,8 @@ export default function Home() {
               variant="secondary"
               onPress={() => router.push('/(app)/popular')}
             />
-          </Card>
-        </View>
+          </View>
+        </Section>
       ) : null}
       {user?.role === 'ADMIN' ? (
         <MenuCard
@@ -677,7 +677,7 @@ const styles = StyleSheet.create({
     됩니다. 좌우만 남기고 위아래는 줄이 스스로 가집니다 — 그래야 머리카락
     선이 카드 끝까지 닿습니다.
   */
-  listCard: {
+  listBody: {
     paddingVertical: Spacing.xs,
     paddingHorizontal: Spacing.lg,
     gap: 0,
@@ -701,10 +701,11 @@ const styles = StyleSheet.create({
     width: 20,
     textAlign: 'center',
   },
-  /* 가로로 흘리는 것을 담는 판. 좌우 여백은 띠가 스스로 가져야 카드가
-     판 끝까지 흘러 나갑니다. */
+  /* 가로로 흘리는 것을 담는 몸통. 좌우 여백은 띠가 스스로 가져야 카드가
+     판 끝까지 흘러 나갑니다. 아래위만 비웁니다 — 제목과 붙으면 둘이 한
+     덩어리로 보입니다. */
   stripPanel: {
-    paddingHorizontal: 0,
+    paddingVertical: Spacing.sm,
   },
   /* 가로로 흘리는 띠. 끝을 띄워 둬야 마지막 카드가 잘린 것처럼 안 보입니다. */
   strip: {

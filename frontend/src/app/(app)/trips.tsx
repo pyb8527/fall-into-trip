@@ -29,6 +29,7 @@ import {
   Screen,
   SearchField,
   SegmentedTabs,
+  Section,
   Split,
   Subtitle,
 } from '@/ui';
@@ -247,22 +248,25 @@ export default function Trips() {
       ) : null}
 
       {sections.map((section) => (
-        <View key={section.title} style={styles.section}>
-          <Split align="baseline">
-            <Subtitle>{section.title}</Subtitle>
-            <Caption tone="secondary">{section.trips.length}</Caption>
-          </Split>
-
-          {section.trips.map((trip) => (
-            <TripRow
-              key={trip.id}
-              trip={trip}
-              mine={trip.ownerId === user?.id}
-              onOpen={() => open(trip.id)}
-              onFolder={() => setPlacing(trip)}
-            />
-          ))}
-        </View>
+        /* 묶음 제목이 회색 바탕에 그대로 있었습니다. 제목과 그 아래 여행들이
+           한 장에 담겨야 어디까지가 한 묶음인지 보입니다. */
+        <Section
+          key={section.title}
+          title={section.title}
+          flush
+          action={<Caption tone="secondary">{section.trips.length}</Caption>}>
+          <View style={styles.sectionBody}>
+            {section.trips.map((trip) => (
+              <TripRow
+                key={trip.id}
+                trip={trip}
+                mine={trip.ownerId === user?.id}
+                onOpen={() => open(trip.id)}
+                onFolder={() => setPlacing(trip)}
+              />
+            ))}
+          </View>
+        </Section>
       ))}
 
       <TripForm
@@ -466,7 +470,13 @@ function countdownBadge(startIso: string | null, endIso: string | null) {
   );
 }
 
-type Section = { title: string; trips: TripSummary[] };
+/*
+  한 묶음과 그 안의 여행들.
+
+  <p>Section 이라 불렀는데 화면의 Section(흰 판)과 겹쳤고, Group 은 이미
+  「무엇으로 묶을지」(when·folder)가 쓰고 있습니다. 묶인 결과라서 Bunch 입니다.
+*/
+type Bunch = { title: string; trips: TripSummary[] };
 
 /**
  * 일정으로 나눕니다.
@@ -477,7 +487,7 @@ type Section = { title: string; trips: TripSummary[] };
  *
  * <p>날짜가 없는 여행은 아직 짜는 중인 것이라 다가올 쪽에 둡니다.
  */
-function byWhen(trips: TripSummary[]): Section[] {
+function byWhen(trips: TripSummary[]): Bunch[] {
   const today = todayIso();
   const going: TripSummary[] = [];
   const coming: TripSummary[] = [];
@@ -531,7 +541,10 @@ const styles = StyleSheet.create({
     borderRadius: Radius.sm,
     padding: Spacing.lg,
   },
-  section: {
+  /* 묶음 안의 여행 줄들. 카드 노릇은 Section 이 하므로 여백만 둡니다.
+     줄은 저마다 흰 바탕을 가지므로 좌우를 조금만 비웁니다. */
+  sectionBody: {
     gap: Spacing.sm,
+    padding: Spacing.sm,
   },
 });

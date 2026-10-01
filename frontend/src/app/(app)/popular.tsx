@@ -101,10 +101,14 @@ export default function Popular() {
 
       {tab === 'places' ? (
         <>
-          <Caption tone="secondary">
-            올라온 여행에 여럿이 넣은 곳이에요. 한 여행에서 여러 번 넣었어도 한 번으로
-            세어요.
-          </Caption>
+          {/* 이 화면이 무엇인지 말하는 한 줄입니다. 회색 바탕에 두면 가장
+              먼저 읽어야 하는 글자가 가장 허름한 자리에 놓입니다. */}
+          <Card>
+            <Caption tone="secondary">
+              올라온 여행에 여럿이 넣은 곳이에요. 한 여행에서 여러 번 넣었어도 한 번으로
+              세어요.
+            </Caption>
+          </Card>
 
           {/*
             고르는 칸 둘.
@@ -187,7 +191,11 @@ export default function Popular() {
         </>
       ) : (
         <>
-          <Caption tone="secondary">여럿이 다녀온 지역이에요. 누르면 그 지역 글만 봐요.</Caption>
+          <Card>
+            <Caption tone="secondary">
+              여럿이 다녀온 지역이에요. 누르면 그 지역 글만 봐요.
+            </Caption>
+          </Card>
 
           {loadingRegions && !regions ? <Loading /> : null}
           {regionError ? <ErrorNote message={regionError} onRetry={reloadRegions} /> : null}

@@ -372,6 +372,65 @@ export const Screen = forwardRef<ScreenHandle, ScreenProps>(function Screen(
   );
 });
 
+/**
+ * 제목이 붙은 한 구역.
+ *
+ * <h3>글자가 시멘트 바닥에 놓여 있었습니다</h3>
+ *
+ * <p>구역 제목과 안내 한 줄을 회색 바탕에 그대로 올려 두고, 내용만 흰 판에
+ * 담았습니다. 그래서 <b>가장 먼저 읽어야 하는 글자가 가장 허름한 자리</b>에
+ * 있었습니다 — 판 위의 작은 글씨보다 못해 보입니다.
+ *
+ * <p>제목도 판 안으로 들입니다. 제목과 내용이 한 장에 있으면 어디까지가 이
+ * 구역인지가 선으로 보이고, 회색 바탕은 구역 사이를 가르는 일만 합니다.
+ *
+ * <h3>두 가지로 씁니다</h3>
+ *
+ * <p>기본은 판이 제 여백을 가집니다 — 안에 글이나 칩이 올 때입니다.
+ *
+ * <p>{@code flush} 는 내용이 <b>줄</b>일 때입니다. 줄은 저마다 여백을 가지고
+ * 좌우 끝까지 닿아야 하므로, 판의 여백을 걷고 제목에만 따로 줍니다. 제목과
+ * 줄 사이에는 선을 한 줄 넣습니다 — 여백이 없으니 선이 그 일을 합니다.
+ */
+export function Section({
+  title,
+  action,
+  note,
+  flush = false,
+  children,
+}: {
+  title: string;
+  /** 제목 오른쪽. 「전체보기」처럼 이 구역에서 바로 하는 일. */
+  action?: React.ReactNode;
+  /** 제목 아래 한 줄. 이 구역이 무엇인지 설명할 때. */
+  note?: React.ReactNode;
+  /** 내용이 줄들이면 true. 판의 여백을 걷고 제목에만 줍니다. */
+  flush?: boolean;
+  children?: React.ReactNode;
+}) {
+  const head = (
+    <>
+      {action ? (
+        <Split align="baseline">
+          <Subtitle>{title}</Subtitle>
+          {action}
+        </Split>
+      ) : (
+        <Subtitle>{title}</Subtitle>
+      )}
+      {note ? <Caption tone="secondary">{note}</Caption> : null}
+    </>
+  );
+
+  return (
+    <Card style={flush ? styles.sectionFlush : undefined}>
+      {flush ? <View style={styles.sectionHead}>{head}</View> : head}
+      {flush ? <Divider /> : null}
+      {children}
+    </Card>
+  );
+}
+
 /** 흰 판. 관련 있는 것들을 하나로 묶습니다. */
 export function Card({ children, style, ...rest }: ViewProps) {
   return (
@@ -2540,6 +2599,18 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
     padding: Spacing.lg,
     gap: Spacing.md,
+  },
+
+  /* 줄을 담는 구역. 여백은 제목과 줄이 저마다 가집니다. */
+  sectionFlush: {
+    padding: 0,
+    gap: 0,
+  },
+  sectionHead: {
+    paddingTop: Spacing.lg,
+    paddingBottom: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    gap: Spacing.xs,
   },
 
   listRow: {
