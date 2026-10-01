@@ -10,7 +10,7 @@ import { FeedList } from '@/components/feed-list';
 import { GroupForm } from '@/components/group-form';
 import { MatesSheet } from '@/components/mates-sheet';
 import { TripForm } from '@/components/trip-form';
-import { Colors, Gutter, Radius, Spacing, Tap } from '@/constants/theme';
+import { Colors, Radius, Spacing, Tap } from '@/constants/theme';
 import { faceOf } from '@/constants/user-marks';
 import {
   Band,

@@ -188,10 +188,11 @@ export function SavedPicker({
       ) : null}
 
       <View style={styles.list}>
-        {shown.map((place) => (
+        {shown.map((place, at) => (
           <SavedRow
             key={place.id}
             place={place}
+            last={at === shown.length - 1}
             selected={picked.has(place.id)}
             onToggle={() => toggle(place.id)}
           />

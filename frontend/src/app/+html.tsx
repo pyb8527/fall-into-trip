@@ -134,6 +134,26 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+/*
+  키보드로 옮겨 다니는 사람에게 「지금 여기」를 보여 줍니다.
+
+  지금 어디에 있는지 표시가 없었습니다. 마우스를 쓰면 가리키는 자리가
+  보이지만, Tab 으로 옮겨 다니면 눌릴 것이 어디인지 아무 데도 안 나옵니다 —
+  엉뚱한 것을 누르고 나서야 압니다.
+
+  :focus 가 아니라 :focus-visible 입니다. :focus 는 마우스로 누른 뒤에도
+  남아서, 단추를 누를 때마다 테두리가 하나씩 생기는 것으로 보입니다.
+
+  부품마다 넣지 않고 여기 한 줄로 둡니다. 웹에서만 있는 개념이라 React
+  Native 스타일에는 자리가 없고, 쉰 군데에 같은 판단을 흩어 두면 언젠가
+  한 곳이 빠집니다.
+*/
+:focus-visible {
+  outline: 2px solid #6D5BF6;
+  outline-offset: 2px;
+  /* 둥근 것에 네모난 테두리가 둘리면 모서리가 삐져 나옵니다. */
+  border-radius: inherit;
+}
 #fit-splash {
   position: fixed;
   inset: 0;

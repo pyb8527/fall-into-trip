@@ -139,7 +139,7 @@ export function TabBar({
                 name={item.icon}
                 size={24}
                 solid={!!item.active}
-                tone={item.active ? 'accent' : 'muted'}
+                tone={item.active ? 'accent' : 'off'}
               />
               {item.dot ? <View style={styles.dot} /> : null}
             </View>
@@ -262,7 +262,7 @@ function Sidebar({
                 name={item.icon}
                 size={24}
                 solid={!!item.active}
-                tone={item.active ? 'accent' : 'muted'}
+                tone={item.active ? 'accent' : 'off'}
               />
               {item.dot ? <View style={styles.dot} /> : null}
             </View>

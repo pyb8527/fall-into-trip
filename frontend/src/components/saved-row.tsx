@@ -72,6 +72,7 @@ export function SavedRow({
   onPress,
   onLook,
   lit,
+  last,
 }: {
   place: SavedPlace;
   /** 고른 상태. 고르는 자리가 아니면 null. */
@@ -88,6 +89,13 @@ export function SavedRow({
   onLook?: () => void;
   /** 지도에서 켜 둔 것. 목록의 그 줄도 함께 켜집니다. */
   lit?: boolean;
+  /**
+   * 목록의 마지막 줄인지.
+   *
+   * <p>마지막에는 선을 안 긋습니다. 목록이 끝났는데 선이 하나 더 있으면
+   * 아래에 뭔가 더 있는 줄 압니다.
+   */
+  last?: boolean;
 }) {
   const on = selected === true;
   const picking = selected !== null && selected !== undefined;
@@ -106,7 +114,12 @@ export function SavedRow({
   const about = [kind, said].filter(Boolean).join(' · ');
 
   return (
-    <View style={[styles.row, on ? styles.rowOn : lit ? styles.rowLit : null]}>
+    <View
+      style={[
+        styles.row,
+        last ? null : styles.rowLine,
+        on ? styles.rowOn : lit ? styles.rowLit : null,
+      ]}>
       {picking ? (
         <Checkbox
           checked={on}
@@ -160,6 +173,20 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.s2,
     marginHorizontal: -Gutter,
     paddingHorizontal: Gutter,
+  },
+  /*
+    아래 선.
+
+    <p>이 줄만 선이 없었습니다. 바닥이 회색이고 줄마다 흰 카드였을 때는
+    밝기 차이가 줄을 갈랐는데, 바닥이 흰색으로 돌아간 뒤로 <b>「저장」
+    목록만</b> 글자가 줄줄이 늘어서고 어디서 한 줄이 끝나는지 안 보였습니다.
+
+    <p>{@link ListRow} 와 같은 자리에서 긋습니다 — 앞에 표식이 서므로
+    글 시작점(표식 40 + 사이 12)부터입니다.
+  */
+  rowLine: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.divider,
   },
   /* 고른 것. 글자로 적지 않고 바탕으로 말합니다. */
   rowOn: {

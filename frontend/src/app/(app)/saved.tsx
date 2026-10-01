@@ -561,10 +561,11 @@ export default function Saved() {
         */}
         <View style={styles.list}>
           <CardGrid>
-            {shown.map((place) => (
+            {shown.map((place, at) => (
               <SavedRow
                 key={place.id}
                 place={place}
+                last={at === shown.length - 1}
                 selected={picked.has(place.id)}
                 lit={activeId === place.id}
                 onToggle={() => {

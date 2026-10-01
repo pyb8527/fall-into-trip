@@ -34,6 +34,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ContentWidth, useBreakpoint, useWide } from './layout';
+
 import {
   Colors,
   BandHeight,
@@ -130,6 +132,7 @@ export function Press({
   disabled,
   scale = 0.98,
   style,
+  hoverStyle,
   pressedStyle,
   accessibilityLabel,
   accessibilityRole = 'button',
@@ -153,6 +156,15 @@ export function Press({
   accessibilityState?: { selected?: boolean; disabled?: boolean; busy?: boolean };
   hitSlop?: number;
   /**
+   * 마우스를 얹었을 때.
+   *
+   * <p>손가락에는 「얹음」이 없어서 여태 없었습니다. 그런데 넓은 화면에는
+   * 마우스가 있고, 마우스를 쓰는 사람은 <b>누르기 전에 얹어 보고</b> 무엇이
+   * 눌리는지 가늠합니다. 아무 반응이 없으면 눌리는 것인지 그냥 글인지
+   * 눌러 봐야 압니다.
+   */
+  hoverStyle?: StyleProp<ViewStyle>;
+  /**
    * 눌려 있는 동안 얹는 모습. 대개 바탕색 한 겹입니다.
    *
    * <p>크기가 안 변하는 것({@code scale={1}})에 필요합니다 — 목록 줄처럼
@@ -164,6 +176,7 @@ export function Press({
   const value = useRef(new Animated.Value(1)).current;
   const calm = useCalm();
   const [down, setDown] = useState(false);
+  const [over, setOver] = useState(false);
 
   const to = (next: number, duration: number) =>
     Animated.timing(value, {
@@ -203,7 +216,16 @@ export function Press({
           setDown(false);
         }
       }}
-      style={[style, down ? pressedStyle : null, { transform: [{ scale: value }] }]}>
+      /* 손가락만 있는 기기에서는 이 둘이 영영 안 불립니다. 달아 두어도
+         값이 안 듭니다. */
+      onHoverIn={hoverStyle ? () => setOver(true) : undefined}
+      onHoverOut={hoverStyle ? () => setOver(false) : undefined}
+      style={[
+        style,
+        over && !down ? hoverStyle : null,
+        down ? pressedStyle : null,
+        { transform: [{ scale: value }] },
+      ]}>
       {children}
     </Squeezable>
   );
@@ -326,14 +348,6 @@ type ScreenProps = {
    * </ul>
    */
   variant?: 'plain' | 'banded' | 'gray';
-  /**
-   * 갈래 루트 화면의 큰 제목.
-   *
-   * <p>상단바 아래에서 본문과 함께 굴러 올라갑니다. 상단바에 박아 두면 다섯
-   * 갈래가 모두 같은 자리에 같은 크기 글자를 두게 되어, 갈래를 옮겨도
-   * <b>화면이 바뀐 것 같지 않습니다.</b>
-   */
-  largeTitle?: string;
 };
 
 /**
@@ -368,13 +382,23 @@ export const Screen = forwardRef<ScreenHandle, ScreenProps>(function Screen(
     scroll = true,
     safeTop = false,
     variant = 'plain',
-    largeTitle,
   },
   ref,
 ) {
   const insets = useSafeAreaInsets();
   const keyboardUp = useKeyboardUp();
   const scroller = useRef<ScrollView>(null);
+  const wide = useWide();
+
+  /*
+    본문이 넓어질 수 있는 한도.
+
+    <p>스타일에 {@code maxWidth} 를 박아 두면 창이 아무리 넓어도 한 값입니다.
+    680 으로 두면 1280짜리 창에서 양옆 300씩이 비고, 960 으로 두면 폰에서
+    아무 일도 안 하다가 <b>태블릿에서 글줄이 너무 길어집니다.</b> 단계마다
+    다른 값을 봐야 합니다.
+  */
+  const room = ContentWidth[useBreakpoint()];
 
   /*
     갈래 띠가 실제로 먹는 높이.
@@ -383,7 +407,14 @@ export const Screen = forwardRef<ScreenHandle, ScreenProps>(function Screen(
     높이가 됩니다. 이것을 안 세고 TabDock 만 비워 두었더니, 아래 단추와 띠
     사이가 여덟 픽셀밖에 안 남아 둘이 붙어 보였습니다.
   */
-  const dock = tabs && !keyboardUp ? TabDock + Math.max(insets.bottom, Spacing.sm) : 0;
+  /*
+    넓은 화면에서는 아래를 먹는 것이 없습니다.
+
+    <p>갈래가 아래 띠가 아니라 <b>왼쪽 기둥</b>으로 서기 때문입니다. 그런데도
+    아래를 그만큼 비우면 화면 끝에 64 + 안전영역이 남고, 바닥에 고정된 바가
+    바닥에서 떠 있습니다.
+  */
+  const dock = tabs && !keyboardUp && !wide ? TabDock + Math.max(insets.bottom, Spacing.sm) : 0;
 
   useImperativeHandle(
     ref,
@@ -394,8 +425,12 @@ export const Screen = forwardRef<ScreenHandle, ScreenProps>(function Screen(
   );
 
   const body = (
-    <View style={[styles.screenInner, variant === 'banded' ? styles.screenInnerBanded : null]}>
-      {largeTitle ? <Text style={styles.screenTitle}>{largeTitle}</Text> : null}
+    <View
+      style={[
+        styles.screenInner,
+        variant === 'banded' ? styles.screenInnerBanded : null,
+        { maxWidth: room },
+      ]}>
       {children}
     </View>
   );
@@ -411,7 +446,7 @@ export const Screen = forwardRef<ScreenHandle, ScreenProps>(function Screen(
       behavior="padding">
       {header ? (
         <View style={[styles.header, { paddingTop: (safeTop ? insets.top : 0) + Spacing.sm }]}>
-          <View style={styles.headerInner}>{header}</View>
+          <View style={[styles.headerInner, { maxWidth: room }]}>{header}</View>
         </View>
       ) : null}
 
@@ -474,7 +509,7 @@ export const Screen = forwardRef<ScreenHandle, ScreenProps>(function Screen(
                 : (keyboardUp ? 0 : insets.bottom) + Spacing.md,
             },
           ]}>
-          <View style={styles.footerInner}>
+          <View style={[styles.footerInner, { maxWidth: room }]}>
             <OnFloor.Provider value>{footer}</OnFloor.Provider>
           </View>
         </View>
@@ -518,8 +553,28 @@ export function Card({
   tone = 'raised',
   ...rest
 }: ViewProps & { tone?: 'raised' | 'fill' }) {
+  const [over, setOver] = useState(false);
+
   return (
-    <View style={[styles.card, tone === 'fill' ? styles.cardFill : null, style]} {...rest}>
+    <View
+      /*
+        마우스를 얹으면 한 단 더 뜹니다.
+
+        <p>넓은 화면에서는 눌리는 카드와 그냥 묶음인 카드가 생김새로 똑같습니다.
+        손가락은 눌러 보는 수밖에 없지만 마우스는 얹어 볼 수 있으니, 얹었을 때
+        떠오르는 것으로 「이것은 눌러서 들어가는 것」을 말합니다.
+
+        <p>면 카드({@code tone="fill"})는 눌리는 것이 아니라 가만히 있습니다.
+      */
+      onPointerEnter={tone === 'fill' ? undefined : () => setOver(true)}
+      onPointerLeave={tone === 'fill' ? undefined : () => setOver(false)}
+      style={[
+        styles.card,
+        tone === 'fill' ? styles.cardFill : null,
+        over ? Elevation.float : null,
+        style,
+      ]}
+      {...rest}>
       {children}
     </View>
   );
@@ -578,7 +633,19 @@ export function ListRow({
    * 색으로 먼저 알아야 합니다.
    */
   danger?: boolean;
-  onPress: () => void;
+  /**
+   * 눌렀을 때 하는 일. <b>없으면 안 눌립니다.</b>
+   *
+   * <p>전에는 반드시 받았습니다. 그래서 <b>누를 데가 없는 줄</b> — 값만
+   * 적는 줄, 좌표가 없어 열 수 없는 장소, 순위 번호 — 은 이 부품을 못 쓰고
+   * 화면마다 같은 모양을 손으로 다시 그렸습니다. 그렇게 그린 줄들은 아래
+   * 선과 여백이 조금씩 어긋나서, 한 목록 안에서 줄 높이가 들쭉날쭉했습니다.
+   *
+   * <p>안 주면 선과 여백만 같은 <b>안 눌리는 줄</b>이 됩니다. 눌리지 않는
+   * 것에 눌리는 꼴을 입히지 않으려고 읽어 주는 기기에도 단추라고 말하지
+   * 않습니다.
+   */
+  onPress?: () => void;
 }) {
   const inside = (
     <>
@@ -610,6 +677,17 @@ export function ListRow({
   const line = last ? null : (
     <View style={[styles.listRowLine, left ? styles.listRowLineInset : null]} />
   );
+
+  /* 누를 데가 없는 줄. 선과 여백만 같습니다. */
+  if (!onPress) {
+    return (
+      <View style={[styles.listRow, subtitle ? styles.listRowTwo : null]}>
+        {inside}
+        {action}
+        {line}
+      </View>
+    );
+  }
 
   if (!action) {
     return (
@@ -809,6 +887,15 @@ type Tone =
   | 'hot'
   | 'warning'
   | 'brand'
+  /**
+   * 꺼진 갈래 — 아래 띠와 기둥의 안 고른 칸.
+   *
+   * <p>{@code muted} 를 쓰고 있었습니다. 그 값이 메타 글자색이라 한 단
+   * 진해지면서, <b>라벨만 흐려지고 아이콘은 진한 채로</b> 남았습니다 — 한
+   * 칸 안에서 글자와 그림이 다른 세기로 서면 꺼진 것으로도 켜진 것으로도
+   * 안 읽힙니다.
+   */
+  | 'off'
   | 'inverse';
 
 const toneColor: Record<Tone, string> = {
@@ -833,6 +920,7 @@ const toneColor: Record<Tone, string> = {
   brand: Colors.accentInk,
   hot: Colors.hot,
   warning: Colors.warning,
+  off: Colors.iconOff,
   /* 색으로 채운 자리 위에 얹는 것. 우리 강조색은 모두 밝아서, 그 위에는
      어두운 글자가 올라가야 읽힙니다. */
   inverse: Colors.onDay,
@@ -848,6 +936,7 @@ const toneSoft: Record<Tone, string> = {
   hot: Colors.hotSoft,
   warning: Colors.warningSoft,
   brand: Colors.accentSoft,
+  off: Colors.fill,
   /* 바탕이 이미 진한 자리에 쓰므로 무른 배경은 두지 않습니다. */
   inverse: 'transparent',
 };
@@ -2258,6 +2347,14 @@ export function BottomSheet({
   const insets = useSafeAreaInsets();
   const keyboardUp = useKeyboardUp();
   const { height: screenHeight } = useWindowDimensions();
+  /*
+    넓은 화면에서는 아래에서 올라오지 않습니다.
+
+    <p>아래 판은 <b>엄지가 닿는 자리</b>를 쓰려고 생긴 꼴입니다. 마우스에는
+    닿는 자리가 따로 없고, 1280짜리 창에서 아래에만 붙은 판은 화면 위쪽
+    절반을 통째로 버립니다 — 그 위는 가림막뿐입니다.
+  */
+  const wide = useWide();
 
   /*
     끌어서 닫고, 끌어서 넓히기.
@@ -2327,7 +2424,7 @@ export function BottomSheet({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView
-        style={styles.sheetWrap}
+        style={[styles.sheetWrap, wide ? styles.sheetWrapWide : null]}
         /* 판은 화면 아래에 붙어 있어 자판이 그대로 덮습니다. 게다가 Modal
            안에는 창을 줄여 주는 동작이 미치지 않습니다. 직접 밀어 올립니다.
            판의 최대 높이가 비율(88%)이라 밀린 만큼 판도 같이 낮아집니다. */
@@ -2338,16 +2435,18 @@ export function BottomSheet({
         <Animated.View
           style={[
             styles.sheet,
-            tall ? styles.sheetTall : null,
+            wide ? styles.sheetDialog : null,
+            tall && !wide ? styles.sheetTall : null,
             {
-              paddingBottom: (keyboardUp ? 0 : insets.bottom) + Spacing.md,
-              transform: [{ translateY: slide }],
+              paddingBottom: (keyboardUp || wide ? 0 : insets.bottom) + Spacing.md,
+              transform: [{ translateY: wide ? 0 : slide }],
             },
           ]}>
           {/* 손잡이와 제목 줄까지가 끄는 자리입니다. 손잡이만 잡게 하면
-              손가락으로는 잘 안 맞습니다. */}
-          <View {...drag.panHandlers}>
-            <View style={styles.sheetGrip} />
+              손가락으로는 잘 안 맞습니다. 넓은 화면에서는 끌 데가 없습니다 —
+              가운데 뜬 창을 아래로 미는 동작은 아무 데도 안 닿습니다. */}
+          <View {...(wide ? {} : drag.panHandlers)}>
+            {wide ? null : <View style={styles.sheetGrip} />}
 
             <View style={styles.sheetHead}>
               <Subtitle>{title}</Subtitle>
@@ -2972,14 +3071,7 @@ const styles = StyleSheet.create({
   screenInnerBanded: {
     gap: 0,
   },
-  /* 갈래 루트의 큰 제목. 아래 8 — 제목은 아래 것의 이름입니다. */
-  screenTitle: {
-    ...Type.title1,
-    fontWeight: Weight.bold,
-    color: Colors.text,
-    paddingTop: Spacing.s2,
-    paddingBottom: Spacing.s2,
-  },
+
 
   /*
     위에 붙어 있는 줄.
@@ -3828,6 +3920,20 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     backgroundColor: Colors.scrim,
+  },
+  /* 넓은 화면에서는 가운데에 띄웁니다. */
+  sheetWrapWide: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sheetDialog: {
+    width: '100%',
+    maxWidth: 480,
+    /* 아래가 아니라 가운데에 뜨므로 네 모서리가 모두 둥급니다. 위만 둥글면
+       아래 모서리가 잘린 것처럼 보입니다. */
+    borderRadius: Radius.r5,
+    maxHeight: '80%',
+    ...Elevation.dialog,
   },
   sheet: {
     backgroundColor: Colors.surface,
