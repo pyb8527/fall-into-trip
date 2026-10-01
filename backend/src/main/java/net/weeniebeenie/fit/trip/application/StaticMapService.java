@@ -170,9 +170,32 @@ public class StaticMapService {
                 path.append('|').append(at);
                 mark.append('|').append(at);
             }
-            paths.add(path.toString());
+            /*
+              점이 하나뿐인 날에는 선을 안 보냅니다.
+
+              <p>구글의 path 는 <b>두 점부터</b>입니다. 한 점짜리 선은 그릴
+              것이 없어서, 보내면 그림 전체가 거절당합니다 — 한 곳만 찍는
+              지도(장소 상세 판)가 통째로 안 뜨던 까닭입니다.
+            */
+            if (thinned.get(i).size() > 1) {
+                paths.add(path.toString());
+            }
             markers.add(mark.toString());
         }
+
+        /*
+          한 점이면 어디를 얼마나 크게 볼지 직접 말해 줍니다.
+
+          <p>구글은 보통 점들을 다 담는 네모를 스스로 잡습니다. 그런데 점이
+          하나면 그 네모가 <b>넓이가 없어서</b>, 땅끝까지 당겨 보거나 아예
+          못 정하고 거절합니다.
+
+          <p>15는 "이 동네" 가 보이는 배율입니다 — 건물 하나만 꽉 차지도 않고
+          도시 전체로 멀어지지도 않아, 어디쯤인지를 묻는 자리에 맞습니다.
+        */
+        Point only = thinned.size() == 1 && thinned.get(0).size() == 1
+                ? thinned.get(0).get(0)
+                : null;
 
         /* 캐시에 맞은 그림은 위에서 돌아갔습니다. 여기까지 온 것만 셉니다 —
            같은 글의 썸네일을 여럿이 봐도 구글은 여섯 시간에 한 번입니다. */
@@ -181,7 +204,8 @@ public class StaticMapService {
         byte[] png;
         try {
             png = client.get()
-                    .uri(uri -> uri.path("/maps/api/staticmap")
+                    .uri(uri -> {
+                        uri.path("/maps/api/staticmap")
                             .queryParam("size", width + "x" + height)
                             /* 촘촘한 화면에서 흐리게 보이지 않도록 두 배로 받습니다. */
                             .queryParam("scale", 2)
@@ -190,8 +214,15 @@ public class StaticMapService {
                             .queryParam("style", QUIET.toArray())
                             .queryParam("path", paths.toArray())
                             .queryParam("markers", markers.toArray())
-                            .queryParam("key", key)
-                            .build())
+                            .queryParam("key", key);
+                        if (only != null) {
+                            uri.queryParam("center",
+                                            String.format(Locale.ROOT, "%.5f,%.5f",
+                                                    only.lat(), only.lng()))
+                                    .queryParam("zoom", 15);
+                        }
+                        return uri.build();
+                    })
                     .retrieve()
                     .body(byte[].class);
         } catch (RestClientResponseException e) {

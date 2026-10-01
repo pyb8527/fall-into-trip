@@ -4161,9 +4161,23 @@ const styles = StyleSheet.create({
     띠는 카드 높이만큼 섭니다. 하루가 길수록 띠도 길어지므로, 훑어 내려가는
     동안 어느 날의 어디쯤인지가 계속 보입니다.
   */
+  /*
+    <p>판이 흰 종이가 되면서 그 위의 흰 카드가 안 보이게 되었습니다. 하루와
+    하루 사이가 어디서 갈리는지는 왼쪽 띠 색이 바뀌는 것뿐이었는데, 날짜
+    색이 비슷한 이틀이 붙어 있으면 그것도 안 갈립니다.
+
+    <p>테두리 한 가닥을 두릅니다. 왼쪽 띠는 <b>어느 날인지</b>를 말하고
+    테두리는 <b>어디까지가 하루인지</b>를 말합니다 — 다른 일입니다.
+  */
   dayBand: {
     borderLeftWidth: 4,
     paddingLeft: Spacing.lg - 4,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderRightWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.border,
+    borderRightColor: Colors.border,
+    borderBottomColor: Colors.border,
   },
 
   places: {

@@ -1773,6 +1773,19 @@ export function IconButton({
                 ? Colors.surface
                 : Colors.fill,
         },
+        /*
+          바탕만으로는 모자랍니다.
+
+          <p>연회색 바탕 하나로 단추를 말했습니다. 바닥이 그보다 진했을 때는
+          그것으로 갈렸는데, 바닥이 밝아지고 판이 흰 종이가 되면서 <b>흰 위에
+          거의 흰 네모</b>가 되었습니다 — 눌리는 것인지 그냥 그림인지 안
+          보입니다.
+
+          <p>선 한 가닥을 두릅니다. 바탕은 무엇 위에 놓이느냐에 따라 묻히지만
+          선은 안 묻힙니다. 바탕 없는 것(bare)과 지도 위의 것(onMap)은 제
+          생김새가 따로 있으므로 안 두릅니다.
+        */
+        !bare && !onMap ? styles.iconButtonEdge : null,
         active && onMap ? { borderColor: toneColor[tone] } : null,
       ]}>
       <Icon name={name} tone={disabled ? 'muted' : active ? tone : 'secondary'} />
@@ -3314,6 +3327,11 @@ const styles = StyleSheet.create({
     borderRadius: Radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  /* 바탕이 묻히는 자리에서도 단추로 보이게. */
+  iconButtonEdge: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.border,
   },
   /* 안에 볼 것이 있다는 점.
 

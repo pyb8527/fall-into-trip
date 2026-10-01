@@ -277,20 +277,26 @@ export default function Home() {
             {/* 찾기가 화면마다 흩어져 있었습니다 — 장소는 여행 안에서,
                 남의 일정은 둘러보기에서. 여행을 짜기 전에 하는 일이라
                 홈에서 바로 닿아야 합니다. */}
+            {/* 머리줄 안에서는 바탕을 안 깝니다. 줄 바탕과 단추 바탕이
+                밝기 한 단 차이라, 채워 두면 줄에 회색 조각 셋을 덧댄 것처럼
+                보입니다. 무엇이 눌리는지는 자리로 이미 압니다. */}
             <IconButton
               name="search"
               label="찾기"
+              bare
               onPress={() => router.push('/(app)/search')}
             />
             <IconButton
               name="bell"
               label={news?.unseen ? `소식 ${news.unseen}건` : '소식'}
               dot={!!news?.unseen}
+              bare
               onPress={() => router.push('/(app)/news')}
             />
             <IconButton
               name="settings"
               label="내 계정"
+              bare
               onPress={() => router.push('/(app)/settings')}
             />
           </Row>
