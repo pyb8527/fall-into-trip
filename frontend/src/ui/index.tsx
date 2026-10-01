@@ -35,6 +35,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   Colors,
+  BandHeight,
   Gutter,
   Elevation,
   MaxContentWidth,
@@ -591,6 +592,25 @@ export function Grow({ children, style, gap, ...rest }: ViewProps & { gap?: numb
 /** 카드 안에서 내용을 가르는 얇은 선. */
 export function Divider() {
   return <View style={styles.divider} />;
+}
+
+/**
+ * 구역을 가르는 회색 띠.
+ *
+ * <h3>선 대신 띠입니다</h3>
+ *
+ * <p>전에는 구역마다 흰 카드를 하나씩 두고 회색 바닥이 그 사이로 비치게
+ * 했습니다. 그러면 <b>모든 것이 카드</b>가 되어야 해서, 글 한 줄을 놓으려
+ * 해도 상자를 만들어야 했습니다. 상자가 늘면 화면이 사각형의 더미가 됩니다.
+ *
+ * <p>바닥을 흰색으로 돌리고 구역 사이에 8픽셀 띠를 깝니다. 카드는 <b>눌러서
+ * 들어가는 물건</b>(여행·장소·글)에만 남습니다.
+ *
+ * <p>화면 좌우 여백 밖으로 밀어 내 끝까지 닿게 합니다. 여백 안에 머물면
+ * 띠가 아니라 가운데 떠 있는 회색 막대가 됩니다.
+ */
+export function Band() {
+  return <View style={styles.band} />;
 }
 
 /* ------------------------------------------------------------------ 글씨 */
@@ -2790,6 +2810,13 @@ const styles = StyleSheet.create({
       있지만 다른 줄" 의 선입니다.
     */
     gap: Spacing.xs,
+  },
+
+  band: {
+    height: BandHeight,
+    marginHorizontal: -Gutter,
+    marginVertical: Spacing.s3,
+    backgroundColor: Colors.band,
   },
 
   /* 줄을 담는 구역. 여백은 제목과 줄이 저마다 가집니다. */
