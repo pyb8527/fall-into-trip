@@ -4,11 +4,10 @@ import { Linking, StyleSheet, View } from 'react-native';
 import { api } from '@/api/client';
 import type { PlaceInfo, TravelMode } from '@/api/types';
 import { useAsync } from '@/api/use-async';
-import type { MapPlace } from '@/components/map-types';
 import { PlacePhoto } from '@/components/place-photo';
-import { TripMap } from '@/components/trip-map';
-import { iconOf, labelOf } from '@/constants/place-icons';
-import { Colors, Spacing } from '@/constants/theme';
+import { SpotMap } from '@/components/spot-map';
+import { labelOf } from '@/constants/place-icons';
+import { Spacing } from '@/constants/theme';
 import { openDirections, openPlace } from '@/lib/directions';
 import { awayFrom } from '@/lib/geo';
 import {
@@ -135,28 +134,6 @@ export function PlaceDetailSheet({
     return null;
   }
 
-  const pin: MapPlace = {
-    id: 'looked',
-    name: place.name,
-    lat: place.lat,
-    lng: place.lng,
-    dayIndex: 0,
-    order: 1,
-    emoji: iconOf(place.icon) || '',
-    color: Colors.accent,
-    fit: true,
-    radius: null,
-    detail: {
-      time: null,
-      cat: place.address ?? null,
-      cost: null,
-      note: null,
-      sub: null,
-      dayLabel: labelOf(place.icon) || '',
-      visited: false,
-    },
-  };
-
   return (
     <BottomSheet visible title={place.name} onClose={onClose}>
       {/*
@@ -170,8 +147,22 @@ export function PlaceDetailSheet({
       */}
       <PlacePhoto name={info?.photoName} by={info?.photoBy} height={200} big />
 
-      {/* 어디쯤인지. 이름만 읽어서는 그 동네인지 알 수 없습니다. */}
-      <TripMap places={[pin]} activeId="looked" onSelect={() => {}} link={false} height={200} />
+      {/*
+        어디쯤인지. 이름만 읽어서는 그 동네인지 알 수 없습니다.
+
+        <h3>살아 있는 지도에서 그림으로</h3>
+
+        <p>상호작용 지도를 띄우고 있었습니다. 그런데 여기 지도는 누를 것도 이을
+        것도 없었습니다 — onSelect 가 빈 함수였고 link 가 꺼져 있었습니다.
+
+        <p>Maps JavaScript 는 지도가 뜰 때마다 셉니다. 혼자 쓰는데도 하루
+        할당량의 20%가 나갔고 그중 상당수가 이 판이었습니다. 게다가 지도 로딩은
+        우리가 캐시할 수 없습니다.
+
+        <p>그림은 서버가 받아서 여섯 시간 들고 있습니다. 같은 장소를 다시 열면
+        구글에 아예 안 나갑니다. 움직일 일이 없으니 잃는 것도 없습니다.
+      */}
+      <SpotMap lat={place.lat} lng={place.lng} name={place.name} height={200} />
 
       {place.address ? <Caption tone="secondary">{place.address}</Caption> : null}
 

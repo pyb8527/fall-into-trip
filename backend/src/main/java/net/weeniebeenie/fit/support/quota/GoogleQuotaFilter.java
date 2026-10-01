@@ -74,7 +74,9 @@ public class GoogleQuotaFilter extends OncePerRequestFilter {
                   길(/api/photos/…)은 구글과 무관하므로 여기 안 걸립니다.
                 */
                 || path.endsWith("/places/photo")
-                || path.endsWith("/map");
+                || path.endsWith("/map")
+                /* 한 자리를 그린 지도 그림. 같은 정적 지도 몫을 씁니다. */
+                || path.endsWith("/maps/spot");
     }
 
     @Override

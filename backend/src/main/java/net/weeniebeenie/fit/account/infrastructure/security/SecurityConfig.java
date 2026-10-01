@@ -89,6 +89,11 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/places/*/tips").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/posts/*/comments").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/posts/*/map").permitAll()
+                        /* 한 자리를 그린 지도 그림. 장소 상세 판이 씁니다 —
+                           둘러보기와 지금 뜨는 여행지에서도 열리고 둘 다
+                           계정 없이 보는 자리입니다. 좌표는 비밀이 아니고
+                           구글 키는 서버에만 있습니다. */
+                        .requestMatchers(HttpMethod.GET, "/api/maps/spot").permitAll()
                         /* 링크를 펼쳐 카드로 만드는 것들이 받아 가는 한 장.
                            토큰을 들고 다닐 수 없는 쪽이라 열려 있어야 하고,
                            내용도 이미 공개된 글에서만 나옵니다. */
