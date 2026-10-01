@@ -4103,9 +4103,20 @@ const styles = StyleSheet.create({
        넓어지며 줄이 덜컥합니다. */
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'transparent',
-    /* 바닥이 회색이 되면서 이 칸도 회색이면 사라집니다. 흰 카드로 올려야
-       누를 수 있는 것으로 읽힙니다. */
-    backgroundColor: Colors.surface,
+    /*
+      판이 흰 종이가 되면서 이 넷이 사라졌습니다.
+
+      <p>흰 카드로 두고 있었습니다. 그때는 판이 회색이라 흰 칸이 떠 보였는데,
+      판이 흰 종이가 된 지금은 <b>흰 위에 흰 네모</b>입니다 — 누를 수 있는
+      것인지 그냥 글자인지 안 보입니다.
+
+      <p>회색으로 뒤집습니다. 떠 보이는 것과 파인 것은 둘 다 "여기는 누르는
+      자리" 를 말하고, 어느 쪽이냐는 <b>바탕이 무엇이냐</b>가 정합니다.
+
+      <p>켜진 하나는 그대로 코랄로 물듭니다. 나머지 셋이 조용한 회색이라
+      물든 하나가 더 또렷합니다.
+    */
+    backgroundColor: Colors.fill,
   },
   /* 캡션(15)보다 두 눈금 작게. 네 칸이 나란히 서는 자리라 "글 올리기" 같은
      이름이 잘리지 않아야 합니다. */
@@ -4118,7 +4129,7 @@ const styles = StyleSheet.create({
   shortcutLabelOn: {
     color: Colors.accentInk,
   },
-  /* 켜진 것. 나머지 셋은 늘 흰 카드라, 하나만 물들면 그것이 켜진 것으로
+  /* 켜진 것. 나머지 셋은 조용한 회색이라, 하나만 물들면 그것이 켜진 것으로
      읽힙니다. */
   shortcutOn: {
     backgroundColor: Colors.accentSoft,
