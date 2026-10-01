@@ -33,7 +33,8 @@ public class PublishController {
                 req == null ? null : req.days(),
                 req != null && Boolean.TRUE.equals(req.feedback()),
                 req == null ? null : req.coverPhotoId(),
-                seen(req == null ? null : req.visibility()));
+                seen(req == null ? null : req.visibility()),
+                req == null ? null : req.storyIds());
         return Map.of("postId", post.getId());
     }
 
@@ -60,10 +61,14 @@ public class PublishController {
      * @param coverPhotoId 표지 사진. 내가 올린 것이어야 합니다
      * @param visibility   LISTED(둘러보기에 뜸) · LINK(주소 아는 사람만) ·
      *                     PRIVATE(나만). 안 주면 LISTED — 지금까지의 동작입니다
+     * @param storyIds     같이 실을 피드 글. 내가 쓴, 이 여행의 글만 됩니다 —
+     *                     모임에서 남이 올린 사진을 공개로 돌리는 결정은
+     *                     찍은 사람이 합니다
      */
     public record PublishRequest(String title, String summary, String region,
                                  java.util.List<String> tags,
                                  java.util.List<String> days, Boolean feedback,
-                                 String coverPhotoId, String visibility) {
+                                 String coverPhotoId, String visibility,
+                                 java.util.List<String> storyIds) {
     }
 }

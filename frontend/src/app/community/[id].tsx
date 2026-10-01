@@ -6,7 +6,7 @@ import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { api, ApiError, query, UNEXPECTED } from '@/api/client';
-import type { ItineraryDay, ItineraryPlace, PostDetail } from '@/api/types';
+import type { ItineraryDay, ItineraryPlace, Maybe, PostDetail, Story } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
 import {
@@ -18,6 +18,7 @@ import {
 import type { MapPlace } from '@/components/map-types';
 import { PhotoStrip } from '@/components/photo-strip';
 import { PlaceDetailSheet } from '@/components/place-detail-sheet';
+import { StoryBlock } from '@/components/story-block';
 import { PostFields, type PostShape } from '@/components/post-fields';
 import { formatNights } from '@/lib/countdown';
 import { PostMap } from '@/components/post-map';
@@ -514,7 +515,20 @@ export default function Post() {
         첫날은 열어 둡니다. 다 접혀 있으면 무엇이 들었는지 모르는 채로
         제목만 늘어선 화면이 됩니다.
       */}
+      {/*
+        일정과, 그 사이에 끼인 글.
+
+        <p>글은 날마다 걸려 있습니다(stories[].dayIndex). 날 하나를 그리고
+        거기 걸린 글을 바로 아래 세웁니다 — 뒤에 모아 두면 읽는 사람이 일정을
+        다 지나간 뒤에야 사진을 보게 되고, 그 사진이 어느 날의 것인지 다시
+        거슬러 올라가야 합니다.
+
+        <p><b>옛 글에는 stories 가 없습니다.</b> 장소마다 기록을 남기던 시절에
+        올린 글이고, 사본은 그때의 모습이라 고쳐 쓰지 않습니다. 없으면 그냥
+        일정만 섭니다.
+      */}
       {data.itinerary.days.map((day, i) => (
+        <View key={`day-${i}`} style={styles.lane}>
         <DayBlock
           key={i}
           day={day}
@@ -541,7 +555,21 @@ export default function Post() {
           mine={data.mine}
           onDrop={(placeIndex) => setDropping({ dayIndex: i, placeIndex })}
         />
+        {storiesOn(data.itinerary.stories, i).map((s, at) => (
+          <StoryBlock key={`story-${i}-${at}`} story={s} />
+        ))}
+        </View>
       ))}
+
+      {/* 날이 안 적힌 글. 돌아와서 올린 것이라 일정 뒤에 섭니다. */}
+      {storiesOn(data.itinerary.stories, null).length > 0 ? (
+        <>
+          <Caption tone="secondary">다녀와서 남긴 것</Caption>
+          {storiesOn(data.itinerary.stories, null).map((s, at) => (
+            <StoryBlock key={`tail-${at}`} story={s} />
+          ))}
+        </>
+      ) : null}
 
       {/*
         아래 목록은 거르지 않고 전부 보여 줍니다. 장소에 달린 것도 어디에
@@ -1237,7 +1265,27 @@ function today() {
 }
 
 
+/**
+ * 그 날에 걸린 글들.
+ *
+ * @param at 몇째 날. null 이면 어느 날에도 안 걸린 것들 — 돌아와서 올렸거나,
+ *           붙어 있던 날이 나중에 빠진 글입니다
+ *
+ * <p>옛 글에는 stories 가 아예 없습니다. 사본은 그때의 모습이라 고쳐 쓰지
+ * 않으므로, 없는 것을 빈 것으로 읽습니다.
+ */
+function storiesOn(stories: Maybe<Story[]>, at: number | null): Story[] {
+  return (stories ?? []).filter((s) =>
+    at === null ? s.dayIndex == null : s.dayIndex === at,
+  );
+}
+
 const styles = StyleSheet.create({
+  /* 하루와 그날의 글을 한 묶음으로. 사이가 벌어지면 그 글이 어느 날 것인지
+     안 보입니다. */
+  lane: {
+    gap: Spacing.sm,
+  },
   /* 지도가 바탕입니다. 판이 아직 안 깔린 자리는 지도 색으로 둡니다 —
      흰 판이 비치면 판이 두 겹인 것처럼 보입니다. */
   /* 떠 있는 띠가 서는 자리. 하단 띠 위로 올립니다. */

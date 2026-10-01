@@ -59,6 +59,14 @@ public class PostService {
     /** 글 하나에 달 수 있는 태그 수. 이보다 많으면 분류가 아니라 검색 낚시입니다. */
     private static final int MAX_TAGS = 8;
 
+    /**
+     * 여행기 한 편에 같이 실을 수 있는 글.
+     *
+     * <p>스무 편이면 여행기가 아니라 피드를 통째로 옮긴 것이 됩니다. 읽는
+     * 사람은 일정을 보러 왔는데 남의 사진 백 장을 지나가야 합니다.
+     */
+    private static final int MAX_STORIES = 20;
+
     /** 태그 하나의 길이. 문장을 태그로 다는 것을 막습니다. */
     private static final int MAX_TAG_LENGTH = 20;
 
@@ -80,6 +88,9 @@ public class PostService {
 
     private final net.weeniebeenie.fit.trip.application.VisitService visits;
     private final net.weeniebeenie.fit.photo.domain.PhotoRepository photos;
+    /* 여행기에 같이 실을 피드 글. 글쓴이가 고른 것만 담습니다. */
+    private final net.weeniebeenie.fit.feed.domain.PostRepository stories;
+    private final net.weeniebeenie.fit.feed.domain.PostPhotoRepository storyPhotos;
 
     private final AuditService audit;
     private final ObjectMapper mapper;
@@ -89,7 +100,8 @@ public class PostService {
     @Transactional
     public TripPost publish(AuthPrincipal me, String tripId, String title, String summary,
                             String region, List<String> tags, List<String> dayIds,
-                            boolean feedback, String coverPhotoId, Visibility visibility) {
+                            boolean feedback, String coverPhotoId, Visibility visibility,
+                            List<String> storyIds) {
         Trip trip = access.requireOwner(tripId, me.id());
 
         if (posts.findAllByAuthorIdOrderByCreatedAtDesc(me.id(), Pageable.ofSize(1))
@@ -129,7 +141,7 @@ public class PostService {
                   <p>올린 사람 것만 봅니다. 같이 간 사람이 각자 찍은 도장은
                   그 사람 것이고, 남의 감상을 내 글에 실을 일이 아닙니다.
                 */
-                .snapshot(snapshotOf(clean, dayList, placeList))
+                .snapshot(snapshotOf(clean, dayList, placeList, storiesOf(me, trip, dayList, storyIds)))
                 .dayCount(dayList.size())
                 .placeCount(placeList.size())
                 .feedback(feedback)
@@ -146,9 +158,37 @@ public class PostService {
      * (updatedBy), 동행자가 누구인지는 그 여행을 같이 간 사람들의 것이지
      * 일정의 일부가 아닙니다. 남이 복제해 갈 때 따라가면 안 됩니다.
      */
-    private String snapshotOf(String title, List<Day> dayList, List<Place> placeList) {
+    private String snapshotOf(String title, List<Day> dayList, List<Place> placeList,
+                              List<Story> storyList) {
         ObjectNode root = mapper.createObjectNode();
         root.put("title", title);
+
+        /*
+          같이 실은 피드 글.
+
+          <p>여행기의 알맹이가 이것입니다 — 어디를 갔는지는 일정이 말하고,
+          <b>어땠는지</b>는 그때 올린 사진과 한 줄이 말합니다. 돌아와서 다시
+          쓰라고 하면 안 씁니다.
+
+          <p>사본에 담으므로 나중에 그 글을 고치거나 지워도 여행기는 그대로
+          입니다. 사본은 <b>그때의 모습</b>이고, 그것이 여행기가 사본인
+          이유입니다.
+        */
+        ArrayNode storyNodes = root.putArray("stories");
+        for (Story s : storyList) {
+            ObjectNode n = storyNodes.addObject();
+            n.put("text", s.text());
+            n.put("author", s.author());
+            n.put("at", s.at().toString());
+            /* 몇째 날 사이에 끼울지. 없으면 일정 뒤에 섭니다. */
+            if (s.dayIndex() != null) {
+                n.put("dayIndex", s.dayIndex());
+            }
+            ArrayNode tagNodes = n.putArray("tags");
+            s.tags().forEach(tagNodes::add);
+            ArrayNode shots = n.putArray("photos");
+            s.photos().forEach(shots::add);
+        }
 
         ArrayNode dayNodes = root.putArray("days");
         /*
@@ -230,6 +270,87 @@ public class PostService {
             }
         }
         return root.toString();
+    }
+
+    /**
+     * 여행기에 같이 실을 피드 글을 골라 담습니다.
+     *
+     * <h3>내가 쓴 것만</h3>
+     *
+     * <p>같은 모임에서 남이 올린 사진을 내 여행기에 실어 <b>공개</b>로
+     * 돌리는 일이 됩니다. 모임 안에서 보이는 것과 아무나 보는 것은 다른
+     * 이야기이고, 그 결정은 찍은 사람이 합니다.
+     *
+     * <h3>이 여행의 글만</h3>
+     *
+     * <p>다른 여행 이야기가 섞이면 여행기가 그 여행의 기록이 아니게 됩니다.
+     *
+     * <h3>몇째 날 사이에 끼울지</h3>
+     *
+     * <p>글이 올라온 날짜를 일정의 날짜와 맞춰 봅니다. 여행 중에 올린 글은
+     * 그날 자리에 끼이고, 돌아와서 올린 글은 일정 뒤에 섭니다. 올린 때가 곧
+     * 겪은 때는 아니지만, 사람에게 날을 또 고르게 하는 것보다 낫습니다 —
+     * 올리는 일이 길어지면 안 올립니다.
+     */
+    private List<Story> storiesOf(AuthPrincipal me, Trip trip, List<Day> dayList,
+                                  List<String> storyIds) {
+        if (storyIds == null || storyIds.isEmpty()) {
+            return List.of();
+        }
+        List<String> want = storyIds.stream()
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .distinct()
+                .toList();
+        if (want.size() > MAX_STORIES) {
+            throw ApiException.badRequest("같이 실을 글은 " + MAX_STORIES + "편까지예요.");
+        }
+
+        /* 날짜 → 몇째 날인지. 고른 날만 들어 있습니다 — 안 올린 날에 걸리면
+           그 글은 갈 데가 없으므로 뒤에 섭니다. */
+        Map<java.time.LocalDate, Integer> whichDay = new java.util.HashMap<>();
+        for (int i = 0; i < dayList.size(); i++) {
+            java.time.LocalDate iso = dayList.get(i).getIso();
+            if (iso != null) {
+                whichDay.putIfAbsent(iso, i);
+            }
+        }
+
+        String myName = users.findById(me.id()).map(User::getName).orElse("알 수 없음");
+        List<Story> out = new ArrayList<>();
+        for (String id : want) {
+            net.weeniebeenie.fit.feed.domain.Post story = stories.findById(id)
+                    .orElseThrow(() -> ApiException.badRequest("그런 글이 없어요."));
+            if (!story.getAuthorId().equals(me.id())) {
+                throw ApiException.badRequest("내가 쓴 글만 함께 실을 수 있어요.");
+            }
+            if (!trip.getId().equals(story.getTripId())) {
+                throw ApiException.badRequest("이 여행의 글만 함께 실을 수 있어요.");
+            }
+
+            List<String> shots = storyPhotos.findAllByPostIdOrderBySortAsc(id).stream()
+                    .map(net.weeniebeenie.fit.feed.domain.PostPhoto::getPhotoId)
+                    .toList();
+            java.time.LocalDate on = story.getCreatedAt()
+                    .atZone(java.time.ZoneId.systemDefault()).toLocalDate();
+
+            out.add(new Story(story.getText(), myName, story.getCreatedAt(),
+                    whichDay.get(on), List.of(story.getTags()), shots));
+        }
+        /* 올린 차례대로. 고른 차례는 화면이 어떻게 늘어놓았느냐에 달렸는데,
+           읽는 사람에게 뜻이 있는 것은 시간입니다. */
+        out.sort(java.util.Comparator.comparing(Story::at));
+        return out;
+    }
+
+    /**
+     * 사본에 담기 직전의 글 한 편.
+     *
+     * @param dayIndex 몇째 날 뒤에 설지. 비어 있으면 일정 뒤입니다
+     */
+    private record Story(String text, String author, java.time.Instant at,
+                         Integer dayIndex, List<String> tags, List<String> photos) {
     }
 
     /* ------------------------------------------------------------- 읽기 */
@@ -708,6 +829,7 @@ public class PostService {
                 ((ObjectNode) d).put("color", DayLabels.colorOf(at));
                 at++;
             }
+            shiftStories(root, dayAt);
         }
 
         post.setSnapshot(write(root));
@@ -729,6 +851,34 @@ public class PostService {
      * <p>감춰진 댓글도 함께 옮깁니다. 운영자가 나중에 풀었을 때 엉뚱한 곳에
      * 붙어 있으면 그것이 더 나쁩니다.
      */
+    /**
+     * 날이 하나 빠졌을 때, 같이 실은 글이 가리키는 날을 옮깁니다.
+     *
+     * <p>댓글과 같은 일인데 사는 곳이 다릅니다 — 댓글은 표에 있고 이것은
+     * 사본 안에 있습니다. 안 옮기면 셋째 날에 끼워 둔 사진이 넷째 날 밑에
+     * 붙습니다.
+     *
+     * <p>빠진 그 날에 붙어 있던 글은 <b>안 지웁니다.</b> 일정 뒤로 내립니다 —
+     * 장소를 하나 빼는 일 때문에 올린 사진이 통째로 사라지면 안 됩니다. 댓글은
+     * 그 장소에 대한 말이라 같이 가지만, 이쪽은 그날 있었던 일입니다.
+     */
+    private static void shiftStories(JsonNode root, int dayAt) {
+        if (!root.path("stories").isArray()) {
+            return;
+        }
+        for (JsonNode s : root.path("stories")) {
+            if (!s.isObject() || !s.hasNonNull("dayIndex")) {
+                continue;
+            }
+            int at = s.path("dayIndex").asInt();
+            if (at == dayAt) {
+                ((ObjectNode) s).remove("dayIndex");
+            } else if (at > dayAt) {
+                ((ObjectNode) s).put("dayIndex", at - 1);
+            }
+        }
+    }
+
     private void shiftComments(String postId, int dayAt, int placeAt, boolean dayGone) {
         List<PostComment> all = comments.findAllByPostId(postId);
         List<PostComment> gone = new ArrayList<>();

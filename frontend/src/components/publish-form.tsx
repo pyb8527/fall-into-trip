@@ -1,11 +1,13 @@
-import { StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useEffect, useState } from 'react';
 
 import { api, ApiError, UNEXPECTED } from '@/api/client';
+import type { FeedPost } from '@/api/types';
 import { useAsync } from '@/api/use-async';
+import { OurPhoto } from '@/components/our-photo';
 import { PostFields, type PostShape } from '@/components/post-fields';
-import { Spacing } from '@/constants/theme';
-import { BottomSheet, Button, Caption, Chip, ErrorNote, Row } from '@/ui';
+import { Colors, Radius, Spacing } from '@/constants/theme';
+import { BottomSheet, Button, Caption, Checkbox, Chip, ErrorNote, Grow, Press, Row } from '@/ui';
 
 /**
  * 내 일정을 게시판에 올립니다.
@@ -62,6 +64,27 @@ export function PublishForm({
   */
   const [pickedDays, setPickedDays] = useState<string[]>([]);
 
+  /*
+    같이 실을 피드 글.
+
+    <p>0단계에서 장소마다 남기던 기록을 걷어 냈고, 그때부터 새 여행기에는
+    사진이 한 장도 안 실렸습니다. 그 자리를 이것이 메웁니다 — 어디를 갔는지는
+    일정이 말하고, <b>어땠는지</b>는 그때 올린 사진과 한 줄이 말합니다.
+
+    <p>내가 쓴 것만 고를 수 있습니다. 모임에서 남이 올린 사진을 공개로 돌리는
+    결정은 찍은 사람이 합니다 — 서버도 같은 것을 봅니다.
+  */
+  const [pickedStories, setPickedStories] = useState<string[]>([]);
+
+  const { data: storyData } = useAsync<{ posts: FeedPost[] }>(
+    (signal) =>
+      visible
+        ? api.get(`/api/feed?trip=${encodeURIComponent(tripId)}`, signal)
+        : Promise.resolve({ posts: [] }),
+    [visible, tripId],
+  );
+  const stories = (storyData?.posts ?? []).filter((p) => p.mine);
+
   const { data: tripDays } = useAsync<{ days: { id: string; label: string; date: string | null }[] }>(
     (signal) =>
       api
@@ -89,6 +112,7 @@ export function PublishForm({
     });
     setFailed(null);
     setBusy(false);
+    setPickedStories([]);
   }, [visible, tripTitle]);
 
   async function submit() {
@@ -111,6 +135,7 @@ export function PublishForm({
         feedback: shape.feedback,
         coverPhotoId: shape.coverPhotoId,
         visibility: shape.visibility,
+        storyIds: pickedStories,
       });
       onDone(res.postId);
     } catch (e) {
@@ -165,6 +190,58 @@ export function PublishForm({
         </>
       ) : null}
 
+      {/*
+        어떤 글을 같이 실을까요.
+
+        <p>기본은 <b>아무것도 안 고름</b>입니다. 피드에 올린 것은 아는
+        사람들끼리 보려고 올린 것이라, 공개 글에 통째로 딸려 가면 안 됩니다 —
+        공개로 돌리는 것은 한 편씩 고르는 일이어야 합니다.
+      */}
+      {stories.length > 0 ? (
+        <>
+          <Caption tone="secondary">
+            이 여행에 올린 글을 같이 실을까요? 고른 것만 공개돼요.
+          </Caption>
+          <View style={styles.stories}>
+            {stories.map((s) => {
+              const on = pickedStories.includes(s.id);
+              return (
+                <Press
+                  key={s.id}
+                  onPress={() =>
+                    setPickedStories((was) =>
+                      was.includes(s.id) ? was.filter((x) => x !== s.id) : [...was, s.id],
+                    )
+                  }
+                  accessibilityLabel={`${s.text ?? '사진'} 같이 싣기`}
+                  style={[styles.story, on ? styles.storyOn : null]}>
+                  <Row gap={Spacing.sm}>
+                    <Checkbox
+                      label=""
+                      checked={on}
+                      onChange={() =>
+                        setPickedStories((was) =>
+                          was.includes(s.id) ? was.filter((x) => x !== s.id) : [...was, s.id],
+                        )
+                      }
+                    />
+                    {s.photoIds.length > 0 ? (
+                      <OurPhoto id={s.photoIds[0]} width={44} height={44} />
+                    ) : null}
+                    <Grow gap={1}>
+                      <Caption numberOfLines={2}>{s.text ?? '사진만 올린 글'}</Caption>
+                      {s.photoIds.length > 0 ? (
+                        <Caption tone="muted">사진 {s.photoIds.length}장</Caption>
+                      ) : null}
+                    </Grow>
+                  </Row>
+                </Press>
+              );
+            })}
+          </View>
+        </>
+      ) : null}
+
       <PostFields value={shape} onChange={setShape} />
 
       {failed ? <ErrorNote message={failed} /> : null}
@@ -177,5 +254,20 @@ const styles = StyleSheet.create({
      오른쪽에 뭐가 더 있는지 안 보입니다. */
   wrap: {
     flexWrap: 'wrap',
+  },
+  stories: {
+    gap: Spacing.xs,
+  },
+  /* 고른 것이 보이게 테두리를 둡니다. 체크만으로는 줄이 여럿일 때 어느 것을
+     골랐는지 훑어서 안 보입니다. */
+  story: {
+    backgroundColor: Colors.fill,
+    borderRadius: Radius.sm,
+    padding: Spacing.sm,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'transparent',
+  },
+  storyOn: {
+    borderColor: Colors.accent,
   },
 });

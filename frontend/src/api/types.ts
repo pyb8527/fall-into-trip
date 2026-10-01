@@ -526,6 +526,36 @@ export type PostCard = {
 export type Itinerary = {
   title: string;
   days: ItineraryDay[];
+  /**
+   * 같이 실은 피드 글.
+   *
+   * <p><b>새 글에만 있습니다.</b> 장소마다 기록을 남기던 시절의 옛 글에는
+   * 없고, 사본은 그때의 모습이라 고쳐 쓰지 않습니다 — 받는 쪽이 둘 다 그릴
+   * 수 있어야 합니다.
+   */
+  stories?: Maybe<Story[]>;
+};
+
+/**
+ * 여행기에 같이 실린 글 한 편.
+ *
+ * <p>사본입니다. 올린 뒤에 그 피드 글을 고치거나 지워도 여기 담긴 것은
+ * 그대로입니다.
+ */
+export type Story = {
+  text: Maybe<string>;
+  author: string;
+  /** 올린 때. */
+  at: string;
+  /**
+   * 몇째 날 뒤에 설지(0부터).
+   *
+   * <p>비어 있으면 일정 뒤입니다 — 돌아와서 올린 글이거나, 붙어 있던 날이
+   * 나중에 빠진 글입니다.
+   */
+  dayIndex?: Maybe<number>;
+  tags: string[];
+  photos: string[];
 };
 
 export type ItineraryDay = {
