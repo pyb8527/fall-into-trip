@@ -299,19 +299,41 @@ export default function Trips() {
         <Tabs items={WHOSE} value={whose} onChange={setWhose} />
       ) : null}
 
+      {/*
+        빈 화면에 할 일을 답니다.
+
+        <p>한 줄만 떠 있었습니다. 이 화면은 처음 들어온 사람이 가장 먼저
+        보는 자리인데, 다음에 무엇을 하면 되는지를 말하지 않았습니다.
+
+        <p>단추는 「모임 것이 없다」 에만 답니다. 나머지 둘이 할 일은
+        <b>새 여행 만들기</b>이고 그것은 이미 바닥에 고정돼 있습니다 —
+        같은 단추를 둘 세우면 둘 다 주 동작으로 안 보입니다(계획서 원칙 5).
+        그 둘은 바닥 단추를 가리키기만 합니다.
+      */}
       {data && all.length === 0 ? (
-        <Empty
-          message={
-            !hasGroupTrips
-              ? '아직 그려 둔 여행이 없어요. 아래에서 첫 줄을 그어 보세요.'
-              : whose === 'group'
-                ? '모임에서 짠 여행이 아직 없어요.'
-                : '혼자 짜 둔 여행이 없어요.'
-          }
-        />
+        !hasGroupTrips ? (
+          <Empty
+            icon="map-pin"
+            message="아직 그려 둔 여행이 없어요."
+            note="아래 「새 여행 만들기」로 첫 줄을 그어 보세요."
+          />
+        ) : whose === 'group' ? (
+          <Empty
+            icon="users"
+            message="모임에서 짠 여행이 아직 없어요."
+            note="모임에서 만든 여행은 모두가 함께 고칠 수 있어요."
+            action={{ label: '모임 보기', onPress: () => router.push('/(app)/groups') }}
+          />
+        ) : (
+          <Empty
+            icon="map-pin"
+            message="혼자 짜 둔 여행이 없어요."
+            note="아래 「새 여행 만들기」로 첫 줄을 그어 보세요."
+          />
+        )
       ) : null}
       {data && all.length > 0 && trips.length === 0 ? (
-        <Empty message={`"${q.trim()}" 로는 찾은 것이 없어요.`} />
+        <Empty icon="search" message={`"${q.trim()}" 로는 찾은 것이 없어요.`} />
       ) : null}
 
       {/* 폴더를 하나라도 만들었으면 여행이 하나뿐이어도 띠를 둡니다. 안 그러면
@@ -462,7 +484,14 @@ export default function Trips() {
       {opened ? (
         <BottomSheet visible title={opened.name} onClose={() => setOpened(null)}>
           {inFolder(opened).length === 0 ? (
-            <Empty message="이 폴더는 아직 비어 있어요." />
+            <Empty
+              icon="folder"
+              message="이 폴더는 아직 비어 있어요."
+              /* 폴더를 만들어 놓고 넣는 길을 못 찾는 자리입니다. 옮기는
+                 길은 줄 오른쪽 점 셋인데, 빈 폴더 안에는 그 줄이 하나도
+                 없어서 어디서 넣는지가 안 보입니다. */
+              note="여행 목록에서 줄 오른쪽 ⋯ 를 누르면 이 폴더로 옮길 수 있어요."
+            />
           ) : null}
           {inFolder(opened).map((trip, i, rows) => (
               <TripRow
@@ -797,7 +826,8 @@ const styles = StyleSheet.create({
 
     <p>여백 안에 가두면 선이 양쪽에서 20픽셀씩 모자라, 화면을 가르는
     가닥이 아니라 내용 위에 얹힌 상자의 밑변으로 보입니다.
-  */
+  */
+
   /* 되돌릴 수 없는 줄. 빨간 글씨 하나로 말합니다 — 면을 칠하면 그 줄이
      주 동작처럼 보입니다. */
   dangerRow: {

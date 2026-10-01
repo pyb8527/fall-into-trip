@@ -192,7 +192,6 @@ export default function Popular() {
           {loadingPlaces && !places ? <Loading /> : null}
           {placeError ? <ErrorNote message={placeError} onRetry={reloadPlaces} /> : null}
 
-          {places && places.places.length === 0 ? (
             {/*
               한 줄만 있으면 「없다」로 끝납니다.
 
@@ -201,6 +200,7 @@ export default function Popular() {
               아직 아무것도 없어서 비었으면 그 말을 해 줘야 합니다 — 둘이
               같은 문장이면 조건을 풀어 볼 생각을 못 합니다.
             */}
+          {places && places.places.length === 0 ? (
             <Empty
               icon="map-pin"
               message={

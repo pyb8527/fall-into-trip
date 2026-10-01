@@ -203,7 +203,14 @@ export default function Search() {
           {postError && tab !== 'places' ? <ErrorNote message={postError} /> : null}
 
           {nothing ? (
-            <Empty message={`"${q}" 로는 찾은 것이 없어요. 다른 말로 해 보세요.`} />
+            <Empty
+              icon="search"
+              message={`"${q}" 로는 찾은 것이 없어요.`}
+              /* 「다른 말로 해 보세요」 뿐이었습니다. 어떤 말이 되는지를 안
+                 알려 주면 같은 말을 조금 고쳐 다시 치고, 또 빈 화면을
+                 봅니다. 이 찾기가 장소 이름 말고 무엇을 받는지 적습니다. */
+              note="장소 이름 말고 「온천」, 「아이랑」 처럼 느낌으로도 찾을 수 있어요."
+            />
           ) : null}
 
           {/*
@@ -434,7 +441,8 @@ const styles = StyleSheet.create({
 
     <p>여백 안에 가두면 선이 양쪽에서 20픽셀씩 모자라, 화면을 가르는
     가닥이 아니라 내용 위에 얹힌 상자의 밑변으로 보입니다.
-  */
+  */
+
   /* 구역 머리 오른쪽. 글자와 꺽쇠가 붙어 한 덩어리로 읽혀야 합니다. */
   moreLink: {
     flexDirection: 'row',

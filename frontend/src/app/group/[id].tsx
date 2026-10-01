@@ -203,7 +203,14 @@ export default function GroupScreen() {
           {lane === 'trips' ? (
             <>
               {data.trips.length === 0 ? (
-                <Empty message="아직 짠 여행이 없어요. 위에서 첫 줄을 그어 보세요." />
+                <Empty
+                  icon="map-pin"
+                  message="아직 짠 여행이 없어요."
+                  /* 단추를 또 달지 않습니다. 「여행 만들기」가 바로 위
+                     머리 구역에 이미 서 있어서, 같은 것이 한 화면에 둘
+                     보이면 둘 다 주 동작으로 안 읽힙니다. */
+                  note="위 「여행 만들기」로 첫 줄을 그어 보세요."
+                />
               ) : null}
               {data.trips.map((t, i) => (
                 <ListRow
@@ -290,7 +297,8 @@ const styles = StyleSheet.create({
 
     <p>여백 안에 가두면 선이 양쪽에서 20픽셀씩 모자라, 화면을 가르는
     가닥이 아니라 내용 위에 얹힌 상자의 밑변으로 보입니다.
-  */
+  */
+
   /* 머리 구역. 판이 아니라 그냥 흐름입니다 — 사이만 벌려 둡니다. */
   head: {
     gap: Spacing.s3,

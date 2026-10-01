@@ -502,14 +502,45 @@ export default function Community() {
 
       {data && data.posts.length === 0 ? (
         <Empty
+          /*
+            빈 자리마다 갈 길이 다릅니다.
+
+            <p>한 줄에 「없다」와 「이렇게 하세요」를 붙여 적고 있었습니다.
+            말로만 가리키면 그 화면을 찾아 나가야 하는데, 넷 중 셋은
+            <b>한 번 누르면 되는 일</b>입니다 — 조건을 거두거나, 다른 칸으로
+            옮기거나, 내 여행으로 가는 것.
+
+            <p>그림도 갈래마다 다릅니다. 「좋아요」에는 안 답니다 — 하트를
+            뜻하는 그림이 이 앱의 그림표에 없고, 뜻이 안 맞는 그림은 없는
+            것보다 나쁩니다.
+          */
+          icon={view === 'mine' ? 'upload' : filtered ? 'search' : 'compass'}
           message={
             view === 'mine'
-              ? '아직 내놓은 길이 없어요. 여행 화면에서 내놓을 수 있어요.'
+              ? '아직 내놓은 길이 없어요.'
               : view === 'liked'
-                ? '아직 하트를 누른 글이 없어요. 마음에 드는 길에 눌러 두세요.'
+                ? '아직 하트를 누른 글이 없어요.'
                 : filtered
-                ? '조건에 맞는 길이 없어요. 조건을 줄여 보세요.'
-                : '아직 올라온 길이 없어요. 첫 번째가 되어 보세요.'
+                  ? '조건에 맞는 길이 없어요.'
+                  : '아직 올라온 길이 없어요.'
+          }
+          note={
+            view === 'mine'
+              ? '여행 요약 화면에서 「여행기 쓰기」로 내놓을 수 있어요.'
+              : view === 'liked'
+                ? '마음에 드는 길에 하트를 눌러 두면 여기 모입니다.'
+                : filtered
+                  ? '조건을 줄이면 더 보일 수 있어요.'
+                  : '누군가 여행기를 내놓으면 여기 쌓입니다. 첫 번째가 되어 보세요.'
+          }
+          action={
+            view === 'mine'
+              ? { label: '내 여행 보기', onPress: () => router.push('/(app)/trips') }
+              : view === 'liked'
+                ? { label: '둘러보기', onPress: () => setView('all') }
+                : filtered
+                  ? { label: '조건 지우기', onPress: () => refilter(clearAll) }
+                  : undefined
           }
         />
       ) : null}
@@ -659,7 +690,8 @@ const styles = StyleSheet.create({
 
     <p>여백 안에 가두면 선이 양쪽에서 20픽셀씩 모자라, 화면을 가르는
     가닥이 아니라 내용 위에 얹힌 상자의 밑변으로 보입니다.
-  */
+  */
+
   applied: {
     flexWrap: 'wrap',
   },

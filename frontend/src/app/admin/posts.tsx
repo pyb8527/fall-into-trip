@@ -89,7 +89,15 @@ export default function AdminPosts() {
 
       {loading && !data ? <Loading /> : null}
       {error ? <ErrorNote message={error} onRetry={reload} /> : null}
-      {data && data.items.length === 0 ? <Empty message="살펴볼 것이 없어요." /> : null}
+      {/* 여기가 비어 있는 것은 <b>좋은 일</b>입니다. 다른 화면의 빈 자리와
+          달리 할 일을 달지 않고, 비어 있는 까닭만 적습니다. */}
+      {data && data.items.length === 0 ? (
+        <Empty
+          icon="check"
+          message="살펴볼 것이 없어요."
+          note="신고가 들어오면 여기에 쌓입니다."
+        />
+      ) : null}
 
       {data?.items.map((item) => (
         <ReportedRow key={item.id} kind={kind} item={item} onChanged={reload} />
@@ -179,7 +187,8 @@ const styles = StyleSheet.create({
 
     <p>여백 안에 가두면 선이 양쪽에서 20픽셀씩 모자라, 화면을 가르는
     가닥이 아니라 내용 위에 얹힌 상자의 밑변으로 보입니다.
-  */
+  */
+
   title: {
     flexShrink: 1,
     gap: 2,
