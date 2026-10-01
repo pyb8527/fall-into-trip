@@ -933,48 +933,46 @@ export function Button({
   compact?: boolean;
 }) {
   const off = disabled || busy;
-  /* 바닥에 고정된 주 단추만 색을 가득 칠합니다. 카드 안에 있는 것은
-     옅은 물에 코랄 글씨로 남습니다 — 화면에 색 덩어리는 하나면 됩니다. */
-  /* 조건 안에서 부르면 안 됩니다 — 훅은 늘 같은 차례로 불려야 합니다. */
-  const onFloor = useContext(OnFloor);
-  const filled = variant === 'primary' && (strong || onFloor);
+  /* 훅은 늘 같은 차례로 불려야 합니다 — 조건 안에서 부르면 안 됩니다. */
+  useContext(OnFloor);
 
   /* 못 누르는 버튼은 흐리게 만드는 대신 아예 다른 색으로 둡니다. 투명도만
      낮추면 그 아래 배경이 비쳐 글자가 읽기 어려워집니다. */
   /*
     단추의 세기.
 
-      주 동작   바닥에 고정된 것이거나 strong 이면 코랄로 꽉 채우고 흰 글씨,
-                그 밖에는 옅은 코랄 바탕에 코랄 글씨
-      보조      흰 바탕에 검은 글씨
-      위험      흰 바탕에 굵은 선 — 되돌릴 수 없다는 표시
-      곁다리    아무것도 없는 글자
+      주 동작   바이올렛으로 꽉 채우고 흰 글씨
+      보조      회색 면에 검은 글씨
+      위험      옅은 빨강 면에 빨간 글씨
+      곁다리    아무것도 없는 바이올렛 글자 — 링크
 
-    <h3>색으로 꽉 채우지 않습니다</h3>
+    <h3>이제 가득 칠합니다</h3>
 
-    한동안 주 단추를 코랄로 채우고 흰 글씨를 얹었습니다. 그러려면 색이
-    충분히 어두워야 하는데, 어두운 코랄은 이미 코랄이 아니라 팥색입니다.
-    밝게 두면 글씨가 안 읽히고 어둡게 두면 색이 죽습니다.
+    <p>옛 코랄은 글씨를 질 수 없는 색이었습니다. 밝게 두면 흰 글씨가 안
+    읽히고 어둡게 두면 코랄이 아니라 팥색이 됐습니다. 그래서 주 단추를
+    <b>옅은 물에 코랄 글씨</b>로 뒤집었는데, 흰 판 위에 혼자 서면 연분홍
+    덩어리가 되어 <b>꺼진 단추처럼</b> 보였습니다.
 
-    옅은 바탕에 진한 글씨로 뒤집으면 그 자리가 없어집니다. 대비는 5:1 이
-    넘고, 회색 바닥 위 흰 단추들 사이에서 색 있는 것은 이것 하나라 충분히
-    눈에 걸립니다.
+    <p>바이올렛 500 은 흰 글씨와 5.3:1 입니다. 가득 칠해도 읽힙니다 — 그래서
+    주 단추가 주 단추로 보입니다.
 
-    위험을 굵은 선으로 두는 것은, 색을 안 쓰기로 한 자리에 무언가는 있어야
-    하기 때문입니다. 그리고 그 앞에는 늘 확인 판이 한 번 더 섭니다.
+    <p>{@code strong} 과 {@code OnFloor} 로 「이것만 채운다」를 가르던 길도
+    없앱니다. primary 는 늘 채워집니다. <b>화면에 하나만</b> 쓰면 됩니다.
+
+    <p>못 누를 때는 흐리게 만들지 않고 아예 옅은 바이올렛으로 둡니다. 투명도만
+    낮추면 그 아래 배경이 비쳐 글자가 더 안 읽힙니다.
   */
   const palette: Record<ButtonVariant, { bg: string; pressed: string; fg: string }> = {
-    primary: filled
-      ? { bg: Colors.accentInk, pressed: Colors.accentPressed, fg: Colors.onAccent }
-      : { bg: Colors.accentSoft, pressed: Colors.accentSoftPressed, fg: Colors.accentInk },
-    secondary: { bg: Colors.surface, pressed: Colors.fill, fg: Colors.text },
-    danger: { bg: Colors.surface, pressed: Colors.fill, fg: Colors.text },
-    ghost: { bg: 'transparent', pressed: Colors.fill, fg: Colors.textMuted },
+    primary: { bg: Colors.accent, pressed: Colors.accentPressed, fg: Colors.onAccent },
+    secondary: { bg: Colors.fill, pressed: Colors.fillPressed, fg: Colors.text },
+    danger: { bg: Colors.dangerSoft, pressed: Colors.dangerSoftPressed, fg: Colors.danger },
+    ghost: { bg: 'transparent', pressed: Colors.fill, fg: Colors.accentInk },
   };
   const c = palette[variant];
-  const offBg = variant === 'ghost' || variant === 'secondary' || variant === 'danger'
-    ? 'transparent'
+  const offBg = variant === 'ghost' ? 'transparent'
+    : variant === 'primary' ? Colors.accentDisabled
     : Colors.fill;
+  const offFg = variant === 'primary' ? Colors.onAccent : Colors.textDisabled;
 
   return (
     <Press
@@ -989,17 +987,14 @@ export function Button({
         compact ? styles.buttonCompact : styles.buttonFull,
         onMap ? styles.buttonOnMap : null,
         { backgroundColor: off ? offBg : c.bg },
-        /* 테두리가 세기를 나눕니다. 위험한 것만 굵게 두릅니다. */
-        variant === 'danger' ? styles.buttonEdge : null,
-        variant === 'secondary' ? styles.buttonHair : null,
       ]}>
       {busy ? (
-        <ActivityIndicator color={off ? Colors.textDisabled : c.fg} size="small" />
+        <ActivityIndicator color={off ? offFg : c.fg} size="small" />
       ) : (
         <Text
           style={[
             compact ? styles.buttonLabelCompact : styles.buttonLabel,
-            { color: off ? Colors.textDisabled : c.fg },
+            { color: off ? offFg : c.fg },
           ]}
           numberOfLines={1}>
           {label}
@@ -1128,15 +1123,26 @@ export function Chip({
       style={[
         styles.chip,
         {
-          backgroundColor: selected ? Colors.accentSoft : Colors.surface,
-          borderColor: selected ? Colors.accent : Colors.border,
+          /*
+            고른 것은 바이올렛을 가득 칠합니다.
+
+            <p>옅은 물에 색 글씨였습니다. 바닥이 회색이던 시절에는 그것으로
+            충분히 걸렸는데, 바닥이 흰색이 되니 <b>고른 것과 안 고른 것이
+            둘 다 밝은 면</b>이 되어 흘긋 봐서는 안 갈립니다.
+
+            <p>칩은 버튼과 다른 일을 합니다 — 무슨 일을 일으키는 것이 아니라
+            보는 방식을 바꿉니다. 그래도 지금 무엇을 보고 있는지는 또렷해야
+            하고, 그 자리에 색을 쓰는 것이 맞습니다.
+          */
+          backgroundColor: selected ? Colors.accent : Colors.fill,
+          borderColor: selected ? Colors.accent : 'transparent',
         },
       ]}>
       <Text
         style={[
           styles.chipLabel,
           selected ? styles.chipLabelOn : null,
-          { color: selected ? Colors.accentInk : Colors.textMuted },
+          { color: selected ? Colors.onAccent : Colors.textSecondary },
         ]}>
         {label}
       </Text>
@@ -2763,8 +2769,16 @@ const styles = StyleSheet.create({
   */
   card: {
     backgroundColor: Colors.surface,
-    borderRadius: Radius.md,
-    padding: Spacing.lg,
+    borderRadius: Radius.r4,
+    padding: Spacing.s4,
+    /*
+      흰 바탕 위에 흰 카드가 놓입니다.
+
+      <p>바닥이 회색이던 시절에는 밝기 차이만으로 카드가 떠 보였습니다.
+      바닥을 흰색으로 돌렸으니 그 일을 <b>옅은 그림자</b>가 대신합니다 —
+      선을 두르면 화면이 다시 「테두리 쳐진 사각형의 더미」가 됩니다.
+    */
+    ...Elevation.card,
     /*
       안에 든 것들 사이.
 
@@ -2799,10 +2813,10 @@ const styles = StyleSheet.create({
 
   listRow: {
     backgroundColor: Colors.surface,
-    borderRadius: Radius.md,
-    paddingVertical: Spacing.lg,
-    paddingHorizontal: Spacing.xl,
-    minHeight: Tap.min + Spacing.lg,
+    borderRadius: Radius.r3,
+    paddingVertical: Spacing.s3,
+    paddingHorizontal: Spacing.s4,
+    minHeight: Tap.min + Spacing.s3,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -3122,13 +3136,13 @@ const styles = StyleSheet.create({
   },
 
   chip: {
-    height: Tap.compact,
+    height: Tap.chip,
     borderRadius: Radius.full,
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.s4,
     alignItems: 'center',
     justifyContent: 'center',
-    /* 어두운 바탕에서 칩과 판은 밝기가 비슷합니다. 실선이 없으면 칩이
-       어디서 끝나는지 보이지 않습니다. */
+    /* 안 고른 칩은 회색 면이라 선이 없어도 어디서 끝나는지 보입니다.
+       선은 자리만 잡아 두고(고른 칩이 그 선을 씁니다) 평소엔 비웁니다. */
     borderWidth: StyleSheet.hairlineWidth,
   },
   switchRow: {
