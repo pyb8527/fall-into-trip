@@ -1,0 +1,167 @@
+import { useCallback, useEffect, useState } from 'react';
+import { View } from 'react-native';
+import { StyleSheet } from 'react-native';
+
+import { api, ApiError, UNEXPECTED } from '@/api/client';
+import type { FeedPost, FeedSlice } from '@/api/types';
+import { FeedCard } from '@/components/feed-card';
+import { FeedForm } from '@/components/feed-form';
+import { Spacing } from '@/constants/theme';
+import { Button, Caption, Chip, Empty, ErrorNote, Loading, Row } from '@/ui';
+
+/**
+ * 피드 한 벌.
+ *
+ * <p>모임 안의 띠와 (나중에) 마이페이지가 같이 씁니다. 보는 자리만 다르고
+ * 모양은 같습니다 — 두 벌로 두면 한쪽만 고치는 날이 옵니다.
+ *
+ * <h3>더 보기로 이어 붙입니다</h3>
+ *
+ * <p>끝없이 흐르게 하지 않습니다. 이 피드는 아는 사람들끼리의 것이라 글이
+ * 수천 편이 되지 않고, 저절로 불러오면 「어디까지 봤더라」를 잃습니다.
+ */
+export function FeedList({
+  /** 모임 피드면 그 모임. 안 주면 내 피드입니다. */
+  groupId,
+  groupName,
+}: {
+  groupId?: string | null;
+  groupName?: string | null;
+}) {
+  const [posts, setPosts] = useState<FeedPost[]>([]);
+  const [more, setMore] = useState(false);
+  const [page, setPage] = useState(0);
+  const [tag, setTag] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [writing, setWriting] = useState(false);
+  const [editing, setEditing] = useState<FeedPost | null>(null);
+
+  const where = groupId ? `group=${encodeURIComponent(groupId)}` : 'mine=true';
+
+  /**
+   * 한 쪽 받아 옵니다.
+   *
+   * @param at   몇 쪽
+   * @param onto true 면 이어 붙이고, false 면 갈아 끼웁니다
+   */
+  const load = useCallback(
+    async (at: number, onto: boolean) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const q = tag ? `&tag=${encodeURIComponent(tag)}` : '';
+        const got = await api.get<FeedSlice>(`/api/feed?${where}&page=${at}${q}`);
+        setPosts((was) => (onto ? [...was, ...got.posts] : got.posts));
+        setMore(got.more);
+        setPage(at);
+      } catch (e) {
+        setError(e instanceof ApiError ? e.message : UNEXPECTED);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [where, tag],
+  );
+
+  useEffect(() => {
+    load(0, false);
+  }, [load]);
+
+  /** 쓰거나 지운 뒤. 보던 자리를 잃지 않게 첫 쪽부터 다시 받습니다. */
+  const refresh = useCallback(() => load(0, false), [load]);
+
+  /* 글에 달린 태그들을 모읍니다. 고를 거리를 따로 받아 오지 않습니다 —
+     지금 보고 있는 것들에서 뽑으면 충분하고, 왕복이 하나 줍니다. */
+  const seen = Array.from(new Set(posts.flatMap((p) => p.tags))).slice(0, 12);
+
+  return (
+    <View style={styles.body}>
+      <Button
+        label={groupName ? `${groupName}에 올리기` : '피드에 올리기'}
+        onPress={() => setWriting(true)}
+      />
+
+      {(seen.length > 0 || tag) ? (
+        <Row gap={Spacing.xs} style={styles.wrap}>
+          <Chip label="전체" selected={tag === null} onPress={() => setTag(null)} />
+          {/* 고른 태그가 지금 보이는 글에 없을 수도 있습니다(걸러진 뒤라
+              그 태그만 남습니다). 그래도 칸은 서 있어야 풀 수 있습니다. */}
+          {(tag && !seen.includes(tag) ? [tag, ...seen] : seen).map((t) => (
+            <Chip
+              key={t}
+              label={`#${t}`}
+              selected={tag === t}
+              onPress={() => setTag(tag === t ? null : t)}
+            />
+          ))}
+        </Row>
+      ) : null}
+
+      {error ? <ErrorNote message={error} onRetry={refresh} /> : null}
+      {loading && posts.length === 0 ? <Loading /> : null}
+
+      {!loading && posts.length === 0 ? (
+        <Empty
+          message={
+            tag
+              ? `#${tag} 가 달린 글이 없어요.`
+              : groupId
+                ? '아직 올라온 글이 없어요. 사진 몇 장이면 돼요.'
+                : '아직 올린 글이 없어요. 사진 몇 장이면 돼요.'
+          }
+        />
+      ) : null}
+
+      {posts.map((p) => (
+        <FeedCard key={p.id} post={p} onChanged={refresh} onEdit={setEditing} />
+      ))}
+
+      {more ? (
+        <Button
+          label="더 보기"
+          variant="secondary"
+          busy={loading}
+          onPress={() => load(page + 1, true)}
+        />
+      ) : null}
+
+      {posts.length > 0 && !more ? (
+        <Caption tone="muted">여기까지예요.</Caption>
+      ) : null}
+
+      <FeedForm
+        visible={writing}
+        groupId={groupId}
+        groupName={groupName}
+        onClose={() => setWriting(false)}
+        onDone={() => {
+          setWriting(false);
+          refresh();
+        }}
+      />
+
+      <FeedForm
+        visible={editing !== null}
+        groupId={groupId}
+        groupName={groupName}
+        post={editing}
+        onClose={() => setEditing(null)}
+        onDone={() => {
+          setEditing(null);
+          refresh();
+        }}
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  body: {
+    gap: Spacing.sm,
+  },
+  wrap: {
+    flexWrap: 'wrap',
+  },
+});

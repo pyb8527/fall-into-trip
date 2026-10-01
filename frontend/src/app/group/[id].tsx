@@ -6,6 +6,7 @@ import { api, ApiError, UNEXPECTED } from '@/api/client';
 import type { Group, Mate, Trip } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
+import { FeedList } from '@/components/feed-list';
 import { GroupForm } from '@/components/group-form';
 import { MatesSheet } from '@/components/mates-sheet';
 import { TripForm } from '@/components/trip-form';
@@ -27,6 +28,7 @@ import {
   Row,
   Screen,
   Section,
+  SegmentedTabs,
   Split,
   Title,
 } from '@/ui';
@@ -40,6 +42,11 @@ import { stackHeader } from '@/ui/nav';
  * <p>모임에 들어와서 하는 일은 둘입니다 — 누가 있는지 보고, 여행을 짭니다.
  * 그 둘을 다른 화면으로 가르면 모임 화면이 이름만 띄우는 빈 방이 됩니다.
  *
+ * <h3>여행이 첫 칸입니다</h3>
+ *
+ * <p>모임을 다시 여는 이유가 대개 「다음에 언제 가지」입니다. 피드를 먼저
+ * 두면 모임이 게시판처럼 읽히고, 그러면 이미 쓰고 있는 메신저와 겹칩니다.
+ *
  * <h3>지울 때 여행은 안 지웁니다</h3>
  *
  * <p>모임을 지우면 여행은 만든 사람의 혼자 여행으로 남습니다. 방을
@@ -47,6 +54,14 @@ import { stackHeader } from '@/ui/nav';
  * 해 줘야 합니다 — 안 그러면 「여행도 없어지나?」 를 사람이 눌러 보고
  * 알게 됩니다.
  */
+/** 모임 안에서 볼 것. 여행이 먼저입니다. */
+type Lane = 'trips' | 'feed';
+
+const LANES: { value: Lane; label: string }[] = [
+  { value: 'trips', label: '여행' },
+  { value: 'feed', label: '피드' },
+];
+
 type Detail = {
   group: Group;
   members: Mate[];
@@ -64,6 +79,7 @@ export default function GroupScreen() {
     [id],
   );
 
+  const [lane, setLane] = useState<Lane>('trips');
   const [editing, setEditing] = useState(false);
   const [mates, setMates] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -90,7 +106,7 @@ export default function GroupScreen() {
   return (
     <Screen
       footer={
-        group ? (
+        group && lane === 'trips' ? (
           <Button label="이 모임에서 여행 만들기" onPress={() => setAdding(true)} />
         ) : undefined
       }>
@@ -152,22 +168,28 @@ export default function GroupScreen() {
             </View>
           </Card>
 
-          <Section title="모임의 여행" flush>
-            <View style={styles.body}>
-              {data.trips.length === 0 ? (
-                <Empty message="아직 짠 여행이 없어요. 아래에서 첫 줄을 그어 보세요." />
-              ) : null}
-              {data.trips.map((t) => (
-                <ListRow
-                  key={t.id}
-                  title={t.title}
-                  onPress={() => router.push({ pathname: '/trip/[id]', params: { id: t.id } })}
-                />
-              ))}
-            </View>
-          </Section>
+          <SegmentedTabs items={LANES} value={lane} onChange={setLane} />
 
-          {amOwner ? (
+          {lane === 'trips' ? (
+            <Section title="모임의 여행" flush>
+              <View style={styles.body}>
+                {data.trips.length === 0 ? (
+                  <Empty message="아직 짠 여행이 없어요. 아래에서 첫 줄을 그어 보세요." />
+                ) : null}
+                {data.trips.map((t) => (
+                  <ListRow
+                    key={t.id}
+                    title={t.title}
+                    onPress={() => router.push({ pathname: '/trip/[id]', params: { id: t.id } })}
+                  />
+                ))}
+              </View>
+            </Section>
+          ) : (
+            <FeedList groupId={group.id} groupName={group.name} />
+          )}
+
+          {amOwner && lane === 'trips' ? (
             <Button label="모임 지우기" variant="danger" onPress={() => setDeleting(true)} />
           ) : null}
 

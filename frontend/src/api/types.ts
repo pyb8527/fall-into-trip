@@ -292,6 +292,42 @@ export type Mate = {
 };
 
 /**
+ * 피드 글 한 편 — 사진 몇 장과 글 한 줄.
+ *
+ * <p>여행기(Post 가 아니라 TripPost 쪽)와 다릅니다. 저쪽은 제목·지역·공개
+ * 범위를 가지는, 남에게 내놓는 글입니다. 이쪽은 아는 사람들끼리 보는 것이라
+ * 올리는 데 드는 품이 사진 고르기 하나여야 합니다.
+ *
+ * <p>좋아요가 없습니다. 스무 명짜리 모임에서 좋아요는 셈이 아니라 눈치가
+ * 됩니다 — 누가 안 눌렀는지가 보입니다.
+ */
+export type FeedPost = {
+  id: string;
+  authorId: string;
+  authorName: string;
+  authorMark: Maybe<string>;
+  /** 모임 글이면 그 모임. 내 피드면 비어 있습니다. */
+  groupId: Maybe<string>;
+  /** 어느 여행 이야기인지. 지워진 여행이면 비어 있습니다. */
+  tripId: Maybe<string>;
+  tripTitle: Maybe<string>;
+  text: Maybe<string>;
+  tags: string[];
+  photoIds: string[];
+  commentCount: number;
+  /** 내가 쓴 것인지. 고치기·지우기 단추가 여기에 걸립니다. */
+  mine: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+/** 피드 한 번에 오는 것. @param more 더 있는지 */
+export type FeedSlice = {
+  posts: FeedPost[];
+  more: boolean;
+};
+
+/**
  * 이 여행을 같이 보는 사람.
  *
  * <p>만든 사람과, 모임 여행이면 그 모임 사람 전부입니다. 일정의 이름표,
