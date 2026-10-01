@@ -88,8 +88,15 @@ export default function RootLayout() {
               headerBackButtonDisplayMode: 'minimal',
               headerTintColor: Colors.text,
               headerStyle: { backgroundColor: Colors.background },
+              /*
+                상단바 제목.
+
+                <p>{@code title3}(18/600) 입니다. 본문과 같은 크기였는데,
+                그러면 막대의 제목이 화면 안의 글과 같은 무게로 서서 「여기가
+                어디인지」를 말해 주지 못합니다. 한 단 올립니다.
+              */
               headerTitleStyle: {
-                fontSize: Type.body.fontSize,
+                fontSize: Type.title3.fontSize,
                 fontWeight: Weight.semibold,
                 color: Colors.text,
               },

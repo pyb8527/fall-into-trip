@@ -124,13 +124,14 @@ const pathStyles = StyleSheet.create({
     /* 막대 가운데에 섭니다. 좌우에 단추가 서므로 그만큼 비켜 둡니다. */
     maxWidth: 220,
   },
+  /* 위에 작게 붙는 「어디에서 왔는지」. 읽으라고 있는 것이 아니라 자리를
+     알려 주는 것이라 가장 작은 단으로 둡니다. */
   parent: {
-    ...Type.caption,
-    fontSize: 11,
+    ...Type.micro,
     color: Colors.textMuted,
   },
   title: {
-    ...Type.body,
+    ...Type.title3,
     fontWeight: Weight.semibold,
     color: Colors.text,
   },
