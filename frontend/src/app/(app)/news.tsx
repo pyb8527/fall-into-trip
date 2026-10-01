@@ -7,7 +7,7 @@ import type { News, NewsItem } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { Colors, Spacing } from '@/constants/theme';
 import { ago } from '@/lib/countdown';
-import { Body, Caption, Empty, ErrorNote, Icon, Loading, Press, Screen } from '@/ui';
+import { Body, Caption, Card, Empty, ErrorNote, Icon, Loading, Press, Screen } from '@/ui';
 import type { IconName } from '@/ui';
 
 /**
@@ -83,7 +83,9 @@ export default function NewsScreen() {
           </View>
           {/* 30일이라고 미리 말해 둡니다. 어제 것이 안 보이는 날에 고장인지
               지난 것인지 알 수 있어야 합니다. */}
-          <Caption>지난 30일치예요.</Caption>
+          <Card>
+            <Caption>지난 30일치예요.</Caption>
+          </Card>
         </>
       )}
       {/* 소식이 하나도 없어도 이 줄은 섭니다. 위 목록과 성격이 달라서입니다 —

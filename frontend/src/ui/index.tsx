@@ -389,8 +389,12 @@ export const Screen = forwardRef<ScreenHandle, ScreenProps>(function Screen(
  * <p>기본은 판이 제 여백을 가집니다 — 안에 글이나 칩이 올 때입니다.
  *
  * <p>{@code flush} 는 내용이 <b>줄</b>일 때입니다. 줄은 저마다 여백을 가지고
- * 좌우 끝까지 닿아야 하므로, 판의 여백을 걷고 제목에만 따로 줍니다. 제목과
- * 줄 사이에는 선을 한 줄 넣습니다 — 여백이 없으니 선이 그 일을 합니다.
+ * 좌우 끝까지 닿아야 하므로, 판의 여백을 걷고 제목에만 따로 줍니다.
+ *
+ * <p>제목과 줄 사이에 선을 그었다가 걷었습니다. 안에 든 줄들이 이미 저마다
+ * 선으로 갈려 있어서, 제목 아래에도 선이 있으면 <b>제목이 첫 줄처럼</b>
+ * 보입니다. 제목은 줄 하나가 아니라 묶음의 이름입니다 — 빈자리가 그 말을
+ * 더 잘합니다.
  */
 export function Section({
   title,
@@ -425,7 +429,6 @@ export function Section({
   return (
     <Card style={flush ? styles.sectionFlush : undefined}>
       {flush ? <View style={styles.sectionHead}>{head}</View> : head}
-      {flush ? <Divider /> : null}
       {children}
     </Card>
   );

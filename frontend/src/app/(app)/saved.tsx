@@ -22,6 +22,7 @@ import {
   BottomSheet,
   Button,
   Caption,
+  Card,
   Chip,
   ConfirmButton,
   Divider,
@@ -354,16 +355,20 @@ export default function Saved() {
         />
       ) : null}
 
-      <Split>
-        <Grow>
-          <Body tone="secondary">
-            {all.length > 0
-              ? `주워 둔 ${all.length}곳. 골라서 일정 아무 날에나 얹어요.`
-              : '눈에 띄는 곳을 담아 두었다가 일정에 꺼내 써요.'}
-          </Body>
-        </Grow>
-        <Button label="담기" compact onPress={() => setKeeping(true)} />
-      </Split>
+{/* 이 화면이 무엇인지 말하는 줄입니다. 회색 바탕에 두면 가장 먼저 읽어야
+          하는 글자가 가장 허름한 자리에 놓입니다. */}
+      <Card>
+        <Split>
+          <Grow>
+            <Body tone="secondary">
+              {all.length > 0
+                ? `주워 둔 ${all.length}곳. 골라서 일정 아무 날에나 얹어요.`
+                : '눈에 띄는 곳을 담아 두었다가 일정에 꺼내 써요.'}
+            </Body>
+          </Grow>
+          <Button label="담기" compact onPress={() => setKeeping(true)} />
+        </Split>
+      </Card>
 
       {loading && !data ? <Loading /> : null}
       {error ? <ErrorNote message={error} onRetry={reload} /> : null}

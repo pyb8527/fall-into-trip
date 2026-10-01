@@ -75,12 +75,14 @@ export default function MoneyList() {
 
   return (
     <Screen safeTop tabs={<AppTabs />}>
-      <View style={styles.head}>
+      {/* 제목과 안내가 회색 바탕에 그대로 있었습니다. 판 위로 올립니다 —
+          화면에서 가장 먼저 읽는 글자입니다. */}
+      <Card style={styles.head}>
         <Title>가계부</Title>
         <Caption tone="secondary">
           여행에서 서로 껄끄러워지는 자리는 돈이에요. 쓴 김에 적어 두면 돌아와서 편해요.
         </Caption>
-      </View>
+      </Card>
 
       {loading && !data ? <Loading /> : null}
       {error ? <ErrorNote message={error} onRetry={reload} /> : null}

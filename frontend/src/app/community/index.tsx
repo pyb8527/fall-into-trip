@@ -227,7 +227,9 @@ export default function Community() {
         남깁니다. 대개 하나나 둘이고, 아무것도 안 걸렸으면 한 줄도 안 먹습니다.
       */}
       {PRIVATE.includes(view) ? null : (
-        <View style={styles.filters}>
+        /* 찾기 칸과 지금 걸린 조건. 회색 바탕에 떠 있으면 어디까지가
+           고르는 자리인지 안 보입니다. */
+        <Card style={styles.filters}>
           <SearchField
             label="찾기"
             value={typed}
@@ -257,7 +259,7 @@ export default function Community() {
             </Row>
             {data ? <Caption tone="secondary">{data.total.toLocaleString()}개</Caption> : null}
           </Split>
-        </View>
+        </Card>
       )}
 
       <BottomSheet
