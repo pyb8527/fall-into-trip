@@ -44,13 +44,18 @@ const navigationTheme: NavTheme = {
     border: 'transparent',
     notification: Colors.danger,
   },
-  /* 위쪽 막대의 글자도 화면 안과 같은 글꼴을 씁니다. 여기만 'System' 으로
-     두면 제목 줄만 다른 글꼴로 그려집니다. */
+  /*
+    위쪽 막대의 글자도 화면 안과 같은 글꼴을 씁니다.
+
+    <p>앱에서는 글꼴 이름이 비어 있습니다 — 기기 고딕을 그대로 쓰기
+    때문입니다(Fonts). 빈 값을 넘기면 안드로이드가 글꼴을 못 찾을 수 있어
+    'System' 으로 돌려 둡니다.
+  */
   fonts: {
-    regular: { fontFamily: Fonts.sans, fontWeight: '400' },
-    medium: { fontFamily: Fonts.sans, fontWeight: '500' },
-    bold: { fontFamily: Fonts.sans, fontWeight: '600' },
-    heavy: { fontFamily: Fonts.sans, fontWeight: '700' },
+    regular: { fontFamily: Fonts.sans ?? 'System', fontWeight: '400' },
+    medium: { fontFamily: Fonts.sans ?? 'System', fontWeight: '500' },
+    bold: { fontFamily: Fonts.sans ?? 'System', fontWeight: '600' },
+    heavy: { fontFamily: Fonts.sans ?? 'System', fontWeight: '700' },
   },
 };
 

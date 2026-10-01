@@ -99,9 +99,41 @@ export default function Document({ children }: PropsWithChildren) {
           <p>스타일도 여기 박아 둡니다. 따로 받아야 하는 것이 하나라도 있으면
           그만큼 늦게 뜨는데, 늦게 뜨는 시작 화면은 있으나 마나입니다.
         */}
+        {/*
+          글꼴과 바탕.
+
+          <p>이것이 {@code global.css} 에 있었습니다. 그런데 <b>그 파일을
+          아무도 import 하지 않아</b> 번들에 실리지도 않았습니다 — 웹은
+          프리텐다드를 한 번도 쓴 적이 없고, 글자는 대체 목록 끝의 기기
+          고딕으로 그려지고 있었습니다. 스타일시트가 하나도 안 붙어 있으니
+          알아챌 길도 없었습니다.
+
+          <p>여기로 옮깁니다. 이 파일은 웹에서만 도는 것이 확실하고, 머리에
+          그대로 박히므로 번들러를 거치지 않습니다.
+        */}
         <style
           dangerouslySetInnerHTML={{
             __html: `
+@font-face {
+  font-family: 'Pretendard';
+  /* public/ 은 통째로 뿌리에 복사됩니다. 번들러는 CSS 안의 url() 을 안 건드립니다. */
+  src: url('/fonts/PretendardVariable.woff2') format('woff2');
+  font-weight: 45 920;
+  font-style: normal;
+  /* 받는 동안 글자가 안 보이는 것보다, 기기 글꼴로 먼저 보여 주는 편이 낫습니다. */
+  font-display: swap;
+}
+:root {
+  --font-sans: Pretendard, -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo',
+    'Segoe UI', 'Malgun Gothic', 'Noto Sans KR', system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+html, body, #root { background: #FFFFFF; }
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
 #fit-splash {
   position: fixed;
   inset: 0;
@@ -109,10 +141,11 @@ export default function Document({ children }: PropsWithChildren) {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #fafafa;
+  /* 시안의 바이올렛. 앱 스플래시와 같은 바탕입니다. */
+  background: #6D5BF6;
   transition: opacity .25s ease;
 }
-#fit-splash img { width: 160px; height: auto; }
+#fit-splash img { width: 96px; height: auto; }
 #fit-splash.gone { opacity: 0; pointer-events: none; }
 /* 움직임을 줄여 달라고 해 둔 사람에게는 서서히 사라지는 것도 안 해요. */
 @media (prefers-reduced-motion: reduce) { #fit-splash { transition: none; } }`,
@@ -175,19 +208,18 @@ export default function Document({ children }: PropsWithChildren) {
     대체 글꼴로 한 번 그려졌다가 바뀝니다. 스플래시 다음의 로딩 화면만
     다른 글씨체로 나오던 것이 이거예요.
 
-    글꼴은 화면 코드가 받아 와요(ui/hand). 여기서는 받아졌는지만 봐요.
-    3초까지만 기다립니다 — 망이 느리다고 시작 화면을 붙들고 있는 것이,
-    글씨체 한 번 바뀌는 것보다 나쁩니다.
+    글꼴은 안 기다립니다.
+
+    <p>손글씨를 쓰던 시절에는 그것이 도착할 때까지 시작 화면을 붙들고
+    있었습니다. 굵기가 하나뿐인 손글씨는 시스템 고딕과 생김새가 아주 달라서,
+    먼저 그렸다가 갈아 끼우면 화면이 통째로 바뀌는 것처럼 보였기 때문입니다.
+
+    <p>프리텐다드는 시스템 고딕과 거의 같은 꼴이라 바뀌는 티가 안 납니다.
+    먼저 그리고 도착하면 조용히 갈아 끼웁니다 — 망이 느린 사람이 흰 화면을
+    보고 있는 것보다 낫습니다.
   */
-  var waited = 0;
-  function ready() {
-    if (!document.fonts || !document.fonts.check) return true;
-    try { return document.fonts.check('1em LeeSeoyun'); } catch (e) { return true; }
-  }
   function whenReady() {
-    if (ready() || waited >= 3000) { clear(); return; }
-    waited += 100;
-    setTimeout(whenReady, 100);
+    clear();
   }
 
   var root = document.getElementById('root');

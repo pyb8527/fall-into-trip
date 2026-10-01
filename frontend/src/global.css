@@ -26,7 +26,15 @@
    * 않고, 주소도 CSS 가 놓인 자리(/_expo/static/css/) 기준으로 풀려 엉뚱한
    * 곳을 가리킵니다. public/ 은 통째로 뿌리에 복사됩니다.
    */
-  src: url('/fonts/PretendardVariable.woff2') format('woff2-variations');
+  /*
+   * format 은 woff2 입니다.
+   *
+   * woff2-variations 라고 적어 두었습니다. 가변 글꼴이니 그게 맞아 보이지만
+   * 그 값은 옛 초안의 것이라 요즘 크롬이 모르는 글자로 읽고 @font-face 를
+   * 통째로 버립니다 — 그래서 프리텐다드가 <b>한 번도 안 받아졌습니다.</b>
+   * 글자는 대체 목록 끝의 기기 고딕으로 그려지고 있었고, 아무도 몰랐습니다.
+   */
+  src: url('/fonts/PretendardVariable.woff2') format('woff2');
   font-weight: 45 920;
   font-style: normal;
   font-display: swap;
@@ -36,15 +44,17 @@
   /*
     이 앱의 글자.
 
-    <p>맨 앞이 이서윤체입니다. 이 글꼴은 CSS 가 아니라 expo-font 가 붙입니다
-    (ui/hand) — 웹과 앱이 같은 파일 하나를 써야 해서입니다. 도착하기 전에는
-    이 줄의 다음 것(프리텐다드)으로 그려지다가 조용히 갈아 끼워집니다.
+    <p>프리텐다드 한 가족입니다. 가변 글꼴이라 파일 하나에 굵기 45~920 이
+    다 들어 있습니다 — 굵기 네 단계를 쓰면서도 받는 것은 한 번뿐입니다.
 
-    <p>뒤쪽은 프리텐다드마저 못 받았을 때 쓸 것들입니다. 위에서 아래로
-    한글이 또렷한 순서.
+    <p>손글씨(이서윤체)가 맨 앞에 있었습니다. 1종이라 굵기가 하나뿐이었고,
+    그래서 위계를 크기 하나에 맡겨야 했습니다. 걷었습니다.
+
+    <p>뒤쪽은 프리텐다드를 못 받았을 때 쓸 것들입니다. 위에서 아래로 한글이
+    또렷한 순서 — 모두 같은 계열이라 바뀌는 티가 거의 안 납니다.
   */
   --font-sans:
-    LeeSeoyun, Pretendard, -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Segoe UI',
+    Pretendard, -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Segoe UI',
     'Malgun Gothic', 'Noto Sans KR', system-ui, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
