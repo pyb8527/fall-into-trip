@@ -381,7 +381,7 @@ export default function Saved() {
       {/* 몇 개 안 될 때는 찾을 것이 없습니다. 칸만 자리를 차지합니다. */}
       {all.length > 4 ? (
         <SearchField
-          label="보석함에서 찾기"
+          label="저장한 곳에서 찾기"
           value={q}
           onChangeText={setQ}
           placeholder="국밥, 온천, 도톤보리"

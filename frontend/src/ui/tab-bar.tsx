@@ -79,7 +79,7 @@ export function TabBar({ items, onBack }: { items: TabItem[]; onBack?: () => voi
         /* 띠와 같은 재질입니다. 하나만 꽉 막힌 흰 동그라미면 둘이 다른
            층에 있는 것처럼 보입니다. */
         <Press onPress={onBack} accessibilityLabel="나가기" style={styles.back}>
-          <Icon name="chevron-left" size={26} />
+          <Icon name="chevron-left" size={24} />
         </Press>
       ) : null}
 
@@ -103,7 +103,20 @@ export function TabBar({ items, onBack }: { items: TabItem[]; onBack?: () => voi
             scale={0.94}
             style={styles.tab}>
             <View>
-              <Icon name={item.icon} size={27} tone={item.active ? 'default' : 'muted'} />
+              {/*
+                켜지면 채우고 꺼지면 선으로 그립니다.
+
+                <p>전에는 색 하나로만 갈랐습니다(진한 회색 ↔ 옅은 회색).
+                페더에 채운 그림이 없어서였는데, 그러면 띠를 흘긋 봐서는
+                어느 칸에 있는지 모릅니다. 색은 눈이 견주어야 읽히고 모양은
+                바로 읽힙니다.
+              */}
+              <Icon
+                name={item.icon}
+                size={24}
+                solid={!!item.active}
+                tone={item.active ? 'accent' : 'muted'}
+              />
               {item.dot ? <View style={styles.dot} /> : null}
             </View>
             {/*
@@ -173,8 +186,15 @@ export function AppTabs() {
           onPress: go('/(app)/groups'),
         },
         {
+          /*
+            「보석함」이었습니다.
+
+            <p>이 앱의 말투이긴 한데, 처음 연 사람은 무엇이 들었는지 모릅니다 —
+            눌러 봐야 「담아 둔 장소」라는 것을 압니다. 띠의 칸 이름은 멋을
+            부리는 자리가 아니라 길 표지입니다.
+          */
           key: 'saved',
-          label: '보석함',
+          label: '저장',
           icon: 'bookmark',
           active: here.startsWith('/saved'),
           onPress: go('/(app)/saved'),

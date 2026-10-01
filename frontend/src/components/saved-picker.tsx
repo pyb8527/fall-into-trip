@@ -140,13 +140,13 @@ export function SavedPicker({
       {failed ? <ErrorNote message={failed} /> : null}
 
       {data && all.length === 0 ? (
-        <Empty message="보석함이 비어 있어요. 장소를 찾다가 별을 누르면 여기 쌓이고, 그다음부터 이 자리에서 꺼내 쓸 수 있어요." />
+        <Empty message="저장한 곳이 비어 있어요. 장소를 찾다가 별을 누르면 여기 쌓이고, 그다음부터 이 자리에서 꺼내 쓸 수 있어요." />
       ) : null}
 
       {/* 몇 개 안 될 때는 찾을 것이 없습니다. 칸만 자리를 차지합니다. */}
       {all.length > 4 ? (
         <SearchField
-          label="보석함에서 찾기"
+          label="저장한 곳에서 찾기"
           value={q}
           onChangeText={setQ}
           placeholder="국밥, 온천, 도톤보리"

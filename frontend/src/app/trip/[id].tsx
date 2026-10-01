@@ -2251,7 +2251,7 @@ function DayCard({
           {canEdit ? (
             <IconButton
               name="bookmark"
-              label={`${day.date || day.label}에 보석함에서 꺼내 넣기`}
+              label={`${day.date || day.label}에 저장한 곳에서 꺼내 넣기`}
               onPress={() => {
                 setFolded(false);
                 setDigging(true);

@@ -543,7 +543,7 @@ function Keep({
           onPress={() => onKeep(card, 'candidate')}
         />
       ) : null}
-      <Button label="보석함에" variant="ghost" compact onPress={() => onKeep(card, 'saved')} />
+      <Button label="저장" variant="ghost" compact onPress={() => onKeep(card, 'saved')} />
     </Row>
   );
 }

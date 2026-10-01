@@ -73,7 +73,7 @@ export default function NewsScreen() {
   return (
     <Screen>
       {items.length === 0 ? (
-        <Empty message="아직 온 소식이 없어요. 같이 보는 사람이 일정을 고치면 여기에 쌓여요." />
+        <Empty message="아직 온 알림이 없어요. 같이 보는 사람이 일정을 고치면 여기에 쌓여요." />
       ) : (
         <>
           <View style={styles.list}>

@@ -319,7 +319,7 @@ export default function Home() {
             />
             <IconButton
               name="bell"
-              label={news?.unseen ? `소식 ${news.unseen}건` : '소식'}
+              label={news?.unseen ? `알림 ${news.unseen}건` : '알림'}
               dot={!!news?.unseen}
               bare
               onPress={() => router.push('/(app)/news')}

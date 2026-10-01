@@ -363,11 +363,11 @@ function AddSheet({
       {saved && saved.places.length > 0 ? (
         <>
           <Divider />
-          <Caption tone="secondary">보석함에서</Caption>
+          <Caption tone="secondary">저장한 곳에서</Caption>
           {/* 담아 둔 것이 여럿이면 여기서도 훑어 내려가야 합니다. */}
           {saved.places.length > 5 ? (
             <SearchField
-              label="보석함에서 찾기"
+              label="저장한 곳에서 찾기"
               value={pick}
               onChangeText={setPick}
               placeholder="국밥, 온천"

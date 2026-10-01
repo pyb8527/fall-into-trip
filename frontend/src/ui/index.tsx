@@ -1,4 +1,4 @@
-import Feather from '@expo/vector-icons/Feather';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import {
   createContext,
   forwardRef,
@@ -1074,7 +1074,7 @@ export function Picker<T extends string>({
         <Text style={[styles.chipLabel, picked ? { color: Colors.accentInk } : null]}>
           {label} · {picked?.label ?? allLabel}
         </Text>
-        <Feather
+        <Ionicons
           name="chevron-down"
           size={16}
           color={picked ? Colors.accentInk : Colors.textSecondary}
@@ -1314,8 +1314,8 @@ export function ChoiceTile({
  *
  * <h3>아이콘 체계가 둘입니다</h3>
  *
- * <p>화면에는 선으로 그린 UI 아이콘(Feather)과 이모지가 같이 삽니다. 섞여
- * 있으면 어설퍼 보이는데, 그렇다고 이모지를 걷을 수도 없습니다 — Feather
+ * <p>화면에는 선으로 그린 UI 아이콘(Ionicons)과 이모지가 같이 삽니다. 섞여
+ * 있으면 어설퍼 보이는데, 그렇다고 이모지를 걷을 수도 없습니다 — Ionicons
  * 287개를 뒤져도 온천·초밥·라멘·신사는 없습니다. 그쪽은 도구를 그리는
  * 세트이지 갈래를 그리는 세트가 아닙니다.
  *
@@ -1672,19 +1672,101 @@ export type IconName =
   /** 사진. 다니면서 볼 것을 챙겨 두는 자리에 씁니다 */
   | 'image';
 
+/**
+ * 이름 하나가 가리키는 두 가지 — 선과 채움.
+ *
+ * <h3>왜 세트를 바꿨는가</h3>
+ *
+ * <p>페더(Feather)에는 <b>채운 그림이 없습니다.</b> 그래서 아래 갈래 띠의
+ * 켜짐·꺼짐을 그릴 수가 없었습니다 — 상용 앱이 거의 다 쓰는 「꺼지면 선,
+ * 켜지면 채움」을 못 하니, 켜진 칸을 색 하나로만 가려야 했고 그것이 띠를
+ * 밋밋하게 만들었습니다.
+ *
+ * <p>세트를 섞는 길도 있었지만 획 굵기가 달라 엉성해 보입니다. 한 세트로
+ * 통일합니다. Ionicons 는 {@code @expo/vector-icons} 에 이미 들어 있어
+ * 새로 받을 것이 없습니다.
+ *
+ * <p>여기 한 곳만 고치면 화면 이백 군데가 따라 바뀝니다 — 화면들은 옛
+ * 이름을 그대로 부르고 이 표가 번역합니다.
+ */
+const ionicon: Record<IconName, { line: string; solid: string }> = {
+  check: { line: 'checkmark', solid: 'checkmark' },
+  info: { line: 'information-circle-outline', solid: 'information-circle' },
+  'credit-card': { line: 'card-outline', solid: 'card' },
+  home: { line: 'home-outline', solid: 'home' },
+  shuffle: { line: 'shuffle-outline', solid: 'shuffle' },
+  'edit-2': { line: 'create-outline', solid: 'create' },
+  'trash-2': { line: 'trash-outline', solid: 'trash' },
+  settings: { line: 'settings-outline', solid: 'settings' },
+  maximize: { line: 'expand-outline', solid: 'expand' },
+  minimize: { line: 'contract-outline', solid: 'contract' },
+  x: { line: 'close', solid: 'close' },
+  plus: { line: 'add', solid: 'add' },
+  minus: { line: 'remove', solid: 'remove' },
+  search: { line: 'search-outline', solid: 'search' },
+  'map-pin': { line: 'location-outline', solid: 'location' },
+  calendar: { line: 'calendar-outline', solid: 'calendar' },
+  users: { line: 'people-outline', solid: 'people' },
+  'share-2': { line: 'share-social-outline', solid: 'share-social' },
+  'log-out': { line: 'log-out-outline', solid: 'log-out' },
+  'user-minus': { line: 'person-remove-outline', solid: 'person-remove' },
+  'chevron-left': { line: 'chevron-back', solid: 'chevron-back' },
+  'chevron-right': { line: 'chevron-forward', solid: 'chevron-forward' },
+  navigation: { line: 'navigate-outline', solid: 'navigate' },
+  clock: { line: 'time-outline', solid: 'time' },
+  phone: { line: 'call-outline', solid: 'call' },
+  'external-link': { line: 'open-outline', solid: 'open' },
+  crosshair: { line: 'locate-outline', solid: 'locate' },
+  'chevron-down': { line: 'chevron-down', solid: 'chevron-down' },
+  'chevron-up': { line: 'chevron-up', solid: 'chevron-up' },
+  'arrow-up': { line: 'arrow-up', solid: 'arrow-up' },
+  'arrow-down': { line: 'arrow-down', solid: 'arrow-down' },
+  folder: { line: 'folder-outline', solid: 'folder' },
+  star: { line: 'star-outline', solid: 'star' },
+  bookmark: { line: 'bookmark-outline', solid: 'bookmark' },
+  'book-open': { line: 'book-outline', solid: 'book' },
+  'thumbs-up': { line: 'thumbs-up-outline', solid: 'thumbs-up' },
+  compass: { line: 'compass-outline', solid: 'compass' },
+  'message-square': { line: 'chatbubble-outline', solid: 'chatbubble' },
+  upload: { line: 'cloud-upload-outline', solid: 'cloud-upload' },
+  menu: { line: 'reorder-three-outline', solid: 'reorder-three' },
+  flag: { line: 'flag-outline', solid: 'flag' },
+  bell: { line: 'notifications-outline', solid: 'notifications' },
+  'more-horizontal': { line: 'ellipsis-horizontal', solid: 'ellipsis-horizontal' },
+  printer: { line: 'print-outline', solid: 'print' },
+  download: { line: 'download-outline', solid: 'download' },
+  copy: { line: 'copy-outline', solid: 'copy' },
+  image: { line: 'image-outline', solid: 'image' },
+};
+
 export function Icon({
   name,
-  /* 본문(20)보다 조금 큽니다. 글자 옆에 설 때 같은 무게로 보이려면 그림은
-     글자보다 조금 커야 합니다 — 글자는 위아래 여백을 제 안에 갖고 있고
-     그림은 테두리까지가 전부이기 때문입니다. */
-  size = 23,
+  /*
+    글자 옆에 설 때 같은 무게로 보이려면 그림이 글자보다 조금 커야 합니다 —
+    글자는 위아래 여백을 제 안에 갖고 있고 그림은 테두리까지가 전부입니다.
+
+    <p>23 이었습니다. 본문이 20이던 시절의 값이라, 글자를 16으로 되돌리면서
+    함께 내립니다. 쓰는 크기는 셋입니다 — 16(글자 옆) · 20(목록·입력) ·
+    24(바·탭).
+  */
+  size = 20,
   tone = 'default',
+  /** 켜진 칸처럼 채워서 그려야 하는 자리. 아래 갈래 띠가 씁니다. */
+  solid = false,
 }: {
   name: IconName;
   size?: number;
   tone?: Tone;
+  solid?: boolean;
 }) {
-  return <Feather name={name} size={size} color={toneColor[tone]} />;
+  const glyph = ionicon[name];
+  return (
+    <Ionicons
+      name={(solid ? glyph.solid : glyph.line) as never}
+      size={size}
+      color={toneColor[tone]}
+    />
+  );
 }
 
 /**
@@ -2557,7 +2639,7 @@ export function Snack({ undo, onHide }: { undo: UndoNote | null; onHide: () => v
         </Press>
       ) : (
         <Press onPress={onHide} accessibilityLabel="닫기" style={styles.snackAction}>
-          <Feather name="x" size={21} color={Colors.surface} />
+          <Ionicons name="close" size={20} color={Colors.surface} />
         </Press>
       )}
     </Animated.View>

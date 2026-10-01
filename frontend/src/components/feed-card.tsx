@@ -138,7 +138,7 @@ export function FeedCard({
       <ConfirmDialog
         visible={dropping}
         title="이 글을 지울까요?"
-        message="사진은 안 지워져요. 글에서 떨어질 뿐이라 보석함에는 그대로 있어요."
+        message="사진은 안 지워져요. 글에서 떨어질 뿐이라 저장한 곳에는 그대로 있어요."
         confirmLabel="지우기"
         danger
         busy={busy}
