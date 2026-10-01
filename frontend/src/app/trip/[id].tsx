@@ -2046,7 +2046,7 @@ function SheetHead({
           {title}
         </Text>
         {/* 남은 날. 노랑은 「지금 · 곧」을 가리키는 자리에만 씁니다. */}
-        {at ? <DayBadge label={countdownLabel(at)} /> : null}
+        {at ? <Badge tone="hot" solid label={countdownLabel(at)} /> : null}
       </Split>
 
       <Caption tone="muted">
@@ -2128,25 +2128,6 @@ function DayChip({
         {label}
       </Text>
     </Press>
-  );
-}
-
-/**
- * 며칠 남았는지.
- *
- * <p>노랑은 「지금 · 곧」을 가리키는 자리에만 씁니다 — 심볼의 노란 알약이
- * 「일정 칸에 들어가는 한 자리」를 뜻하는 데서 왔습니다. 노란 면 위의 글자는
- * 늘 먹색입니다(흰 바탕에서 노랑은 대비가 1.6:1 입니다).
- *
- * <p>공용 배지를 안 씁니다. 공용 배지에는 아직 노란 종류가 없어서, 옅은
- * 노랑에 노란 글씨가 되어 아무것도 안 읽힙니다. 부품에 그 종류가 생기면
- * 이것은 지웁니다.
- */
-function DayBadge({ label }: { label: string }) {
-  return (
-    <View style={styles.dayBadge}>
-      <Text style={styles.dayBadgeLabel}>{label}</Text>
-    </View>
   );
 }
 
@@ -4293,20 +4274,6 @@ const styles = StyleSheet.create({
     fontWeight: Weight.semibold,
     /* 날짜 색 여덟은 모두 진해서 흰 글자가 읽힙니다. */
     color: Colors.onDay,
-  },
-  /* 「지금 · 곧」을 가리키는 노란 표. */
-  dayBadge: {
-    height: 20,
-    paddingHorizontal: Spacing.s2,
-    borderRadius: Radius.r1,
-    backgroundColor: Colors.hot,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dayBadgeLabel: {
-    ...Type.micro,
-    fontWeight: Weight.semibold,
-    color: Colors.onHot,
   },
 
 

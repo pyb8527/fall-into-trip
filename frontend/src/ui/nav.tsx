@@ -100,10 +100,21 @@ export function NavLeft({
     router.replace(user ? '/(app)/home' : '/(auth)/welcome');
   }
 
+  /*
+    뒤로 하나만 섭니다.
+
+    <h3>집 그림이 자리를 먹고 있었습니다</h3>
+
+    <p>뒤로와 「처음으로」 둘이 나란히 섰습니다. 그런데 처음으로 가는 길은
+    <b>아래 갈래 띠의 「홈」</b>이 이미 가지고 있습니다 — 같은 일을 하는
+    길이 한 화면에 둘이면, 둘 중 어느 것이 맞는지 한 번 생각하게 됩니다.
+
+    <p>무엇보다 막대 왼쪽을 88 이나 먹었습니다. 그 바람에 가운데 제목이
+    좁아져서, 여행 이름이 긴 것은 한두 글자만 남고 말줄임이 됐습니다.
+  */
   return (
-    <Row gap={Spacing.xs} style={rail ? navStyles.railGap : null}>
-      <IconButton name="chevron-left" label="뒤로" bare onPress={back} />
-      <IconButton name="home" label="처음으로" bare onPress={() => router.replace(start)} />
+    <Row gap={Spacing.s1} style={rail ? navStyles.railGap : null}>
+      <IconButton name="chevron-left" label="뒤로" onPress={back} />
     </Row>
   );
 }
@@ -142,22 +153,39 @@ const navStyles = StyleSheet.create({
   },
 });
 
+/*
+  무엇이 크게 서야 하는가.
+
+  <h3>뒤집었습니다</h3>
+
+  <p>위에 작은 「도쿄 여행」, 아래에 큰 「가계부」였습니다. 네 화면이 모두
+  여행 이름만 달고 있던 것을 고치려다 그렇게 됐는데, 이제 <b>어느 화면인지는
+  아래 갈래 띠가 말합니다</b> — 여행 안에서는 일정·가계부·요약이 띠에 서고
+  켜진 칸이 채워집니다. 막대가 그것을 한 번 더 적으면 같은 말이 두 번이고,
+  그 두 번째가 더 크게 적혀 있었습니다.
+
+  <p>막대가 말해야 하는 것은 <b>어느 여행인지</b>입니다. 여행 이름을 올리고
+  화면 이름을 그 아래 작게 둡니다.
+
+  <p>가운데 정렬도 걷습니다. 가운데에 두려면 좌우로 같은 자리를 비워 둬야
+  해서 폭이 220 밖에 안 남았고, 긴 여행 이름이 거기서 잘렸습니다. 왼쪽
+  글자선에 맞추면 단추 하나만큼만 비키면 됩니다.
+*/
 const pathStyles = StyleSheet.create({
   wrap: {
-    alignItems: 'center',
-    /* 막대 가운데에 섭니다. 좌우에 단추가 서므로 그만큼 비켜 둡니다. */
-    maxWidth: 220,
+    alignItems: 'flex-start',
+    flexShrink: 1,
   },
-  /* 위에 작게 붙는 「어디에서 왔는지」. 읽으라고 있는 것이 아니라 자리를
-     알려 주는 것이라 가장 작은 단으로 둡니다. */
+  /* 여행 이름. 읽어야 하는 것입니다. */
   parent: {
-    ...Type.micro,
-    color: Colors.textMuted,
-  },
-  title: {
-    ...Type.title3,
+    ...Type.headline,
     fontWeight: Weight.semibold,
     color: Colors.text,
+  },
+  /* 화면 이름. 아래 띠가 이미 말하고 있으므로 거드는 한 줄입니다. */
+  title: {
+    ...Type.caption,
+    color: Colors.textMuted,
   },
 });
 

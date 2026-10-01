@@ -7,7 +7,7 @@ import type { PopularKind, PopularPlace, PopularRegion } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { PlaceDetailSheet, type Looked } from '@/components/place-detail-sheet';
 import { iconOf, labelOf } from '@/constants/place-icons';
-import { Colors, Palette, Spacing, Type, Weight } from '@/constants/theme';
+import { Colors, Gutter, Palette, Spacing, Type, Weight } from '@/constants/theme';
 import {
   Body,
   Caption,
@@ -20,7 +20,7 @@ import {
   Press,
   Row,
   Screen,
-  SegmentedTabs,
+  Tabs,
   Title,
 } from '@/ui';
 import { NavLeft } from '@/ui/nav';
@@ -133,7 +133,16 @@ export default function Popular() {
           한 화면에 두 번 적힙니다. */}
       <Stack.Screen options={{ headerShown: false }} />
 
-      <SegmentedTabs items={TABS} value={tab} onChange={setTab} />
+      {/*
+        알약이 아니라 밑줄 탭입니다.
+
+        <p>장소와 지역은 <b>같은 목록을 다르게 늘어놓는 것이 아닙니다.</b>
+        장소 쪽에는 「어떤 곳」·「지역」 고르는 칸 둘이 함께 서고 누르면 장소
+        시트가 열리는데, 지역 쪽에는 그 칸들이 없고 누르면 둘러보기로
+        떠납니다. 아래가 통째로 다른 화면이라 알약으로 묶어 둘 것이
+        아닙니다.
+      */}
+      <Tabs items={TABS} value={tab} onChange={setTab} />
 
       {tab === 'places' ? (
         <>
@@ -184,11 +193,34 @@ export default function Popular() {
           {placeError ? <ErrorNote message={placeError} onRetry={reloadPlaces} /> : null}
 
           {places && places.places.length === 0 ? (
+            {/*
+              한 줄만 있으면 「없다」로 끝납니다.
+
+              <p>빈 화면을 보는 사람은 대개 <b>무엇을 잘못 눌렀나</b>를 먼저
+              생각합니다. 조건 때문에 비었으면 그 조건을 가리켜 줘야 하고,
+              아직 아무것도 없어서 비었으면 그 말을 해 줘야 합니다 — 둘이
+              같은 문장이면 조건을 풀어 볼 생각을 못 합니다.
+            */}
             <Empty
+              icon="map-pin"
               message={
+                kind ? '이런 곳은 아직 올라온 것이 없어요.' : '아직 올라온 일정이 없어요.'
+              }
+              note={
                 kind
-                  ? '이런 곳은 아직 올라온 것이 없어요.'
-                  : '아직 올라온 일정이 없어요. 첫 번째가 되어 보세요.'
+                  ? '조건을 줄이면 더 보일 수 있어요.'
+                  : '누군가 여행을 내놓으면 여기 쌓입니다. 첫 번째가 되어 보세요.'
+              }
+              action={
+                kind || region
+                  ? {
+                      label: '조건 지우기',
+                      onPress: () => {
+                        setKind(null);
+                        setRegion(null);
+                      },
+                    }
+                  : undefined
               }
             />
           ) : null}
@@ -223,7 +255,11 @@ export default function Popular() {
           {regionError ? <ErrorNote message={regionError} onRetry={reloadRegions} /> : null}
 
           {regions && regions.regions.length === 0 ? (
-            <Empty message="아직 올라온 일정이 없어요. 첫 번째가 되어 보세요." />
+            <Empty
+              icon="map-pin"
+              message="아직 올라온 일정이 없어요."
+              note="누군가 여행을 내놓으면 그 지역이 여기 쌓입니다. 첫 번째가 되어 보세요."
+            />
           ) : null}
 
           {regions?.regions.map((r, i, all) => (
@@ -324,6 +360,13 @@ function Rank({
 }
 
 const styles = StyleSheet.create({
+  /*
+    탭 아래 선은 좌우 여백을 뚫고 나갑니다.
+
+    <p>여백 안에 가두면 선이 양쪽에서 20픽셀씩 모자라, 화면을 가르는
+    가닥이 아니라 내용 위에 얹힌 상자의 밑변으로 보입니다.
+  */
+
   chips: {
     flexWrap: 'wrap',
   },

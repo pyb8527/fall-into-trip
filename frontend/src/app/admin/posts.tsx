@@ -4,7 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import { api, ApiError, query, UNEXPECTED } from '@/api/client';
 import type { PageView } from '@/api/types';
 import { useAsync } from '@/api/use-async';
-import { Spacing } from '@/constants/theme';
+import { Gutter, Spacing } from '@/constants/theme';
 import {
   Badge,
   Body,
@@ -17,9 +17,9 @@ import {
   Pager,
   Row,
   Screen,
-  SegmentedTabs,
   Split,
   Subtitle,
+  Tabs,
   Title,
 } from '@/ui';
 
@@ -76,7 +76,9 @@ export default function AdminPosts() {
         신고가 쌓여 자동으로 감춰진 것과, 신고가 들어왔지만 아직 보이는 거예요.
       </Body>
 
-      <SegmentedTabs
+      {/* 밑줄 탭입니다. 칸마다 부르는 길이 다르고 줄에 달리는 단추도 다릅니다 —
+          같은 목록을 다르게 늘어놓는 것이 아니라 볼 것이 통째로 바뀝니다. */}
+      <Tabs
         items={KINDS}
         value={kind}
         onChange={(next) => {
@@ -172,6 +174,12 @@ function ReportedRow({
 }
 
 const styles = StyleSheet.create({
+  /*
+    탭 아래 선은 좌우 여백을 뚫고 나갑니다.
+
+    <p>여백 안에 가두면 선이 양쪽에서 20픽셀씩 모자라, 화면을 가르는
+    가닥이 아니라 내용 위에 얹힌 상자의 밑변으로 보입니다.
+  */
   title: {
     flexShrink: 1,
     gap: 2,

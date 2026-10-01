@@ -43,6 +43,7 @@ import {
   Elevation,
   MaxContentWidth,
   Motion,
+  Palette,
   Radius,
   ScreenGap,
   Spacing,
@@ -959,12 +960,10 @@ const OnFloor = createContext(false);
 
 
 /** 화면의 제목. 한 화면에 하나만. */
-/** 화면의 제목. 한 화면에 하나만. */
 export function Title({ children, tone }: { children: React.ReactNode; tone?: Tone }) {
   return <Text style={[styles.title, tone ? { color: toneColor[tone] } : null]}>{children}</Text>;
 }
 
-/** 카드나 묶음의 제목. */
 /** 카드나 묶음의 제목. */
 export function Subtitle({ children }: { children: React.ReactNode }) {
   return <Text style={styles.subtitle}>{children}</Text>;
@@ -1035,6 +1034,10 @@ export function Field({
   onBlur,
   action,
   mark,
+  required,
+  onClear,
+  unit,
+  limit,
   ...rest
 }: TextInputProps & {
   label: string;
@@ -1058,15 +1061,74 @@ export function Field({
    * 그려는 두되 누르는 것이 아니게 둡니다.
    */
   mark?: IconName;
+  /** 안 적으면 넘어갈 수 없는 칸. 라벨 뒤에 점이 붙습니다. */
+  required?: boolean;
+  /**
+   * 적은 것을 한 번에 지우는 ⓧ.
+   *
+   * <p>길게 적은 것을 지우려면 백스페이스를 스무 번 눌러야 했습니다. 폰에서
+   * 글자 사이에 커서를 놓는 것은 생각보다 어려운 일이라, 대개는 다 지우고
+   * 다시 칩니다.
+   */
+  onClear?: () => void;
+  /** 「원」, 「명」 처럼 칸 안 오른쪽에 붙는 단위. 누르는 것이 아닙니다. */
+  unit?: string;
+  /** 몇 자까지. 힌트 오른쪽에 「12/40」 이 섭니다. */
+  limit?: number;
 }) {
-  /* 지금 쓰고 있는 칸이 어디인지 보이게 합니다. 회색 칸이 여럿 붙어 있으면
+  /* 지금 쓰고 있는 칸이 어디인지 보이게 합니다. 칸이 여럿 붙어 있으면
      커서만으로는 눈에 잘 띄지 않습니다. */
   const [focused, setFocused] = useState(false);
 
+  /*
+    비밀번호를 한 번 보여 주기.
+
+    <h3>왜 필요한가</h3>
+
+    <p>점으로만 가려 두면 <b>잘못 친 것을 알 길이 없습니다.</b> 폰 자판에서
+    긴 비밀번호를 치면 한두 자는 흔히 틀리는데, 틀린 줄도 모르고 「로그인
+    실패」만 보게 됩니다 — 그러면 비밀번호가 틀렸는지 계정이 없는지도
+    구별이 안 됩니다.
+
+    <p>{@code secureTextEntry} 를 받은 칸은 스스로 눈을 답니다. 호출부
+    여섯 자리가 각자 상태를 들고 있을 일이 아닙니다.
+  */
+  const [shown, setShown] = useState(false);
+  const secret = rest.secureTextEntry === true;
+
+  const typed = typeof rest.value === 'string' ? rest.value : '';
+  /* 글이 있을 때만 섭니다. 빈 칸에 지우기 단추가 있으면 누를 수 있는 줄
+     알고 눌러 보게 됩니다. */
+  const clearable = onClear != null && typed.length > 0 && !rest.editable === false;
+
   return (
     <View style={styles.field}>
-      <Text style={styles.label}>{label}</Text>
-      <View>
+      <Text style={styles.label}>
+        {label}
+        {required ? <Text style={styles.labelDot}> ●</Text> : null}
+      </Text>
+      <View
+        /*
+          상자가 바깥에 섭니다.
+
+          <h3>줄 하나였습니다</h3>
+
+          <p>밑줄형이었습니다 — 「회색으로 채운 칸이 여럿 놓이면 그 덩어리가
+          먼저 눈에 들어온다」가 까닭이었고, 바닥이 회색이던 때는 맞는
+          말이었습니다. 바닥이 흰색이 된 뒤로는 <b>칸이 어디서 시작해 어디서
+          끝나는지</b>가 밑줄 한 가닥뿐이라, 적는 자리가 글줄처럼 보였습니다.
+
+          <p>상자를 두릅니다. 테두리는 안쪽이 아니라 <b>바깥 껍데기</b>가
+          가집니다 — 안쪽 {@code TextInput} 에 두르면 단추와 단위가 그 선
+          밖에 서서, 칸과 그것들이 따로 놀았습니다.
+        */
+        style={[
+          styles.box,
+          multiline ? styles.boxMultiline : null,
+          focused ? styles.boxFocused : null,
+          error ? styles.boxError : null,
+          rest.editable === false ? styles.boxOff : null,
+        ]}>
         <TextInput
           placeholderTextColor={Colors.textDisabled}
           multiline={multiline}
@@ -1078,38 +1140,53 @@ export function Field({
             setFocused(false);
             onBlur?.(e);
           }}
-          style={[
-            styles.input,
-            multiline && styles.inputMultiline,
-            focused && styles.inputFocused,
-            error ? styles.inputError : null,
-            /* 단추나 표식이 붙으면 글자가 그 밑으로 들어가지 않게 오른쪽을 비웁니다. */
-            action || mark ? styles.inputWithAction : null,
-            style,
-          ]}
+          maxLength={limit}
+          style={[styles.input, multiline ? styles.inputMultiline : null, style]}
           {...rest}
+          /* {@code rest} 뒤에 둡니다. 앞에 두면 호출부가 넘긴
+             {@code secureTextEntry} 가 이것을 덮어써서 눈이 안 먹습니다. */
+          secureTextEntry={secret && !shown}
         />
+        {secret ? (
+          <IconButton
+            name={shown ? 'eye' : 'eye-off'}
+            label={shown ? '비밀번호 감추기' : '비밀번호 보기'}
+            tone="muted"
+            onPress={() => setShown((was) => !was)}
+          />
+        ) : null}
+        {unit ? <Text style={styles.fieldUnit}>{unit}</Text> : null}
+        {clearable ? (
+          <IconButton name="x" label={`${label} 지우기`} tone="muted" onPress={onClear} />
+        ) : null}
         {action ? (
-          <View style={styles.fieldAction}>
-            <IconButton
-              name={action.icon}
-              label={action.label}
-              tone="accent"
-              bare
-              disabled={action.disabled}
-              onPress={action.onPress}
-            />
-          </View>
+          <IconButton
+            name={action.icon}
+            label={action.label}
+            tone="accent"
+            disabled={action.disabled}
+            onPress={action.onPress}
+          />
         ) : mark ? (
-          <View style={styles.fieldMark} pointerEvents="none">
-            <Icon name={mark} tone="muted" />
-          </View>
+          <Icon name={mark} tone="muted" />
         ) : null}
       </View>
       {error ? (
-        <Text style={styles.errorText}>{error}</Text>
-      ) : hint ? (
-        <Text style={styles.hint}>{hint}</Text>
+        <View style={styles.fieldNote}>
+          <Icon name="alert" size={14} tone="danger" />
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      ) : hint || limit ? (
+        <View style={styles.fieldNote}>
+          <Text style={styles.hint}>{hint}</Text>
+          {/* 몇 자 남았는지. 다 쓰고 나서 잘리는 것보다 치는 동안 보이는
+              편이 낫습니다. */}
+          {limit ? (
+            <Text style={styles.hint}>
+              {typed.length}/{limit}
+            </Text>
+          ) : null}
+        </View>
       ) : null}
     </View>
   );
@@ -1130,6 +1207,17 @@ export function Field({
  * <p>여기서 가릅니다. {@code onSearch} 를 주면 눌러서 묻는 칸이 되고, 안
  * 주면 돋보기는 표식으로만 남습니다 — 치는 대로 이미 걸러지고 있으니
  * 누를 것이 없습니다.
+ *
+ * <h3>적는 칸과 찾는 칸은 다르게 생겨야 합니다</h3>
+ *
+ * <p>여태 {@link Field} 를 그대로 감싸고 있었습니다. 그래서 찾는 칸이
+ * <b>라벨이 붙은 흰 상자</b>로 섰습니다 — 「이름」, 「메모」 와 똑같은
+ * 생김새입니다. 찾는 칸은 적어 넣는 칸이 아니라 <b>걸러 보는 칸</b>이고,
+ * 화면 맨 위에서 한 번 쓰고 지나가는 자리입니다.
+ *
+ * <p>계획서대로 회색 면에 테두리 없이, 높이 44, 앞에 돋보기를 둡니다. 라벨은
+ * 글자로 안 보이고 읽어 주는 기기만 씁니다 — 돋보기가 이미 무슨 칸인지
+ * 말하므로, 그 위에 「찾기」를 한 번 더 적으면 같은 말이 두 번입니다.
  */
 export function SearchField({
   label,
@@ -1150,22 +1238,47 @@ export function SearchField({
   busy?: boolean;
 }) {
   return (
-    <Field
-      label={label}
-      value={value}
-      onChangeText={onChangeText}
-      placeholder={placeholder}
-      hint={hint}
-      autoCorrect={false}
-      returnKeyType="search"
-      onSubmitEditing={onSearch}
-      mark={onSearch ? undefined : 'search'}
-      action={
-        onSearch
-          ? { icon: 'search', label, disabled: !value.trim() || busy, onPress: onSearch }
-          : undefined
-      }
-    />
+    <View style={styles.field}>
+      <Row gap={Spacing.s2}>
+        <View style={styles.seek}>
+          {/* 앞에 섭니다. 뒤에 두면 글자가 길어질 때 돋보기가 밀려서
+              칸이 적는 칸처럼 보입니다. */}
+          <Icon name="search" tone="muted" />
+          <TextInput
+            value={value}
+            onChangeText={onChangeText}
+            placeholder={placeholder}
+            placeholderTextColor={Colors.textDisabled}
+            accessibilityLabel={label}
+            autoCorrect={false}
+            returnKeyType="search"
+            onSubmitEditing={onSearch}
+            style={styles.input}
+          />
+          {value.length > 0 ? (
+            <IconButton
+              name="x"
+              label={`${label} 지우기`}
+              tone="muted"
+              onPress={() => onChangeText('')}
+            />
+          ) : null}
+        </View>
+        {/* 눌러야 묻는 칸만 단추를 가집니다. 칸 안이 아니라 옆에 두는
+            까닭은, 이것이 「적은 것을 가지고 하는 일」이라 칸과 같은 무게로
+            서야 하기 때문입니다. */}
+        {onSearch ? (
+          <Button
+            label="찾기"
+            size="m"
+            disabled={!value.trim() || busy}
+            busy={busy}
+            onPress={onSearch}
+          />
+        ) : null}
+      </Row>
+      {hint ? <Text style={styles.hint}>{hint}</Text> : null}
+    </View>
   );
 }
 
@@ -1217,6 +1330,8 @@ export function Button({
   onMap,
   variant = 'primary',
   size,
+  icon,
+  iconAfter,
   disabled,
   busy,
   compact,
@@ -1225,6 +1340,21 @@ export function Button({
   label: string;
   onPress: () => void;
   variant?: ButtonVariant;
+  /**
+   * 글자 앞에 서는 그림.
+   *
+   * <h3>글리프를 글자에 섞어 넣고 있었습니다</h3>
+   *
+   * <p>이것이 없어서 호출부가 라벨 안에 {@code '필터 ⚙'} 처럼 글리프를
+   * 적었습니다. 그 글자들은 <b>기기 글꼴에 있을 때만</b> 그려집니다 —
+   * 안드로이드에서는 판과 글꼴에 따라 색깔 이모지로 뜨거나 아예 두부
+   * 네모(□)가 됩니다. 글리프가 두부가 되면 단추가 고장 난 것으로 보입니다.
+   *
+   * <p>{@link Icon} 은 번들에 든 글꼴이라 어디서나 같게 그려집니다.
+   */
+  icon?: IconName;
+  /** 글자 뒤에 서는 그림. 「⌄」 처럼 <b>열린다</b>를 말하는 것에 씁니다. */
+  iconAfter?: IconName;
   /**
    * 크기. 안 주면 {@code compact} 가 {@code 's'}, 아니면 {@code 'l'} 입니다.
    */
@@ -1343,6 +1473,8 @@ export function Button({
   /* 보이는 높이가 44 보다 작으면 그만큼 누르는 넓이를 넓혀 줍니다. */
   const slop =
     step === 's' ? Tap.compactSlop : step === 'xs' ? Tap.tinySlop : undefined;
+  /* 그림은 글자보다 한 단 큽니다 — 계획서 §3-5 의 L20 · M18 · S16 · XS14. */
+  const glyph = { l: 20, m: 18, s: 16, xs: 14 }[step];
 
   return (
     <Press
@@ -1364,9 +1496,15 @@ export function Button({
       {busy ? (
         <ActivityIndicator color={off ? offFg : c.fg} size="small" />
       ) : (
-        <Text style={[letters, { color: off ? offFg : c.fg }]} numberOfLines={1}>
-          {label}
-        </Text>
+        <>
+          {icon ? <Icon name={icon} size={glyph} tone="inherit" color={off ? offFg : c.fg} /> : null}
+          <Text style={[letters, { color: off ? offFg : c.fg }]} numberOfLines={1}>
+            {label}
+          </Text>
+          {iconAfter ? (
+            <Icon name={iconAfter} size={glyph} tone="inherit" color={off ? offFg : c.fg} />
+          ) : null}
+        </>
       )}
     </Press>
   );
@@ -1492,25 +1630,32 @@ export function Chip({
         styles.chip,
         {
           /*
-            고른 것은 바이올렛을 가득 칠합니다.
+            고른 것은 <b>검정 반전</b>입니다.
 
-            <p>옅은 물에 색 글씨였습니다. 바닥이 회색이던 시절에는 그것으로
-            충분히 걸렸는데, 바닥이 흰색이 되니 <b>고른 것과 안 고른 것이
-            둘 다 밝은 면</b>이 되어 흘긋 봐서는 안 갈립니다.
+            <h3>바이올렛으로 채웠다가 되돌렸습니다</h3>
 
-            <p>칩은 버튼과 다른 일을 합니다 — 무슨 일을 일으키는 것이 아니라
-            보는 방식을 바꿉니다. 그래도 지금 무엇을 보고 있는지는 또렷해야
-            하고, 그 자리에 색을 쓰는 것이 맞습니다.
+            <p>옅은 물에 색 글씨 → 바이올렛 가득 채움 → 검정 반전으로 두 번
+            옮겼습니다. 가운데 단계의 까닭은 「바닥이 흰색이 되니 고른 것과
+            안 고른 것이 둘 다 밝은 면이라 안 갈린다」였고, 그 진단은 맞았는데
+            <b>약을 잘못 골랐습니다.</b>
+
+            <p>칩은 <b>한 번에 여럿 켜집니다.</b> 갈래 셋에 지역 둘을 걸어
+            두면 바이올렛 덩어리가 다섯입니다. 그러면 같은 화면의 주 단추 —
+            정말로 무슨 일을 일으키는 하나 — 가 그 다섯과 같은 무게로 서서
+            묻힙니다. 색을 가득 쓰는 자리는 화면에 하나여야 합니다.
+
+            <p>검정은 몇 개가 켜져도 그 일이 안 생깁니다. 또렷하게 갈리고,
+            브랜드색을 안 먹습니다.
           */
-          backgroundColor: selected ? Colors.accent : Colors.fill,
-          borderColor: selected ? Colors.accent : 'transparent',
+          backgroundColor: selected ? Colors.text : Colors.surface,
+          borderColor: selected ? Colors.text : Colors.borderStrong,
         },
       ]}>
       <Text
         style={[
           styles.chipLabel,
           selected ? styles.chipLabelOn : null,
-          { color: selected ? Colors.onAccent : Colors.textSecondary },
+          { color: selected ? Colors.onDay : Colors.textSecondary },
         ]}>
         {label}
       </Text>
@@ -1549,7 +1694,8 @@ export function Switch({
   useEffect(() => {
     Animated.timing(slide, {
       toValue: value ? 1 : 0,
-      duration: Motion.tap,
+      duration: Motion.base,
+      easing: Easing.out(Easing.quad),
       useNativeDriver: true,
     }).start();
   }, [value, slide]);
@@ -1570,14 +1716,16 @@ export function Switch({
       <View
         style={[
           styles.switchTrack,
-          { backgroundColor: value ? Colors.accent : Colors.fillPressed },
+          { backgroundColor: value ? Colors.accent : Colors.borderStrong },
         ]}>
         <Animated.View
           style={[
             styles.switchKnob,
             {
               transform: [
-                { translateX: slide.interpolate({ inputRange: [0, 1], outputRange: [0, 20] }) },
+                /* 51 − 안쪽 2 둘 − 손잡이 27 = 20. 손잡이 크기가 바뀌면
+                   이 값도 같이 바뀌어야 해서 셈으로 적어 둡니다. */
+                { translateX: slide.interpolate({ inputRange: [0, 1], outputRange: [0, 51 - 4 - 27] }) },
               ],
             },
           ]}
@@ -1772,10 +1920,39 @@ export function FilterChip({
  * <p>선을 걷고 옅은 바탕을 깝니다. 배지는 상태를 알리는 것이지 경계를
  * 긋는 것이 아닙니다.
  */
-export function Badge({ label, tone = 'muted' }: { label: string; tone?: Tone }) {
+/**
+ * 작은 꼬리표.
+ *
+ * <h3>노란 배지가 안 읽혔습니다</h3>
+ *
+ * <p>옅은 면 + 같은 색 글자 한 가지만 있었습니다. 대개는 그것으로 되는데,
+ * <b>노랑</b>에서 깨집니다 — 옅은 노랑 면에 노란 글자는 흰 바탕에서 대비가
+ * 2:1 도 안 됩니다. 그래서 「D-3」, 「여행 중」 같은 가장 눈에 띄어야 하는
+ * 것들을 {@code home.tsx} 와 {@code trip/[id].tsx} 가 <b>손으로</b> 노란
+ * 상자에 검은 글자로 그리고 있었습니다.
+ *
+ * <p>{@code solid} 를 둡니다. 색을 가득 칠하고 글자는 그 위에서 읽히는
+ * 것으로 뒤집습니다 — 노란 면 위는 늘 Ink 입니다(§2-3).
+ */
+export function Badge({
+  label,
+  tone = 'muted',
+  solid,
+}: {
+  label: string;
+  tone?: Tone;
+  solid?: boolean;
+}) {
   return (
-    <View style={[styles.badge, { backgroundColor: toneSoft[tone] }]}>
-      <Text style={[styles.badgeLabel, { color: toneColor[tone] }]}>{label}</Text>
+    <View
+      style={[styles.badge, { backgroundColor: solid ? toneColor[tone] : toneSoft[tone] }]}>
+      <Text
+        style={[
+          styles.badgeLabel,
+          { color: solid ? (tone === 'hot' ? Colors.onHot : Colors.onDay) : toneColor[tone] },
+        ]}>
+        {label}
+      </Text>
     </View>
   );
 }
@@ -1787,6 +1964,126 @@ export function Badge({ label, tone = 'muted' }: { label: string; tone?: Tone })
  * 눌러 본 뒤에야 무엇이 있는지 알지만, 띠로 두면 고를 수 있는 것이 처음부터
  * 다 보입니다.
  */
+/**
+ * 못 누르는 꼬리표.
+ *
+ * <h3>칩과 생김새를 가릅니다</h3>
+ *
+ * <p>「#오사카」, 「3박 4일」 처럼 글 카드에 붙는 것입니다. 이것들을
+ * {@link Chip} 으로 그리면 <b>눌러서 거를 수 있는 것</b>처럼 보입니다 —
+ * 실제로 눌러 보면 아무 일도 안 일어납니다.
+ *
+ * <p>그래서 칩과 반대로 둡니다. 칩은 키 34 에 둥근 알약, 테두리가 있습니다.
+ * 이것은 키 22 에 모서리 4, 회색 면이고 테두리가 없습니다.
+ *
+ * <p>{@code feed-card.tsx} 가 같은 모양을 손으로 그리고 있었습니다. 글
+ * 카드가 둘러보기·좋아요·내 글 세 화면에 서는데, 한 군데서만 고치면
+ * 나머지 둘이 어긋납니다.
+ */
+export function Tag({ label }: { label: string }) {
+  return (
+    <View style={styles.tag}>
+      <Text style={styles.tagLabel}>{label}</Text>
+    </View>
+  );
+}
+
+/**
+ * 내용 갈래를 바꾸는 상단 탭.
+ *
+ * <h3>{@link SegmentedTabs} 와 무엇이 다른가</h3>
+ *
+ * <p><b>보기만 바뀌면 Segmented, 내용 갈래가 바뀌면 Tabs</b> 입니다.
+ * 일정순·폴더별은 <b>같은 것들</b>을 다르게 늘어놓는 것이고(Segmented),
+ * 모임 여행·피드는 <b>다른 것들</b>을 보는 것입니다(Tabs).
+ *
+ * <p>여태 둘 다 {@link SegmentedTabs} 였습니다. 그래서 화면 위쪽이 회색
+ * 알약으로 가득 찼고 — 「내 여행」은 알약 묶음이 둘이나 섰습니다 — 무엇을
+ * 눌렀을 때 <b>목록이 다시 그려지는지 내용이 통째로 바뀌는지</b>가 생김새로
+ * 안 갈렸습니다.
+ *
+ * <p>알약은 제 바탕을 가진 묶음이라 「이 안에서 고른다」는 뜻이 강합니다.
+ * 밑줄 탭은 화면 폭을 가로지르는 선 위에 서므로 「여기서부터 아래가
+ * 바뀐다」로 읽힙니다. 그것이 내용 갈래가 하는 일입니다.
+ *
+ * @param items 2~6개. 더 많으면 가로로 굴러가고 화면 끝에서 잘립니다
+ */
+export function Tabs<T extends string>({
+  items,
+  value,
+  onChange,
+}: {
+  items: { value: T; label: string }[];
+  value: T;
+  onChange: (value: T) => void;
+}) {
+  /*
+    칸이 많으면 가로로 굴립니다.
+
+    <p>여섯을 넘으면 글자가 줄어들다 말줄임이 되는데, 그러면 어느 갈래인지
+    읽을 수가 없습니다. 잘리게 두는 편이 낫습니다 — 오른쪽이 잘려 있으면
+    옆으로 밀어 볼 수 있다는 것이 그 자체로 보입니다.
+  */
+  const roll = items.length > 4;
+
+  const row = (
+    <View style={[styles.tabsRow, roll ? styles.tabsRoll : null]} accessibilityRole="tablist">
+      {items.map((item) => {
+        const selected = item.value === value;
+        return (
+          <Press
+            key={item.value}
+            onPress={() => onChange(item.value)}
+            accessibilityRole="tab"
+            accessibilityState={{ selected }}
+            /* 크기를 안 줄입니다. 글자가 선 위에 앉아 있어, 줄어들면
+               밑줄과 글자가 따로 움직이는 것으로 보입니다. */
+            scale={1}
+            style={styles.tabsItem}>
+            <Text style={[styles.tabsLabel, selected ? styles.tabsLabelOn : null]}>
+              {item.label}
+            </Text>
+            {/* 밑줄은 <b>글자 폭만큼</b>입니다. 칸 전체에 그으면 칸 넓이가
+                글자 길이에 따라 달라서, 긴 이름의 밑줄이 유난히 길어집니다. */}
+            {selected ? <View style={styles.tabsUnder} /> : null}
+          </Press>
+        );
+      })}
+    </View>
+  );
+
+  /*
+    선은 화면 끝까지, 글자는 글자선에.
+
+    <h3>둘을 같이 맞출 수 없었습니다</h3>
+
+    <p>선을 칸들과 같은 {@code View} 에 들고 있었습니다. 그러면 호출부가
+    고를 수 있는 것이 둘 중 하나뿐입니다 — 좌우 여백 밖으로 끌어내서 선을
+    끝까지 가게 하면 <b>첫 칸 글자가 12 에서 시작</b>하고, 안쪽 여백을 주면
+    그만큼 <b>선이 되돌아와</b> 어중간하게 끊깁니다.
+
+    <p>그래서 여기서 두 겹으로 둡니다. 바깥 겹이 좌우 여백 밖으로 나가 선을
+    긋고, 안쪽 줄이 여백을 되돌려 첫 글자를 20 에 세웁니다. 호출부는 아무것도
+    안 감싸면 됩니다 — 여섯 화면이 저마다 {@code marginHorizontal: -Gutter}
+    를 적고 있던 것이 이것으로 사라집니다.
+  */
+  if (!roll) {
+    return <View style={styles.tabs}>{row}</View>;
+  }
+
+  return (
+    <View style={styles.tabs}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        /* 잘려 있다는 것이 보여야 옆으로 밀어 볼 수 있다는 것을 압니다. */
+        contentContainerStyle={styles.tabsRowPad}>
+        {row}
+      </ScrollView>
+    </View>
+  );
+}
+
 export function SegmentedTabs<T extends string>({
   items,
   value,
@@ -1971,6 +2268,9 @@ export function MenuCard({
 export type IconName =
   | 'check'
   | 'info'
+  | 'alert'
+  | 'eye'
+  | 'eye-off'
   | 'credit-card'
   | 'home'
   /* 동선 정리. 순서를 다시 세운다는 뜻으로 이만한 그림이 없습니다. */
@@ -2066,6 +2366,13 @@ export type IconName =
 const ionicon: Record<IconName, { line: string; solid: string }> = {
   check: { line: 'checkmark', solid: 'checkmark' },
   info: { line: 'information-circle-outline', solid: 'information-circle' },
+  /* 무엇이 잘못됐다는 표식. 「알림」(bell)과 다릅니다 — 이것은 적은 것이
+     규칙에 안 맞는다는 말이고, 오류 글자 앞에만 섭니다. */
+  alert: { line: 'alert-circle-outline', solid: 'alert-circle' },
+  /* 비밀번호를 보여 주는 눈. 뜬 눈이 「지금 보인다」입니다 — 감은 눈을
+     「보기」 단추로 쓰면 눌렀을 때 감기는 것인지 떠지는 것인지 헷갈립니다. */
+  eye: { line: 'eye-outline', solid: 'eye' },
+  'eye-off': { line: 'eye-off-outline', solid: 'eye-off' },
   'credit-card': { line: 'card-outline', solid: 'card' },
   home: { line: 'home-outline', solid: 'home' },
   shuffle: { line: 'shuffle-outline', solid: 'shuffle' },
@@ -2127,18 +2434,27 @@ export function Icon({
   tone = 'default',
   /** 켜진 칸처럼 채워서 그려야 하는 자리. 아래 갈래 띠가 씁니다. */
   solid = false,
+  color,
 }: {
   name: IconName;
   size?: number;
-  tone?: Tone;
+  tone?: Tone | 'inherit';
   solid?: boolean;
+  /**
+   * 색을 직접.
+   *
+   * <p>{@code tone} 으로 못 고르는 자리가 있습니다 — 채운 단추 위의 그림은
+   * <b>그 단추의 글자색</b>을 그대로 따라야 하고, 그 색은 종류·눌림·못
+   * 누름에 따라 바뀝니다. 이름을 열두 개 더 만드는 대신 색을 넘깁니다.
+   */
+  color?: string;
 }) {
-  const glyph = ionicon[name];
+  const mark = ionicon[name];
   return (
     <Ionicons
-      name={(solid ? glyph.solid : glyph.line) as never}
+      name={(solid ? mark.solid : mark.line) as never}
       size={size}
-      color={toneColor[tone]}
+      color={color ?? (tone === 'inherit' ? Colors.text : toneColor[tone])}
     />
   );
 }
@@ -2153,12 +2469,24 @@ export function IconButton({
   name,
   label,
   onPress,
-  tone = 'secondary',
+  /*
+    그림만 서는 단추는 <b>진합니다.</b>
+
+    <p>기본이 gray700 이었습니다. 회색 네모 안에 담겨 있던 시절에는 그
+    네모가 「여기가 단추」를 말해 주어서 그림이 흐려도 됐습니다. 바탕이
+    걷히고 그림 하나만 남은 뒤로는 <b>그림이 유일한 표시</b>인데, 한 단
+    흐린 회색으로 두면 상단바에서 글자보다 약하게 보입니다.
+
+    <p>회색 원·선을 가지는 꼴({@code fill}·{@code outline})은 칸이 말해
+    주므로 호출부에서 흐린 톤을 줘도 됩니다.
+  */
+  tone = 'default',
   active,
   disabled,
   onMap,
   bare,
   fill,
+  outline,
   dot,
 }: {
   name: IconName;
@@ -2207,6 +2535,15 @@ export function IconButton({
    */
   fill?: boolean;
   /**
+   * 1px 테두리를 두른 36 원.
+   *
+   * <p>회색 면({@code fill})이 묻히는 자리에 씁니다 — 이미 회색 면 위에
+   * 놓이는 단추, 그리고 글 묶음 안에서 「이것도 누를 수 있다」를 조용히
+   * 말해야 하는 것. 면은 무엇 위에 놓이느냐에 따라 묻히지만 선은 안
+   * 묻힙니다.
+   */
+  outline?: boolean;
+  /**
    * 오른쪽 위에 찍는 점.
    *
    * <p>안에 볼 것이 있다는 표시입니다. 숫자를 적지 않습니다 — 몇 건인지는
@@ -2225,6 +2562,10 @@ export function IconButton({
       scale={0.96}
       style={[
         styles.iconButton,
+        /* 바탕이나 테두리를 가지는 것만 동그란 칸이 됩니다. 그림만 서는
+           것(기본)은 칸이 없으므로 둥글릴 것도 없습니다. */
+        fill ? styles.iconButtonFill : null,
+        outline ? styles.iconButtonOutline : null,
         onMap ? styles.iconButtonOnMap : null,
         {
           /*
@@ -2255,8 +2596,11 @@ export function IconButton({
         name={name}
         /* 그림만 서는 것은 24 입니다 — 바탕이 없으면 눈에 걸리는 것이
            그림 하나뿐이라, 20 으로는 눌리는 자리로 안 읽힙니다. */
-        size={fill || onMap ? 20 : 24}
-        tone={disabled ? 'muted' : active ? tone : 'secondary'}
+        size={fill || outline || onMap ? 20 : 24}
+        /* 꺼져 있을 때도 {@code tone} 을 봅니다. 전에는 'secondary' 를
+           박아 두어서, 위에서 기본값을 아무리 바꿔도 <b>켜졌을 때만</b>
+           먹었습니다 — 상단바의 그림들이 늘 한 단 흐린 채였습니다. */
+        tone={disabled ? 'muted' : tone}
       />
       {dot ? <View style={styles.iconButtonDot} /> : null}
     </Press>
@@ -2295,20 +2639,20 @@ export function ConfirmDialog({
       <Pressable style={styles.dialogBackdrop} onPress={onCancel}>
         {/* 안쪽을 눌렀다고 닫히면 안 됩니다. */}
         <Pressable style={styles.dialog} onPress={() => {}}>
-          <Subtitle>{title}</Subtitle>
-          {message ? (
-            <Body small tone="secondary">
-              {message}
-            </Body>
-          ) : null}
-          <Row gap={Spacing.sm} style={styles.dialogActions}>
+          {/* 제목과 설명을 가운데로 둡니다. 이 창은 글을 읽는 자리가 아니라
+              <b>한 가지를 묻는 자리</b>라, 왼쪽 정렬하면 눈이 왼쪽 위부터
+              훑게 되어 묻는 말이 한 덩어리로 안 들어옵니다. */}
+          <Text style={styles.dialogTitle}>{title}</Text>
+          {message ? <Text style={styles.dialogMessage}>{message}</Text> : null}
+          <Row gap={Spacing.s2} style={styles.dialogActions}>
             <View style={styles.dialogButton}>
-              <Button label={cancelLabel} variant="secondary" onPress={onCancel} />
+              <Button label={cancelLabel} variant="secondary" size="m" onPress={onCancel} />
             </View>
             <View style={styles.dialogButton}>
               <Button
                 label={confirmLabel}
                 variant={danger ? 'danger' : 'primary'}
+                size="m"
                 busy={busy}
                 onPress={onConfirm}
               />
@@ -2449,7 +2793,12 @@ export function BottomSheet({
             {wide ? null : <View style={styles.sheetGrip} />}
 
             <View style={styles.sheetHead}>
-              <Subtitle>{title}</Subtitle>
+              {/* 판 제목은 title2 20/700 입니다. body 16/700 이었는데, 그
+                  크기는 목록 줄 제목과 같아서 판이 열렸을 때 무엇에 관한
+                  판인지가 약하게 읽혔습니다. */}
+              <Text style={styles.sheetTitle} numberOfLines={1}>
+                {title}
+              </Text>
               <IconButton name="x" label="닫기" onPress={onClose} />
             </View>
           </View>
@@ -2883,17 +3232,37 @@ export function Pager({
 export function Loading({ label = '가져오는 중' }: { label?: string }) {
   return (
     <View style={styles.center}>
-      <ActivityIndicator color={Colors.accentInk} />
+      {/* 스피너는 회색입니다. 바이올렛으로 두면 「기다리는 중」이 화면에서
+          가장 눈에 띄는 것이 되는데, 기다리는 것은 알리기만 하면 됩니다. */}
+      <ActivityIndicator color={Colors.textDisabled} />
       <Caption>{label}</Caption>
     </View>
   );
 }
 
+/**
+ * 잘못됐다는 말.
+ *
+ * <h3>왼쪽에 검은 세로선이 있었습니다</h3>
+ *
+ * <p>2px 검정 세로선을 긋고 그 안에 빨간 글자를 두었습니다. 색을 안 쓰기로
+ * 했던 때 「위험한 것은 색이 아니라 모양으로」 라서 생긴 것인데, 이제
+ * {@link Colors.danger} 를 씁니다. 그러면 선은 <b>인용문의 들여쓰기</b>처럼
+ * 보일 뿐이고, 무엇보다 선 때문에 글자가 왼쪽 글자선에서 안으로 밀려
+ * 들어가 있었습니다.
+ *
+ * <p>선을 걷고 ⚠ 를 글자 앞에 둡니다 — 입력칸의 오류와 같은 모양입니다.
+ */
 export function ErrorNote({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
     <View style={styles.note}>
-      <Text style={styles.noteText}>{message}</Text>
-      {onRetry ? <Button label="다시 시도" variant="ghost" compact onPress={onRetry} /> : null}
+      <Row gap={Spacing.s1}>
+        <Icon name="alert" size={14} tone="danger" />
+        <Text style={styles.noteText}>{message}</Text>
+      </Row>
+      {onRetry ? (
+        <Button label="다시 시도" variant="outline" size="s" onPress={onRetry} />
+      ) : null}
     </View>
   );
 }
@@ -2905,10 +3274,46 @@ export function ErrorNote({ message, onRetry }: { message: string; onRetry?: () 
  * 크게 적습니다 — 회색 글씨 한 줄이 "없습니다" 라고 말하는 것과, 손으로 적어
  * 둔 것처럼 보이는 것은 다릅니다.
  */
-export function Empty({ message }: { message: string }) {
+/**
+ * 아무것도 없는 자리.
+ *
+ * <h3>글자 한 줄이었습니다</h3>
+ *
+ * <p>「아직 없어요」 한 줄만 가운데에 떠 있었습니다. 그러면 <b>안 불러온
+ * 것인지 원래 없는 것인지</b>가 안 갈립니다 — 비어 있는 화면은 대개 처음
+ * 들어온 사람이 보는 화면인데, 거기서 다음에 무엇을 하면 되는지도 말하지
+ * 않았습니다.
+ *
+ * <p>그림 하나와 할 일 하나를 답니다. 그림은 회색 원 안에 들어가 「여기가
+ * 비었다」를 모양으로 말하고, 단추는 그 비어 있음을 메우는 길입니다.
+ *
+ * @param icon 무엇이 비었는지. 그 화면이 다루는 것의 그림을 줍니다
+ * @param action 비어 있음을 메우는 한 가지. 없으면 안 섭니다
+ */
+export function Empty({
+  message,
+  note,
+  icon,
+  action,
+}: {
+  message: string;
+  /** 한 줄 더. 왜 비었는지, 또는 무엇을 하면 채워지는지 */
+  note?: string;
+  icon?: IconName;
+  action?: { label: string; onPress: () => void };
+}) {
   return (
     <View style={styles.center}>
+      {icon ? (
+        <View style={styles.emptyMark}>
+          <Icon name={icon} size={28} tone="off" />
+        </View>
+      ) : null}
       <Text style={styles.emptyLine}>{message}</Text>
+      {note ? <Text style={styles.emptyNote}>{note}</Text> : null}
+      {action ? (
+        <Button label={action.label} variant="outline" size="m" onPress={action.onPress} />
+      ) : null}
     </View>
   );
 }
@@ -3324,8 +3729,10 @@ const styles = StyleSheet.create({
       위에 놓이든 떠 보입니다.
     */
     backgroundColor: Colors.surface,
-    borderTopLeftRadius: Radius.lg,
-    borderTopRightRadius: Radius.lg,
+    /* 바텀시트와 같은 r20 입니다. 16 이었는데, 둘 다 「아래에서 올라오는
+       판」이라 모서리가 다르면 다른 물건으로 보입니다. */
+    borderTopLeftRadius: Radius.r5,
+    borderTopRightRadius: Radius.r5,
     /*
       지도 위에 얹히는 판이라 판이 어디서 시작하는지가 보여야 합니다.
       한동안 위쪽으로 그림자를 드리웠습니다.
@@ -3375,9 +3782,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: Spacing.xs,
   },
+  /* 손잡이는 36×4 입니다. 44 였는데, 44 는 「누르는 것의 최소 크기」에서
+     온 값입니다 — 이것은 누르는 것이 아니라 끄는 자리를 가리키는 표식이고,
+     바텀시트의 손잡이와 같은 폭이어야 둘이 같은 동작으로 읽힙니다. */
   dragGrip: {
     alignSelf: 'center',
-    width: 44,
+    width: 36,
     height: 4,
     borderRadius: Radius.full,
     backgroundColor: Colors.borderStrong,
@@ -3437,12 +3847,80 @@ const styles = StyleSheet.create({
   },
 
   field: {
-    gap: Spacing.sm,
+    gap: Spacing.s2,
   },
+  /* 라벨은 label 14/500 입니다. caption 13/600 이었는데, 작고 굵은 글자는
+     「적어 둔 값」처럼 보여서 무엇을 적는 칸인지가 약하게 읽혔습니다. */
   label: {
-    ...Type.caption,
-    fontWeight: Weight.semibold,
+    ...Type.label,
+    fontWeight: Weight.medium,
     color: Colors.textSecondary,
+  },
+  /* 안 적으면 못 넘어가는 칸의 점. 「*」 가 아니라 점입니다 — 별표는
+     각주처럼 읽혀서 아래에 설명이 있는지 찾게 됩니다. */
+  labelDot: {
+    color: Colors.accent,
+  },
+
+  /*
+    칸의 상자.
+
+    <p>높이 52 · r12 · 흰 바탕 · 1px gray300 · 좌우 16. 안쪽 글자와 단추를
+    한 줄에 담으므로 {@code flexDirection: 'row'} 입니다.
+  */
+  box: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.s2,
+    height: Tap.control,
+    borderRadius: Radius.r3,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.borderStrong,
+    paddingHorizontal: Spacing.s4,
+  },
+  /* 여러 줄은 최소 120. 104 였는데 네 줄째가 걸려서, 적는 동안 칸이
+     스스로 굴러가 방금 친 줄이 안 보였습니다. */
+  boxMultiline: {
+    height: undefined,
+    minHeight: 120,
+    alignItems: 'flex-start',
+    paddingVertical: Spacing.s3 + 2,
+  },
+  /*
+    지금 쓰고 있는 칸.
+
+    <p>테두리 색만 바꾸고 굵기는 1.5 로 한 단만 올립니다. 2 를 넘기면 칸이
+    커진 것처럼 보여서 글자가 한 번 밀립니다.
+  */
+  boxFocused: {
+    borderWidth: 1.5,
+    borderColor: Colors.accent,
+    /* 웹에서 칸을 누르면 브라우저가 제 테두리를 한 겹 더 둘러 줍니다.
+       우리가 이미 그리고 있으니 둘이 겹칩니다. */
+    outlineWidth: 0,
+  },
+  boxError: {
+    borderWidth: 1.5,
+    borderColor: Colors.danger,
+  },
+  /* 못 쓰는 칸. 흰 바탕을 회색으로 돌려 「여기는 지금 못 적는다」를
+     바탕으로 말합니다 — 글자만 흐리면 다 적힌 칸으로 보입니다. */
+  boxOff: {
+    backgroundColor: Colors.fill,
+    borderColor: Colors.border,
+  },
+  /* 「원」·「명」. 누르는 것이 아니므로 흐린 글자입니다. */
+  fieldUnit: {
+    ...Type.body2,
+    color: Colors.textMuted,
+  },
+  /* 힌트와 글자 수가 한 줄에서 양끝으로 갈립니다. */
+  fieldNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.s1,
   },
   /*
     입력칸은 상자가 아니라 줄입니다.
@@ -3454,58 +3932,17 @@ const styles = StyleSheet.create({
     그만큼 줍니다. 쓰는 동안에는 그 줄이 검게 굵어집니다 — 색을 못 쓰니
     지금 어느 칸에 있는지는 굵기가 말합니다.
   */
+  /* 글자만 담습니다. 상자·테두리·여백은 겉껍데기({@code box})가 가집니다. */
   input: {
-    height: Tap.control,
-    borderRadius: Radius.none,
-    backgroundColor: 'transparent',
-    paddingHorizontal: 0,
+    flex: 1,
     ...Type.body,
     color: Colors.text,
-    /* 자리를 미리 잡아 둡니다. 굵어질 때 글자가 밀리지 않게. */
-    borderBottomWidth: 1.5,
-    borderBottomColor: Colors.border,
-    /*
-      웹에서 칸을 누르면 브라우저가 제 테두리를 사각으로 둘러 줍니다.
-      밑줄만 남기려고 상자를 걷었는데 손이 닿는 순간 그 상자가 도로
-      나타났습니다.
-
-      끄고, 대신 밑줄이 검게 굵어지는 것으로 대신합니다. 자판만 쓰는
-      사람에게도 지금 어느 칸에 있는지가 그대로 보입니다.
-    */
+    /* 브라우저가 둘러 주는 테두리. 겉껍데기가 이미 그립니다. */
     outlineWidth: 0,
   },
-  inputWithAction: {
-    paddingRight: Tap.min,
-  },
-  fieldAction: {
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    bottom: 0,
-    justifyContent: 'center',
-  },
-  /* 단추와 같은 자리에 서되 누르는 넓이를 안 가집니다. */
-  fieldMark: {
-    position: 'absolute',
-    right: Spacing.md,
-    top: 0,
-    bottom: 0,
-    justifyContent: 'center',
-  },
   inputMultiline: {
-    height: 104,
-    paddingTop: Spacing.md,
-    paddingBottom: Spacing.md,
+    alignSelf: 'stretch',
     textAlignVertical: 'top',
-  },
-  inputFocused: {
-    borderBottomColor: Colors.text,
-  },
-  /* 색으로 못 가리므로 줄을 한 단 더 굵힙니다. 무엇이 잘못됐는지는
-     바로 아래 줄이 말합니다. */
-  inputError: {
-    borderBottomWidth: 2.5,
-    borderBottomColor: Colors.text,
   },
   hint: {
     ...Type.caption,
@@ -3517,8 +3954,11 @@ const styles = StyleSheet.create({
   },
 
   button: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    /* 그림과 글자 사이. 그림이 없으면 아무 일도 안 합니다. */
+    gap: Spacing.s1 + 2,
   },
   buttonL: {
     height: Tap.control,
@@ -3568,13 +4008,15 @@ const styles = StyleSheet.create({
   chip: {
     height: Tap.chip,
     borderRadius: Radius.full,
-    paddingHorizontal: Spacing.s4,
+    /* 좌우 14. 16 이었는데, 알약이 길어져서 네댓 개가 한 줄에 안 들어가고
+       두 줄로 접혔습니다 — 고르는 줄이 화면 위쪽을 두 줄씩 먹습니다. */
+    paddingHorizontal: Spacing.s3 + 2,
     alignItems: 'center',
     justifyContent: 'center',
-    /* 안 고른 칩은 회색 면이라 선이 없어도 어디서 끝나는지 보입니다.
-       선은 자리만 잡아 두고(고른 칩이 그 선을 씁니다) 평소엔 비웁니다. */
-    borderWidth: StyleSheet.hairlineWidth,
+    /* 안 고른 칩은 흰 바탕이라 선이 없으면 어디서 끝나는지 안 보입니다. */
+    borderWidth: 1,
   },
+
   switchRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -3593,26 +4035,49 @@ const styles = StyleSheet.create({
     ...Type.caption,
     color: Colors.textMuted,
   },
+  /*
+    켜고 끄는 것.
+
+    <h3>네모였습니다</h3>
+
+    <p>{@code borderRadius: 0} 으로 둔 46×26 네모에 20 네모 손잡이였습니다.
+    모서리를 안 쓰기로 했던 때의 것인데, 그러면 <b>켜고 끄는 것인지
+    고르는 칸인지</b>가 안 보입니다 — 네모난 것은 이 앱에서 체크박스이고,
+    체크박스는 「여럿 중 몇 개」, 스위치는 「이 하나를 켜고 끔」입니다.
+
+    <p>알약으로 돌립니다. 두 쪽 기기가 모두 쓰는 51×31 이라, 처음 보는
+    사람도 손가락으로 밀 수 있다는 것을 압니다.
+  */
   switchTrack: {
-    width: 46,
-    height: 26,
-    borderRadius: 0,
-    padding: 3,
+    width: 51,
+    height: 31,
+    borderRadius: Radius.full,
+    padding: 2,
     justifyContent: 'center',
   },
   switchKnob: {
-    width: 20,
-    height: 20,
-    borderRadius: 0,
+    width: 27,
+    height: 27,
+    borderRadius: Radius.full,
     backgroundColor: Colors.surface,
     /* 켜졌을 때 강조색 위에서, 꺼졌을 때 회색 위에서 둘 다 떠 보여야
        합니다. 옅은 그림자 하나로 충분합니다. */
     ...Elevation.stamp,
   },
+  /*
+    갈래를 나타내는 표식.
+
+    <p>44 r12 네모였습니다. 44 는 <b>누르는 것의 최소 크기</b>인데 이것은
+    누르는 것이 아니고, 네모는 {@link Card} 와 같은 모양입니다 — 목록 줄
+    앞에 작은 카드가 하나 더 붙은 꼴이었습니다.
+
+    <p>40 짜리 원으로 돌립니다. 원은 이 앱에서 「눌리지 않는 표식」이고,
+    40 은 목록 줄의 구분선이 비켜서는 자리와 같은 값입니다(§3-4).
+  */
   mark: {
-    width: 44,
-    height: 44,
-    borderRadius: Radius.sm,
+    width: 40,
+    height: 40,
+    borderRadius: Radius.full,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: Colors.fill,
@@ -3630,30 +4095,117 @@ const styles = StyleSheet.create({
     fontWeight: Weight.bold,
     color: Colors.textSecondary,
   },
+  /*
+    걸려 있는 필터.
+
+    <p>테두리를 둘렀다가 걷었습니다. 이것은 <b>고르는 칩이 아니라 이미
+    걸린 것</b>입니다 — 테두리가 있으면 {@link Chip} 과 같은 무게로 서서,
+    눌러서 거는 것인지 눌러서 떼는 것인지 헷갈립니다. 옅은 면만 두고 ×
+    하나로 「떼는 것」을 말합니다.
+
+    <p>높이도 30 으로 한 단 낮춥니다. 고르는 줄 바로 아래에 붙는 것이라
+    36 이면 둘이 같은 줄처럼 보입니다.
+  */
   filterChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.xs,
-    height: Tap.compact,
-    paddingHorizontal: Spacing.md,
+    gap: Spacing.s1,
+    height: Tap.tiny,
+    paddingHorizontal: Spacing.s3,
     borderRadius: Radius.full,
     backgroundColor: Colors.accentSoft,
-    borderWidth: 1,
-    borderColor: Colors.accent,
   },
   filterChipLabel: {
     ...Type.caption,
-    fontWeight: Weight.bold,
-    color: Colors.accentInk,
+    fontWeight: Weight.medium,
+    color: Colors.accentText,
   },
-  /* 고른 것은 굵기로도 말합니다. 옅은 물만으로는 한 단이 모자랍니다. */
+  /* 고른 것만 한 단 굵게. 검정 면 위에서 500 은 흰 글자가 얇아 보입니다. */
   chipLabelOn: {
     fontWeight: Weight.bold,
   },
+  /* label 14/500. 15/600 이었는데, 굵은 15 는 목록 제목과 같은 무게라
+     「고르는 것」보다 「적힌 것」으로 읽혔습니다. */
   chipLabel: {
-    ...Type.bodySmall,
+    ...Type.label,
+    fontWeight: Weight.medium,
+  },
+
+  /* 못 누르는 꼬리표. 칩(키 34, 알약, 테두리)과 생김새를 가릅니다. */
+  tag: {
+    height: 22,
+    borderRadius: Radius.r1,
+    paddingHorizontal: 6,
+    backgroundColor: Colors.fill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tagLabel: {
+    ...Type.micro,
+    fontSize: 12,
+    fontWeight: Weight.medium,
+    color: Colors.textMuted,
+  },
+
+  /*
+    내용 갈래를 바꾸는 탭.
+
+    <p>아래로 한 가닥 선이 화면을 가로지르고, 고른 칸만 그 위에 2px 검정
+    밑줄을 얹습니다. 선이 먼저 있어야 밑줄이 「그 선 위에 덧그어진 것」으로
+    읽힙니다 — 선 없이 밑줄만 두면 글자에 줄을 친 것처럼 보입니다.
+  */
+  /* 바깥 겹 — 선을 화면 끝까지 긋습니다. */
+  tabs: {
+    marginHorizontal: -Gutter,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.divider,
+  },
+  /*
+    안쪽 줄 — 글자를 글자선으로 되돌립니다.
+
+    <p>{@code Gutter}(20) 에서 칸이 제 안에 가진 여백({@code s3} 12)을 뺀
+    8 입니다. 그래야 <b>첫 칸의 글자</b>가 20 에 섭니다 — 20 을 그대로 주면
+    글자가 32 에서 시작해 아래 내용보다 안으로 들어갑니다.
+  */
+  tabsRow: {
+    flexDirection: 'row',
+    paddingHorizontal: Gutter - Spacing.s3,
+  },
+  tabsRowPad: {
+    paddingHorizontal: Gutter - Spacing.s3,
+  },
+  /* 굴러가는 탭은 칸이 제 글자만큼만 넓습니다. 고르게 나누면 칸 넷이
+     화면을 채워 버려서 다섯째가 안 보입니다. */
+  tabsRoll: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 0,
+  },
+  tabsItem: {
+    height: Tap.topTab,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.s3,
+    /* 선 위에 밑줄을 얹으려고 아래쪽을 기준으로 둡니다. */
+    position: 'relative',
+  },
+  tabsLabel: {
+    ...Type.body2,
+    fontWeight: Weight.medium,
+    color: Colors.textMuted,
+  },
+  tabsLabelOn: {
+    color: Colors.text,
     fontWeight: Weight.semibold,
   },
+  tabsUnder: {
+    position: 'absolute',
+    left: Spacing.s3,
+    right: Spacing.s3,
+    bottom: -1,
+    height: 2,
+    backgroundColor: Colors.text,
+  },
+
 
   /*
     띠는 밑줄이 아니라 알약입니다.
@@ -3674,10 +4226,21 @@ const styles = StyleSheet.create({
     <p>바탕은 회색입니다. 흰 판 위에 서든 회색 화면에 서든 제 바닥을 갖고,
     그 위의 흰 알약이 「지금 여기」를 말합니다.
   */
+  /*
+    바탕은 gray100, 모서리는 r12.
+
+    <p>gray50 + 알약이었습니다. gray50 은 <b>구역을 가르는 띠</b>와 같은
+    값이라, 띠를 쓰는 화면에서 이 묶음이 띠의 일부처럼 보였습니다 — 한 단
+    더 내려 제 바닥을 갖게 합니다.
+
+    <p>알약(full)을 r12 로 바꿉니다. 알약은 {@link Chip} 의 모양이고, 칩은
+    <b>여럿 중 몇 개를 거는 것</b>입니다. 이것은 <b>둘 중 하나를 보는 것</b>
+    이라 같은 모양을 쓰면 무슨 일이 일어나는지가 헷갈립니다.
+  */
   segment: {
     flexDirection: 'row',
-    backgroundColor: Colors.fill,
-    borderRadius: Radius.full,
+    backgroundColor: Colors.fillPressed,
+    borderRadius: Radius.r3,
     padding: SEGMENT_PAD,
   },
   /* 고른 칸을 덮는 흰 알약. 글자 뒤에 깝니다. */
@@ -3686,18 +4249,22 @@ const styles = StyleSheet.create({
     top: SEGMENT_PAD,
     bottom: SEGMENT_PAD,
     left: SEGMENT_PAD,
-    borderRadius: Radius.full,
+    borderRadius: Radius.r2,
     backgroundColor: Colors.surface,
-    ...Elevation.stamp,
+    /* 손잡이는 e1 입니다. stamp 는 도장처럼 눌린 자리를 말하는 그림자라
+       「위에 떠 있는 것」과 반대 방향으로 읽힙니다. */
+    ...Elevation.card,
   },
+  /* 칸 높이 40 − 안쪽 여백. 44 였는데, 계획서가 세그먼트를 40 으로 두는
+     까닭은 이것이 화면 맨 위에 늘 서 있는 것이라서입니다. */
   segmentItem: {
     flex: 1,
-    height: Tap.min,
+    height: Tap.segment - SEGMENT_PAD * 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
   segmentLabel: {
-    ...Type.bodySmall,
+    ...Type.label,
     fontWeight: Weight.medium,
     color: Colors.textMuted,
   },
@@ -3787,7 +4354,7 @@ const styles = StyleSheet.create({
   check: {
     width: 22,
     height: 22,
-    borderRadius: 6,
+    borderRadius: Radius.r1 + 2,
     borderWidth: 1.5,
     borderColor: Colors.borderStrong,
     alignItems: 'center',
@@ -3798,16 +4365,24 @@ const styles = StyleSheet.create({
     borderColor: Colors.accent,
   },
 
+  /*
+    격자로 늘어놓고 고르는 칸.
+
+    <p>최소 높이가 44 였습니다. 44 는 <b>손가락이 닿는 최소</b>이고, 이것은
+    격자로 여러 개가 늘어서는 칸입니다 — 최소에 딱 맞춰 두니 이모지와
+    이름이 위아래로 꽉 차서, 칸이 아니라 빽빽한 표처럼 보였습니다.
+    계획서의 64 로 올립니다.
+  */
   tile: {
     minWidth: 56,
-    minHeight: Tap.min,
+    minHeight: 64,
     /* 이름이 붙는 칸은 글자가 들어갈 만큼 넓어야 합니다. */
-    borderRadius: Radius.sm,
+    borderRadius: Radius.r3,
     borderWidth: 1.5,
     borderColor: 'transparent',
     backgroundColor: Colors.fill,
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.s2,
+    paddingHorizontal: Spacing.s2,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 2,
@@ -3817,6 +4392,7 @@ const styles = StyleSheet.create({
   tileBare: {
     minWidth: Tap.min,
     width: Tap.min,
+    minHeight: Tap.min,
   },
   tileOn: {
     borderColor: Colors.accent,
@@ -3837,10 +4413,21 @@ const styles = StyleSheet.create({
     fontWeight: Weight.semibold,
   },
 
+  /*
+    배지.
+
+    <p>알약(full)이었습니다. 알약은 {@link Chip} 의 모양이라, 못 누르는
+    배지가 <b>고를 수 있는 칩</b>처럼 보였습니다 — 눌러 봐도 아무 일이 안
+    일어납니다. r4 로 내리고 높이를 20 으로 고정합니다.
+
+    <p>높이를 안 주고 위아래 여백 3 으로 두면, 글자가 한글인지 숫자인지에
+    따라 키가 달라져서 나란히 선 배지 둘이 어긋났습니다.
+  */
   badge: {
-    borderRadius: Radius.full,
-    paddingVertical: 3,
-    paddingHorizontal: Spacing.sm + 1,
+    height: 20,
+    borderRadius: Radius.r1,
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.s2 - 2,
   },
   /* 배지 글자는 micro 11/14 입니다 — 계획서 §2-2. 전에 여기가 보던
      {@code Type.label} 은 「구역 이름표」(12/16, 자간 1.2)였는데, 그 이름이
@@ -3850,31 +4437,59 @@ const styles = StyleSheet.create({
     fontWeight: Weight.semibold,
   },
 
+  /*
+    누르는 넓이는 늘 44 입니다.
+
+    <p>보이는 칸이 40 이나 36 으로 줄어도 이 넓이는 안 줄입니다 — 계획서
+    §2-8 의 「작게 보여도 44 를 채운다」입니다. 그래서 바탕을 가지는 꼴들은
+    이 안에 제 크기의 원을 하나 더 그립니다.
+
+    <p>모서리를 r12 로 두고 있었습니다. 그런데 바탕이 없는 것이 기본이 된
+    뒤로 그 값을 쓰는 데가 한 군데도 없습니다 — 보이지 않는 칸의 모서리는
+    아무 일도 안 합니다.
+  */
   iconButton: {
     width: Tap.min,
     height: Tap.min,
-    borderRadius: Radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  /* 안에 볼 것이 있다는 점.
-
-     이 화면은 흑백입니다. 그래서 색으로 눈에 띄게 할 수가 없고, 대신 흰
-     테두리를 둘러 그림에서 떼어 놓습니다 — 테두리가 없으면 종 그림의
-     선 하나처럼 보입니다. */
+  /* 회색 원 40. 44 r12 네모였습니다 — 네모는 이 앱에서 카드의 모양이라,
+     단추가 작은 카드처럼 보였습니다. */
+  iconButtonFill: {
+    width: 40,
+    height: 40,
+    borderRadius: Radius.full,
+  },
+  /* 선만 두른 원 36. 회색 면 위에 놓이는 단추는 면으로 말할 수 없습니다. */
+  iconButtonOutline: {
+    width: 36,
+    height: 36,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  /* 안에 볼 것이 있다는 점. accent 9 였는데, 바이올렛은 이 앱에서
+     「눌러서 하는 일」의 색이라 점이 단추의 일부처럼 보였습니다. 계획서의
+     danger 8 로 둡니다 — 들여다봐야 하는 것은 알림이고, 알림은 빨강입니다. */
   iconButtonDot: {
     position: 'absolute',
     top: 10,
     right: 10,
-    width: 9,
-    height: 9,
-    borderRadius: 5,
-    backgroundColor: Colors.accent,
+    width: 8,
+    height: 8,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.danger,
     borderWidth: 1.5,
     borderColor: Colors.surface,
   },
   /* 지도 위에 떠 있는 단추. 동그랗고, 실선과 그림자로 지도에서 떼어 놓습니다. */
+  /* 지도 위. 흰 원 40 에 그림자. 44 였는데, 지도 위에 떠 있는 것들은
+     지도를 가리는 만큼만 작아야 합니다 — 누르는 넓이는 겉껍데기가 44 로
+     지킵니다. */
   iconButtonOnMap: {
+    width: 40,
+    height: 40,
     borderRadius: Radius.full,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: Colors.border,
@@ -3891,15 +4506,38 @@ const styles = StyleSheet.create({
        그대로 남아, 토큰 쪽을 고쳐도 화면은 안 바뀌었습니다. */
     backgroundColor: Colors.scrim,
   },
+  /*
+    한 번 더 묻는 창.
+
+    <p>최대 폭 320 입니다. 360 이었는데, 이 창에 드는 것은 제목 한 줄과
+    설명 두어 줄뿐이라 넓으면 글자가 가로로 흩어져서 <b>한눈에 안
+    읽힙니다.</b> 되돌릴 수 없는 일을 묻는 자리라 한눈에 읽혀야 합니다.
+
+    <p>위를 아래보다 넓게 둡니다(28 / 20). 아래에는 단추가 서는데, 단추는
+    제 안에 여백을 갖고 있어 같은 값으로 두면 아래가 더 벌어져 보입니다.
+  */
   dialog: {
     width: '100%',
-    maxWidth: 360,
+    maxWidth: 320,
     backgroundColor: Colors.surface,
     borderRadius: Radius.r5,
     /* 가림막 위에 떠 있는 것이라 선이 아니라 그림자가 띄웁니다. */
     ...Elevation.dialog,
-    padding: Spacing.s6,
+    paddingTop: Spacing.s6 + 4,
+    paddingHorizontal: Spacing.s6,
+    paddingBottom: Spacing.s5,
     gap: Spacing.s3,
+  },
+  dialogTitle: {
+    ...Type.title3,
+    fontWeight: Weight.bold,
+    color: Colors.text,
+    textAlign: 'center',
+  },
+  dialogMessage: {
+    ...Type.body2,
+    color: Colors.textSecondary,
+    textAlign: 'center',
   },
   dialogActions: {
     marginTop: Spacing.sm,
@@ -3949,12 +4587,12 @@ const styles = StyleSheet.create({
     ...Elevation.sheet,
     paddingTop: Spacing.s3,
     /* 화면을 다 덮지 않습니다. 뒤가 조금 보여야 어디로 돌아가는지 압니다. */
-    maxHeight: '88%',
+    maxHeight: '90%',
   },
   /* 위로 한 번 끌어올렸을 때. 내용이 짧아도 끝까지 폅니다 — 끌어올렸는데
      아무것도 안 움직이면 안 되는 줄 압니다. */
   sheetTall: {
-    height: '88%',
+    height: '90%',
   },
   sheetGrip: {
     alignSelf: 'center',
@@ -3962,6 +4600,12 @@ const styles = StyleSheet.create({
     height: 4,
     borderRadius: Radius.full,
     backgroundColor: Colors.borderStrong,
+  },
+  sheetTitle: {
+    ...Type.title2,
+    fontWeight: Weight.bold,
+    color: Colors.text,
+    flexShrink: 1,
   },
   sheetHead: {
     flexDirection: 'row',
@@ -3979,22 +4623,62 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.lg,
     gap: Spacing.lg,
   },
+  /*
+    판 아래에 붙는 것.
+
+    <p>위에 실선을 두르고 있었습니다. 화면 바닥의 고정 바와 같은 까닭으로
+    걷습니다 — 선은 「여기서 구역이 갈린다」는 말이고, 이것은 <b>굴러가는
+    내용 위에 떠 있는 것</b>입니다. 그림자로 말해야 그 아래로 내용이
+    지나간다는 것이 보입니다.
+  */
   sheetFoot: {
     paddingHorizontal: Gutter,
-    paddingTop: Spacing.md,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: Colors.border,
-    gap: Spacing.sm,
+    paddingTop: Spacing.s3,
+    backgroundColor: Colors.surface,
+    ...Elevation.float,
+    /* 아래가 아니라 위로. 이 아래에는 아무것도 없습니다. */
+    shadowOffset: { width: 0, height: -4 },
+    gap: Spacing.s2,
   },
 
+  /*
+    찾는 칸.
+
+    <p>회색 면에 테두리가 없습니다. 적는 칸({@code box})이 흰 바탕에 선을
+    두르는 것과 일부러 반대로 둡니다 — 한 화면에 둘이 같이 있을 때 어느
+    것이 적는 칸이고 어느 것이 걸러 보는 칸인지 생김새로 갈려야 합니다.
+  */
+  seek: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.s2,
+    height: Tap.min,
+    borderRadius: Radius.r3,
+    backgroundColor: Colors.fill,
+    paddingHorizontal: Spacing.s3,
+  },
+
+  /*
+    더하고 빼는 칸.
+
+    <p>회색 면이었습니다. 적는 칸이 상자형으로 바뀌면서 같은 폼 안에
+    회색 면 하나가 끼어 보였습니다 — 둘 다 「값을 정하는 칸」인데 하나는
+    흰 상자, 하나는 회색 덩어리였습니다. 같은 상자를 두릅니다.
+
+    <p>높이만 44 로 한 단 낮습니다. 글자를 치는 칸이 아니라 두 단추를
+    누르는 칸이고, 52 로 두면 그 안의 단추들 위아래가 휑합니다.
+  */
   stepper: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: Colors.fill,
-    borderRadius: Radius.sm,
-    paddingHorizontal: Spacing.sm,
-    height: Tap.control,
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.r3,
+    borderWidth: 1,
+    borderColor: Colors.borderStrong,
+    paddingHorizontal: Spacing.s2,
+    height: Tap.min,
   },
   stepperValue: {
     ...Type.body,
@@ -4014,13 +4698,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
-    maxWidth: 520,
+    maxWidth: 480,
     width: '100%',
-    paddingVertical: Spacing.sm + 2,
-    paddingLeft: Spacing.md,
-    paddingRight: Spacing.sm,
-    borderRadius: Radius.md,
-    backgroundColor: Colors.text,
+    paddingVertical: Spacing.s2 + 2,
+    paddingLeft: Spacing.s4,
+    paddingRight: Spacing.s2,
+    borderRadius: Radius.r4,
+    /* gray800. gray900 이었는데, 그것은 <b>글자색</b>입니다 — 같은 값으로
+       면을 깔면 띠가 글자 덩어리처럼 보이고, 그 위에 얹힌 흰 글자가 파낸
+       것처럼 읽힙니다. 한 단 밝은 면이 「진한 띠」로 보입니다. */
+    backgroundColor: Palette.gray[800],
   },
   snackText: {
     flex: 1,
@@ -4038,13 +4725,29 @@ const styles = StyleSheet.create({
   snackActionText: {
     ...Type.bodySmall,
     fontWeight: Weight.bold,
-    color: Colors.accentSoft,
+    /* violet300. violet50 은 거의 흰색이라 진한 띠 위에서 옆의 흰 글자와
+       구별이 안 돼, 누를 수 있다는 것이 안 보였습니다. */
+    color: Palette.violet[300],
   },
   /* 빈 화면 한 줄. */
+  /* 비어 있음을 말하는 그림이 드는 회색 원. */
+  emptyMark: {
+    width: 64,
+    height: 64,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.fill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   emptyLine: {
-    ...Type.body,
-    fontWeight: Weight.regular,
-    color: Colors.textSecondary,
+    ...Type.headline,
+    fontWeight: Weight.semibold,
+    color: Colors.text,
+    textAlign: 'center',
+  },
+  emptyNote: {
+    ...Type.body2,
+    color: Colors.textMuted,
     textAlign: 'center',
   },
   center: {
@@ -4058,11 +4761,9 @@ const styles = StyleSheet.create({
      도형이 하나 줄고, 무엇에 대한 말인지는 그대로 보입니다. */
   note: {
     backgroundColor: 'transparent',
-    borderLeftWidth: 2,
-    borderLeftColor: Colors.text,
-    paddingLeft: Spacing.md,
-    paddingVertical: Spacing.xs,
-    gap: Spacing.xs,
+    paddingVertical: Spacing.s1,
+    gap: Spacing.s2,
+    alignItems: 'flex-start',
   },
   noteText: {
     ...Type.bodySmall,

@@ -31,8 +31,8 @@ import {
   Row,
   Screen,
   SearchField,
-  SegmentedTabs,
   Split,
+  Tabs,
   Title,
 } from '@/ui';
 import { CardGrid } from '@/ui/grid';
@@ -178,6 +178,21 @@ export default function Community() {
   /** 무엇으로든 거르고 있는지. 아무것도 안 걸렸을 때만 안내를 띄웁니다. */
   const filtered = picked.length > 0;
 
+  /**
+   * 걸린 것을 모두 거둡니다.
+   *
+   * <p>판 안의 「모두 지우기」 가 {@code setRegion}·{@code setDays}·
+   * {@code setQ} 를 손으로 꼽고 있었습니다. 그 사이에 태그 조건이 하나 늘었고,
+   * 꼽는 쪽에는 안 늘었습니다 — 「모두 지우기」 를 눌러도 {@code #온천} 이
+   * 남아 있고, 개수는 1 인데 지울 길이 없었습니다.
+   *
+   * <p>이제 {@code picked} 를 되짚습니다. 조건을 더해도 거두는 쪽은 저절로
+   * 따라옵니다.
+   */
+  function clearAll() {
+    picked.forEach((p) => p.clear());
+  }
+
   const { data, error, loading, reload, setData } = useAsync<PostPage>(
     (signal) =>
       view === 'mine' || view === 'liked'
@@ -248,7 +263,7 @@ export default function Community() {
           한 화면에 두 번 적힙니다. */}
       <Stack.Screen options={{ headerShown: false }} />
 
-      <SegmentedTabs
+      <Tabs
         items={user ? TABS : TABS.filter((t) => !PRIVATE.includes(t.value))}
         value={view}
         onChange={(next) => {
@@ -292,27 +307,63 @@ export default function Community() {
             contentContainerStyle={styles.sieve}
             /* 줄은 화면 끝까지 흐르되 첫 칩은 글자선에 맞습니다. */
             style={styles.sieveBleed}>
-            {/* 세우는 법은 늘 걸려 있으므로 조건 칩으로 안 뺍니다. 대신
-                지금 무엇으로 서 있는지를 단추에 적어 둡니다 — 판 안에만
-                두면 어떻게 서 있는지 보려고 판을 열어야 합니다. */}
+            {/*
+              판을 여는 칸. 늘 맨 앞에 섭니다.
+
+              <p>회색 면({@code secondary})이었습니다. 그 뒤로 따라오는
+              {@code FilterChip} 들도 면이라, 「누르면 고를 수 있는 칸」과
+              「이미 걸려 있는 것」이 같은 무게로 늘어섰습니다. 테두리만 둔
+              칸으로 두면 걸린 것들보다 한 발 뒤로 물러섭니다.
+
+              <p>세우는 법은 여기서 뺐습니다 — 늘 걸려 있는 것이라 조건이
+              아니고, 개수 줄 오른쪽이 제자리입니다(계획서 §4-10 의
+              「최근 담은 순」과 같은 자리).
+            */}
             <Button
-              label={
-                picked.length > 0
-                  ? `${SORTS.find((x) => x.value === sort)?.label} · 필터 ${picked.length}`
-                  : (SORTS.find((x) => x.value === sort)?.label ?? '인기순')
-              }
-              variant="secondary"
-              compact
+              label={picked.length > 0 ? `필터 ${picked.length}` : '필터'}
+              icon="settings"
+              variant="outline"
+              size="xs"
               onPress={() => setSifting(true)}
             />
             {picked.map((p) => (
               <FilterChip key={p.key} label={p.label} onRemove={() => refilter(p.clear)} />
             ))}
+            {/* 걸린 것이 둘셋만 되어도 하나씩 ×를 누르는 것이 일이 됩니다.
+                판을 열지 않고 한 번에 거둘 길을 줄 끝에 둡니다 — 판 안의
+                「모두 지우기」와 같은 조건에 같은 일을 합니다. */}
+            {picked.length > 0 ? (
+              <Button
+                label="초기화"
+                variant="text"
+                size="xs"
+                onPress={() => refilter(clearAll)}
+              />
+            ) : null}
           </ScrollView>
 
-          {/* 개수는 조건 줄 아래 한 줄로. 줄 안에 끼우면 조건이 늘어날 때마다
-              밀려 나가 영영 안 보입니다. */}
-          {data ? <Caption tone="secondary">글 {data.total.toLocaleString()}개</Caption> : null}
+          {/*
+            개수와 세우는 법.
+
+            <p>개수는 조건 줄 아래 한 줄로 둡니다 — 줄 안에 끼우면 조건이
+            늘어날 때마다 오른쪽으로 밀려 나가 영영 안 보입니다.
+
+            <p>세우는 법은 그 줄 오른쪽입니다. 판 안에만 두면 지금 무엇으로
+            서 있는지 보려고 판을 열어야 하는데, 그것은 <b>조건이 아니라 늘
+            걸려 있는 것</b>이라 열어 보지 않아도 보여야 합니다.
+          */}
+          <Split>
+            <Caption tone="secondary">
+              {data ? `글 ${data.total.toLocaleString()}개` : '세는 중'}
+            </Caption>
+            <Button
+              label={SORTS.find((x) => x.value === sort)?.label ?? '인기순'}
+              iconAfter="chevron-down"
+              variant="text"
+              size="xs"
+              onPress={() => setSifting(true)}
+            />
+          </Split>
 
           {/*
             고르는 곳과 보는 곳을 띠가 가릅니다.
@@ -353,18 +404,7 @@ export default function Community() {
               />
             </Grow>
             {picked.length > 0 ? (
-              <Button
-                label="모두 지우기"
-                variant="secondary"
-                onPress={() =>
-                  refilter(() => {
-                    setRegion(null);
-                    setDays(null);
-                    setTyped('');
-                    setQ('');
-                  })
-                }
-              />
+              <Button label="모두 지우기" variant="secondary" onPress={() => refilter(clearAll)} />
             ) : null}
           </Row>
         }>
@@ -614,6 +654,12 @@ function PostRow({
 }
 
 const styles = StyleSheet.create({
+  /*
+    탭 아래 선은 좌우 여백을 뚫고 나갑니다.
+
+    <p>여백 안에 가두면 선이 양쪽에서 20픽셀씩 모자라, 화면을 가르는
+    가닥이 아니라 내용 위에 얹힌 상자의 밑변으로 보입니다.
+  */
   applied: {
     flexWrap: 'wrap',
   },

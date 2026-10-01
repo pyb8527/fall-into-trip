@@ -10,7 +10,7 @@ import type { Found } from '@/components/map-types';
 import { OurPhoto } from '@/components/our-photo';
 import { PlaceDetailSheet } from '@/components/place-detail-sheet';
 import { iconOf, labelOf } from '@/constants/place-icons';
-import { Colors, Palette, Spacing, Tap, Type, Weight } from '@/constants/theme';
+import { Colors, Gutter, Palette, Spacing, Tap, Type, Weight } from '@/constants/theme';
 import { formatNights } from '@/lib/countdown';
 import { forgetAll, recentSearches, remember } from '@/lib/recent';
 import {
@@ -30,8 +30,8 @@ import {
   Screen,
   SearchField,
   SectionHeader,
-  SegmentedTabs,
   Snack,
+  Tabs,
   useUndo,
 } from '@/ui';
 
@@ -196,7 +196,7 @@ export default function Search() {
 
       {q ? (
         <>
-          <SegmentedTabs items={TABS} value={tab} onChange={setTab} />
+          <Tabs items={TABS} value={tab} onChange={setTab} />
 
           {busy && placeRows.length === 0 && postRows.length === 0 ? <Loading /> : null}
           {placeError && tab !== 'ideas' ? <ErrorNote message={placeError} /> : null}
@@ -429,6 +429,12 @@ function MoreLink({
 }
 
 const styles = StyleSheet.create({
+  /*
+    탭 아래 선은 좌우 여백을 뚫고 나갑니다.
+
+    <p>여백 안에 가두면 선이 양쪽에서 20픽셀씩 모자라, 화면을 가르는
+    가닥이 아니라 내용 위에 얹힌 상자의 밑변으로 보입니다.
+  */
   /* 구역 머리 오른쪽. 글자와 꺽쇠가 붙어 한 덩어리로 읽혀야 합니다. */
   moreLink: {
     flexDirection: 'row',

@@ -1,3 +1,4 @@
+import Constants from 'expo-constants';
 import { Stack, useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -7,7 +8,7 @@ import { GoogleButton } from '@/components/google-button';
 import { canNotify, notifyState, turnOff, turnOn } from '@/lib/notify';
 import { useAuth } from '@/auth/auth-provider';
 import { USER_MARKS, markOf } from '@/constants/user-marks';
-import { Colors, Radius, Spacing, Tap } from '@/constants/theme';
+import { Colors, Radius, Spacing, Tap, Type } from '@/constants/theme';
 import {
   Badge,
   Band,
@@ -123,6 +124,18 @@ export default function Settings() {
           그래서 아래쪽 것만 빨간 글씨입니다. */}
       <Line label="로그아웃" onPress={logout} />
       <Line label="모든 기기에서 로그아웃" danger last onPress={() => setLeaving(true)} />
+
+      {/*
+        몇 판인지.
+
+        <p>이것이 없으면 「안 되는데요」 를 받았을 때 <b>어느 판에서</b> 안
+        되는지를 물어봐야 합니다. 스스로 올라가는 앱(OTA)이라 사람마다 든
+        판이 다를 수 있어서 더 그렇습니다.
+
+        <p>맨 아래, 가장 작은 글자로 둡니다. 읽으라고 있는 것이 아니라
+        물어볼 때 찾으려고 있는 것입니다.
+      */}
+      <Text style={styles.build}>FIT {Constants.expoConfig?.version ?? ""}</Text>
 
       <ConfirmDialog
         visible={leaving}
@@ -637,5 +650,12 @@ const styles = StyleSheet.create({
   },
   tiles: {
     flexWrap: 'wrap',
+  },
+  /* 몇 판인지. 가장 작은 단으로, 가운데에. */
+  build: {
+    ...Type.micro,
+    color: Colors.textDisabled,
+    textAlign: 'center',
+    paddingTop: Spacing.s6,
   },
 });

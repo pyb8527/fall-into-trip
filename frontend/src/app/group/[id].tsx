@@ -10,7 +10,7 @@ import { FeedList } from '@/components/feed-list';
 import { GroupForm } from '@/components/group-form';
 import { MatesSheet } from '@/components/mates-sheet';
 import { TripForm } from '@/components/trip-form';
-import { Colors, Radius, Spacing, Tap } from '@/constants/theme';
+import { Colors, Gutter, Radius, Spacing, Tap } from '@/constants/theme';
 import { faceOf } from '@/constants/user-marks';
 import {
   Band,
@@ -27,8 +27,8 @@ import {
   Press,
   Row,
   Screen,
-  SegmentedTabs,
   Split,
+  Tabs,
 } from '@/ui';
 import { stackHeader } from '@/ui/nav';
 
@@ -198,7 +198,7 @@ export default function GroupScreen() {
 
           <Band />
 
-          <SegmentedTabs items={LANES} value={lane} onChange={setLane} />
+          <Tabs items={LANES} value={lane} onChange={setLane} />
 
           {lane === 'trips' ? (
             <>
@@ -285,6 +285,12 @@ export default function GroupScreen() {
 }
 
 const styles = StyleSheet.create({
+  /*
+    탭 아래 선은 좌우 여백을 뚫고 나갑니다.
+
+    <p>여백 안에 가두면 선이 양쪽에서 20픽셀씩 모자라, 화면을 가르는
+    가닥이 아니라 내용 위에 얹힌 상자의 밑변으로 보입니다.
+  */
   /* 머리 구역. 판이 아니라 그냥 흐름입니다 — 사이만 벌려 둡니다. */
   head: {
     gap: Spacing.s3,

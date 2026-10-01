@@ -514,64 +514,58 @@ const styles = StyleSheet.create({
     bottom: 0,
     flexDirection: 'row',
     alignItems: 'flex-end',
-    gap: Spacing.sm,
-    paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.sm,
+    /* 바닥에 붙습니다. 좌우로 12 띄워 알약을 떠 있게 두던 여백을
+       걷습니다 — 그 여백이 있으면 띠 양옆으로 본문이 비집고 나옵니다. */
+    gap: 0,
+    paddingHorizontal: 0,
+    paddingTop: 0,
   },
   /*
-    떠 있는 띠.
+    바닥에 붙은 흰 띠.
 
-    <p>화면 끝까지 붙인 네모가 아니라 둥근 알약으로 띄웁니다. 이 앱은
-    회색 바닥에 흰 판을 얹어 층을 만드는데, 아래를 흰 띠로 꽉 채우면
-    바닥과 띠가 한 덩어리가 되어 층이 무너집니다.
+    <h3>떠 있는 알약이었습니다</h3>
 
-    <h3>비쳐 보입니다</h3>
+    <p>좌우로 12 띄운 둥근 알약이었고, 속이 0.86 만큼 비치고 뒤엣것을
+    흐리고(backdropFilter) 그림자로 떠 있었습니다. 까닭은 「회색 바닥에
+    흰 판을 얹어 층을 만드는데, 아래를 흰 띠로 꽉 채우면 바닥과 띠가 한
+    덩어리가 되어 층이 무너진다」였습니다.
 
-    <p>아래에 회색 바탕을 깔지 않으므로, 떠 있다는 것을 알약이 혼자
-    말해야 합니다. 셋이 함께 그 일을 합니다.
+    <p>그 전제가 사라졌습니다. <b>바닥이 흰색입니다.</b> 그래서 반투명 흰
+    알약이 흰 바닥 위에 떠 있는 꼴이 되어, 비치는 것도 흐리는 것도 아무
+    말을 안 하고 <b>그림자만 남아 화면 아래가 들떠</b> 보였습니다. 알약
+    양옆으로는 본문이 비집고 나왔습니다.
 
-    <p>첫째, 속이 조금 비칩니다. 꽉 막힌 흰 판은 <b>그 자리에 원래 있던
-    것</b>처럼 보이고, 아주 투명하면 글자가 뒤엣것과 겹쳐 안 읽힙니다.
-    0.86은 뒤가 비치는 것이 보이면서 글자는 또렷한 자리입니다.
+    <p>바닥에 붙입니다. 흰 면에 위로 1px 선 하나 — 선이 「여기서부터 띠」를
+    말하고, 그림자는 안 씁니다. 떠 있을 이유가 없습니다.
 
-    <p>둘째, 웹에서는 뒤엣것을 흐립니다(backdropFilter). 흐리지 않으면
-    지도의 글씨와 띠의 글씨가 나란히 읽혀 어느 쪽이 위인지 헷갈립니다.
-    앱에는 이 성질이 없지만, 폰에서 보는 것도 결국 웹입니다(껍데기).
-
-    <p>셋째, 그림자. 이 앱에서 그림자를 쓰는 몇 안 되는 자리인데, 바탕색을
-    걷은 지금은 그림자가 유일하게 「위에 있다」를 말합니다.
+    <p>지도 위에 얹히는 화면에서도 그대로입니다. 지도는 띠 뒤로 지나가지
+    않고 띠 위까지만 그려집니다.
   */
   bar: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: Radius.full,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: Colors.border,
-    backgroundColor: 'rgba(255, 255, 255, 0.86)',
-    ...Elevation.float,
-    ...Platform.select({
-      web: { backdropFilter: 'saturate(180%) blur(18px)' } as object,
-      default: {},
-    }),
-    paddingVertical: Spacing.xs,
-    paddingHorizontal: Spacing.xs,
+    backgroundColor: Colors.surface,
+    borderTopWidth: 1,
+    borderTopColor: Colors.divider,
   },
   tab: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 2,
-    paddingVertical: Spacing.xs,
-    borderRadius: Radius.full,
+    paddingVertical: Spacing.s1,
   },
+  /*
+    갈래 이름.
+
+    <p>micro 11/14 입니다. 14/18 이었는데, 그만하면 <b>목록의 메타 글자와
+    같은 크기</b>입니다 — 띠의 이름은 읽으라고 있는 것이 아니라 아이콘이
+    무엇인지 한 번 알려 주는 것이라, 그보다 작아야 띠가 얇아집니다.
+    다섯 칸이 나란히 서므로 「가고 싶은 곳」 같은 긴 이름도 들어갑니다.
+  */
   label: {
-    ...Type.caption,
-    /* 캡션(15)보다 한 눈금 작게. 다섯 칸이 나란히 서는 자리라 "가고 싶은 곳"
-       같은 긴 이름이 잘리지 않아야 합니다. 줄 높이도 같이 줄입니다 —
-       캡션의 것을 그대로 쓰면 글자 위아래로 빈자리가 남아 띠만 두꺼워집니다. */
-    fontSize: 14,
-    lineHeight: 18,
+    ...Type.micro,
     /* 꺼진 칸용 회색입니다. 메타 글자색(textMuted)이 한 단 진해지면서
        켜진 칸과 구별이 흐려졌습니다 — 꺼진 것은 꺼진 것끼리 같은 값을
        봐야 합니다. */
@@ -581,16 +575,22 @@ const styles = StyleSheet.create({
      그 색이 이 화면에서 가장 진한 것이 되어, 정작 내용이 밀립니다. */
   labelOn: {
     color: Colors.text,
-    fontWeight: Weight.bold,
+    fontWeight: Weight.semibold,
   },
+  /* 안 읽은 것이 있다는 점. accent 였는데, 바이올렛은 이 앱에서 「눌러서
+     하는 일」의 색이라 점이 켜진 칸처럼 보였습니다 — 꺼진 갈래에 붙어 있을
+     때 특히요. 알림은 빨강입니다(§2-3). */
   dot: {
     position: 'absolute',
     top: -1,
     right: -3,
-    width: 6,
-    height: 6,
+    width: 8,
+    height: 8,
     borderRadius: Radius.full,
-    backgroundColor: Colors.accent,
+    backgroundColor: Colors.danger,
+    /* 아이콘 선 위에 겹치면 선 하나처럼 보입니다. 흰 테두리로 떼어 놓습니다. */
+    borderWidth: 1.5,
+    borderColor: Colors.surface,
   },
   /* ------------------------------------------------ 넓은 화면의 왼쪽 기둥 */
   /*

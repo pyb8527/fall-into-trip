@@ -9,7 +9,7 @@ import { useAuth } from '@/auth/auth-provider';
 import { TripMark } from '@/components/trip-mark';
 import { FolderSheet } from '@/components/folder-sheet';
 import { TripForm } from '@/components/trip-form';
-import { Colors, Radius, Spacing, Type, Weight } from '@/constants/theme';
+import { Colors, Gutter, Radius, Spacing, Type, Weight } from '@/constants/theme';
 import { countdownIsNear, countdownLabel, countdownOf, formatNights, formatSpan, todayIso } from '@/lib/countdown';
 import {
   Badge,
@@ -33,6 +33,7 @@ import {
   SectionHeader,
   SegmentedTabs,
   Split,
+  Tabs,
   Title,
 } from '@/ui';
 import { AppTabs } from '@/ui/tab-bar';
@@ -287,9 +288,15 @@ export default function Trips() {
 
         <p>묶기 띠(일정순·폴더별) <b>위에</b> 섭니다. 먼저 가르는 것이
         이쪽이라 아래에 두면 묶기를 고친 뒤에 다시 칸을 고르게 됩니다.
+
+        <p>이쪽만 밑줄 탭으로 바꿉니다. 혼자와 모임은 <b>서로 다른 여행
+        묶음</b>이고(빈 자리에 나오는 말도 다릅니다), 일정순·폴더별은 그
+        묶음을 다르게 늘어놓는 것입니다. 여태 둘 다 알약이라 화면 위쪽에
+        회색 알약 묶음이 둘이나 섰고, 어느 쪽이 먼저 가르는 칸인지가
+        생김새로 안 보였습니다.
       */}
       {data && hasGroupTrips ? (
-        <SegmentedTabs items={WHOSE} value={whose} onChange={setWhose} />
+        <Tabs items={WHOSE} value={whose} onChange={setWhose} />
       ) : null}
 
       {data && all.length === 0 ? (
@@ -785,6 +792,12 @@ function byWhen(trips: TripSummary[]): Bunch[] {
 
 
 const styles = StyleSheet.create({
+  /*
+    탭 아래 선은 좌우 여백을 뚫고 나갑니다.
+
+    <p>여백 안에 가두면 선이 양쪽에서 20픽셀씩 모자라, 화면을 가르는
+    가닥이 아니라 내용 위에 얹힌 상자의 밑변으로 보입니다.
+  */
   /* 되돌릴 수 없는 줄. 빨간 글씨 하나로 말합니다 — 면을 칠하면 그 줄이
      주 동작처럼 보입니다. */
   dangerRow: {

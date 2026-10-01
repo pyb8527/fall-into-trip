@@ -7,7 +7,7 @@ import type { FeedPost } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
 import { PhotoStrip } from '@/components/photo-strip';
-import { Colors, Radius, Spacing, Type, Weight } from '@/constants/theme';
+import { Colors, Radius, Spacing } from '@/constants/theme';
 import { faceOf } from '@/constants/user-marks';
 import {
   Body,
@@ -23,6 +23,7 @@ import {
   Press,
   Row,
   Split,
+  Tag,
 } from '@/ui';
 
 /**
@@ -111,13 +112,15 @@ export function FeedCard({
         accent 는 <b>검정</b>이라, "#온천" 이 본문과 똑같은 검정 글씨였습니다 —
         누를 수 있는 것처럼 보이면서 누를 수도 없었습니다. 작은 회색 면에
         담아 「붙어 있는 이름표」 로 둡니다.
+
+        <p>그 면을 여기서 손으로 그리고 있었습니다. 이 카드가 둘러보기·좋아요·
+        내 글 세 화면에 서는데 꼬리표 모양은 이 파일에만 적혀 있어서, 다른
+        데의 같은 꼬리표와 조용히 어긋났습니다. 공용 {@link Tag} 로 돌립니다.
       */}
       {post.tags.length > 0 ? (
         <Row gap={Spacing.s2} style={styles.wrap}>
           {post.tags.map((t) => (
-            <View key={t} style={styles.tag}>
-              <Text style={styles.tagLabel}>#{t}</Text>
-            </View>
+            <Tag key={t} label={`#${t}`} />
           ))}
         </Row>
       ) : null}
@@ -313,21 +316,6 @@ const styles = StyleSheet.create({
   },
   wrap: {
     flexWrap: 'wrap',
-  },
-  /* 못 누르는 꼬리표. 칩(키 34, 둥금, 테두리)과 생김새를 가릅니다. */
-  tag: {
-    height: 22,
-    borderRadius: Radius.r1,
-    paddingHorizontal: 6,
-    backgroundColor: Colors.fill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tagLabel: {
-    ...Type.micro,
-    fontSize: 12,
-    fontWeight: Weight.medium,
-    color: Colors.textSecondary,
   },
   where: {
     flexDirection: 'row',
