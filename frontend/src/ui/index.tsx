@@ -3464,11 +3464,11 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 360,
     backgroundColor: Colors.surface,
-    borderRadius: Radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: Colors.borderStrong,
-    padding: Spacing.xl,
-    gap: Spacing.md,
+    borderRadius: Radius.r5,
+    /* 가림막 위에 떠 있는 것이라 선이 아니라 그림자가 띄웁니다. */
+    ...Elevation.dialog,
+    padding: Spacing.s6,
+    gap: Spacing.s3,
   },
   dialogActions: {
     marginTop: Spacing.sm,
@@ -3492,12 +3492,17 @@ const styles = StyleSheet.create({
   },
   sheet: {
     backgroundColor: Colors.surface,
-    borderTopLeftRadius: Radius.lg,
-    borderTopRightRadius: Radius.lg,
-    /* 모서리를 각지게 두었으니 판이 어디서 시작하는지는 선이 말합니다. */
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: Colors.borderStrong,
-    paddingTop: Spacing.md,
+    borderTopLeftRadius: Radius.r5,
+    borderTopRightRadius: Radius.r5,
+    /*
+      선을 걷고 그림자로 띄웁니다.
+
+      <p>판 위에 선을 한 가닥 그어 「여기서부터 판」을 말하고 있었습니다.
+      모서리가 각지던 시절의 길입니다. 이제 위 모서리가 20만큼 둥글고 그림자가
+      위로 드리우므로, 선은 그 위에 한 겹 더 얹힌 군더더기입니다.
+    */
+    ...Elevation.sheet,
+    paddingTop: Spacing.s3,
     /* 화면을 다 덮지 않습니다. 뒤가 조금 보여야 어디로 돌아가는지 압니다. */
     maxHeight: '88%',
   },
@@ -3508,10 +3513,10 @@ const styles = StyleSheet.create({
   },
   sheetGrip: {
     alignSelf: 'center',
-    width: 40,
+    width: 36,
     height: 4,
     borderRadius: Radius.full,
-    backgroundColor: Colors.fillPressed,
+    backgroundColor: Colors.borderStrong,
   },
   sheetHead: {
     flexDirection: 'row',
