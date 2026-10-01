@@ -12,6 +12,7 @@ import { SignUpGate } from '@/components/signup-gate';
 import { Colors, Elevation, Gutter, Radius, Spacing, Tap } from '@/constants/theme';
 import type { Comeback } from '@/lib/comeback';
 import {
+  Band,
   Body,
   BottomSheet,
   Button,
@@ -34,6 +35,7 @@ import {
   Split,
   Title,
 } from '@/ui';
+import { CardGrid } from '@/ui/grid';
 import { AppTabs } from '@/ui/tab-bar';
 
 /**
@@ -311,6 +313,16 @@ export default function Community() {
           {/* 개수는 조건 줄 아래 한 줄로. 줄 안에 끼우면 조건이 늘어날 때마다
               밀려 나가 영영 안 보입니다. */}
           {data ? <Caption tone="secondary">글 {data.total.toLocaleString()}개</Caption> : null}
+
+          {/*
+            고르는 곳과 보는 곳을 띠가 가릅니다.
+
+            <p>띠·칸·개수 줄과 글 카드가 같은 흰 바닥 위에 쭉 쌓여 있어서,
+            어디까지가 조건이고 어디서부터 목록인지가 <b>글자 크기로만</b>
+            갈렸습니다. 다른 화면들은 이미 구역마다 띠로 갈라져 있는데
+            여기만 안 갈려 있었습니다.
+          */}
+          <Band />
         </>
       )}
 
@@ -462,15 +474,19 @@ export default function Community() {
         />
       ) : null}
 
-      {data?.posts.map((post) => (
-        <PostRow
-          key={post.id}
-          post={post}
-          onOpen={() => router.push(`/community/${post.id}`)}
-          onLike={() => toggleLike(post)}
-          onTag={(t) => refilter(() => setTag(t))}
-        />
-      ))}
+      {/* 넓은 화면에서는 글 카드를 두세 칸으로 늘어놓습니다. 폰에서는
+          감싸는 것이 없습니다 — 한 칸일 때는 격자가 아무 일도 안 합니다. */}
+      <CardGrid>
+        {data?.posts.map((post) => (
+          <PostRow
+            key={post.id}
+            post={post}
+            onOpen={() => router.push(`/community/${post.id}`)}
+            onLike={() => toggleLike(post)}
+            onTag={(t) => refilter(() => setTag(t))}
+          />
+        ))}
+      </CardGrid>
 
       <Pager
         page={data?.page ?? 0}

@@ -1,5 +1,6 @@
 import { Stack } from 'expo-router';
 
+import { useWide } from '@/ui/layout';
 import { stackHeader } from '@/ui/nav';
 
 /**
@@ -19,13 +20,17 @@ import { stackHeader } from '@/ui/nav';
 export const unstable_settings = { anchor: 'index' };
 
 export default function CommunityLayout() {
+  /* 둘 다 아래 갈래 띠를 답니다. 넓은 화면에서 그 띠가 왼쪽 기둥으로
+     서므로 본문과 막대가 그만큼 비켜 앉습니다(ui/nav 의 rail). */
+  const wide = useWide();
+
   return (
     <Stack>
       {/* 둘러보기는 계정 없이도 열립니다. 그래서 위층도 홈이 아니라
           둘러보기 목록입니다 — 글을 읽다가 뒤로를 눌렀는데 로그인 화면이
           뜨면 그게 막다른 길입니다. */}
-      <Stack.Screen name="index" options={stackHeader('여행 둘러보기')} />
-      <Stack.Screen name="[id]" options={stackHeader('', { up: '/community' })} />
+      <Stack.Screen name="index" options={stackHeader('여행 둘러보기', { rail: wide })} />
+      <Stack.Screen name="[id]" options={stackHeader('', { up: '/community', rail: wide })} />
     </Stack>
   );
 }

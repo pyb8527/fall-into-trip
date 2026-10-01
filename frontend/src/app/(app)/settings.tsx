@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { Stack, useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -7,16 +7,7 @@ import { GoogleButton } from '@/components/google-button';
 import { canNotify, notifyState, turnOff, turnOn } from '@/lib/notify';
 import { useAuth } from '@/auth/auth-provider';
 import { USER_MARKS, markOf } from '@/constants/user-marks';
-import {
-  Colors,
-  Gutter,
-  Palette,
-  Radius,
-  Spacing,
-  Tap,
-  Type,
-  Weight,
-} from '@/constants/theme';
+import { Colors, Radius, Spacing, Tap } from '@/constants/theme';
 import {
   Badge,
   Band,
@@ -30,13 +21,15 @@ import {
   Field,
   Grow,
   Icon,
-  Press,
+  ListRow,
   Row,
   Screen,
-  Split,
+  SectionHeader,
   Switch,
+  Title,
 } from '@/ui';
 import { LogoMark } from '@/ui/logo';
+import { NavLeft } from '@/ui/nav';
 
 const PASSWORD_MIN = 8;
 
@@ -55,16 +48,37 @@ const PASSWORD_MIN = 8;
  * 바꿀 수 있는지가 목록으로 한눈에</b> 보입니다 — 상용 앱의 설정이 거의
  * 다 이 모양인 까닭입니다.
  *
- * <p>묶음은 8픽셀 띠가 가릅니다. 띠 위에 작은 머리글을 두어 「알림」 ·
- * 「지도」 · 「계정」 을 나눕니다.
+ * <p>묶음은 8픽셀 띠가 가릅니다. 띠마다 머리글을 두어 「알림」 · 「지도」 ·
+ * 「계정」 을 나눕니다. 머리글은 이 화면이 만들지 않고 <b>구역 머리 부품</b>
+ * (SectionHeader)이 씁니다 — 화면마다 손으로 만들던 머리글이 크기도 여백도
+ * 달라서, 화면을 옮겨 다니면 같은 앱이 아닌 것처럼 보였습니다.
+ *
+ * <h3>제목이 상단바에서 본문으로 내려왔습니다</h3>
+ *
+ * <p>갈래에서 바로 열리는 다른 화면들은 큰 제목을 본문 맨 위에 두는데 이
+ * 화면만 작은 제목을 막대 가운데에 두고 있었습니다. 같은 자리로 맞춥니다.
+ * 돌아갈 길이 있어야 하는 화면이라 제목 왼쪽에 뒤로·처음 단추를 둡니다.
  */
 export default function Settings() {
   const { user, logout, logoutAll } = useAuth();
   const router = useRouter();
+  const navigation = useNavigation();
   const [leaving, setLeaving] = useState(false);
 
   return (
-    <Screen>
+    <Screen
+      safeTop
+      header={
+        <Row gap={Spacing.s2}>
+          <NavLeft navigation={navigation} up="/(app)/home" />
+          <Grow>
+            <Title>내 계정</Title>
+          </Grow>
+        </Row>
+      }>
+      {/* 큰 제목이 본문 위에 서므로 상단바는 걷습니다. 둘 다 두면 같은 말이
+          한 화면에 두 번 적힙니다. */}
+      <Stack.Screen options={{ headerShown: false }} />
       {/*
         누구로 들어와 있는지.
 
@@ -94,7 +108,7 @@ export default function Settings() {
       </Row>
 
       {user?.role === 'ADMIN' ? (
-        <Line label="운영 관리" onPress={() => router.push('/admin')} />
+        <Line label="운영 관리" last onPress={() => router.push('/admin')} />
       ) : null}
 
       <NotifyGroup />
@@ -108,7 +122,7 @@ export default function Settings() {
       {/* 나가는 일 둘. 하나는 되돌릴 수 있고 하나는 다른 기기까지 끊습니다 —
           그래서 아래쪽 것만 빨간 글씨입니다. */}
       <Line label="로그아웃" onPress={logout} />
-      <Line label="모든 기기에서 로그아웃" danger onPress={() => setLeaving(true)} />
+      <Line label="모든 기기에서 로그아웃" danger last onPress={() => setLeaving(true)} />
 
       <ConfirmDialog
         visible={leaving}
@@ -127,60 +141,88 @@ export default function Settings() {
 }
 
 /**
- * 묶음 하나의 머리글.
- *
- * <p>읽으라고 있는 것이 아니라 「여기서부터 다른 이야기」 라는 표시입니다.
- * 그래서 본문보다 작고 흐리되 굵습니다.
- */
-function GroupHead({ label }: { label: string }) {
-  return <Text style={styles.groupHead}>{label}</Text>;
-}
-
-/**
  * 설정 한 줄.
  *
- * <h3>왜 {@link ListRow} 가 아닌가</h3>
+ * <h3>목록 줄 부품을 그대로 씁니다</h3>
  *
- * <p>{@link ListRow} 는 <b>눌러서 들어가는 물건</b>의 줄입니다 — 제 판과
- * 모서리를 가집니다. 설정 줄은 물건이 아니고, 눌러도 어디로 가지 않는 줄
- * (가입일처럼 값만 적는 줄)도 섞여 있습니다. 그런 줄까지 판에 담으면
- * 누를 수 있는 것처럼 보입니다.
+ * <p>전에는 이 화면이 줄을 직접 그렸습니다. {@code ListRow} 가 흰 판과
+ * 모서리를 가지던 시절의 판단이었는데, 바닥이 흰색이 된 뒤로 그 판은
+ * 사라졌습니다 — 지금 {@code ListRow} 는 <b>배경 없는 줄 + 아래 선</b>이라
+ * 설정 줄이 바라던 모양 그대로입니다. 직접 그릴 이유가 없어졌습니다.
  *
- * @param value 오른쪽에 적는 지금 값. 누르는 줄이면 뒤에 화살표가 섭니다.
+ * <p>맞춰 쓰면 같은 일을 하는 줄이 보석함·가계부·모임과 같은 높이·여백·
+ * 선으로 섭니다. 설정 화면만 줄 모양이 다르던 것이 「도화지에 아무거나
+ * 올려 둔 느낌」 의 한 조각이었습니다.
+ *
+ * <h3>값만 적는 줄은 여전히 따로입니다</h3>
+ *
+ * <p>{@code ListRow} 는 누르는 줄이라 갈 곳이 반드시 있어야 합니다. 가입일
+ * 처럼 값만 적는 줄은 누를 데가 없는데, 누르는 줄로 두면 눌러도 아무 일이
+ * 안 일어나는 줄이 목록에 섞입니다. 그 줄만 높이와 선을 맞춘 제 모양으로
+ * 둡니다.
+ *
+ * @param value 오른쪽에 적는 지금 값. 누르는 줄이면 뒤에 화살표가 섭니다
+ * @param badge 값 대신 오른쪽에 서는 표. 「연결됨」 처럼 상태를 말할 때
+ * @param last  묶음의 마지막 줄인지. 마지막에는 선을 안 긋습니다
  */
 function Line({
   label,
   value,
+  badge,
   danger,
+  last,
   onPress,
 }: {
   label: string;
   value?: string;
+  badge?: React.ReactNode;
   /** 되돌리기 어려운 일. 글자만 빨갛게 둡니다 — 채운 단추는 과합니다. */
   danger?: boolean;
+  last?: boolean;
   onPress?: () => void;
 }) {
-  const inside = (
-    <>
-      <Grow>
-        <Body tone={danger ? 'danger' : 'default'}>{label}</Body>
-      </Grow>
-      {value ? (
-        <Caption tone="secondary" numberOfLines={1}>
-          {value}
-        </Caption>
-      ) : null}
-      {onPress ? <Icon name="chevron-right" size={20} tone="muted" /> : null}
-    </>
-  );
-
   if (!onPress) {
-    return <View style={styles.line}>{inside}</View>;
+    return (
+      <View style={[styles.fact, last ? null : styles.factLine]}>
+        <Grow>
+          <Body>{label}</Body>
+        </Grow>
+        {value ? (
+          <Caption tone="secondary" numberOfLines={1}>
+            {value}
+          </Caption>
+        ) : null}
+      </View>
+    );
   }
+
   return (
-    <Press onPress={onPress} scale={1} accessibilityLabel={label} style={styles.line}>
-      {inside}
-    </Press>
+    <ListRow
+      /* 빨간 줄은 글자를 바꿔 끼웁니다. 줄 제목의 굵기는 그대로 두고 색만
+         갈아야 다른 줄들과 같은 무게로 섭니다. */
+      title={
+        danger ? (
+          <Body strong tone="danger">
+            {label}
+          </Body>
+        ) : (
+          label
+        )
+      }
+      last={last}
+      right={
+        <Row gap={Spacing.s2}>
+          {badge}
+          {value ? (
+            <Caption tone="secondary" numberOfLines={1}>
+              {value}
+            </Caption>
+          ) : null}
+          <Icon name="chevron-right" size={20} tone="muted" />
+        </Row>
+      }
+      onPress={onPress}
+    />
   );
 }
 
@@ -248,11 +290,11 @@ function NotifyGroup() {
   return (
     <>
       <Band />
-      <GroupHead label="알림" />
+      <SectionHeader title="알림" tight />
 
       {state === 'blocked' ? (
         /* 우리가 할 수 있는 것이 없습니다. 어디서 푸는지만 알려 줍니다. */
-        <View style={styles.line}>
+        <View style={styles.fact}>
           <Caption tone="danger">
             이 브라우저에서 알림을 막아 뒀어요. 주소창 왼쪽의 자물쇠를 눌러 알림을 허용으로
             바꾸면 켤 수 있어요.
@@ -320,8 +362,8 @@ function MarkGroup() {
   return (
     <>
       <Band />
-      <GroupHead label="지도" />
-      <Line label="지도에서 나" value={now} onPress={() => setOpen(true)} />
+      <SectionHeader title="지도" tight />
+      <Line label="지도에서 나" value={now} last onPress={() => setOpen(true)} />
       {error ? <ErrorNote message={error} /> : null}
 
       <BottomSheet visible={open} title="지도에서 나" onClose={() => setOpen(false)}>
@@ -419,25 +461,19 @@ function AccountGroup() {
   return (
     <>
       <Band />
-      <GroupHead label="계정" />
+      <SectionHeader title="계정" tight />
 
       {showGoogle ? (
-        <Press
+        <Line
+          label="구글로 로그인하기"
+          badge={linked ? <Badge label="연결됨" tone="success" /> : null}
           onPress={() => setLinking(true)}
-          scale={1}
-          accessibilityLabel="구글로 로그인하기"
-          style={styles.line}>
-          <Grow>
-            <Body>구글로 로그인하기</Body>
-          </Grow>
-          {linked ? <Badge label="연결됨" tone="success" /> : null}
-          <Icon name="chevron-right" size={20} tone="muted" />
-        </Press>
+        />
       ) : null}
 
       <Line label="비밀번호 바꾸기" onPress={() => setChanging(true)} />
       <Line label="가입" value={formatDate(user?.createdAt)} />
-      <Line label="마지막 로그인" value={formatDate(user?.lastLoginAt)} />
+      <Line label="마지막 로그인" value={formatDate(user?.lastLoginAt)} last />
 
       {error ? <ErrorNote message={error} /> : null}
 
@@ -581,20 +617,23 @@ const styles = StyleSheet.create({
     /* 이모지는 글꼴이 제 높이를 갖고 있어, 줄 높이를 두면 아래로 처집니다. */
     lineHeight: undefined,
   },
-  groupHead: {
-    ...Type.caption,
-    fontWeight: Weight.semibold,
-    color: Palette.gray[500],
-    paddingTop: Spacing.s6,
-    paddingBottom: Spacing.s2,
-  },
-  /* 설정 한 줄. 손가락이 닿을 높이를 채웁니다. */
-  line: {
+  /*
+    값만 적는 줄.
+
+    <p>누르는 줄({@code ListRow})과 높이·여백·선을 같게 둡니다. 한 묶음
+    안에서 누르는 줄과 안 눌리는 줄이 나란히 서므로, 줄 높이가 어긋나면
+    목록이 들쭉날쭉해 보입니다.
+  */
+  fact: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.s3,
     minHeight: Tap.min + Spacing.s3,
-    paddingVertical: Spacing.s2,
+    paddingVertical: Spacing.s3,
+  },
+  factLine: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.divider,
   },
   tiles: {
     flexWrap: 'wrap',

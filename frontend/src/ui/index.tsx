@@ -10,6 +10,7 @@ import {
   useState,
 } from 'react';
 import {
+  AccessibilityInfo,
   ActivityIndicator,
   Animated,
   Easing,
@@ -81,12 +82,55 @@ import {
  */
 const Squeezable = Animated.createAnimatedComponent(Pressable);
 
+/**
+ * 움직임을 줄이겠다고 해 둔 사람인지.
+ *
+ * <h3>왜 보는가</h3>
+ *
+ * <p>크기가 줄었다 늘고 아래에서 떠오르는 움직임은, 어지럼증이 있는 사람에게
+ * <b>속이 울렁거리는 일</b>입니다. 그래서 iOS·안드로이드·웹 모두 「움직임
+ * 줄이기」 설정을 두고 있습니다. 우리는 그것을 <b>한 번도 보지 않고</b>
+ * 눌릴 때마다 줄이고 나타날 때마다 띄웠습니다.
+ *
+ * <p>끄는 것은 움직임뿐입니다. 눌렸다는 것은 색이 말하고, 나타난 것은 그냥
+ * 거기 있습니다 — 움직임이 없어도 모자란 것이 없어야 켠 사람이 손해를 안
+ * 봅니다.
+ *
+ * <h3>한 번만 묻지 않습니다</h3>
+ *
+ * <p>설정은 앱을 켜 둔 동안에도 바뀝니다. 처음 한 번만 물어 두면, 설정에서
+ * 켜고 돌아온 사람에게는 <b>앱을 다시 켤 때까지</b> 안 먹습니다.
+ */
+function useCalm() {
+  const [calm, setCalm] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    AccessibilityInfo.isReduceMotionEnabled().then((on) => {
+      if (alive) {
+        setCalm(on);
+      }
+    });
+    const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', setCalm);
+    return () => {
+      alive = false;
+      /* 웹에서 {@code matchMedia} 가 없으면 react-native-web 이 <b>아무것도
+         돌려주지 않습니다.</b> 그대로 {@code .remove()} 를 부르면 화면을
+         떠날 때마다 터집니다 — 웹을 미리 그려 내보내는 자리가 그렇습니다. */
+      sub?.remove();
+    };
+  }, []);
+
+  return calm;
+}
+
 export function Press({
   children,
   onPress,
   disabled,
-  scale = 0.97,
+  scale = 0.98,
   style,
+  pressedStyle,
   accessibilityLabel,
   accessibilityRole = 'button',
   accessibilityState,
@@ -95,15 +139,31 @@ export function Press({
   children: React.ReactNode;
   onPress?: () => void;
   disabled?: boolean;
-  /** 얼마나 작아질지. 큰 판일수록 덜 줄어야 어색하지 않습니다. */
+  /**
+   * 얼마나 작아질지. 큰 판일수록 덜 줄어야 어색하지 않습니다.
+   *
+   * <p>계획서가 정한 것은 두 값입니다 — 큰 버튼·카드 0.98, 작은 버튼 0.96.
+   * 전에 쓰던 0.88~0.94 는 손끝 아래에서 <b>물건이 쑥 꺼지는</b> 것처럼
+   * 보였습니다.
+   */
   scale?: number;
   style?: StyleProp<ViewStyle>;
   accessibilityLabel?: string;
   accessibilityRole?: 'button' | 'tab' | 'link';
   accessibilityState?: { selected?: boolean; disabled?: boolean; busy?: boolean };
   hitSlop?: number;
+  /**
+   * 눌려 있는 동안 얹는 모습. 대개 바탕색 한 겹입니다.
+   *
+   * <p>크기가 안 변하는 것({@code scale={1}})에 필요합니다 — 목록 줄처럼
+   * 배경이 없는 자리에서 크기까지 그대로면 <b>눌렸는지 아닌지 아무 표시가
+   * 없습니다.</b> 손끝 아래에서 무엇이 받아졌는지 모르면 한 번 더 누릅니다.
+   */
+  pressedStyle?: StyleProp<ViewStyle>;
 }) {
   const value = useRef(new Animated.Value(1)).current;
+  const calm = useCalm();
+  const [down, setDown] = useState(false);
 
   const to = (next: number, duration: number) =>
     Animated.timing(value, {
@@ -131,9 +191,19 @@ export function Press({
       accessibilityState={accessibilityState}
       /* 누를 때는 바로 붙고, 뗄 때는 조금 느긋하게 돌아옵니다. 둘이 같으면
          튕기는 것처럼 보입니다. */
-      onPressIn={() => to(scale, Motion.tap)}
-      onPressOut={() => to(1, Motion.base)}
-      style={[style, { transform: [{ scale: value }] }]}>
+      onPressIn={() => {
+        to(calm ? 1 : scale, Motion.tap);
+        if (pressedStyle) {
+          setDown(true);
+        }
+      }}
+      onPressOut={() => {
+        to(1, Motion.base);
+        if (pressedStyle) {
+          setDown(false);
+        }
+      }}
+      style={[style, down ? pressedStyle : null, { transform: [{ scale: value }] }]}>
       {children}
     </Squeezable>
   );
@@ -156,9 +226,16 @@ export function Rise({
   order?: number;
   style?: StyleProp<ViewStyle>;
 }) {
-  const value = useRef(new Animated.Value(0)).current;
+  const calm = useCalm();
+  /* 움직임을 줄이겠다고 해 둔 사람에게는 처음부터 다 보인 채로 둡니다.
+     1 로 시작하면 아래 timing 이 돌아도 바뀌는 것이 없습니다. */
+  const value = useRef(new Animated.Value(calm ? 1 : 0)).current;
 
   useEffect(() => {
+    if (calm) {
+      value.setValue(1);
+      return;
+    }
     /* 늦추는 것도 한도를 둡니다. 스무 번째 줄까지 차례를 기다리게 하면
        마지막 것이 나타날 때쯤엔 이미 굴려서 지나간 뒤입니다. */
     const delay = Math.min(order, 6) * 45;
@@ -169,7 +246,7 @@ export function Rise({
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
-  }, [value, order]);
+  }, [value, order, calm]);
 
   return (
     <Animated.View
@@ -232,6 +309,31 @@ type ScreenProps = {
   scroll?: boolean;
   /** 위에 막대(헤더)가 없는 화면이면 켭니다. 노치를 피해 여백을 넣습니다. */
   safeTop?: boolean;
+  /**
+   * 화면의 바탕 꼴 — 계획서 §3-1.
+   *
+   * <h3>간격이 띠와 겹쳐 있었습니다</h3>
+   *
+   * <p>덩어리 사이를 늘 12 띄우고 있었습니다. 카드를 늘어놓는 목록에서는
+   * 그게 맞는데, <b>구역을 띠로 가르는 화면</b>에서는 띠 위아래로 12 가 더
+   * 붙어 8짜리 띠가 32 자리를 먹었습니다 — 띠가 구역을 가르는 선이 아니라
+   * 텅 빈 구간으로 보였습니다.
+   *
+   * <ul>
+   *   <li>{@code plain} 흰 바탕에 덩어리 사이 12. 기본</li>
+   *   <li>{@code banded} 띠가 가르는 화면. 사이를 안 띄웁니다</li>
+   *   <li>{@code gray} 회색 바탕 위 카드. 넓은 화면의 대시보드에서만</li>
+   * </ul>
+   */
+  variant?: 'plain' | 'banded' | 'gray';
+  /**
+   * 갈래 루트 화면의 큰 제목.
+   *
+   * <p>상단바 아래에서 본문과 함께 굴러 올라갑니다. 상단바에 박아 두면 다섯
+   * 갈래가 모두 같은 자리에 같은 크기 글자를 두게 되어, 갈래를 옮겨도
+   * <b>화면이 바뀐 것 같지 않습니다.</b>
+   */
+  largeTitle?: string;
 };
 
 /**
@@ -257,7 +359,17 @@ function useKeyboardUp() {
 }
 
 export const Screen = forwardRef<ScreenHandle, ScreenProps>(function Screen(
-  { children, header, footer, snack, tabs, scroll = true, safeTop = false },
+  {
+    children,
+    header,
+    footer,
+    snack,
+    tabs,
+    scroll = true,
+    safeTop = false,
+    variant = 'plain',
+    largeTitle,
+  },
   ref,
 ) {
   const insets = useSafeAreaInsets();
@@ -281,11 +393,16 @@ export const Screen = forwardRef<ScreenHandle, ScreenProps>(function Screen(
     [],
   );
 
-  const body = <View style={styles.screenInner}>{children}</View>;
+  const body = (
+    <View style={[styles.screenInner, variant === 'banded' ? styles.screenInnerBanded : null]}>
+      {largeTitle ? <Text style={styles.screenTitle}>{largeTitle}</Text> : null}
+      {children}
+    </View>
+  );
 
   return (
     <KeyboardAvoidingView
-      style={styles.screen}
+      style={[styles.screen, variant === 'gray' ? styles.screenGray : null]}
       /* 자판이 가리는 만큼 아래에서 밀어 올립니다.
 
          안드로이드는 예전에 창 자체가 줄어들어 손댈 일이 없었지만,
@@ -305,17 +422,20 @@ export const Screen = forwardRef<ScreenHandle, ScreenProps>(function Screen(
             styles.scrollBody,
             {
               /*
-                맨 위 빈자리.
+                맨 위 빈자리 — <b>없습니다.</b>
 
-                <p>xxl(28) 이었습니다. 화면 제목이 본문 안에 있던 시절의
-                크기인데, 지금은 첫 줄이 대개 <b>띠나 카드</b>라 그만큼
-                띄우면 화면을 열 때마다 빈 회색부터 봅니다.
+                <p>xxl(28) 이었다가 md(12) 로 줄였는데, 계획서가 정한 것은
+                0 입니다. 위에는 이미 상단바가 서 있고, 그 아래 첫 줄은 대개
+                띠나 큰 제목입니다 — 제 여백을 가진 것들 위에 또 띄우면
+                화면을 열 때마다 <b>빈자리부터</b> 봅니다.
               */
-              paddingTop: header ? Spacing.md : (safeTop ? insets.top : 0) + Spacing.md,
-              /* 아래 버튼이 있으면 그 높이만큼, 없으면 홈 인디케이터만큼 띄웁니다.
-                 갈래 띠까지 있으면 그만큼 더 비웁니다 — 마지막 줄이 띠 뒤로
-                 들어가면 아무리 굴려도 안 보입니다. */
-              paddingBottom: (footer ? Spacing.xl : insets.bottom + Spacing.huge) + dock,
+              paddingTop: header ? 0 : safeTop ? insets.top : 0,
+              /* 아래 버튼이 있으면 그 높이만큼, 없으면 홈 인디케이터 위로
+                 64 를 비웁니다(계획서 §3-1). 48 이었는데, 마지막 줄이 화면
+                 맨 끝에 닿아 있으면 더 굴릴 것이 있는지 없는지 모릅니다.
+                 갈래 띠까지 있으면 그만큼 더 — 마지막 줄이 띠 뒤로 들어가면
+                 아무리 굴려도 안 보입니다. */
+              paddingBottom: (footer ? Spacing.s5 : insets.bottom + Spacing.s16) + dock,
             },
           ]}
           keyboardShouldPersistTaps="handled"
@@ -324,11 +444,7 @@ export const Screen = forwardRef<ScreenHandle, ScreenProps>(function Screen(
           {body}
         </ScrollView>
       ) : (
-        <View
-          style={[
-            styles.staticBody,
-            { paddingTop: (safeTop ? insets.top : 0) + Spacing.md },
-          ]}>
+        <View style={[styles.staticBody, { paddingTop: safeTop ? insets.top : 0 }]}>
           {body}
         </View>
       )}
@@ -381,71 +497,29 @@ export const Screen = forwardRef<ScreenHandle, ScreenProps>(function Screen(
 });
 
 /**
- * 제목이 붙은 한 구역.
+ * 판. 관련 있는 것들을 하나로 묶습니다.
  *
- * <h3>글자가 시멘트 바닥에 놓여 있었습니다</h3>
+ * <h3>두 가지입니다</h3>
  *
- * <p>구역 제목과 안내 한 줄을 회색 바탕에 그대로 올려 두고, 내용만 흰 판에
- * 담았습니다. 그래서 <b>가장 먼저 읽어야 하는 글자가 가장 허름한 자리</b>에
- * 있었습니다 — 판 위의 작은 글씨보다 못해 보입니다.
+ * <p>기본은 <b>물건 카드</b>입니다 — 눌러서 들어가는 것(여행, 장소, 글).
+ * 흰 바탕에 옅은 그림자로 떠 있습니다.
  *
- * <p>제목도 판 안으로 들입니다. 제목과 내용이 한 장에 있으면 어디까지가 이
- * 구역인지가 선으로 보이고, 회색 바탕은 구역 사이를 가르는 일만 합니다.
+ * <p>{@code tone="fill"} 은 <b>면 카드</b>입니다 — 주소·전화 같은 정보
+ * 상자, 안내문, 합계. 회색 면에 그림자도 테두리도 없습니다. 눌리는 것이
+ * 아니므로 떠 있을 이유가 없습니다.
  *
- * <h3>두 가지로 씁니다</h3>
- *
- * <p>기본은 판이 제 여백을 가집니다 — 안에 글이나 칩이 올 때입니다.
- *
- * <p>{@code flush} 는 내용이 <b>줄</b>일 때입니다. 줄은 저마다 여백을 가지고
- * 좌우 끝까지 닿아야 하므로, 판의 여백을 걷고 제목에만 따로 줍니다.
- *
- * <p>제목과 줄 사이에 선을 그었다가 걷었습니다. 안에 든 줄들이 이미 저마다
- * 선으로 갈려 있어서, 제목 아래에도 선이 있으면 <b>제목이 첫 줄처럼</b>
- * 보입니다. 제목은 줄 하나가 아니라 묶음의 이름입니다 — 빈자리가 그 말을
- * 더 잘합니다.
+ * <p>전에는 면 카드가 없어서 화면마다 {@code backgroundColor: Colors.fill}
+ * 상자를 손으로 만들고 있었습니다. 그래서 모서리가 8·12·16 으로 제각각이고
+ * 안쪽 여백도 12·14·16 이 섞였습니다.
  */
-export function Section({
-  title,
-  action,
-  note,
-  flush = false,
+export function Card({
   children,
-}: {
-  title: string;
-  /** 제목 오른쪽. 「전체보기」처럼 이 구역에서 바로 하는 일. */
-  action?: React.ReactNode;
-  /** 제목 아래 한 줄. 이 구역이 무엇인지 설명할 때. */
-  note?: React.ReactNode;
-  /** 내용이 줄들이면 true. 판의 여백을 걷고 제목에만 줍니다. */
-  flush?: boolean;
-  children?: React.ReactNode;
-}) {
-  const head = (
-    <>
-      {action ? (
-        <Split align="baseline">
-          <Subtitle>{title}</Subtitle>
-          {action}
-        </Split>
-      ) : (
-        <Subtitle>{title}</Subtitle>
-      )}
-      {note ? <Caption tone="secondary">{note}</Caption> : null}
-    </>
-  );
-
+  style,
+  tone = 'raised',
+  ...rest
+}: ViewProps & { tone?: 'raised' | 'fill' }) {
   return (
-    <Card style={flush ? styles.sectionFlush : undefined}>
-      {flush ? <View style={styles.sectionHead}>{head}</View> : head}
-      {children}
-    </Card>
-  );
-}
-
-/** 흰 판. 관련 있는 것들을 하나로 묶습니다. */
-export function Card({ children, style, ...rest }: ViewProps) {
-  return (
-    <View style={[styles.card, style]} {...rest}>
+    <View style={[styles.card, tone === 'fill' ? styles.cardFill : null, style]} {...rest}>
       {children}
     </View>
   );
@@ -467,6 +541,7 @@ export function ListRow({
   right,
   action,
   last,
+  danger,
   onPress,
 }: {
   title: React.ReactNode;
@@ -495,19 +570,45 @@ export function ListRow({
    * 아래에 뭔가 더 있는 줄 압니다.
    */
   last?: boolean;
+  /**
+   * 되돌릴 수 없는 줄 — 「지우기」, 「나가기」.
+   *
+   * <p>제목과 앞 그림이 빨강으로 섭니다. 시트 안에 여느 줄들과 섞여 있을 때
+   * 글자만 읽고 누르면 <b>지울 생각이 없던 것이 지워집니다.</b> 누르기 전에
+   * 색으로 먼저 알아야 합니다.
+   */
+  danger?: boolean;
   onPress: () => void;
 }) {
   const inside = (
     <>
       {left}
       <View style={styles.listRowText}>
-        <Text style={styles.listRowTitle} numberOfLines={1}>
+        <Text
+          style={[styles.listRowTitle, danger ? styles.listRowTitleDanger : null]}
+          numberOfLines={1}>
           {title}
         </Text>
         {subtitle ? <Text style={styles.listRowSubtitle}>{subtitle}</Text> : null}
       </View>
       {right}
     </>
+  );
+
+  /*
+    선은 줄 안에 떠 있는 한 겹입니다.
+
+    <p>전에는 {@code borderBottom} 으로 그었습니다. 테두리는 그것을 가진
+    상자의 <b>폭 전체</b>를 지나가므로, 앞에 그림이 선 줄에서도 선이 화면
+    왼쪽 끝에서 시작했습니다 — 그러면 선이 「이 줄의 아래쪽」이 아니라
+    「구역을 가르는 띠」처럼 보입니다.
+
+    <p>글이 시작하는 자리에서부터 긋습니다. 앞에 그림이 있으면 그 그림
+    너비와 사이 간격만큼 비켜서, 그림이 줄들을 왼쪽에서 이끄는 것으로
+    읽힙니다.
+  */
+  const line = last ? null : (
+    <View style={[styles.listRowLine, left ? styles.listRowLineInset : null]} />
   );
 
   if (!action) {
@@ -517,20 +618,23 @@ export function ListRow({
         /* 크기를 안 줄입니다. 배경이 없는 줄에서 크기가 변하면 글자만
            들썩이는 것으로 보입니다 — 눌린 것은 바탕색이 말합니다. */
         scale={1}
-        style={[styles.listRow, last ? null : styles.listRowLine]}>
+        pressedStyle={styles.listRowDown}
+        style={[styles.listRow, subtitle ? styles.listRowTwo : null]}>
         {inside}
+        {line}
       </Press>
     );
   }
 
-  /* 선은 겉껍데기가 긋습니다. 누르는 자리에 그으면 곁다리 밑만 선이
-     끊겨서 줄이 중간에 잘린 것처럼 보입니다. */
+  /* 곁다리가 있는 줄은 선을 겉껍데기가 답니다. 누르는 자리 안에 두면 곁다리
+     밑만 선이 끊겨서 줄이 중간에 잘린 것처럼 보입니다. */
   return (
-    <View style={[styles.listRowHeld, last ? null : styles.listRowLine]}>
-      <Press onPress={onPress} scale={1} style={styles.listRowTap}>
+    <View style={[styles.listRowHeld, subtitle ? styles.listRowTwo : null]}>
+      <Press onPress={onPress} scale={1} pressedStyle={styles.listRowDown} style={styles.listRowTap}>
         {inside}
       </Press>
       {action}
+      {line}
     </View>
   );
 }
@@ -628,20 +732,34 @@ export function Divider() {
  * 구역보다 위쪽 빈자리에 더 붙어 보여서, 어느 묶음의 이름인지 한 번 더
  * 봐야 합니다.
  *
+ * <h3>띠 바로 아래면 위 여백을 걷습니다</h3>
+ *
+ * <p>띠와 이 머리가 붙어 있는 자리가 가장 흔한데, 그때 <b>빈자리가 56픽셀</b>
+ * 이었습니다 — 띠 자신의 위아래 여백 12 둘, 화면이 덩어리 사이에 두는 12,
+ * 그리고 이 머리의 위 여백 32 가 모두 더해졌습니다. 8픽셀 띠 하나를 두려고
+ * 56을 비운 셈입니다.
+ *
+ * <p>그래서 「구역이 갈렸다」가 <b>띠가 아니라 빈자리</b>로 읽혔습니다. 띠는
+ * 그 넓은 흰 바닥 가운데에 놓인 희미한 줄 하나였고, 화면은 어디가 한 묶음인지
+ * 말하지 않는 도화지가 됐습니다.
+ *
  * @param action 「더보기」처럼 이 구역에서 바로 하는 일. 없으면 안 섭니다
  * @param note   제목 아래 한 줄. 이 구역이 무엇인지 설명할 때만
+ * @param tight  바로 위가 띠일 때. 위 여백을 띠에게 맡깁니다
  */
 export function SectionHeader({
   title,
   action,
   note,
+  tight = false,
 }: {
   title: string;
   action?: React.ReactNode;
   note?: React.ReactNode;
+  tight?: boolean;
 }) {
   return (
-    <View style={styles.sectionHeader}>
+    <View style={[styles.sectionHeader, tight ? styles.sectionHeaderTight : null]}>
       <View style={styles.sectionHeaderTop}>
         <Text style={styles.sectionHeaderTitle} numberOfLines={1}>
           {title}
@@ -962,13 +1080,54 @@ export function SearchField({
   );
 }
 
-type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost';
+/**
+ * 단추의 세기 일곱.
+ *
+ * <h3>넷으로는 모자랐습니다</h3>
+ *
+ * <p>전에는 {@code primary · secondary · danger · ghost} 넷이었습니다.
+ * 그래서 화면마다 모자란 것을 <b>손으로 만들었습니다</b> — 「더보기」는
+ * 테두리를 직접 두르고, 「따라 하기」는 옅은 바이올렛 상자를 직접 깔고,
+ * 시트의 「삭제」는 {@code danger} 를 써서 옅은 빨강 덩어리가 됐습니다.
+ * 같은 일을 하는 단추가 화면마다 다르게 생긴 까닭이 이것입니다.
+ *
+ * <h3>{@code danger} 가 뒤집혔습니다</h3>
+ *
+ * <p>전에 {@code danger} 는 <b>옅은 빨강 면 + 빨간 글씨</b>였습니다. 그게
+ * 계획서의 {@code dangerText} 자리인데, 가장 중요한 자리 — 한 번 더 묻는
+ * 판의 「지웁니다」 — 가 그 옅은 모양을 쓰고 있었습니다. 되돌릴 수 없는
+ * 일을 받는 단추가 <b>가장 흐릿하게</b> 서 있었던 것입니다.
+ *
+ * <p>{@code danger} 는 가득 칠합니다. 목록·시트에서 글줄처럼 서는 「삭제」는
+ * {@code dangerText} 입니다.
+ */
+type ButtonVariant =
+  | 'primary'
+  | 'secondary'
+  | 'outline'
+  | 'tonal'
+  | 'text'
+  | 'danger'
+  | 'dangerText'
+  /** @deprecated {@code 'text'} 를 쓰세요. 같은 모습입니다. */
+  | 'ghost';
+
+/**
+ * 단추의 크기 네 단 — 계획서 §3-5.
+ *
+ * <p>{@code l} 52 바닥에 고정된 바·시트 바닥·로그인 /
+ * {@code m} 44 화면 안의 동작·다이얼로그 /
+ * {@code s} 36 목록 줄 끝·카드 안 /
+ * {@code xs} 30 글에 붙어 있는 「편집」·「+ 추가」
+ */
+type ButtonSize = 'l' | 'm' | 's' | 'xs';
 
 export function Button({
   label,
   onPress,
   onMap,
   variant = 'primary',
+  size,
   disabled,
   busy,
   compact,
@@ -977,6 +1136,10 @@ export function Button({
   label: string;
   onPress: () => void;
   variant?: ButtonVariant;
+  /**
+   * 크기. 안 주면 {@code compact} 가 {@code 's'}, 아니면 {@code 'l'} 입니다.
+   */
+  size?: ButtonSize;
   /**
    * 이 화면에서 <b>제일 하려던 일</b>인지.
    *
@@ -1041,41 +1204,78 @@ export function Button({
     <p>못 누를 때는 흐리게 만들지 않고 아예 옅은 바이올렛으로 둡니다. 투명도만
     낮추면 그 아래 배경이 비쳐 글자가 더 안 읽힙니다.
   */
-  const palette: Record<ButtonVariant, { bg: string; pressed: string; fg: string }> = {
+  const palette: Record<
+    ButtonVariant,
+    { bg: string; pressed: string; fg: string; border?: string }
+  > = {
     primary: { bg: Colors.accent, pressed: Colors.accentPressed, fg: Colors.onAccent },
     secondary: { bg: Colors.fill, pressed: Colors.fillPressed, fg: Colors.text },
-    danger: { bg: Colors.dangerSoft, pressed: Colors.dangerSoftPressed, fg: Colors.danger },
+    /* 흰 바탕에 진한 회색 테두리. 「더보기」처럼 눌러도 되지만 주가 아닌 것 */
+    outline: {
+      bg: Colors.surface,
+      pressed: Colors.surfaceRaised,
+      fg: Colors.text,
+      border: Colors.borderStrong,
+    },
+    /* 옅은 바이올렛. 강조하지만 주가 아닌 것 — 따라 하기, 담기 */
+    tonal: { bg: Colors.accentSoft, pressed: Colors.accentSoftPressed, fg: Colors.accentText },
+    text: { bg: 'transparent', pressed: Colors.fill, fg: Colors.accentInk },
+    danger: { bg: Colors.danger, pressed: '#C32B2E', fg: Colors.onAccent },
+    dangerText: { bg: 'transparent', pressed: Colors.dangerSoft, fg: Colors.danger },
     ghost: { bg: 'transparent', pressed: Colors.fill, fg: Colors.accentInk },
   };
   const c = palette[variant];
-  const offBg = variant === 'ghost' ? 'transparent'
+  const bare = variant === 'text' || variant === 'ghost' || variant === 'dangerText';
+  const offBg = bare ? 'transparent'
     : variant === 'primary' ? Colors.accentDisabled
     : Colors.fill;
   const offFg = variant === 'primary' ? Colors.onAccent : Colors.textDisabled;
+
+  /*
+    크기.
+
+    <p>{@code compact} 는 오래 쓰던 이름이라 그대로 둡니다 — 쉰 군데에
+    흩어져 있고, 뜻은 계획서의 {@code s} 와 같습니다. {@code size} 를 주면
+    그것이 이깁니다.
+  */
+  const step: ButtonSize = size ?? (compact ? 's' : 'l');
+  const shape = {
+    l: styles.buttonL,
+    m: styles.buttonM,
+    s: styles.buttonS,
+    xs: styles.buttonXS,
+  }[step];
+  const letters = {
+    l: styles.buttonLabelL,
+    m: styles.buttonLabelM,
+    s: styles.buttonLabelS,
+    xs: styles.buttonLabelXS,
+  }[step];
+  /* 보이는 높이가 44 보다 작으면 그만큼 누르는 넓이를 넓혀 줍니다. */
+  const slop =
+    step === 's' ? Tap.compactSlop : step === 'xs' ? Tap.tinySlop : undefined;
 
   return (
     <Press
       onPress={onPress}
       disabled={off}
       accessibilityState={{ disabled: !!off, busy: !!busy }}
-      /* 보이는 높이가 44 보다 작으면 그만큼 누르는 넓이를 넓혀 줍니다. */
-      hitSlop={compact ? Tap.compactSlop : undefined}
-      scale={compact ? 0.94 : 0.975}
+      hitSlop={slop}
+      /* 계획서 §2-7 — 큰 것 0.98, 작은 것 0.96. 전에 쓰던 0.94 는 줄 안의
+         작은 단추가 손끝 아래에서 쑥 꺼지는 것처럼 보였습니다. */
+      scale={step === 'l' || step === 'm' ? 0.98 : 0.96}
+      pressedStyle={off ? undefined : { backgroundColor: c.pressed }}
       style={[
         styles.button,
-        compact ? styles.buttonCompact : styles.buttonFull,
+        shape,
         onMap ? styles.buttonOnMap : null,
         { backgroundColor: off ? offBg : c.bg },
+        c.border && !off ? { borderWidth: 1, borderColor: c.border } : null,
       ]}>
       {busy ? (
         <ActivityIndicator color={off ? offFg : c.fg} size="small" />
       ) : (
-        <Text
-          style={[
-            compact ? styles.buttonLabelCompact : styles.buttonLabel,
-            { color: off ? offFg : c.fg },
-          ]}
-          numberOfLines={1}>
+        <Text style={[letters, { color: off ? offFg : c.fg }]} numberOfLines={1}>
           {label}
         </Text>
       )}
@@ -1869,6 +2069,7 @@ export function IconButton({
   disabled,
   onMap,
   bare,
+  fill,
   dot,
 }: {
   name: IconName;
@@ -1897,11 +2098,25 @@ export function IconButton({
   /**
    * 바탕 없이 그림만.
    *
-   * <p>위쪽 막대에 얹을 때 씁니다. 막대 바탕과 단추 바탕은 밝기가 한 단
-   * 차이라, 채워 두면 막대에 회색 조각을 덧댄 것처럼 보입니다. 막대 안에서는
-   * 무엇이 눌리는 것인지 자리로 이미 알 수 있어 바탕이 필요 없습니다.
+   * @deprecated 이제 이것이 <b>기본</b>입니다. 안 줘도 같습니다. 회색 원이
+   *   필요하면 {@code fill} 을 주세요.
    */
   bare?: boolean;
+  /**
+   * 회색 원 안에 그림.
+   *
+   * <h3>기본이 뒤집혔습니다</h3>
+   *
+   * <p>전에는 <b>채운 것이 기본</b>이고 {@code bare} 를 줘야 바탕이
+   * 걷혔습니다. 그래서 상단바마다 44짜리 회색 네모가 한두 개씩 얹혀 있었고,
+   * 흰 상단바 위에서 그것이 <b>막대에 회색 조각을 덧댄 것</b>처럼
+   * 보였습니다. 서른 자리 넘게 {@code bare} 를 손으로 적고 있던 것이 그
+   * 증거입니다 — 거의 모든 자리가 바탕을 원하지 않았습니다.
+   *
+   * <p>이제 안 주면 그림만 섭니다. 회색 원이 필요한 자리 — 사진 위, 글 묶음
+   * 안에서 혼자 떠 있어야 하는 것 — 만 이것을 줍니다.
+   */
+  fill?: boolean;
   /**
    * 오른쪽 위에 찍는 점.
    *
@@ -1916,46 +2131,44 @@ export function IconButton({
       disabled={disabled}
       accessibilityLabel={label}
       accessibilityState={{ disabled: !!disabled, selected: !!active }}
-      scale={0.88}
+      /* 계획서 §2-7 — 작은 것은 0.96. 0.88 은 그림이 손끝 아래에서 쑥
+         꺼지는 것처럼 보였습니다. */
+      scale={0.96}
       style={[
         styles.iconButton,
-        onMap && styles.iconButtonOnMap,
+        onMap ? styles.iconButtonOnMap : null,
         {
           /*
-            켜진 것을 <b>바탕이 아니라 그림</b>으로 말합니다.
+            바탕이 있는 것은 <b>달라고 한 자리</b>뿐입니다.
 
-            <p>bare 는 "칩을 두지 않는다" 는 뜻인데, 켜지는 순간 칩이
-            생기고 있었습니다. 보석함에 담으면 단추 뒤에 회색 네모가
-            돋아나는 식이라, 담겼다는 것보다 <b>네모가 생겼다</b>는 것이
-            먼저 보였습니다.
+            <p>전에는 채운 것이 기본이었습니다. 그래서 상단바마다 44짜리
+            회색 네모가 얹혀, 흰 막대에 회색 조각을 덧댄 것처럼 보였습니다 —
+            {@code bare} 를 손으로 적은 자리가 서른 곳을 넘던 것이 그
+            증거입니다.
 
-            <p>bare 일 때는 켜져도 바탕을 안 깝니다. 아래에서 그림에 색이
-            드는 것이 그 말을 합니다.
+            <p>켜진 것은 <b>바탕이 아니라 그림</b>이 말합니다. 전에는 켜지는
+            순간 바탕이 돋아나서, 담겼다는 것보다 <b>네모가 생겼다</b>는
+            것이 먼저 보였습니다. 아래에서 그림에 색이 드는 것으로 충분합니다.
           */
-          backgroundColor: bare
-            ? 'transparent'
-            : active
-              ? toneSoft[tone]
-              : onMap
-                ? Colors.surface
-                : Colors.fill,
+          backgroundColor: onMap
+            ? Colors.surface
+            : fill
+              ? active
+                ? toneSoft[tone]
+                : Colors.fill
+              : 'transparent',
         },
-        /*
-          바탕만으로는 모자랍니다.
-
-          <p>연회색 바탕 하나로 단추를 말했습니다. 바닥이 그보다 진했을 때는
-          그것으로 갈렸는데, 바닥이 밝아지고 판이 흰 종이가 되면서 <b>흰 위에
-          거의 흰 네모</b>가 되었습니다 — 눌리는 것인지 그냥 그림인지 안
-          보입니다.
-
-          <p>선 한 가닥을 두릅니다. 바탕은 무엇 위에 놓이느냐에 따라 묻히지만
-          선은 안 묻힙니다. 바탕 없는 것(bare)과 지도 위의 것(onMap)은 제
-          생김새가 따로 있으므로 안 두릅니다.
-        */
-        !bare && !onMap ? styles.iconButtonEdge : null,
+        /* 지도 위의 것만 테두리를 가집니다. 흰 원이 지도의 건물·구획과
+           섞이면 어디까지가 단추인지 안 보입니다. */
         active && onMap ? { borderColor: toneColor[tone] } : null,
       ]}>
-      <Icon name={name} tone={disabled ? 'muted' : active ? tone : 'secondary'} />
+      <Icon
+        name={name}
+        /* 그림만 서는 것은 24 입니다 — 바탕이 없으면 눈에 걸리는 것이
+           그림 하나뿐이라, 20 으로는 눌리는 자리로 안 읽힙니다. */
+        size={fill || onMap ? 20 : 24}
+        tone={disabled ? 'muted' : active ? tone : 'secondary'}
+      />
       {dot ? <View style={styles.iconButtonDot} /> : null}
     </Press>
   );
@@ -2731,58 +2944,6 @@ export function Snack({ undo, onHide }: { undo: UndoNote | null; onHide: () => v
   );
 }
 
-/**
- * 되돌릴 수 없는 일에는 한 번 더 묻습니다.
- *
- * React Native 의 Alert 은 웹에서 동작이 제각각이라 화면 안에서 처리합니다.
- * 누르면 바로 실행되지 않고 "정말요?" 가 그 자리에 나타납니다.
- */
-export function ConfirmButton({
-  label,
-  confirmLabel,
-  onConfirm,
-  variant = 'danger',
-  busy,
-  disabled,
-}: {
-  label: string;
-  confirmLabel: string;
-  onConfirm: () => void;
-  variant?: ButtonVariant;
-  busy?: boolean;
-  disabled?: boolean;
-}) {
-  const [armed, setArmed] = useState(false);
-
-  if (!armed) {
-    return (
-      <Button
-        label={label}
-        variant={variant}
-        compact
-        busy={busy}
-        disabled={disabled}
-        onPress={() => setArmed(true)}
-      />
-    );
-  }
-  return (
-    <Row gap={Spacing.xs}>
-      <Button
-        label={confirmLabel}
-        variant={variant}
-        compact
-        busy={busy}
-        onPress={() => {
-          setArmed(false);
-          onConfirm();
-        }}
-      />
-      <Button label="취소" variant="ghost" compact onPress={() => setArmed(false)} />
-    </Row>
-  );
-}
-
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
@@ -2798,10 +2959,26 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: Gutter,
   },
+  screenGray: {
+    backgroundColor: Colors.band,
+  },
   screenInner: {
     width: '100%',
     maxWidth: MaxContentWidth,
     gap: ScreenGap,
+  },
+  /* 띠가 구역을 가르는 화면. 띠 위아래로 간격이 또 붙으면 8짜리 띠가
+     32 자리를 먹어, 가르는 선이 아니라 텅 빈 구간으로 보입니다. */
+  screenInnerBanded: {
+    gap: 0,
+  },
+  /* 갈래 루트의 큰 제목. 아래 8 — 제목은 아래 것의 이름입니다. */
+  screenTitle: {
+    ...Type.title1,
+    fontWeight: Weight.bold,
+    color: Colors.text,
+    paddingTop: Spacing.s2,
+    paddingBottom: Spacing.s2,
   },
 
   /*
@@ -2821,13 +2998,22 @@ const styles = StyleSheet.create({
     maxWidth: MaxContentWidth,
     gap: Spacing.md,
   },
+  /*
+    바닥에 고정된 바.
+
+    <p>위에 실선 한 가닥을 두르고 있었습니다. 그런데 이 바는 <b>굴러가는
+    내용 위에 떠 있는 것</b>입니다 — 선은 「여기서 구역이 갈린다」는 말이고,
+    떠 있는 것은 그림자로 말해야 그 아래로 글이 지나간다는 것이 보입니다.
+    선만 있으면 바가 내용의 마지막 칸처럼 보여서, 글이 그 뒤로 흘러 들어가는
+    동안 뭔가 잘린 것 같습니다.
+  */
   footer: {
     paddingHorizontal: Gutter,
-    paddingTop: Spacing.md,
+    paddingTop: Spacing.s3,
     backgroundColor: Colors.background,
-    /* 스크롤되는 내용과 붙어 보이지 않게 실선 하나만 둡니다. */
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: Colors.border,
+    ...Elevation.float,
+    /* 아래가 아니라 위로 드리웁니다. 바 아래에는 아무것도 없습니다. */
+    shadowOffset: { width: 0, height: -4 },
   },
   footerInner: {
     width: '100%',
@@ -2848,7 +3034,10 @@ const styles = StyleSheet.create({
   */
   card: {
     backgroundColor: Colors.surface,
-    borderRadius: Radius.r4,
+    /* r16 이었습니다. 계획서 §2-5 에서 16 은 <b>사진 카드</b>의 모서리이고,
+       물건 카드는 12 입니다 — 안이 글자뿐인 작은 판에 16 을 두르면 둥근
+       끝이 글자 자리를 먹어 안쪽 여백이 모서리마다 달라 보입니다. */
+    borderRadius: Radius.r3,
     padding: Spacing.s4,
     /*
       흰 바탕 위에 흰 카드가 놓입니다.
@@ -2877,9 +3066,18 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.s3,
     gap: Spacing.s1,
   },
+  /* 띠가 바로 위에 있으면 위 여백을 걷습니다. 띠가 제 여백 12 를 가지고
+     화면이 덩어리 사이에 12 를 두므로, 띠 아래로 이미 24 가 있습니다 —
+     계획서가 「띠 바로 아래면 24」라고 적은 그 값입니다. */
+  sectionHeaderTight: {
+    paddingTop: 0,
+  },
+  /* 제목과 「전체보기」는 <b>밑줄</b>로 맞춥니다. 가운데로 맞추면 글자
+     크기가 20 대 14 라, 작은 쪽이 큰 쪽의 가운데에 떠서 둘이 같은 줄에
+     앉은 것으로 안 보입니다. */
   sectionHeaderTop: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'baseline',
     justifyContent: 'space-between',
     gap: Spacing.s3,
   },
@@ -2901,23 +3099,12 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.band,
   },
 
-  /* 줄을 담는 구역. 여백은 제목과 줄이 저마다 가집니다. */
-  sectionFlush: {
-    padding: 0,
-    gap: 0,
-  },
-  /*
-    묶음 제목이 앉는 자리.
-
-    <p>아래 여백이 위와 거의 같았습니다(md·lg). 그래서 제목이 <b>제 묶음보다
-    위쪽 빈자리에 더 붙어</b> 보였습니다 — 제목은 아래 것의 이름이니 아래와
-    가까워야 합니다.
-  */
-  sectionHead: {
-    paddingTop: Spacing.lg,
-    paddingBottom: Spacing.xs,
-    paddingHorizontal: Spacing.lg,
-    gap: 2,
+  /* 면 카드 — 눌리지 않는 것. 떠 있을 이유가 없으니 그림자를 걷습니다. */
+  cardFill: {
+    backgroundColor: Colors.fill,
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
 
   /*
@@ -2945,9 +3132,34 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: Spacing.s3,
   },
+  /* 부제가 붙은 줄. 글이 두 줄이면 위아래 여백만으로는 66 밖에 안 되어,
+     한 줄짜리 줄들과 섞였을 때 키 차이가 어정쩡합니다 — 계획서의 72 로
+     올려 둡니다. */
+  listRowTwo: {
+    minHeight: 72,
+  },
+  /* 눌린 줄. 크기를 안 줄이는 대신 이것이 눌렸다는 말을 합니다. */
+  listRowDown: {
+    backgroundColor: Colors.surfaceRaised,
+  },
   listRowLine: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.divider,
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: Colors.divider,
+  },
+  /*
+    앞에 그림이 선 줄의 선 시작점.
+
+    <p>40 짜리 그림 + 사이 12 = 52 입니다. 좌우 여백 20 을 더하면 화면
+    왼쪽에서 72 — 계획서 §3-4 의 값입니다. 썸네일(56)이 서는 줄은 네 칸
+    차이가 나는데, 그만큼은 눈에 걸리지 않습니다. 앞 요소 너비를 재서
+    맞추려면 줄마다 한 번 더 그려야 해서, 목록이 길어질수록 값이 커집니다.
+  */
+  listRowLineInset: {
+    left: 52,
   },
   /* 곁다리가 있는 줄. 판은 여기가 쓰고 여백은 안쪽이 가집니다. */
   listRowHeld: {
@@ -2970,10 +3182,16 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     gap: Spacing.xs,
   },
+  /* 목록 제목은 headline 16/22 입니다. 전에 보던 {@code Type.body} 는
+     16/24 로, 여러 줄 본문을 위해 줄 사이를 벌려 둔 것입니다 — 한 줄
+     말줄임하는 제목에서는 그 여유가 줄을 괜히 키웁니다. */
   listRowTitle: {
-    ...Type.body,
+    ...Type.headline,
     fontWeight: Weight.semibold,
     color: Colors.text,
+  },
+  listRowTitleDanger: {
+    color: Colors.danger,
   },
   listRowSubtitle: {
     ...Type.caption,
@@ -3210,15 +3428,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  buttonFull: {
+  buttonL: {
     height: Tap.control,
-    borderRadius: Radius.md,
-    paddingHorizontal: Spacing.xl,
+    borderRadius: Radius.r3,
+    paddingHorizontal: Spacing.s5,
   },
-  buttonCompact: {
+  buttonM: {
+    height: Tap.min,
+    borderRadius: Radius.r3,
+    paddingHorizontal: Spacing.s4,
+  },
+  buttonS: {
     height: Tap.compact,
-    borderRadius: Radius.sm,
-    paddingHorizontal: Spacing.lg,
+    borderRadius: Radius.r2,
+    paddingHorizontal: Spacing.s3,
+  },
+  /* 글에 붙어 있는 동작. 알약으로 둥글려야 글줄 사이에서 단추로 읽힙니다 —
+     네모로 두면 작은 네모 하나가 글 옆에 붙은 것으로 보입니다. */
+  buttonXS: {
+    height: Tap.tiny,
+    borderRadius: Radius.full,
+    paddingHorizontal: Spacing.s2 + 2,
   },
   /* 지도 위에 떠 있는 것. 알약으로 둥글리고 그림자를 둡니다 — 지도의 길과
      건물 위에서는 실선만으로 가장자리가 안 보입니다. */
@@ -3226,35 +3456,21 @@ const styles = StyleSheet.create({
     borderRadius: Radius.full,
     ...Elevation.float,
   },
-  /* 주 동작은 뜨지 않습니다. 검정 채움 자체가 화면에서 가장 강한 것이라
-     그림자를 더 얹을 이유가 없습니다. */
-  buttonGlow: {},
-  /* 되돌릴 수 없는 단추만 두른 테두리. 색을 못 쓰니 굵기로 가릅니다. */
-  /*
-    되돌릴 수 없는 것.
-
-    <p>검정 1.5px 를 둘렀습니다. 색을 안 쓰기로 했던 때, 빨강을 뺀 자리에
-    무언가는 있어야 해서였습니다. 그런데 이제 회색 바닥에 흰 카드가 놓이고
-    모서리가 둥근 화면에서 그 선만 날카로워, 서류 양식 한 칸처럼 보입니다.
-
-    <p>선을 가늘게 하고 글씨를 진하게 둡니다. 어차피 이 단추 앞에는 늘
-    한 번 더 묻는 판이 섭니다 — 무게는 거기서 집니다.
-  */
-  buttonEdge: {
-    borderWidth: 1,
-    borderColor: Colors.borderStrong,
-  },
-  buttonHair: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: Colors.borderStrong,
-  },
-  buttonLabel: {
-    ...Type.body,
+  buttonLabelL: {
+    ...Type.headline,
     fontWeight: Weight.semibold,
   },
-  buttonLabelCompact: {
-    ...Type.bodySmall,
+  buttonLabelM: {
+    ...Type.body2,
     fontWeight: Weight.semibold,
+  },
+  buttonLabelS: {
+    ...Type.label,
+    fontWeight: Weight.medium,
+  },
+  buttonLabelXS: {
+    ...Type.caption,
+    fontWeight: Weight.medium,
   },
 
   chip: {
@@ -3534,8 +3750,11 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     paddingHorizontal: Spacing.sm + 1,
   },
+  /* 배지 글자는 micro 11/14 입니다 — 계획서 §2-2. 전에 여기가 보던
+     {@code Type.label} 은 「구역 이름표」(12/16, 자간 1.2)였는데, 그 이름이
+     버튼·칩·탭의 14/20 으로 바로잡히면서 배지 글자가 두 단 커질 처지였습니다. */
   badgeLabel: {
-    ...Type.label,
+    ...Type.micro,
     fontWeight: Weight.semibold,
   },
 
@@ -3545,11 +3764,6 @@ const styles = StyleSheet.create({
     borderRadius: Radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  /* 바탕이 묻히는 자리에서도 단추로 보이게. */
-  iconButtonEdge: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: Colors.border,
   },
   /* 안에 볼 것이 있다는 점.
 
@@ -3580,7 +3794,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: Gutter,
-    backgroundColor: 'rgba(25, 31, 40, 0.45)',
+    /* 계획서 §2-3 의 덮개입니다. 전에는 먹색을 섞은 rgba(25,31,40,.45) 를
+       두 자리에 손으로 적어 두었습니다 — {@link Colors.scrim} 이 생긴 뒤에도
+       그대로 남아, 토큰 쪽을 고쳐도 화면은 안 바뀌었습니다. */
+    backgroundColor: Colors.scrim,
   },
   dialog: {
     width: '100%',
@@ -3610,7 +3827,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(25, 31, 40, 0.45)',
+    backgroundColor: Colors.scrim,
   },
   sheet: {
     backgroundColor: Colors.surface,

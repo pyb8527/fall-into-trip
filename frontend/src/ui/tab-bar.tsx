@@ -2,6 +2,7 @@ import { usePathname, useRouter } from 'expo-router';
 import { Platform, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useAuth } from '@/auth/auth-provider';
 import {
   Colors,
   Elevation,
@@ -12,7 +13,10 @@ import {
   Type,
   Weight,
 } from '@/constants/theme';
-import { Icon, type IconName, Press } from '@/ui';
+import { Icon, type IconName, Mark, Press } from '@/ui';
+import { SidebarWidth, useWide } from '@/ui/layout';
+import { LogoMark, LogoSymbol } from '@/ui/logo';
+import { faceOf } from '@/constants/user-marks';
 import { WANT } from '@/constants/words';
 
 /**
@@ -48,8 +52,28 @@ export type TabItem = {
   dot?: boolean;
 };
 
-export function TabBar({ items, onBack }: { items: TabItem[]; onBack?: () => void }) {
+export function TabBar({
+  items,
+  onBack,
+  /**
+   * 지금 들어와 있는 곳의 이름. 넓은 화면에서만 씁니다.
+   *
+   * <p>여행 안에서는 사이드바 위쪽에 「← 내 여행」과 이 이름이 섭니다.
+   * 아래 띠에서는 쓰지 않습니다 — 띠에는 적을 자리가 없습니다.
+   */
+  title,
+}: {
+  items: TabItem[];
+  onBack?: () => void;
+  title?: string;
+}) {
   const insets = useSafeAreaInsets();
+  const wide = useWide();
+
+  /* 넓은 화면에서는 아래 띠가 아니라 왼쪽 기둥입니다. 폰은 아래 그대로입니다. */
+  if (wide) {
+    return <Sidebar items={items} onBack={onBack} title={title} />;
+  }
 
   return (
     <View
@@ -130,6 +154,151 @@ export function TabBar({ items, onBack }: { items: TabItem[]; onBack?: () => voi
           </Press>
         ))}
       </View>
+    </View>
+  );
+}
+
+/**
+ * 넓은 화면의 왼쪽 기둥.
+ *
+ * <h3>아래 띠가 모니터 밑에 깔려 있었습니다</h3>
+ *
+ * <p>같은 코드가 폰과 PC 브라우저를 다 그립니다. 그래서 1920 짜리 창에서도
+ * 갈래가 <b>화면 맨 아래 가로 띠</b>로 섰습니다. 손가락이 가는 자리라서
+ * 아래에 둔 것인데, 마우스를 쓰는 사람에게 화면 맨 아래는 가장 먼 자리입니다.
+ * 게다가 띠가 화면 폭을 다 쓰면서 다섯 칸이 모니터 가운데에 띄엄띄엄
+ * 흩어졌습니다.
+ *
+ * <p>세웁니다. 폭 240 흰 기둥에 로고와 갈래와 내 계정이 위에서 아래로 쌓이고,
+ * 본문은 그 오른쪽에서 시작합니다 — 웹 앱이 거의 다 이 모양입니다.
+ *
+ * <h3>자리는 본문이 비켜 줍니다</h3>
+ *
+ * <p>기둥은 {@code fixed} 로 떠 있습니다. 굴려도 따라오지 않고, 안에 든
+ * 내용이 길어도 창에 붙어 있어야 하기 때문입니다. 대신 기둥만큼을 비워 두는
+ * 일은 본문 쪽이 합니다(각 화면의 {@code contentStyle}) — 떠 있는 것은
+ * 자리를 차지하지 못하므로, 안 비켜 주면 본문 왼쪽이 기둥 뒤로 들어갑니다.
+ */
+function Sidebar({
+  items,
+  onBack,
+  title,
+}: {
+  items: TabItem[];
+  onBack?: () => void;
+  title?: string;
+}) {
+  const router = useRouter();
+  const { user } = useAuth();
+
+  return (
+    <View style={styles.rail}>
+      {/*
+        맨 위는 로고입니다.
+
+        <p>여행 안에 들어와 있어도 걷지 않습니다. 걷어 보았더니 기둥 맨 위가
+        여행 이름으로 시작해서, 지금 보고 있는 것이 <b>이 앱인지</b>가 화면
+        어디에도 안 적혀 있었습니다. 로고는 그대로 두고 여행 이름을 그 아래에
+        답니다.
+      */}
+      <Press
+        onPress={() => router.replace('/(app)/home')}
+        scale={1}
+        accessibilityLabel="처음으로"
+        style={styles.railLogo}>
+        <LogoSymbol size={24} />
+        <LogoMark size={20} />
+      </Press>
+
+      {/*
+        여행 안이면 나가는 길과 여행 이름.
+
+        <p>폰에서는 띠 왼쪽의 동그란 화살표 하나였습니다. 그림만으로는 어디로
+        나가는지 안 보였는데, 기둥에는 글자를 적을 자리가 있습니다.
+      */}
+      {onBack || title ? (
+        <View style={styles.railTrip}>
+          {/*
+            적어 둔 대로 갑니다.
+
+            <p>폰 띠의 화살표(onBack)를 그대로 쓰지 않습니다. 그쪽은 화면마다
+            다른 데로 갑니다 — 일정에서는 여행 목록으로, 가계부·요약에서는
+            일정으로. 그림 하나일 때는 「한 걸음 물러난다」로 읽혀 괜찮지만,
+            여기는 글자가 「내 여행」이라고 적혀 있습니다. 적힌 데로 가야
+            합니다.
+          */}
+          <Press
+            onPress={() => router.replace('/(app)/trips')}
+            scale={1}
+            accessibilityLabel="내 여행으로"
+            style={styles.railBack}>
+            <Icon name="chevron-left" size={20} tone="muted" />
+            <Text style={styles.railBackLabel}>내 여행</Text>
+          </Press>
+          {title ? (
+            <Text style={styles.railTitle} numberOfLines={2}>
+              {title}
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
+
+      <View style={styles.railItems}>
+        {items.map((item) => (
+          <Press
+            key={item.key}
+            /* 지금 이 화면이면 아무 일도 안 합니다 — 아래 띠와 같은 규칙입니다.
+               같은 곳을 다시 쌓으면 뒤로가기가 한 번 헛돕니다. */
+            onPress={item.active ? () => {} : item.onPress}
+            accessibilityLabel={item.label}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: !!item.active }}
+            /* 줄은 크기가 안 변합니다. 240 짜리 줄이 쪼그라들면 아래 줄들이
+               들썩이는 것처럼 보입니다 — 눌린 것은 바탕이 말합니다. */
+            scale={1}
+            style={[styles.railItem, item.active ? styles.railItemOn : null]}>
+            <View>
+              <Icon
+                name={item.icon}
+                size={24}
+                solid={!!item.active}
+                tone={item.active ? 'accent' : 'muted'}
+              />
+              {item.dot ? <View style={styles.dot} /> : null}
+            </View>
+            <Text
+              style={[styles.railLabel, item.active ? styles.railLabelOn : null]}
+              numberOfLines={1}>
+              {item.label}
+            </Text>
+          </Press>
+        ))}
+      </View>
+
+      {/*
+        내 계정은 맨 아래입니다.
+
+        <p>폰에서는 홈 막대 오른쪽의 그림 단추였다가 홈의 맨 아래 줄로
+        내려갔습니다. 하루에 한 번도 안 누르는 것이라 갈래 다섯과 같은 무게로
+        둘 일이 아닙니다. 기둥에서도 갈래와 떨어진 맨 아래에 둡니다 — 이름이
+        적혀 있으니 누가 로그인해 있는지도 여기서 보입니다.
+      */}
+      <View style={styles.railGrow} />
+      <Press
+        onPress={() => router.push(user ? '/(app)/settings' : '/(auth)/welcome')}
+        scale={1}
+        accessibilityLabel={user ? '내 계정' : '로그인'}
+        style={styles.railMe}>
+        <Mark emoji={faceOf(user?.mark, user?.name ?? '나')} fallback="🙂" />
+        <View style={styles.railMeText}>
+          <Text style={styles.railMeName} numberOfLines={1}>
+            {user?.name ?? '로그인'}
+          </Text>
+          <Text style={styles.railMeNote} numberOfLines={1}>
+            {user ? '내 계정' : '계정 만들기'}
+          </Text>
+        </View>
+      </Press>
     </View>
   );
 }
@@ -238,11 +407,14 @@ export function TripTabs({
   tripId,
   active,
   onBack,
+  title,
 }: {
   tripId: string;
   active: TripTabKey;
   /** 나가는 길. 안 주면 일정 화면으로 돌아갑니다. */
   onBack?: () => void;
+  /** 여행 이름. 넓은 화면의 기둥 위쪽에 섭니다. 아래 띠는 안 씁니다. */
+  title?: string;
 }) {
   const router = useRouter();
 
@@ -254,6 +426,7 @@ export function TripTabs({
 
   return (
     <TabBar
+      title={title}
       onBack={onBack ?? (() => router.replace({ pathname: '/trip/[id]', params: { id: tripId } }))}
       items={[
         {
@@ -399,7 +572,10 @@ const styles = StyleSheet.create({
        캡션의 것을 그대로 쓰면 글자 위아래로 빈자리가 남아 띠만 두꺼워집니다. */
     fontSize: 14,
     lineHeight: 18,
-    color: Colors.textMuted,
+    /* 꺼진 칸용 회색입니다. 메타 글자색(textMuted)이 한 단 진해지면서
+       켜진 칸과 구별이 흐려졌습니다 — 꺼진 것은 꺼진 것끼리 같은 값을
+       봐야 합니다. */
+    color: Colors.iconOff,
   },
   /* 켜진 것은 색이 아니라 굵기로 말합니다. 다섯 중 하나에만 색을 칠하면
      그 색이 이 화면에서 가장 진한 것이 되어, 정작 내용이 밀립니다. */
@@ -416,6 +592,118 @@ const styles = StyleSheet.create({
     borderRadius: Radius.full,
     backgroundColor: Colors.accent,
   },
+  /* ------------------------------------------------ 넓은 화면의 왼쪽 기둥 */
+  /*
+    기둥.
+
+    <p>떠 있지만 비치지 않습니다. 아래 띠는 지도 위에 얹히는 알약이라
+    반투명했는데, 이것은 본문 옆에 붙은 <b>면</b>입니다. 비치면 뒤로 지나가는
+    내용이 글자에 겹칩니다.
+  */
+  rail: {
+    position: 'absolute',
+    ...Platform.select({ web: { position: 'fixed' as 'absolute' }, default: {} }),
+    /* 아래 띠와 같은 층입니다 — 본문 위, 판 위. */
+    zIndex: 3,
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: SidebarWidth,
+    backgroundColor: Colors.surface,
+    /* 선 한 가닥. 그림자로 띄우지 않습니다 — 기둥은 본문 위에 뜬 것이
+       아니라 본문 옆에 붙은 면입니다. */
+    borderRightWidth: 1,
+    borderRightColor: Colors.border,
+    paddingHorizontal: Spacing.s3,
+    paddingTop: Spacing.s5,
+    paddingBottom: Spacing.s5,
+    gap: Spacing.s4,
+  },
+  railLogo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.s2,
+    height: Tap.min,
+    paddingHorizontal: Spacing.s2,
+  },
+  railTrip: {
+    gap: Spacing.s1,
+    paddingHorizontal: Spacing.s2,
+  },
+  railBack: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.s1,
+    height: Tap.min,
+    /* 화살표가 글자선보다 왼쪽으로 나가 앉습니다. 안 빼면 「내 여행」이
+       아래 여행 이름보다 들여쓴 것처럼 보입니다. */
+    marginLeft: -Spacing.s1,
+  },
+  railBackLabel: {
+    ...Type.label,
+    fontWeight: Weight.medium,
+    color: Colors.textSecondary,
+  },
+  railTitle: {
+    ...Type.title3,
+    fontWeight: Weight.semibold,
+    color: Colors.text,
+  },
+  railItems: {
+    gap: Spacing.s1,
+  },
+  /* 한 줄. 계획서가 정한 높이 44 · 모서리 8 입니다. */
+  railItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.s3,
+    height: Tap.min,
+    paddingHorizontal: Spacing.s2,
+    borderRadius: Radius.r2,
+  },
+  /* 켜진 줄은 바탕이 한 단 어둡습니다. 폰 띠에서는 칸이 다섯 나란히 서서
+     굵기만으로 갈랐지만, 기둥에서는 줄이 위아래로 쌓이므로 바탕이 어디까지가
+     그 줄인지까지 함께 말해 줍니다. */
+  railItemOn: {
+    backgroundColor: Colors.fill,
+  },
+  railLabel: {
+    ...Type.body2,
+    fontWeight: Weight.medium,
+    /* 아래 띠의 꺼진 라벨과 같은 값입니다. */
+    color: Colors.iconOff,
+    flexShrink: 1,
+  },
+  railLabelOn: {
+    color: Colors.text,
+    fontWeight: Weight.semibold,
+  },
+  /* 갈래와 내 계정 사이를 벌립니다. 기둥 높이는 창 높이라 남는 자리를
+     여기서 다 먹습니다. */
+  railGrow: {
+    flex: 1,
+  },
+  railMe: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.s3,
+    paddingHorizontal: Spacing.s2,
+    paddingVertical: Spacing.s2,
+    borderRadius: Radius.r2,
+  },
+  railMeText: {
+    flex: 1,
+  },
+  railMeName: {
+    ...Type.body2,
+    fontWeight: Weight.semibold,
+    color: Colors.text,
+  },
+  railMeNote: {
+    ...Type.caption,
+    color: Colors.textMuted,
+  },
+
   /* 나가는 길. 띠 바깥에 따로 둡니다 — 갈래 중 하나가 아니라 이 갈래
      전체에서 빠져나가는 것이라, 같은 줄 안에 두면 여섯 번째 갈래로
      읽힙니다. */

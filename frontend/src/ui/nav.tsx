@@ -4,6 +4,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '@/auth/auth-provider';
 import { Colors, Spacing, Type, Weight } from '@/constants/theme';
 import { IconButton, Row } from '@/ui';
+import { SidebarWidth } from '@/ui/layout';
 
 /**
  * 위 막대 왼쪽에 서는 것들.
@@ -52,11 +53,26 @@ export function NavLeft({
    * 딸린 화면의 위층은 늘 그 여행입니다.
    */
   up,
+  /**
+   * 이 화면 왼쪽에 기둥(사이드바)이 서 있는지.
+   *
+   * <h3>화살표가 기둥 뒤에 깔렸습니다</h3>
+   *
+   * <p>넓은 화면에서 갈래가 왼쪽 기둥으로 섭니다(ui/tab-bar). 기둥은 창에
+   * 붙어 떠 있어서 <b>위 막대까지 덮습니다.</b> 막대는 화면 폭을 다 쓰고
+   * 그 왼쪽 끝에 화살표가 있으니, 뒤로가기가 기둥 밑으로 들어가 눌리지
+   * 않았습니다.
+   *
+   * <p>기둥만큼 비켜 앉습니다. 본문이 이미 같은 만큼 비켜 있으므로(각
+   * 화면의 contentStyle), 화살표도 본문과 같은 선에서 시작합니다.
+   */
+  rail = false,
 }: {
   navigation: { canGoBack: () => boolean; goBack: () => void };
   route?: { params?: object };
   toTrip?: boolean;
   up?: string;
+  rail?: boolean;
 }) {
   const router = useRouter();
   const { user } = useAuth();
@@ -85,7 +101,7 @@ export function NavLeft({
   }
 
   return (
-    <Row gap={Spacing.xs}>
+    <Row gap={Spacing.xs} style={rail ? navStyles.railGap : null}>
       <IconButton name="chevron-left" label="뒤로" bare onPress={back} />
       <IconButton name="home" label="처음으로" bare onPress={() => router.replace(start)} />
     </Row>
@@ -117,6 +133,14 @@ export function PathTitle({ parent, title }: { parent: string; title: string }) 
     </View>
   );
 }
+
+const navStyles = StyleSheet.create({
+  /* 기둥만큼 비켜 앉습니다. 막대는 창 왼쪽 끝에서 시작하므로, 그만큼
+     밀어야 기둥 오른쪽에 섭니다. */
+  railGap: {
+    marginLeft: SidebarWidth,
+  },
+});
 
 const pathStyles = StyleSheet.create({
   wrap: {
@@ -150,6 +174,18 @@ export function stackHeader(
     parent?: string;
     /** 돌아갈 데가 없을 때 갈 위층. 안 주면 처음(홈)입니다. */
     up?: string;
+    /**
+     * 넓은 화면에서 이 화면 왼쪽에 기둥(사이드바)이 서는지.
+     *
+     * <p>기둥을 세우는 것은 화면 자신입니다(아래 갈래 띠를 다는 화면이
+     * 넓은 화면에서는 기둥을 답니다). 그런데 기둥은 떠 있어서 자리를
+     * 차지하지 못하므로, <b>비워 두는 일은 이 막대와 본문</b>이 합니다.
+     *
+     * <p>층을 짜는 쪽(각 _layout)이 {@code useWide()} 를 보고 넘겨 줍니다.
+     * 여기서 직접 물을 수는 없습니다 — 이 함수가 돌려주는 것은 부품이
+     * 아니라 설정 덩이라, 그 안에서 훅을 부를 자리가 없습니다.
+     */
+    rail?: boolean;
   },
 ) {
   return ({
@@ -160,12 +196,23 @@ export function stackHeader(
     route?: { params?: object };
   }) => ({
     title,
+    /* 기둥이 서면 본문이 그만큼 비켜 앉습니다. 안 비키면 왼쪽 20 선에 맞춰
+       둔 글자들이 기둥 뒤로 들어갑니다. */
+    contentStyle: opts?.rail
+      ? { paddingLeft: SidebarWidth, backgroundColor: Colors.background }
+      : undefined,
     /* 온 곳이 있으면 제목 위에 적습니다. 없으면 지금까지처럼 한 줄입니다. */
     headerTitle: opts?.parent
       ? () => <PathTitle parent={opts.parent as string} title={title} />
       : undefined,
     headerLeft: () => (
-      <NavLeft navigation={navigation} route={route} toTrip={opts?.toTrip} up={opts?.up} />
+      <NavLeft
+        navigation={navigation}
+        route={route}
+        toTrip={opts?.toTrip}
+        up={opts?.up}
+        rail={opts?.rail}
+      />
     ),
   });
 }

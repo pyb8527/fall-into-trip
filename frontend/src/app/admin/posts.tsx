@@ -164,7 +164,7 @@ function ReportedRow({
             onPress={() => setHidden(false)}
           />
         ) : (
-          <Button label="감추기" variant="danger" compact busy={busy} onPress={() => setHidden(true)} />
+          <Button label="감추기" variant="dangerText" compact busy={busy} onPress={() => setHidden(true)} />
         )}
       </Row>
     </Card>

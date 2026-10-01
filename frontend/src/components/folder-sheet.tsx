@@ -117,6 +117,8 @@ export function FolderSheet({
         title="폴더 없음"
         subtitle="목록에 그대로 둬요"
         right={current === null ? <Icon name="check" size={20} tone="brand" /> : undefined}
+        /* 폴더를 하나도 안 만들었으면 이 줄이 묶음의 끝입니다. */
+        last={folders.length === 0}
         onPress={() =>
           run(() => api.put(`/api/trips/${tripId}/folder`, {}))
         }
@@ -124,12 +126,13 @@ export function FolderSheet({
 
       {/* 지우기는 줄 안에 답니다 — 줄 밖에 붙이면 그 줄만 판이 짧아져서
           목록 오른쪽 끝이 들쭉날쭉합니다({@link ListRow} 의 action). */}
-      {folders.map((folder) => (
+      {folders.map((folder, i) => (
         <ListRow
           key={folder.id}
           title={folder.name}
           subtitle={`여행 ${folder.tripCount}개`}
           right={current === folder.id ? <Icon name="check" size={20} tone="brand" /> : undefined}
+          last={i === folders.length - 1}
           action={
             <IconButton
               name="trash-2"

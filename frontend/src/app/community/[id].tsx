@@ -45,14 +45,15 @@ import {
   Caption,
   Chip,
   ConfirmDialog,
-  DragSheet,
   ErrorNote,
   Icon,
   IconButton,
+  ListRow,
   Loading,
   Press,
   Row,
   Screen,
+  SectionHeader,
   Snack,
   Subtitle,
   Title,
@@ -60,6 +61,8 @@ import {
   useUndo,
 } from '@/ui';
 import { DateField } from '@/ui/date-field';
+import { SidePanelWidth, useWide } from '@/ui/layout';
+import { MapAside } from '@/ui/map-aside';
 import { KEEP, UNKEEP } from '@/constants/words';
 
 /**
@@ -124,7 +127,14 @@ export default function Post() {
   const [covered, setCovered] = useState(0);
   const [headTall, setHeadTall] = useState(0);
   const insets = useSafeAreaInsets();
-  const dock = Math.max(insets.bottom, Spacing.s2) + TabDock;
+  /*
+    넓은 화면에서는 아래 띠가 없습니다.
+
+    <p>갈래가 왼쪽 기둥으로 서고(ui/tab-bar), 끌어올리던 판도 왼쪽 패널이
+    됩니다(ui/map-aside). 아래를 먹는 것이 없으니 비워 둘 것도 없습니다.
+  */
+  const wide = useWide();
+  const dock = wide ? 0 : Math.max(insets.bottom, Spacing.s2) + TabDock;
 
   /** 댓글 판을 열어 둔 장소. */
   const [at, setAt] = useState<{ dayIndex: number; placeIndex: number } | null>(null);
@@ -432,7 +442,12 @@ export default function Post() {
         }}
       />
 
-      {/* 지도가 바탕입니다. 판이 그 위에 얹힙니다. */}
+      {/*
+        지도가 앉는 자리. 넓은 화면에서는 왼쪽 420 을 패널에 내줍니다 —
+        패널은 떠 있어서 자리를 차지하지 못하므로, 비켜 주지 않으면 지도
+        왼쪽이 패널 뒤로 들어갑니다.
+      */}
+      <View style={[styles.mapPane, wide ? styles.mapPaneWide : null]}>
       {pins.length > 0 ? (
         <TripMap
           places={pins}
@@ -451,8 +466,9 @@ export default function Post() {
       ) : (
         <PostMap postId={id} title={data.title} height={260} />
       )}
+      </View>
 
-      <DragSheet
+      <MapAside
         /* 아래 띠만큼 띄웁니다. 안 띄우면 판이 띠 뒤로 들어갑니다. */
         lift={dock}
         /* 내렸을 때 제목 줄과 단추까지는 보여야 합니다. 재서 그만큼 알려
@@ -589,7 +605,11 @@ export default function Post() {
       {/* 날이 안 적힌 글. 돌아와서 올린 것이라 일정 뒤에 섭니다. */}
       {storiesOn(data.itinerary.stories, null).length > 0 ? (
         <>
-          <Caption tone="secondary">다녀와서 남긴 것</Caption>
+          {/* 흐린 작은 글씨 한 줄이었습니다. 그러면 위 일정의 꼬리말처럼
+              읽혀, 여기서부터 다른 이야기라는 것이 안 보였습니다. 띠로
+              가르고 다른 화면과 같은 구역 머리를 답니다. */}
+          <Band />
+          <SectionHeader title="다녀와서 남긴 것" tight />
           {storiesOn(data.itinerary.stories, null).map((s, at) => (
             <StoryBlock key={`tail-${at}`} story={s} />
           ))}
@@ -631,6 +651,9 @@ export default function Post() {
       */}
       <Band />
 
+      {/* 손으로 그린 줄들이었습니다. 목록 줄 부품을 쓰면 높이·여백·선이
+          위 목록들과 같아져, 글을 다 읽은 뒤에 나오는 「또 하나의 줄
+          묶음」 으로 읽힙니다. */}
       {data.mine ? (
         <>
           {/*
@@ -640,34 +663,35 @@ export default function Post() {
             빼먹은 것 때문에 내리면 그동안 받은 추천과 조회수와 댓글이 함께
             사라집니다 — 그 값이 너무 커서 대개 틀린 채로 둡니다.
           */}
-          <Press
+          <ListRow
+            left={<Icon name="edit-2" size={20} tone="muted" />}
+            title="고치기"
             onPress={() => setEditing(true)}
-            scale={1}
-            accessibilityLabel="글 고치기"
-            style={styles.manage}>
-            <Icon name="edit-2" size={20} tone="muted" />
-            <Body>고치기</Body>
-          </Press>
-          <Press
+          />
+          <ListRow
+            left={<Icon name="trash-2" size={20} tone="danger" />}
+            title={
+              <Body strong tone="danger">
+                내리기
+              </Body>
+            }
+            last
             onPress={() => setRemoving(true)}
-            scale={1}
-            accessibilityLabel="글 내리기"
-            style={styles.manage}>
-            <Icon name="trash-2" size={20} tone="danger" />
-            <Body tone="danger">내리기</Body>
-          </Press>
+          />
         </>
       ) : (
-        <Press
+        <ListRow
+          left={<Icon name="flag" size={20} tone="muted" />}
+          title={
+            <Body strong tone="secondary">
+              신고
+            </Body>
+          }
+          last
           onPress={() => (user ? setReporting(true) : needLogin('report'))}
-          scale={1}
-          accessibilityLabel="이 글 신고하기"
-          style={styles.manage}>
-          <Icon name="flag" size={20} tone="muted" />
-          <Body tone="secondary">신고</Body>
-        </Press>
+        />
       )}
-      </DragSheet>
+      </MapAside>
 
       {/* 아래 띠. 이 화면은 Screen 이 아니라 지도 위에 판을 얹는 얼개라
           직접 답니다. */}
@@ -675,7 +699,13 @@ export default function Post() {
 
       {/* 떠 있는 띠도 직접 얹습니다. 아래 띠보다 위에 서야 가려지지
           않습니다. */}
-      <View pointerEvents="box-none" style={[styles.snackRail, { bottom: dock + Spacing.s3 }]}>
+      <View
+        pointerEvents="box-none"
+        style={[
+          styles.snackRail,
+          wide ? styles.snackRailPast : null,
+          { bottom: dock + Spacing.s3 },
+        ]}>
         <Snack undo={undo} onHide={hideUndo} />
       </View>
 
@@ -1363,6 +1393,19 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.abyss,
   },
+  /* 지도가 쓰는 자리. */
+  mapPane: {
+    flex: 1,
+  },
+  /* 넓은 화면에서는 왼쪽을 패널에 내줍니다. 여백(margin)으로 비킵니다 —
+     안쪽 여백으로 두면 떠 있는 패널의 왼쪽 0 이 그 안으로 들어갑니다. */
+  mapPaneWide: {
+    marginLeft: SidePanelWidth,
+  },
+  /* 띠도 패널을 피합니다. 패널 위에 뜨면 읽던 글을 가립니다. */
+  snackRailPast: {
+    left: SidePanelWidth,
+  },
   head: {
     gap: Spacing.s1,
   },
@@ -1417,13 +1460,6 @@ const styles = StyleSheet.create({
   heartCount: {
     ...Type.micro,
     color: Colors.textSecondary,
-  },
-  /* 글을 다루는 줄. 단추가 아니라 줄입니다. */
-  manage: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.s3,
-    minHeight: Tap.min,
   },
   place: {
     borderRadius: Radius.r3,

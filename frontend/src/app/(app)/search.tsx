@@ -10,7 +10,7 @@ import type { Found } from '@/components/map-types';
 import { OurPhoto } from '@/components/our-photo';
 import { PlaceDetailSheet } from '@/components/place-detail-sheet';
 import { iconOf, labelOf } from '@/constants/place-icons';
-import { Colors, Gutter, Palette, Spacing, Tap, Type, Weight } from '@/constants/theme';
+import { Colors, Palette, Spacing, Tap, Type, Weight } from '@/constants/theme';
 import { formatNights } from '@/lib/countdown';
 import { forgetAll, recentSearches, remember } from '@/lib/recent';
 import {
@@ -18,21 +18,20 @@ import {
   Body,
   Caption,
   Chip,
-  Divider,
   Empty,
   ErrorNote,
-  Grow,
+  Icon,
   IconButton,
+  ListRow,
   Loading,
   Mark,
   Press,
   Row,
   Screen,
   SearchField,
+  SectionHeader,
   SegmentedTabs,
   Snack,
-  Split,
-  Subtitle,
   useUndo,
 } from '@/ui';
 
@@ -207,49 +206,39 @@ export default function Search() {
             <Empty message={`"${q}" 로는 찾은 것이 없어요. 다른 말로 해 보세요.`} />
           ) : null}
 
+          {/*
+            구역 하나를 한 칸에 담습니다.
+
+            <p>머리와 줄들을 화면의 직접 자식으로 늘어놓으면 그 사이마다
+            화면 기본 간격이 끼어, 제목이 제 묶음보다 위쪽 빈자리에 더 붙어
+            보입니다. 머리는 공용 부품({@code SectionHeader})이 그립니다 —
+            홈과 「내 여행」의 구역 제목과 같은 크기, 같은 여백입니다.
+          */}
           {placeRows.length > 0 ? (
             <View>
-              <Subtitle>장소</Subtitle>
+              <SectionHeader title="장소" />
               {/*
-                줄에서 판을 벗겼습니다.
+                줄도 공용 부품으로 돌렸습니다.
 
-                <p>줄들을 흰 판 하나에 담고 사이를 선으로 갈랐습니다. 바닥이
-                흰색이 된 뒤로 그 판은 보이지 않으면서 <b>줄을 좌우 16픽셀씩
-                안으로 밀어 넣는</b> 일만 했습니다 — 장소 이름이 화면 왼쪽
-                글자선에서 어긋나 있었습니다. 판을 벗기고 선만 남깁니다.
+                <p>그림·이름·설명·단추를 손으로 짜 맞추고 사이를 선으로
+                갈랐습니다. 속은 {@link ListRow} 와 같은 것이었는데 여백과
+                높이가 이 화면만의 값이라, 같은 장소 줄이 보석함과 홈에서
+                서로 다르게 생겼습니다.
               */}
               {placeRows.map((found, i) => (
-                <View key={`${found.placeId ?? found.name}-${i}`}>
-                  {i > 0 ? <Divider /> : null}
-                  <Split gap={Spacing.s2} style={styles.row}>
-                    <Grow>
-                      <Press
-                        onPress={() => setLooking(found)}
-                        scale={1}
-                        accessibilityLabel={`${found.name} 자세히 보기`}>
-                        <Row gap={Spacing.s3}>
-                          <Mark emoji={iconOf(found.icon)} fallback="📍" />
-                          <Grow gap={2}>
-                            <Body strong numberOfLines={1}>
-                              {found.name}
-                            </Body>
-                            <Caption tone="secondary" numberOfLines={1}>
-                              {[labelOf(found.icon), found.address]
-                                .filter(Boolean)
-                                .join(' · ')}
-                            </Caption>
-                          </Grow>
-                        </Row>
-                      </Press>
-                    </Grow>
-                    {/*
-                      찾은 자리에서 바로 줍습니다.
+                <ListRow
+                  key={`${found.placeId ?? found.name}-${i}`}
+                  left={<Mark emoji={iconOf(found.icon)} fallback="📍" />}
+                  title={found.name}
+                  subtitle={[labelOf(found.icon), found.address].filter(Boolean).join(' · ')}
+                  /*
+                    찾은 자리에서 바로 줍습니다.
 
-                      <p>상세로 들어갔다 나와야 담을 수 있으면, 다섯 곳을
-                      담는 데 열 번을 오갑니다. 담긴 것은 그림에 색이 듭니다 —
-                      회색이 검정으로 바뀌는 것은 티가 안 납니다(accent 가
-                      이 앱에서 검정입니다).
-                    */}
+                    <p>상세로 들어갔다 나와야 담을 수 있으면, 다섯 곳을
+                    담는 데 열 번을 오갑니다. 줄을 누르는 것과는 갈라 두므로
+                    별을 눌러도 상세가 열리지 않습니다.
+                  */
+                  action={
                     <IconButton
                       name="bookmark"
                       label={
@@ -263,59 +252,53 @@ export default function Search() {
                       disabled={kept.has(found.name)}
                       onPress={() => keep(found)}
                     />
-                  </Split>
-                </View>
+                  }
+                  last={i === placeRows.length - 1}
+                  onPress={() => setLooking(found)}
+                />
               ))}
             </View>
           ) : null}
 
-          {placeRows.length > 0 && postRows.length > 0 ? <Band /> : null}
-
           {postRows.length > 0 ? (
             <View>
-              <Split align="baseline">
-                <Subtitle>여행 아이디어</Subtitle>
-                {tab === 'all' ? (
-                  <Press
-                    onPress={() => setTab('ideas')}
-                    accessibilityLabel="여행 아이디어 더보기"
-                    scale={0.98}>
-                    <Caption tone="secondary">더보기 ›</Caption>
-                  </Press>
-                ) : null}
-              </Split>
+              {placeRows.length > 0 ? <Band /> : null}
+              <SectionHeader
+                tight={placeRows.length > 0}
+                title="여행 아이디어"
+                action={
+                  tab === 'all' ? (
+                    <MoreLink
+                      label="더보기"
+                      what="여행 아이디어"
+                      chevron
+                      onPress={() => setTab('ideas')}
+                    />
+                  ) : undefined
+                }
+              />
               {postRows.map((post, i) => (
-                <View key={post.id}>
-                  {i > 0 ? <Divider /> : null}
-                  <Press
-                    onPress={() => router.push(`/community/${post.id}`)}
-                    scale={1}
-                    accessibilityLabel={`${post.title} 열기`}
-                    style={styles.row}>
-                    <Row gap={Spacing.s3}>
-                      {/* 썸네일이 있으면 답니다. 글 목록에서는 사진이 제목보다
-                          먼저 읽혀서, 훑어 내려가는 속도가 달라집니다. */}
-                      {post.coverPhotoId ? (
-                        <OurPhoto id={post.coverPhotoId} width={72} height={72} />
-                      ) : null}
-                      <Grow gap={2}>
-                        <Body strong numberOfLines={2}>
-                          {post.title}
-                        </Body>
-                        <Caption tone="secondary" numberOfLines={1}>
-                          {[
-                            post.region,
-                            formatNights(post.dayCount),
-                            `${post.placeCount}곳`,
-                            post.authorName,
-                          ]
-                            .filter(Boolean)
-                            .join(' · ')}
-                        </Caption>
-                      </Grow>
-                    </Row>
-                  </Press>
-                </View>
+                <ListRow
+                  key={post.id}
+                  /* 썸네일이 있으면 답니다. 글 목록에서는 사진이 제목보다
+                     먼저 읽혀서, 훑어 내려가는 속도가 달라집니다. */
+                  left={
+                    post.coverPhotoId ? (
+                      <OurPhoto id={post.coverPhotoId} width={72} height={72} />
+                    ) : undefined
+                  }
+                  title={post.title}
+                  subtitle={[
+                    post.region,
+                    formatNights(post.dayCount),
+                    `${post.placeCount}곳`,
+                    post.authorName,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                  last={i === postRows.length - 1}
+                  onPress={() => router.push(`/community/${post.id}`)}
+                />
               ))}
             </View>
           ) : null}
@@ -323,27 +306,23 @@ export default function Search() {
       ) : (
         <>
           {recent.length > 0 ? (
-            <View style={styles.block}>
-              <Split align="baseline">
-                <Subtitle>최근 검색</Subtitle>
-                <Press
-                  onPress={() => setRecent(forgetAll())}
-                  accessibilityLabel="최근 검색 모두 지우기"
-                  scale={0.98}
-                  hitSlop={Tap.compactSlop}>
-                  <Caption tone="secondary">모두 지우기</Caption>
-                </Press>
-              </Split>
+            <View>
+              <SectionHeader
+                title="최근 검색"
+                action={
+                  <MoreLink
+                    label="모두 지우기"
+                    what="최근 검색"
+                    onPress={() => setRecent(forgetAll())}
+                  />
+                }
+              />
               <Row gap={Spacing.s2} style={styles.wrap}>
                 {recent.map((word) => (
                   <Chip key={word} label={word} selected={false} onPress={() => ask(word)} />
                 ))}
               </Row>
             </View>
-          ) : null}
-
-          {recent.length > 0 && (tagList?.tags.length ?? 0) > 0 ? (
-            <Band />
           ) : null}
 
           {/*
@@ -356,8 +335,9 @@ export default function Search() {
             <p>번호를 붙여 두 줄로 세웁니다. 앞의 셋만 색을 씁니다.
           */}
           {(tagList?.tags.length ?? 0) > 0 ? (
-            <View style={styles.block}>
-              <Subtitle>많이 찾는 말</Subtitle>
+            <View>
+              {recent.length > 0 ? <Band /> : null}
+              <SectionHeader title="많이 찾는 말" tight={recent.length > 0} />
               <View style={styles.grid}>
                 {tagList?.tags.slice(0, 10).map((t, i) => (
                   <Press
@@ -413,15 +393,53 @@ export default function Search() {
   );
 }
 
+/**
+ * 구역 머리 오른쪽의 작은 글자.
+ *
+ * <p>큰 단추가 아닙니다. 이 구역에서 가장 굵은 것은 그 안의 장소 이름들이어야
+ * 합니다. 홈의 「전체보기」와 같은 크기·같은 색으로 둡니다 — 화면마다 다른
+ * 크기로 적혀 있으면 같은 일을 하는 것으로 안 읽힙니다.
+ *
+ * @param chevron 다른 데로 데려가는 것이면 꺽쇠를 답니다. 그 자리에서
+ *                끝나는 일(지우기)에는 안 답니다
+ */
+function MoreLink({
+  label,
+  what,
+  chevron,
+  onPress,
+}: {
+  label: string;
+  /** 무엇에 대한 것인지. 읽어 주는 기기만 씁니다. */
+  what: string;
+  chevron?: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Press
+      onPress={onPress}
+      hitSlop={Spacing.s3}
+      scale={0.96}
+      accessibilityLabel={`${what} ${label}`}
+      style={styles.moreLink}>
+      <Text style={styles.moreLinkLabel}>{label}</Text>
+      {chevron ? <Icon name="chevron-right" size={16} tone="muted" /> : null}
+    </Press>
+  );
+}
+
 const styles = StyleSheet.create({
-  /* 구역 하나. 제목과 내용 사이는 한 눈금입니다. */
-  block: {
-    gap: Spacing.s3,
+  /* 구역 머리 오른쪽. 글자와 꺽쇠가 붙어 한 덩어리로 읽혀야 합니다. */
+  moreLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
   },
-  /* 줄 하나. 썸네일이 들어도 글자가 눌리지 않을 높이를 둡니다. */
-  row: {
-    paddingVertical: Spacing.s3,
-    minHeight: Tap.min + Spacing.s3,
+  moreLinkLabel: {
+    ...Type.caption,
+    fontSize: 14,
+    fontWeight: Weight.medium,
+    color: Colors.textMuted,
   },
   wrap: {
     flexWrap: 'wrap',

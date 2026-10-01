@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { Stack, useNavigation, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -21,7 +21,9 @@ import {
   Row,
   Screen,
   SegmentedTabs,
+  Title,
 } from '@/ui';
+import { NavLeft } from '@/ui/nav';
 
 type Tab = 'places' | 'regions';
 
@@ -61,9 +63,20 @@ const TABS: { value: Tab; label: string }[] = [
  * 띠를 달아 두었더니 <b>켜진 칸이 하나도 없는 띠</b>가 아래에 서 있었습니다 —
  * 지금 어디인지를 말해야 하는 것이 아무 말도 안 하고 자리만 먹었습니다.
  * 돌아가는 길은 상단바 뒤로가 맡습니다.
+ *
+ * <h3>제목이 상단바에서 본문으로 내려왔습니다</h3>
+ *
+ * <p>갈래에서 바로 열리는 화면들 가운데 어떤 것은 큰 제목을 본문 맨 위에
+ * 두고 어떤 것은 작은 제목을 막대 가운데에 두고 있었습니다. 같은 깊이의
+ * 화면인데 제목이 서는 자리가 다르니, 옮겨 다니면 <b>제목이 위아래로
+ * 뛰었습니다.</b>
+ *
+ * <p>여기도 큰 제목으로 내립니다. 돌아갈 길이 있어야 하는 화면이라
+ * 제목 왼쪽에 뒤로·처음 단추를 함께 둡니다.
  */
 export default function Popular() {
   const router = useRouter();
+  const navigation = useNavigation();
   const [tab, setTab] = useState<Tab>('places');
   /** 갈래로 거르고 있는 것. 비우면 전부. */
   const [kind, setKind] = useState<string | null>(null);
@@ -106,7 +119,20 @@ export default function Popular() {
   );
 
   return (
-    <Screen>
+    <Screen
+      safeTop
+      header={
+        <Row gap={Spacing.s2}>
+          <NavLeft navigation={navigation} up="/(app)/home" />
+          <Grow>
+            <Title>지금 뜨는 여행지</Title>
+          </Grow>
+        </Row>
+      }>
+      {/* 큰 제목이 본문 위에 서므로 상단바는 걷습니다. 둘 다 두면 같은 말이
+          한 화면에 두 번 적힙니다. */}
+      <Stack.Screen options={{ headerShown: false }} />
+
       <SegmentedTabs items={TABS} value={tab} onChange={setTab} />
 
       {tab === 'places' ? (
@@ -167,10 +193,11 @@ export default function Popular() {
             />
           ) : null}
 
-          {places?.places.map((place, i) => (
+          {places?.places.map((place, i, all) => (
             <Rank
               key={place.key}
               at={i + 1}
+              last={i === all.length - 1}
               mark={<Mark emoji={iconOf(place.icon)} fallback="📍" />}
               title={place.name}
               sub={labelOf(place.icon)}
@@ -199,10 +226,11 @@ export default function Popular() {
             <Empty message="아직 올라온 일정이 없어요. 첫 번째가 되어 보세요." />
           ) : null}
 
-          {regions?.regions.map((r, i) => (
+          {regions?.regions.map((r, i, all) => (
             <Rank
               key={r.region}
               at={i + 1}
+              last={i === all.length - 1}
               title={r.region}
               sub={r.likes > 0 ? `♥ ${r.likes}` : '그 지역 글 보기'}
               meta={`여행 ${r.posts}개`}
@@ -237,6 +265,16 @@ export default function Popular() {
  * <p>열 줄이 모두 같은 무게면 순위가 아니라 그냥 목록입니다. 1·2·3 만
  * 브랜드색으로 두고 나머지는 흐린 회색입니다 — 색은 "여기가 위" 라는
  * 말만 하고 물러섭니다.
+ *
+ * <h3>{@code ListRow} 를 안 쓰는 까닭</h3>
+ *
+ * <p>목록 줄은 {@code ListRow} 로 통일했지만 그것은 <b>누르는 줄</b>입니다.
+ * 좌표가 없는 곳은 들여다볼 판을 열 수 없어 누를 데가 없는데, 누르는 줄로
+ * 두면 눌러도 아무 일이 안 일어나는 줄이 목록에 섞입니다.
+ *
+ * <p>생김새는 맞춥니다. 높이·사이·아래 선을 {@code ListRow} 와 같게 두고
+ * 마지막 줄에는 선을 안 긋습니다 — 눌리는 줄과 안 눌리는 줄이 나란히 서도
+ * 한 목록으로 읽혀야 합니다.
  */
 function Rank({
   at,
@@ -244,6 +282,7 @@ function Rank({
   title,
   sub,
   meta,
+  last,
   onPress,
 }: {
   at: number;
@@ -252,6 +291,8 @@ function Rank({
   sub: string;
   /** 줄 오른쪽에 붙는 수. 몇 번 담겼는지. */
   meta: string;
+  /** 목록의 마지막 줄인지. 마지막에는 선을 안 긋습니다. */
+  last?: boolean;
   onPress?: () => void;
 }) {
   const body = (
@@ -268,13 +309,17 @@ function Rank({
     </Row>
   );
 
+  /* 선은 겉껍데기가 긋습니다. 누르는 자리에 그으면 눌릴 때 선까지 함께
+     움직이는 것으로 보입니다. */
   if (!onPress) {
-    return <View>{body}</View>;
+    return <View style={last ? null : styles.rankLine}>{body}</View>;
   }
   return (
-    <Press onPress={onPress} scale={1} accessibilityLabel={`${title} 자세히`}>
-      {body}
-    </Press>
+    <View style={last ? null : styles.rankLine}>
+      <Press onPress={onPress} scale={1} accessibilityLabel={`${title} 자세히`}>
+        {body}
+      </Press>
+    </View>
   );
 }
 
@@ -287,6 +332,11 @@ const styles = StyleSheet.create({
     /* 썸네일이 드는 줄의 높이. 번호와 표식이 함께 서도 글자가 눌리지
        않습니다. */
     minHeight: 72,
+  },
+  /* 줄을 가르는 선. 목록 줄({@code ListRow})과 같은 굵기·색입니다. */
+  rankLine: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.divider,
   },
   /*
     순위 번호.

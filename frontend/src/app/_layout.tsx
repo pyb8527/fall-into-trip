@@ -10,6 +10,7 @@ import { ShellInsets } from '@/lib/shell-insets.web';
 import { listenForShellOpen } from '@/lib/shell-open.web';
 import { Colors, Fonts, Type, Weight } from '@/constants/theme';
 import { HandFont } from '@/ui/hand';
+import { useWide } from '@/ui/layout';
 import { stackHeader } from '@/ui/nav';
 import { WANT } from '@/constants/words';
 
@@ -87,6 +88,11 @@ export default function RootLayout() {
     tellShellCanGoBack(typeof window !== 'undefined' && window.history.length > 1);
   }, [here]);
 
+  /* 여행에 딸린 네 화면은 여행의 갈래 띠를 답니다. 넓은 화면에서 그 띠가
+     왼쪽 기둥으로 서므로, 본문과 막대가 그만큼 비켜 앉아야 합니다
+     (ui/nav 의 rail). */
+  const wide = useWide();
+
   return (
     /* 노치·홈 인디케이터 크기를 화면들이 물어볼 수 있게 가장 바깥에 둡니다. */
     <SafeAreaProvider>
@@ -129,10 +135,22 @@ export default function RootLayout() {
                 (각 화면의 Stack.Screen). 여기 적는 것은 아직 못 받았을
                 때 잠깐 보일 이름입니다. */}
             {/* 일정의 위층은 여행 목록입니다. 여기만 「내 여행」이 맞습니다. */}
-            <Stack.Screen name="trip/[id]" options={stackHeader('일정', { up: '/(app)/trips' })} />
-            <Stack.Screen name="vote/[id]" options={stackHeader(WANT, { toTrip: true })} />
-            <Stack.Screen name="card/[id]" options={stackHeader('여행 카드', { toTrip: true })} />
-            <Stack.Screen name="money/[id]" options={stackHeader('가계부', { toTrip: true })} />
+            <Stack.Screen
+              name="trip/[id]"
+              options={stackHeader('일정', { up: '/(app)/trips', rail: wide })}
+            />
+            <Stack.Screen
+              name="vote/[id]"
+              options={stackHeader(WANT, { toTrip: true, rail: wide })}
+            />
+            <Stack.Screen
+              name="card/[id]"
+              options={stackHeader('여행 카드', { toTrip: true, rail: wide })}
+            />
+            <Stack.Screen
+              name="money/[id]"
+              options={stackHeader('가계부', { toTrip: true, rail: wide })}
+            />
             {/* 모임 이름은 화면이 받아 온 뒤에 스스로 답니다. 여기 적는
                 것은 아직 못 받았을 때 잠깐 보일 이름입니다. */}
             <Stack.Screen name="group/[id]" options={stackHeader('모임', { up: '/(app)/groups' })} />

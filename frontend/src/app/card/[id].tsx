@@ -30,6 +30,7 @@ import {
   Loading,
   Row,
   Screen,
+  SectionHeader,
   SegmentedTabs,
   Split,
   Title,
@@ -105,7 +106,7 @@ export default function Card() {
   }
 
   return (
-    <Screen tabs={<TripTabs tripId={id} active="card" />}>
+    <Screen tabs={<TripTabs tripId={id} active="card" title={data.trip.title} />}>
       <Stack.Screen
         options={{
           title: data.trip.title,
@@ -141,30 +142,36 @@ export default function Card() {
         한쪽만 설명이 붙어 있어서, 아래 단추는 무엇을 보내는 것인지 적혀
         있지 않았습니다. 한 구역에 담고 나란히 둡니다 — 왼쪽이 가벼운 쪽,
         오른쪽이 주된 쪽입니다.
+
+        <h3>회색 상자를 풀었습니다</h3>
+
+        <p>이 구역을 회색 면 상자로 감싸고 제목도 그 안에서 손으로 적고
+        있었습니다. 그런데 상자는 <b>구역을 만드는 물건이 아닙니다</b> —
+        구역은 위의 띠가 가르고 이름은 구역 머리가 답니다. 상자를 쓰니
+        같은 구역 머리가 화면마다 다른 크기로 섰고, 상자 안쪽 여백만큼
+        단추가 좌우 글자선에서 안으로 밀려 들어갔습니다.
       */}
-      <View style={styles.share}>
-        <Body strong>이 여행을 남길까요?</Body>
-        <Caption tone="secondary">
-          여행기로 올리면 일정이 그대로 따라가요. 나만 볼 수도 있어요.
-        </Caption>
-        <Row gap={Spacing.s2}>
+      <SectionHeader
+        title="이 여행을 남길까요?"
+        note="여행기로 올리면 일정이 그대로 따라가요. 나만 볼 수도 있어요."
+      />
+      <Row gap={Spacing.s2}>
+        <Grow>
+          <Button
+            label="링크 보내기"
+            variant="secondary"
+            compact
+            onPress={() => shareLink(sharableUrl(id), data.trip.title)}
+          />
+        </Grow>
+        {/* 장소가 하나도 없으면 안 냅니다 — 빈 일정을 여행기로 남기라고
+            하는 것은 아직 이릅니다. */}
+        {data.days.some((d) => d.places.length > 0) ? (
           <Grow>
-            <Button
-              label="링크 보내기"
-              variant="secondary"
-              compact
-              onPress={() => shareLink(sharableUrl(id), data.trip.title)}
-            />
+            <Button label="여행기 올리기" compact onPress={() => setPublishing(true)} />
           </Grow>
-          {/* 장소가 하나도 없으면 안 냅니다 — 빈 일정을 여행기로 남기라고
-              하는 것은 아직 이릅니다. */}
-          {data.days.some((d) => d.places.length > 0) ? (
-            <Grow>
-              <Button label="여행기 올리기" compact onPress={() => setPublishing(true)} />
-            </Grow>
-          ) : null}
-        </Row>
-      </View>
+        ) : null}
+      </Row>
       <PublishForm
         visible={publishing}
         tripId={id}
@@ -587,12 +594,5 @@ const styles = StyleSheet.create({
   dayRail: {
     flexWrap: 'nowrap',
     paddingRight: Spacing.s4,
-  },
-  /* 내놓는 구역. 눌러서 들어가는 물건이 아니라 안내라 회색 면입니다. */
-  share: {
-    backgroundColor: Colors.fill,
-    borderRadius: Radius.r3,
-    padding: Spacing.s4,
-    gap: Spacing.s2,
   },
 });

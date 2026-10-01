@@ -214,7 +214,9 @@ export default function Money() {
 
   return (
     <Screen
-      tabs={<TripTabs tripId={id} active="money" />}
+      /* 넓은 화면에서는 이 띠가 왼쪽 기둥입니다. 기둥 위쪽에 여행 이름이
+         서므로 넘겨 줍니다 — 아래 띠에서는 안 씁니다. */
+      tabs={<TripTabs tripId={id} active="money" title={trip?.trip.title} />}
       snack={<Snack undo={undo} onHide={hideUndo} />}
       footer={
         tab === 'list' ? (
@@ -836,7 +838,7 @@ function SpendSheet({
           <Divider />
           <Button
             label="이 지출 지우기"
-            variant="danger"
+            variant="dangerText"
             onPress={() => onRemove(spend)}
           />
         </>

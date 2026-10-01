@@ -129,11 +129,14 @@ export function DayPicker({
           ) : null}
           {(trips?.trips ?? [])
             .filter((t) => t.title.toLowerCase().includes(q.trim().toLowerCase()))
-            .map((t) => (
+            /* 찾기로 걸러진 뒤의 줄 수를 봐야 합니다 — 여행 전체를 세면
+               걸러져 사라진 줄이 마지막일 때 선이 하나 남아 떴습니다. */
+            .map((t, i, shown) => (
               <ListRow
                 key={t.id}
                 title={t.title}
                 subtitle={`${t.dayCount}일 · 장소 ${t.placeCount}곳`}
+                last={i === shown.length - 1}
                 onPress={() => setTrip(t)}
               />
             ))}
@@ -154,6 +157,7 @@ export function DayPicker({
               left={<DayDot at={at} />}
               title={day.label || `${at + 1}일차`}
               subtitle={[day.date, `장소 ${day.places.length}곳`].filter(Boolean).join(' · ')}
+              last={at === shown.length - 1}
               onPress={() => pour(day.id)}
             />
           ))}

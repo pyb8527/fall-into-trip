@@ -29,7 +29,6 @@ import {
   Screen,
   SegmentedTabs,
   Split,
-  Title,
 } from '@/ui';
 import { stackHeader } from '@/ui/nav';
 
@@ -134,14 +133,21 @@ export default function GroupScreen() {
       {group ? (
         <>
           <View style={styles.head}>
-            <View style={styles.crest}>
-              <Text style={styles.crestEmoji}>{group.emoji ?? '🧳'}</Text>
-            </View>
+            {/*
+              모임 이름은 위 막대가 적습니다.
 
+              <p>여기 한 번 더 큰 제목으로 적어 두었습니다. 그래서 한 화면에
+              같은 말이 두 번 있었고, 무엇보다 <b>상세 화면마다 제목이 서는
+              자리가 달랐습니다</b> — 여행 요약과 여행기는 막대에만 적고
+              모임만 본문에도 적었습니다. 상세 화면의 제목은 늘 막대입니다.
+
+              <p>남은 것은 이 모임이 무엇인지 말하는 것들뿐입니다 — 표식,
+              소개, 사람들, 그리고 여기서 바로 하는 일 둘.
+            */}
             <Split>
-              <Grow>
-                <Title>{group.name}</Title>
-              </Grow>
+              <View style={styles.crest}>
+                <Text style={styles.crestEmoji}>{group.emoji ?? '🧳'}</Text>
+              </View>
               {amOwner ? (
                 <Button label="편집" variant="ghost" compact onPress={() => setEditing(true)} />
               ) : null}
@@ -199,10 +205,11 @@ export default function GroupScreen() {
               {data.trips.length === 0 ? (
                 <Empty message="아직 짠 여행이 없어요. 위에서 첫 줄을 그어 보세요." />
               ) : null}
-              {data.trips.map((t) => (
+              {data.trips.map((t, i) => (
                 <ListRow
                   key={t.id}
                   title={t.title}
+                  last={i === data.trips.length - 1}
                   onPress={() => router.push({ pathname: '/trip/[id]', params: { id: t.id } })}
                 />
               ))}
@@ -214,14 +221,15 @@ export default function GroupScreen() {
           {amOwner ? (
             <>
               <Band />
-              <Press
+              {/* 손으로 그린 줄이었습니다. 목록 줄 부품을 쓰면 위 여행 목록과
+                  높이·여백이 같아져 「맨 아래에 있는 또 하나의 줄」 로
+                  읽힙니다 — 단추가 아니라 줄이어야 하는 자리입니다. */}
+              <ListRow
+                left={<Icon name="trash-2" size={20} tone="danger" />}
+                title={<Body strong tone="danger">모임 지우기</Body>}
+                last
                 onPress={() => setDeleting(true)}
-                accessibilityLabel="모임 지우기"
-                scale={1}
-                style={styles.dangerRow}>
-                <Icon name="trash-2" size={20} tone="danger" />
-                <Body tone="danger">모임 지우기</Body>
-              </Press>
+              />
             </>
           ) : null}
 
@@ -308,12 +316,5 @@ const styles = StyleSheet.create({
   /* 주 동작은 보조의 두 배 폭을 먹습니다. */
   lead: {
     flex: 2,
-  },
-  /* 되돌릴 수 없는 일. 단추가 아니라 줄입니다. */
-  dangerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.s3,
-    minHeight: Tap.min,
   },
 });

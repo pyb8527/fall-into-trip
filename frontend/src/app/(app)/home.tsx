@@ -46,6 +46,7 @@ import {
   Button,
   Caption,
   ErrorNote,
+  Grow,
   Icon,
   IconButton,
   ListRow,
@@ -54,8 +55,10 @@ import {
   Press,
   Row,
   Screen,
+  SectionHeader,
   Split,
 } from '@/ui';
+import { CardGap, useCardColumns } from '@/ui/layout';
 import { LogoMark } from '@/ui/logo';
 import { AppTabs } from '@/ui/tab-bar';
 
@@ -204,9 +207,18 @@ export default function Home() {
       tabs={<AppTabs />}
       header={
         <Split>
-          {/* 줄 높이는 그 안에서 가장 큰 것이 정합니다. 로고는 막대 안에서
-              22 입니다 — 더 키우면 막대가 그만큼 높아집니다. */}
-          <LogoMark size={22} />
+          {/*
+            갈래 화면 넷이 같은 머리로 섭니다 — 왼쪽에 이 화면의 이름, 오른쪽에
+            그림 단추. 다른 셋은 그 자리에 큰 제목(「내 여행」·「모임」·「저장」)이
+            서고, 홈만 이름 대신 로고입니다. 홈은 앱의 첫 화면이라 「홈」이라고
+            적는 것이 아무 말도 안 하고, 로고가 그 자리에서 이름 노릇을 합니다.
+
+            <p>줄 높이는 그 안에서 가장 큰 것이 정합니다. 로고는 막대 안에서
+            22 입니다 — 더 키우면 막대가 그만큼 높아집니다.
+          */}
+          <Grow>
+            <LogoMark size={22} />
+          </Grow>
           {/*
             오른쪽에 둘입니다.
 
@@ -235,69 +247,89 @@ export default function Home() {
         </Split>
       }>
       {/*
-        히어로 — 가장 가까운 여행.
+        히어로와 그 아래 바로가기는 <b>한 구역</b>입니다.
 
-        <p>여기만 사진(동선 그림)이 깔립니다. 화면에 한 장이면 그것이 무엇을
-        보라는 말인지가 분명하고, 둘이 되면 둘 다 장식이 됩니다.
+        <p>둘을 화면의 직접 자식으로 두면 사이에 화면 기본 간격이 한 번 더
+        끼어, 바로가기가 히어로에 딸린 것이 아니라 제 구역처럼 떠 보였습니다.
+        한 칸에 넣으면 간격을 안쪽에서 정합니다.
       */}
+      <View>
+        {/*
+          히어로 — 가장 가까운 여행.
+
+          <p>여기만 사진(동선 그림)이 깔립니다. 화면에 한 장이면 그것이 무엇을
+          보라는 말인지가 분명하고, 둘이 되면 둘 다 장식이 됩니다.
+        */}
+        {/*
+          아직 못 받았으면 빈자리로 두지 않습니다.
+
+          <p>여행 목록이 오기 전에는 이 자리가 통째로 비어서, 홈을 열면
+          <b>「지금 뜨는 곳」부터</b> 시작하는 화면이 한 박자 보였습니다 —
+          내 것이 하나도 없는 화면입니다.
+
+          <p>못 받아 왔으면 그렇다고 말하고 다시 받을 길을 줍니다. 조용히
+          비워 두면 여행이 없는 것과 못 받아 온 것이 같아 보입니다.
+        */}
+        {mineError ? (
+          <ErrorNote message={mineError} onRetry={reloadMine} />
+        ) : next ? (
+          <Hero
+            trip={next.trip}
+            at={next.at}
+            todayCount={todayCount}
+            onPress={() => router.push(`/trip/${next.trip.id}`)}
+          />
+        ) : mine ? (
+          <FirstSteps />
+        ) : (
+          <Loading />
+        )}
+
+        {/*
+          히어로 아래 바로가기.
+
+          <p>여행 안에 들어가서 아래 갈래 띠로 옮겨야 닿던 것들입니다. 길 위에
+          있는 사람이 하루에 몇 번씩 가는 자리라 한 번에 닿는 편이 맞습니다.
+
+          <p>「챙길 것」과 「공유」는 아직 여행 안에서만 열립니다 — 바깥에서
+          가리킬 주소가 없어서 넣지 않았습니다. 주소가 생기면 여기 붙습니다.
+        */}
+        {next ? (
+          <Row gap={Spacing.s2} style={styles.shortcuts}>
+            <Shortcut
+              icon="thumbs-up"
+              label="가고 싶은 곳"
+              onPress={() => router.push({ pathname: '/vote/[id]', params: { id: next.trip.id } })}
+            />
+            <Shortcut
+              icon="credit-card"
+              label="가계부"
+              onPress={() => router.push({ pathname: '/money/[id]', params: { id: next.trip.id } })}
+            />
+            <Shortcut
+              icon="book-open"
+              label="여행 요약"
+              onPress={() => router.push({ pathname: '/card/[id]', params: { id: next.trip.id } })}
+            />
+          </Row>
+        ) : null}
+      </View>
+
       {/*
-        아직 못 받았으면 빈자리로 두지 않습니다.
+        구역 하나를 한 칸에 담습니다.
 
-        <p>여행 목록이 오기 전에는 이 자리가 통째로 비어서, 홈을 열면
-        <b>「지금 뜨는 곳」부터</b> 시작하는 화면이 한 박자 보였습니다 —
-        내 것이 하나도 없는 화면입니다.
-
-        <p>못 받아 왔으면 그렇다고 말하고 다시 받을 길을 줍니다. 조용히
-        비워 두면 여행이 없는 것과 못 받아 온 것이 같아 보입니다.
+        <p>띠와 머리와 내용을 화면의 직접 자식으로 늘어놓았더니, 그 사이마다
+        화면 기본 간격이 끼어 띠 아래가 쓸데없이 벌어졌습니다. 한 칸에 넣으면
+        여백은 띠와 머리가 가진 것만 남습니다.
       */}
-      {mineError ? (
-        <ErrorNote message={mineError} onRetry={reloadMine} />
-      ) : next ? (
-        <Hero
-          trip={next.trip}
-          at={next.at}
-          todayCount={todayCount}
-          onPress={() => router.push(`/trip/${next.trip.id}`)}
-        />
-      ) : mine ? (
-        <FirstSteps />
-      ) : (
-        <Loading />
-      )}
-
-      {/*
-        히어로 아래 바로가기.
-
-        <p>여행 안에 들어가서 아래 갈래 띠로 옮겨야 닿던 것들입니다. 길 위에
-        있는 사람이 하루에 몇 번씩 가는 자리라 한 번에 닿는 편이 맞습니다.
-
-        <p>「챙길 것」과 「공유」는 아직 여행 안에서만 열립니다 — 바깥에서
-        가리킬 주소가 없어서 넣지 않았습니다. 주소가 생기면 여기 붙습니다.
-      */}
-      {next ? (
-        <Row gap={Spacing.s2} style={styles.shortcuts}>
-          <Shortcut
-            icon="thumbs-up"
-            label="가고 싶은 곳"
-            onPress={() => router.push({ pathname: '/vote/[id]', params: { id: next.trip.id } })}
-          />
-          <Shortcut
-            icon="credit-card"
-            label="가계부"
-            onPress={() => router.push({ pathname: '/money/[id]', params: { id: next.trip.id } })}
-          />
-          <Shortcut
-            icon="book-open"
-            label="여행 요약"
-            onPress={() => router.push({ pathname: '/card/[id]', params: { id: next.trip.id } })}
-          />
-        </Row>
-      ) : null}
-
       {crew.length > 0 ? (
-        <>
+        <View>
           <Band />
-          <SectionHead title="모임 여행" action="전체보기" onAction={() => router.push('/(app)/trips')} />
+          <SectionHeader
+            tight
+            title="모임 여행"
+            action={<SeeAll what="모임 여행" onPress={() => router.push('/(app)/trips')} />}
+          />
           <Carousel>
             {(cardWidth) =>
               crew.map((trip) => (
@@ -330,14 +362,18 @@ export default function Home() {
               ))
             }
           </Carousel>
-        </>
+        </View>
       ) : null}
 
       {solo.length > 0 ? (
-        <>
+        <View>
           <Band />
-          <SectionHead title="내 여행" action="전체보기" onAction={() => router.push('/(app)/trips')} />
-          {solo.map((trip) => {
+          <SectionHeader
+            tight
+            title="내 여행"
+            action={<SeeAll what="내 여행" onPress={() => router.push('/(app)/trips')} />}
+          />
+          {solo.map((trip, i) => {
             const at = countdownOf(trip.startIso, trip.endIso);
             return (
               <ListRow
@@ -354,11 +390,14 @@ export default function Home() {
                     <Icon name="chevron-right" size={20} tone="muted" />
                   )
                 }
+                /* 마지막 줄에는 선을 안 긋습니다. 아래가 띠로 끊기는데 선까지
+                   있으면 줄이 하나 더 있는 줄 압니다. */
+                last={i === solo.length - 1}
                 onPress={() => router.push(`/trip/${trip.id}`)}
               />
             );
           })}
-        </>
+        </View>
       ) : null}
 
       {/*
@@ -369,12 +408,12 @@ export default function Home() {
         보는 사람이 얻는 것은 <b>내 여행의 밑그림</b>입니다.
       */}
       {shared && shared.posts.length > 0 ? (
-        <>
+        <View>
           <Band />
-          <SectionHead
+          <SectionHeader
+            tight
             title="이런 여행은 어때요?"
-            action="전체보기"
-            onAction={() => router.push('/community')}
+            action={<SeeAll what="남이 짜 둔 여행" onPress={() => router.push('/community')} />}
           />
           <Carousel>
             {(cardWidth) =>
@@ -409,7 +448,7 @@ export default function Home() {
               ))
             }
           </Carousel>
-        </>
+        </View>
       ) : null}
 
       {/*
@@ -422,10 +461,10 @@ export default function Home() {
         홈은 있다는 것만 알립니다.
       */}
       {top && top.places.length > 0 ? (
-        <>
+        <View>
           <Band />
-          <SectionHead title="지금 뜨는 곳" />
-          {top.places.slice(0, 5).map((place, i) => {
+          <SectionHeader title="지금 뜨는 곳" tight />
+          {top.places.slice(0, 5).map((place, i, rows) => {
             /*
               누르면 그 곳이 어떤 데인지 봅니다.
 
@@ -449,6 +488,9 @@ export default function Home() {
                 subtitle={[labelOf(place.icon), `여행 ${place.posts}개에 담김`]
                   .filter(Boolean)
                   .join(' · ')}
+                /* 아래에 「더 보러가기」가 붙습니다. 선까지 그으면 그 단추가
+                   순위의 여섯째 줄처럼 보입니다. */
+                last={i === rows.length - 1}
                 onPress={
                   canLook
                     ? () =>
@@ -471,7 +513,7 @@ export default function Home() {
               onPress={() => router.push('/(app)/popular')}
             />
           </View>
-        </>
+        </View>
       ) : null}
 
       {/*
@@ -481,23 +523,27 @@ export default function Home() {
         쓸 일이 있을 때 찾아 내려오는 것이고, 특히 운영은 운영자에게만
         보입니다.
       */}
-      <Band />
-      <ListRow
-        left={<Icon name="settings" size={24} tone="secondary" />}
-        title="내 계정"
-        subtitle={user?.name ?? undefined}
-        right={<Icon name="chevron-right" size={20} tone="muted" />}
-        onPress={() => router.push('/(app)/settings')}
-      />
-      {user?.role === 'ADMIN' ? (
+      <View>
+        <Band />
         <ListRow
-          left={<Icon name="users" size={24} tone="secondary" />}
-          title="운영 관리"
-          subtitle="계정 관리 · 감사 로그"
+          left={<Icon name="settings" size={24} tone="secondary" />}
+          title="내 계정"
+          subtitle={user?.name ?? undefined}
           right={<Icon name="chevron-right" size={20} tone="muted" />}
-          onPress={() => router.push('/admin')}
+          last={user?.role !== 'ADMIN'}
+          onPress={() => router.push('/(app)/settings')}
         />
-      ) : null}
+        {user?.role === 'ADMIN' ? (
+          <ListRow
+            left={<Icon name="users" size={24} tone="secondary" />}
+            title="운영 관리"
+            subtitle="계정 관리 · 감사 로그"
+            right={<Icon name="chevron-right" size={20} tone="muted" />}
+            last
+            onPress={() => router.push('/admin')}
+          />
+        ) : null}
+      </View>
 
       <PlaceDetailSheet place={looking} onClose={() => setLooking(null)} />
     </Screen>
@@ -507,36 +553,33 @@ export default function Home() {
 /* ------------------------------------------------------------------ 조각 */
 
 /**
- * 구역의 이름.
+ * 구역 머리 오른쪽의 「전체보기」.
  *
- * <p>오른쪽의 「전체보기」는 큰 단추가 아니라 작은 글자입니다. 이 구역에서
- * 가장 굵은 것은 그 안의 여행 이름들이어야 합니다 — 전에는 카드 안 맨
- * 아래에 큰 단추로 두어, 제일 안 중요한 것이 제일 커 보였습니다.
+ * <h3>머리는 이제 공용 부품이 만듭니다</h3>
+ *
+ * <p>여기서 구역 머리를 통째로 만들고 있었습니다({@code SectionHead}). 그래서
+ * 글자 크기도 위아래 여백도 「전체보기」가 붙는 자리도 홈만의 값이었고,
+ * 다른 갈래 화면으로 옮겨 가면 <b>같은 앱이 아닌 것처럼</b> 보였습니다.
+ * 머리는 {@code SectionHeader} 가 맡고, 여기에는 오른쪽에 들어갈 것만
+ * 남깁니다.
+ *
+ * <p>큰 단추가 아니라 작은 글자입니다. 이 구역에서 가장 굵은 것은 그 안의
+ * 여행 이름들이어야 합니다 — 전에는 카드 안 맨 아래에 큰 단추로 두어,
+ * 제일 안 중요한 것이 제일 커 보였습니다.
+ *
+ * @param what 무엇을 전체보기 하는지. 읽어 주는 기기만 씁니다
  */
-function SectionHead({
-  title,
-  action,
-  onAction,
-}: {
-  title: string;
-  action?: string;
-  onAction?: () => void;
-}) {
+function SeeAll({ what, onPress }: { what: string; onPress: () => void }) {
   return (
-    <Split align="baseline" style={styles.sectionHead}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      {action && onAction ? (
-        <Press
-          onPress={onAction}
-          hitSlop={Spacing.s3}
-          scale={0.96}
-          accessibilityLabel={`${title} ${action}`}
-          style={styles.sectionAction}>
-          <Text style={styles.sectionActionLabel}>{action}</Text>
-          <Icon name="chevron-right" size={16} tone="muted" />
-        </Press>
-      ) : null}
-    </Split>
+    <Press
+      onPress={onPress}
+      hitSlop={Spacing.s3}
+      scale={0.96}
+      accessibilityLabel={`${what} 전체보기`}
+      style={styles.seeAll}>
+      <Text style={styles.seeAllLabel}>전체보기</Text>
+      <Icon name="chevron-right" size={16} tone="muted" />
+    </Press>
   );
 }
 
@@ -558,6 +601,41 @@ function Carousel({ children }: { children: (cardWidth: number) => React.ReactNo
      밖으로 나가지 않습니다. */
   const inner = Math.min(width, MaxContentWidth);
   const cardWidth = Math.max(160, inner - Gutter - 48);
+
+  /*
+    넓은 화면에서는 흘리지 않고 늘어놓습니다.
+
+    <h3>옆으로 흘리는 것은 폰의 손짓입니다</h3>
+
+    <p>카드 한 장이 거의 화면 폭만 하고, 다음 장이 48 비칩니다. 엄지로
+    밀어 보는 띠라 폰에서는 이것이 맞습니다.
+
+    <p>그런데 PC 브라우저에서는 밀 손가락이 없습니다. 마우스로 가로 띠를
+    굴리는 일은 거의 안 하고, 1280 짜리 창에서 카드 한 장이 600 을 쓰면서
+    그 옆은 비어 있었습니다 — 자리는 남는데 두 장째를 보려면 끌어야
+    했습니다.
+
+    <p>칸을 나눠 한눈에 늘어놓습니다. 두 칸(태블릿)이나 세 칸(PC)이고,
+    사이는 계획서가 정한 20 입니다.
+
+    <h3>폭은 재서 씁니다</h3>
+
+    <p>본문 최대 폭을 숫자로 가져다 나누지 않았습니다. 그 값은 화면 뼈대가
+    들고 있고 단계마다 다릅니다 — 여기서 한 번 더 적어 두면 둘 중 하나가
+    바뀔 때 카드가 본문 밖으로 나갑니다. 제가 받은 자리를 재서 나눕니다.
+    첫 그림에서는 아직 못 쟀으므로 한 번 비워 두고 다음 그림에서 채웁니다.
+  */
+  const columns = useCardColumns();
+  const [room, setRoom] = useState(0);
+
+  if (columns > 1) {
+    const gridCard = room > 0 ? Math.floor((room - CardGap * (columns - 1)) / columns) : 0;
+    return (
+      <View style={styles.grid} onLayout={(e) => setRoom(e.nativeEvent.layout.width)}>
+        {gridCard > 0 ? children(gridCard) : null}
+      </View>
+    );
+  }
 
   return (
     <ScrollView
@@ -727,6 +805,7 @@ function FirstSteps() {
           left={<Icon name="compass" size={24} tone="secondary" />}
           title="남의 길 구경하기"
           right={<Icon name="chevron-right" size={20} tone="muted" />}
+          last
           onPress={() => router.push('/community')}
         />
       </View>
@@ -747,21 +826,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: Gutter,
     gap: Spacing.s3,
   },
+  /* 넓은 화면에서 띠 대신 서는 격자. 흘리는 띠는 화면 끝까지 나갔지만
+     (bleed) 격자는 본문 안에 섭니다 — 끝에서 잘릴 것이 없습니다. */
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: CardGap,
+  },
 
-  sectionHead: {
-    paddingBottom: Spacing.s1,
-  },
-  sectionTitle: {
-    ...Type.title2,
-    fontWeight: Weight.bold,
-    color: Colors.text,
-  },
-  sectionAction: {
+  /* 구역 머리 오른쪽. 글자와 꺽쇠가 붙어 한 덩어리로 읽혀야 합니다. */
+  seeAll: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 2,
   },
-  sectionActionLabel: {
+  seeAllLabel: {
     ...Type.caption,
     fontSize: 14,
     fontWeight: Weight.medium,

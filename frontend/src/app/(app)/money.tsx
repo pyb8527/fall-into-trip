@@ -12,12 +12,14 @@ import {
   Caption,
   Empty,
   ErrorNote,
-  IconButton,
+  Grow,
   ListRow,
   Loading,
   Row,
   Screen,
+  Title,
 } from '@/ui';
+import { NavLeft } from '@/ui/nav';
 
 /** 한 여행에서 한 통화로 쓴 것. */
 type Sum = { currency: string; decimals: number; total: number; items: number };
@@ -83,24 +85,19 @@ export default function MoneyList() {
     <Screen
       safeTop
       /*
-        제목을 막대에 둡니다.
+        제목 줄 — 돌아갈 단추와 큰 제목.
 
-        <p>본문 맨 위에 큰 제목으로 있었습니다. 탭 루트 화면은 그래도 되는데
-        이 화면은 「내 여행」 에서 들어오는 곳이라, 돌아갈 화살표가 서야 합니다.
-        화살표와 제목이 같은 줄에 있으면 그 줄이 곧 "여기가 어디이고 어디로
-        나가는지" 입니다.
+        <p>제목을 막대 제목 크기로 적고, 돌아가는 단추도 이 화면이 직접
+        그리고 있었습니다. 그래서 알림·설정·지금 뜨는 여행지와 <b>같은 깊이의
+        화면인데 제목 크기와 돌아가는 길이 저마다 달랐습니다.</b>
+        네 화면이 같은 줄을 씁니다 — 공용 단추 묶음(NavLeft) + 큰 제목.
       */
       header={
-        <Row gap={Spacing.s1}>
-          <IconButton
-            name="chevron-left"
-            label="뒤로"
-            bare
-            onPress={() =>
-              navigation.canGoBack() ? navigation.goBack() : router.replace('/(app)/trips')
-            }
-          />
-          <Text style={styles.barTitle}>가계부</Text>
+        <Row gap={Spacing.s2}>
+          <NavLeft navigation={navigation} up="/(app)/trips" />
+          <Grow>
+            <Title>가계부</Title>
+          </Grow>
         </Row>
       }>
       {loading && !data ? <Loading /> : null}
@@ -120,9 +117,10 @@ export default function MoneyList() {
         <Empty message="아직 여행이 없어요. 여행을 하나 만들면 그 가계부가 여기 서요." />
       ) : null}
 
-      {sorted.map((trip) => (
+      {sorted.map((trip, i) => (
         <ListRow
           key={trip.id}
+          last={i === sorted.length - 1}
           left={<TripMark theme={trip.theme} emoji={trip.emoji} />}
           title={trip.title}
           subtitle={[formatSpan(trip.startIso, trip.endIso), `${trip.items}건`]
@@ -159,12 +157,6 @@ export default function MoneyList() {
 const tabular: TextStyle = { fontVariant: [...Tabular.fontVariant] };
 
 const styles = StyleSheet.create({
-  /* 막대 제목. 화살표 바로 옆, 왼쪽에 붙습니다. */
-  barTitle: {
-    ...Type.title3,
-    fontWeight: Weight.semibold,
-    color: Colors.text,
-  },
   /*
     금액은 오른쪽 끝에.
 

@@ -132,7 +132,9 @@ export default function Vote() {
 
   return (
     <Screen
-      tabs={<TripTabs tripId={id} active="vote" />}
+      /* 넓은 화면에서는 이 띠가 왼쪽 기둥입니다. 기둥 위쪽에 여행 이름이
+         서므로 넘겨 줍니다 — 아래 띠에서는 안 씁니다. */
+      tabs={<TripTabs tripId={id} active="vote" title={trip?.trip.title} />}
       /*
         아래 줄에 두 가지 일이 섭니다.
 
@@ -524,12 +526,15 @@ function AddSheet({
                 .filter(Boolean)
                 .some((f) => String(f).toLowerCase().includes(pick.trim().toLowerCase())),
             )
-            .map((place) => (
+            /* 찾기로 걸러진 뒤의 줄 수를 봐야 합니다 — 담아 둔 전체를 세면
+               걸러져 사라진 줄이 마지막일 때 선이 하나 남아 떴습니다. */
+            .map((place, i, shown) => (
             <ListRow
               key={place.id}
               title={place.name}
               left={<Mark emoji={iconOf(place.icon)} fallback="📍" />}
               subtitle={place.note ?? place.cat ?? '메모 없음'}
+              last={i === shown.length - 1}
               onPress={() => add({ savedId: place.id })}
             />
             ))}

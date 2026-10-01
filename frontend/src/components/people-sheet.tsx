@@ -230,7 +230,7 @@ function MoveSection({
       {groupId ? (
         <Button
           label="모임에서 빼고 혼자 보기"
-          variant="danger"
+          variant="dangerText"
           busy={busy}
           onPress={() => setPulling(true)}
         />

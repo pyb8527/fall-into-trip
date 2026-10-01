@@ -1,7 +1,9 @@
 import { Redirect, Stack, useRouter } from 'expo-router';
 
 import { useAuth } from '@/auth/auth-provider';
+import { Colors } from '@/constants/theme';
 import { Loading, Screen } from '@/ui';
+import { SidebarWidth, useWide } from '@/ui/layout';
 import { stackHeader } from '@/ui/nav';
 
 /**
@@ -25,6 +27,22 @@ export const unstable_settings = { anchor: 'home' };
 export default function AppLayout() {
   const { ready, user } = useAuth();
   const router = useRouter();
+  /*
+    넓은 화면에서 갈래가 왼쪽 기둥으로 섭니다(ui/tab-bar).
+
+    <h3>기둥을 세우는 쪽과 자리를 비우는 쪽이 다릅니다</h3>
+
+    <p>기둥은 아래 갈래 띠를 달던 화면이 그대로 답니다 — 띠가 모양만 바뀐
+    것이라 다는 자리도 그대로입니다. 그런데 기둥은 창에 붙어 떠 있어서
+    <b>자리를 차지하지 못합니다.</b> 비워 두지 않으면 본문 왼쪽 240 이
+    기둥 뒤로 들어갑니다.
+
+    <p>그래서 비우는 일은 층이 합니다. 띠를 다는 화면에만 비웁니다 — 띠가
+    없는 화면(검색·알림·내 계정 …)까지 비우면 거기에는 아무것도 없는 240 이
+    남습니다.
+  */
+  const wide = useWide();
+  const rail = wide ? { paddingLeft: SidebarWidth, backgroundColor: Colors.background } : undefined;
 
   if (!ready) {
     return (
@@ -40,13 +58,16 @@ export default function AppLayout() {
   return (
     <Stack>
       {/* 첫 화면은 제목 대신 로고를 본문 안에 두므로 막대를 감춥니다. */}
-      <Stack.Screen name="home" options={{ headerShown: false }} />
+      <Stack.Screen name="home" options={{ headerShown: false, contentStyle: rail }} />
       {/* 갈래에서 바로 열리는 화면들입니다. 위층은 홈입니다 — 여기서
           뒤로를 눌러 「내 여행」이 뜨면, 보석함을 보다가 엉뚱한 데로
           옮겨진 셈이 됩니다. */}
-      <Stack.Screen name="trips" options={stackHeader('내 여행', { up: '/(app)/home' })} />
-      <Stack.Screen name="groups" options={stackHeader('모임', { up: '/(app)/home' })} />
-      <Stack.Screen name="saved" options={stackHeader('저장', { up: '/(app)/home' })} />
+      <Stack.Screen
+        name="trips"
+        options={stackHeader('내 여행', { up: '/(app)/home', rail: wide })}
+      />
+      <Stack.Screen name="groups" options={stackHeader('모임', { up: '/(app)/home', rail: wide })} />
+      <Stack.Screen name="saved" options={stackHeader('저장', { up: '/(app)/home', rail: wide })} />
       {/* 제목을 화면 안에 두므로 막대를 감춥니다 — 홈과 같은 방식입니다. */}
       <Stack.Screen name="money" options={{ headerShown: false }} />
       {/* 「여럿이 간 곳」 이었습니다. 무엇이 있는지는 말해 주는데 왜

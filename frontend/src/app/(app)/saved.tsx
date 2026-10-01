@@ -18,12 +18,12 @@ import { labelOf } from '@/constants/place-icons';
 import { Colors, Spacing, Tap } from '@/constants/theme';
 import { kindsIn, savedAgo, siftSaved } from '@/lib/saved';
 import {
+  Band,
   Body,
   BottomSheet,
   Button,
   Caption,
   Chip,
-  ConfirmButton,
   Divider,
   Empty,
   ErrorNote,
@@ -36,11 +36,13 @@ import {
   Row,
   Screen,
   SearchField,
+  SectionHeader,
   Snack,
   Split,
   Title,
   useUndo,
 } from '@/ui';
+import { CardGrid } from '@/ui/grid';
 import { AppTabs } from '@/ui/tab-bar';
 import { KEEP, UNKEEP } from '@/constants/words';
 
@@ -266,17 +268,28 @@ export default function Saved() {
     }
   }
 
-  async function drop(id: string) {
+  /**
+   * 한 곳만 뺍니다.
+   *
+   * <p>누르면 그 자리에서 [빼기/취소] 로 바뀌는 단추로 물었습니다. 단추가
+   * 제 글자를 바꿔 치면 무엇이 없어지는지는 안 보이고, 두 번 누르는 자리가
+   * 겹쳐 있어서 연달아 누르면 묻는 말이 그냥 지나갑니다.
+   *
+   * <p>그런데 이 일은 되돌릴 수 있습니다 — 여러 곳을 뺄 때({@link dropPicked})
+   * 와 같은 길입니다. 그래서 묻지 않고 바로 빼고, 띠에 물러설 길을 둡니다.
+   */
+  async function drop(place: SavedPlace) {
     setFailed(null);
     setLookingId(null);
     try {
-      await api.delete(`/api/saved/${id}`);
+      await api.delete(`/api/saved/${place.id}`);
       setPicked((prev) => {
         const next = new Set(prev);
-        next.delete(id);
+        next.delete(place.id);
         return next;
       });
       reload();
+      showUndo({ message: `「${place.name}」 를 뺐어요.`, onUndo: () => restore([place]) });
     } catch (e) {
       setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
     }
@@ -420,26 +433,38 @@ export default function Saved() {
         <Empty message="눈에 띄는 곳을 담아 두었다가 일정 아무 날에나 꺼내 써요. 여행 둘러보기나 장소 찾기에서 별을 누르면 여기 쌓이고, 제목 옆 ＋ 로 바로 찾아 담을 수도 있어요." />
       ) : null}
 
-      {/* 몇 개 안 될 때는 찾을 것이 없습니다. 칸만 자리를 차지합니다. */}
-      {all.length > 4 ? (
-        <SearchField
-          label="저장한 곳에서 찾기"
-          value={q}
-          onChangeText={setQ}
-          placeholder="국밥, 온천, 도톤보리"
-        />
-      ) : null}
+      {/*
+        지도와 목록은 서로 다른 구역입니다.
+
+        <p>지도 아래로 찾기 칸과 거르기와 줄들이 곧바로 이어져 있었습니다.
+        그래서 어디까지가 「어디에 담아 뒀나」이고 어디부터가 「무엇을 담아
+        뒀나」인지 화면에 안 적혀 있었습니다 — 띠 한 가닥이 그 말을 합니다.
+      */}
+      {pins.length > 0 ? <Band /> : null}
 
       {/*
-        갈래와 정렬도 판 안으로.
+        찾기와 거르기는 한 묶음입니다.
 
-        갈래 칩이 여덟이면 좁은 폰에서 두 줄이고, 그 아래 정렬이 또 한 줄
-        입니다. 담아 둔 것을 보러 왔는데 그것이 늘 화면 밖에서 시작했습니다.
-        둘러보기와 같은 방식으로 섭니다 — 고를 수 있는 것은 판 안에, 밖에는
-        고른 것만.
+        <p>둘을 화면의 직접 자식으로 두면 사이에 기본 간격이 끼어 따로따로
+        떠 보입니다. 둘 다 <b>목록을 좁히는 일</b>이라 붙어 있어야 합니다.
+
+        <p>갈래와 정렬은 판 안으로 보냈습니다. 갈래 칩이 여덟이면 좁은 폰에서
+        두 줄이고 그 아래 정렬이 또 한 줄입니다. 담아 둔 것을 보러 왔는데
+        그것이 늘 화면 밖에서 시작했습니다 — 고를 수 있는 것은 판 안에,
+        밖에는 고른 것만.
       */}
-      {kinds.length > 1 || all.length > 2 ? (
-        <>
+      {all.length > 2 || kinds.length > 1 ? (
+        <View style={styles.sift}>
+          {/* 몇 개 안 될 때는 찾을 것이 없습니다. 칸만 자리를 차지합니다. */}
+          {all.length > 4 ? (
+            <SearchField
+              label="저장한 곳에서 찾기"
+              value={q}
+              onChangeText={setQ}
+              placeholder="국밥, 온천, 도톤보리"
+            />
+          ) : null}
+
           <Row gap={Spacing.s2} style={styles.applied}>
             <Button
               label={applied.length > 0 ? `필터 ${applied.length}` : '필터'}
@@ -451,10 +476,7 @@ export default function Saved() {
               <FilterChip key={a.key} label={a.label} onRemove={a.clear} />
             ))}
           </Row>
-          {/* 개수는 조건 줄 아래 한 줄로. 줄 안에 끼우면 조건이 늘어날 때마다
-              밀려 나가 영영 안 보입니다. */}
-          <Caption tone="secondary">{shown.length}곳</Caption>
-        </>
+        </View>
       ) : null}
 
       {/* 몇 곳이 남는지를 판을 닫기 전에 말합니다. 여기 목록은 이미 받아
@@ -511,26 +533,55 @@ export default function Saved() {
         />
       ) : null}
 
-      <View style={styles.list}>
-        {shown.map((place) => (
-          <SavedRow
-            key={place.id}
-            place={place}
-            selected={picked.has(place.id)}
-            lit={activeId === place.id}
-            onToggle={() => {
-              setActiveId(place.id);
-              toggle(place.id);
-            }}
-            /* 줄은 지도로 보냅니다. 들여다보는 판은 지도를 덮으므로 둘을
-               한꺼번에 하면 움직인 지도를 볼 수가 없습니다. */
-            onPress={() => setActiveId(place.id)}
-            onLook={() => {
-              setActiveId(place.id);
-              setLookingId(place.id);
-            }}
+      {/*
+        목록에도 머리를 세웁니다.
+
+        <p>개수 「32곳」만 조건 줄 아래에 떠 있었습니다. 그래서 줄들이 어느
+        묶음에 속한 것인지 말해 주는 것이 화면에 하나도 없었고, 지도 아래로
+        칸과 칩과 줄이 <b>이름 없이</b> 이어졌습니다 — 다른 갈래 화면들은
+        구역마다 머리가 서 있는데 이 화면만 안 서 있었습니다.
+
+        <p>개수는 머리 오른쪽으로 들어갑니다. 「내 여행」의 묶음 머리와 같은
+        모양입니다 — 제목 왼쪽, 개수 오른쪽.
+      */}
+      <View>
+        {shown.length > 0 ? (
+          <SectionHeader
+            title="담아 둔 곳"
+            action={<Caption tone="secondary">{shown.length}곳</Caption>}
           />
-        ))}
+        ) : null}
+        {/*
+          넓은 화면에서는 줄을 두세 칸으로 늘어놓습니다.
+
+          <p>담아 둔 곳은 서른, 마흔이 되기 쉽습니다. 한 칸으로 쌓으면 PC
+          브라우저에서 한 화면에 여덟 줄이 들어가고 오른쪽 절반은 빕니다 —
+          찾으려면 굴려야 하는데, 굴릴 까닭이 자리가 없어서가 아니라 줄이
+          혼자 1000 픽셀을 쓰고 있어서였습니다.
+        */}
+        <View style={styles.list}>
+          <CardGrid>
+            {shown.map((place) => (
+              <SavedRow
+                key={place.id}
+                place={place}
+                selected={picked.has(place.id)}
+                lit={activeId === place.id}
+                onToggle={() => {
+                  setActiveId(place.id);
+                  toggle(place.id);
+                }}
+                /* 줄은 지도로 보냅니다. 들여다보는 판은 지도를 덮으므로 둘을
+                   한꺼번에 하면 움직인 지도를 볼 수가 없습니다. */
+                onPress={() => setActiveId(place.id)}
+                onLook={() => {
+                  setActiveId(place.id);
+                  setLookingId(place.id);
+                }}
+              />
+            ))}
+          </CardGrid>
+        </View>
       </View>
 
       {/*
@@ -611,10 +662,11 @@ export default function Saved() {
                   setTaggingId(looking.id);
                 }}
               />
-              <ConfirmButton
+              <Button
                 label={UNKEEP}
-                confirmLabel="빼기"
-                onConfirm={() => drop(looking.id)}
+                variant="dangerText"
+                compact
+                onPress={() => drop(looking)}
               />
             </Row>
           ) : null
@@ -734,6 +786,10 @@ function Why({
 }
 
 const styles = StyleSheet.create({
+  /* 찾는 칸과 거르는 줄. 둘 다 목록을 좁히는 일이라 한 묶음입니다. */
+  sift: {
+    gap: Spacing.s3,
+  },
   applied: {
     flexWrap: 'wrap',
   },

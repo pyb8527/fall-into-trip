@@ -11,6 +11,7 @@ import {
   Empty,
   ErrorNote,
   Grow,
+  Icon,
   IconButton,
   ListRow,
   Loading,
@@ -98,12 +99,16 @@ export default function Groups() {
         </>
       ) : null}
 
-      {groups.map((g) => (
+      {groups.map((g, i) => (
         <ListRow
           key={g.id}
           left={<Mark emoji={g.emoji ?? '🧳'} />}
           title={g.name}
           subtitle={`${g.memberCount}명 · 여행 ${g.tripCount}개`}
+          right={<Icon name="chevron-right" size={20} tone="muted" />}
+          /* 마지막 줄에는 선을 안 긋습니다. 목록이 끝났는데 선이 하나 더
+             있으면 아래에 뭔가 더 있는 줄 압니다. */
+          last={i === groups.length - 1}
           onPress={() => router.push({ pathname: '/group/[id]', params: { id: g.id } })}
         />
       ))}

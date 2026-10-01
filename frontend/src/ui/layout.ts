@@ -1,4 +1,6 @@
-import { useWindowDimensions } from 'react-native';
+import { Platform, useWindowDimensions } from 'react-native';
+
+import { Spacing } from '@/constants/theme';
 
 /**
  * 화면 너비 단계.
@@ -27,6 +29,21 @@ const DESKTOP = 1024;
 
 export function useBreakpoint(): Breakpoint {
   const { width } = useWindowDimensions();
+  /*
+    앱(네이티브)에서는 늘 phone 입니다.
+
+    <p>계획서가 정한 넓은 화면은 <b>웹</b>입니다. 그리고 넓은 배치가 쓰는
+    것들이 웹에만 있습니다 — 사이드바는 {@code position: fixed} 로 서서
+    내용 바깥에 붙고, 앱에는 fixed 가 없어 absolute 로 떨어집니다. 그러면
+    사이드바가 자리를 비켜 둔 내용 <b>안쪽</b>에 갇혀 240 만큼 밀려 섭니다.
+
+    <p>가로로 눕힌 큰 태블릿 앱에서 반쯤 바뀐 모양을 보는 것보다, 폰 배치
+    그대로 보는 편이 낫습니다. 안드로이드 웹뷰는 웹이므로 폭만 보고 갈립니다
+    (그쪽은 어차피 768 밑입니다).
+  */
+  if (Platform.OS !== 'web') {
+    return 'phone';
+  }
   if (width >= DESKTOP) {
     return 'desktop';
   }
@@ -75,3 +92,28 @@ export const CardColumns: Record<Breakpoint, number> = {
   tablet: 2,
   desktop: 3,
 };
+
+/** 몇 칸인지만 물을 때. 칸을 세는 쪽이 단계를 다시 외우지 않게 합니다. */
+export function useCardColumns(): number {
+  return CardColumns[useBreakpoint()];
+}
+
+/**
+ * 카드 사이.
+ *
+ * <p>계획서가 정한 20 입니다. 화면 좌우 여백과 같은 값이라, 세 칸이 섰을
+ * 때 카드 사이와 화면 끝까지가 같은 간격으로 보입니다.
+ */
+export const CardGap = Spacing.s5;
+
+/**
+ * 지도를 쓰는 상세 화면의 왼쪽 패널 폭.
+ *
+ * <p>폰에서는 지도 위로 끌어올리는 판(DragSheet)이 하던 일입니다. 넓은
+ * 화면에서는 끌 까닭이 없습니다 — 지도와 일정을 나란히 둘 자리가 있으니,
+ * 판을 올렸다 내렸다 하는 것은 손이 한 번 더 가는 일일 뿐입니다.
+ *
+ * <p>420 은 장소 줄(썸네일 56 + 이름 + 메모)이 줄바꿈 없이 들어가는 폭이고,
+ * 1024 에서도 지도에 600 이 남습니다.
+ */
+export const SidePanelWidth = 420;

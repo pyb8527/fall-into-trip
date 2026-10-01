@@ -93,6 +93,7 @@ export default function AdminHome() {
       <ListRow
         title="신고된 것"
         subtitle="일정 글과 한 줄을 되돌리거나 감춰요"
+        last
         onPress={() => router.push('/admin/posts')}
       />
 

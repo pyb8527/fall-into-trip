@@ -13,7 +13,7 @@ import {
   Caption,
   Card,
   Chip,
-  ConfirmButton,
+  ConfirmDialog,
   Empty,
   ErrorNote,
   Field,
@@ -100,6 +100,15 @@ export default function AdminUsers() {
   );
 }
 
+/** 창이 물을 것 하나. */
+type Ask = {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  danger?: boolean;
+  act: () => void;
+};
+
 function UserCard({ user, onChanged }: { user: AdminUser; onChanged: () => void }) {
   const { user: me } = useAuth();
   const [error, setError] = useState<string | null>(null);
@@ -107,6 +116,18 @@ function UserCard({ user, onChanged }: { user: AdminUser; onChanged: () => void 
   const [resetting, setResetting] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [notice, setNotice] = useState<string | null>(null);
+  /*
+    묻는 창 하나가 넷을 받습니다.
+
+    <p>네 단추가 저마다 그 자리에서 [정말 ○○ / 취소] 로 바뀌었습니다. 단추
+    다섯이 붙어 있는 줄에서 하나가 둘로 늘어나면 줄이 접히면서 옆 단추들이
+    자리를 옮깁니다 — 묻는 말을 읽는 동안 누를 자리가 움직였고, 바뀐 글자가
+    바로 손가락 아래 있어서 연달아 누르면 묻는 것이 그냥 지나갔습니다.
+
+    <p>창에는 누구에게 무엇을 하는지 이름까지 적을 자리가 있습니다. 「삭제」
+    만 눌러서는 이 사람의 여행까지 사라지는 것을 알 수 없습니다.
+  */
+  const [asking, setAsking] = useState<Ask | null>(null);
 
   const isMe = me?.id === user.id;
 
@@ -157,23 +178,35 @@ function UserCard({ user, onChanged }: { user: AdminUser; onChanged: () => void 
 
       <Row gap={Spacing.xs}>
         {user.role === 'ADMIN' ? (
-          <ConfirmButton
+          <Button
             label="운영자 해제"
-            confirmLabel="정말 해제"
             variant="secondary"
+            compact
             busy={busy}
-            onConfirm={() =>
-              run(() => api.patch(`/api/admin/users/${user.id}/role`, { role: 'MEMBER' }))
+            onPress={() =>
+              setAsking({
+                title: '운영자에서 내릴까요?',
+                message: `${user.name} 님이 운영 화면에 더 들어올 수 없게 돼요. 다시 올릴 수 있어요.`,
+                confirmLabel: '해제',
+                act: () =>
+                  run(() => api.patch(`/api/admin/users/${user.id}/role`, { role: 'MEMBER' })),
+              })
             }
           />
         ) : (
-          <ConfirmButton
+          <Button
             label="운영자로"
-            confirmLabel="정말 올리기"
             variant="secondary"
+            compact
             busy={busy}
-            onConfirm={() =>
-              run(() => api.patch(`/api/admin/users/${user.id}/role`, { role: 'ADMIN' }))
+            onPress={() =>
+              setAsking({
+                title: '운영자로 올릴까요?',
+                message: `${user.name} 님이 모든 계정과 신고된 글을 다룰 수 있게 돼요.`,
+                confirmLabel: '올리기',
+                act: () =>
+                  run(() => api.patch(`/api/admin/users/${user.id}/role`, { role: 'ADMIN' })),
+              })
             }
           />
         )}
@@ -189,12 +222,22 @@ function UserCard({ user, onChanged }: { user: AdminUser; onChanged: () => void 
             }
           />
         ) : (
-          <ConfirmButton
+          <Button
             label="잠그기"
-            confirmLabel="정말 잠그기"
+            variant="dangerText"
+            compact
             busy={busy}
-            onConfirm={() =>
-              run(() => api.patch(`/api/admin/users/${user.id}/disabled`, { disabled: true }))
+            onPress={() =>
+              setAsking({
+                title: '이 계정을 잠글까요?',
+                message: `${user.name} 님이 로그인할 수 없게 되고 열려 있던 세션도 끊겨요. 다시 풀 수 있어요.`,
+                confirmLabel: '잠그기',
+                danger: true,
+                act: () =>
+                  run(() =>
+                    api.patch(`/api/admin/users/${user.id}/disabled`, { disabled: true }),
+                  ),
+              })
             }
           />
         )}
@@ -217,11 +260,20 @@ function UserCard({ user, onChanged }: { user: AdminUser; onChanged: () => void 
           onPress={() => setResetting((v) => !v)}
         />
 
-        <ConfirmButton
+        <Button
           label="삭제"
-          confirmLabel="정말 삭제"
+          variant="dangerText"
+          compact
           busy={busy}
-          onConfirm={() => run(() => api.delete(`/api/admin/users/${user.id}`))}
+          onPress={() =>
+            setAsking({
+              title: '이 계정을 지울까요?',
+              message: `${user.name}(${user.email}) 님의 계정이 사라져요. 소유한 여행 ${user.ownedTrips}개도 함께 사라지고, 되돌릴 수 없어요.`,
+              confirmLabel: '지우기',
+              danger: true,
+              act: () => run(() => api.delete(`/api/admin/users/${user.id}`)),
+            })
+          }
         />
       </Row>
 
@@ -260,6 +312,21 @@ function UserCard({ user, onChanged }: { user: AdminUser; onChanged: () => void 
           </Row>
         </>
       ) : null}
+
+      <ConfirmDialog
+        visible={asking !== null}
+        title={asking?.title ?? ''}
+        message={asking?.message}
+        confirmLabel={asking?.confirmLabel}
+        danger={asking?.danger}
+        busy={busy}
+        onCancel={() => setAsking(null)}
+        onConfirm={() => {
+          const ask = asking;
+          setAsking(null);
+          ask?.act();
+        }}
+      />
     </Card>
   );
 }

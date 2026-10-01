@@ -9,7 +9,7 @@ import { useAuth } from '@/auth/auth-provider';
 import { TripMark } from '@/components/trip-mark';
 import { FolderSheet } from '@/components/folder-sheet';
 import { TripForm } from '@/components/trip-form';
-import { Colors, Gutter, Radius, Spacing, Type, Weight } from '@/constants/theme';
+import { Colors, Radius, Spacing, Type, Weight } from '@/constants/theme';
 import { countdownIsNear, countdownLabel, countdownOf, formatNights, formatSpan, todayIso } from '@/lib/countdown';
 import {
   Badge,
@@ -21,6 +21,7 @@ import {
   Empty,
   ErrorNote,
   Field,
+  Grow,
   Icon,
   IconButton,
   ListRow,
@@ -29,8 +30,10 @@ import {
   Row,
   Screen,
   SearchField,
+  SectionHeader,
   SegmentedTabs,
   Split,
+  Title,
 } from '@/ui';
 import { AppTabs } from '@/ui/tab-bar';
 
@@ -222,39 +225,45 @@ export default function Trips() {
     <Screen
       safeTop
       tabs={<AppTabs />}
+      /*
+        갈래 화면은 큰 제목으로 섭니다.
+
+        <p>여기만 상단바에 작은 제목을 달고 있었습니다. 「모임」과 「저장」은
+        큰 제목인데 「내 여행」만 막대라, 아래 갈래 띠로 옮겨 다니면 <b>화면이
+        갈아 끼워진 것처럼</b> 보였습니다 — 제목의 크기와 자리가 화면마다
+        달랐기 때문입니다.
+
+        <p>돋보기는 그 제목 오른쪽에 섭니다. 몇 개 안 될 때는 안 답니다 —
+        다섯 줄을 눈으로 훑는 것이 치는 것보다 빠릅니다.
+      */
+      header={
+        <Split>
+          <Grow>
+            <Title>내 여행</Title>
+          </Grow>
+          {all.length > 4 ? (
+            <IconButton
+              name={searching ? 'x' : 'search'}
+              label={searching ? '찾기 닫기' : '여행 찾기'}
+              bare
+              onPress={() => {
+                setSearching((was) => !was);
+                setQ('');
+              }}
+            />
+          ) : null}
+        </Split>
+      }
       /* 주 동작은 아래에 붙입니다. 한 손으로 쥐었을 때 엄지가 닿는 자리입니다. */
       footer={<Button label="새 여행 만들기" onPress={() => setCreating(true)} />}>
       {/*
-        돋보기는 막대 오른쪽에.
+        큰 제목이 본문 위에 서므로 상단바는 걷습니다.
 
-        <p>막대는 이 층(_layout)이 만들어 주는데, 화면마다 더 달 것이 있으면
-        이렇게 덧붙입니다 — 여행 상세와 가계부도 같은 방식으로 제목을
-        바꿔 답니다.
-
-        <p>몇 개 안 될 때는 안 답니다. 다섯 줄을 눈으로 훑는 것이 치는 것보다
-        빠릅니다.
+        <p>갈래 띠로 오는 화면입니다. 뒤로 갈 데가 없으니 상단바가 할 일이
+        없는데, 작은 제목 하나를 위해 56픽셀을 먹고 있었습니다 — 게다가
+        아래 큰 제목과 같은 말을 두 번 적는 셈이었습니다.
       */}
-      <Stack.Screen
-        options={{
-          /* 조건은 안쪽에서 가립니다. 이 줄 자체를 조건으로 두면, 여행이
-             다섯 아래로 줄어들 때 막대에 돋보기가 그대로 남습니다 — 안
-             그려진 것은 옛 값을 지우지도 못합니다. */
-          headerRight:
-            all.length > 4
-              ? () => (
-                  <IconButton
-                    name={searching ? 'x' : 'search'}
-                    label={searching ? '찾기 닫기' : '여행 찾기'}
-                    bare
-                    onPress={() => {
-                      setSearching((was) => !was);
-                      setQ('');
-                    }}
-                  />
-                )
-              : undefined,
-        }}
-      />
+      <Stack.Screen options={{ headerShown: false }} />
 
       {/* 무엇 때문에 고르는 중인지. 여느 때는 말할 것이 없습니다. */}
       {goal === 'money' ? (
@@ -313,67 +322,65 @@ export default function Trips() {
         누르면 그 안이 열립니다.
       */}
       {group === 'folder' ? (
-        <>
-          <Row gap={Spacing.s3} style={styles.shelf}>
-            {folders.map((folder) => (
-              <Press
-                key={folder.id}
-                onPress={() => setOpened(folder)}
-                scale={0.98}
-                accessibilityLabel={`${folder.name} 폴더 열기`}
-                style={styles.folder}>
-                <Icon name="folder" size={24} tone="brand" />
-                <Text style={styles.folderName} numberOfLines={1}>
-                  {folder.name}
-                </Text>
-                <Caption tone="muted">여행 {folder.tripCount}개</Caption>
-              </Press>
-            ))}
-
-            {/*
-              미분류도 폴더 한 칸으로 냅니다.
-
-              <p>전에는 폴더 선반 <b>아래에</b> "폴더 없음" 이라는 목록으로
-              길게 늘어놓았습니다. 그러면 폴더를 셋 만들어 놓고도 정작 화면의
-              대부분은 안 넣은 여행들이 차지합니다 — 정리한 보람이 없습니다.
-
-              <p>같은 칸으로 둡니다. 폴더에 넣는 것과 안 넣는 것은 <b>같은
-              종류의 자리</b>이고, 누르면 그 안이 열리는 것도 같습니다.
-            */}
-            {loose.length > 0 ? (
-              <Press
-                onPress={() => setOpened(LOOSE)}
-                scale={0.98}
-                accessibilityLabel="아직 안 넣은 여행 보기"
-                style={styles.folder}>
-                <Icon name="folder" size={24} tone="muted" />
-                <Text style={styles.folderName} numberOfLines={1}>
-                  {LOOSE.name}
-                </Text>
-                <Caption tone="muted">여행 {loose.length}개</Caption>
-              </Press>
-            ) : null}
-
-            {/*
-              새 폴더.
-
-              <p>전에는 폴더를 만드는 길이 <b>여행 줄의 폴더 단추 안에만</b>
-              있었습니다. 그래서 폴더를 먼저 만들어 두고 나중에 넣는 순서로는
-              시작할 수가 없었고, 빈 화면의 안내도 "여행 오른쪽의 폴더 단추로
-              만듭니다" 라고 길을 설명해야 했습니다.
-            */}
+        <Row gap={Spacing.s3} style={styles.shelf}>
+          {folders.map((folder) => (
             <Press
-              onPress={() => setNaming(true)}
+              key={folder.id}
+              onPress={() => setOpened(folder)}
               scale={0.98}
-              accessibilityLabel="새 폴더 만들기"
-              style={[styles.folder, styles.folderNew]}>
-              <Icon name="plus" size={24} tone="muted" />
+              accessibilityLabel={`${folder.name} 폴더 열기`}
+              style={styles.folder}>
+              <Icon name="folder" size={24} tone="brand" />
               <Text style={styles.folderName} numberOfLines={1}>
-                새 폴더
+                {folder.name}
               </Text>
+              <Caption tone="muted">여행 {folder.tripCount}개</Caption>
             </Press>
-          </Row>
-        </>
+          ))}
+
+          {/*
+            미분류도 폴더 한 칸으로 냅니다.
+
+            <p>전에는 폴더 선반 <b>아래에</b> "폴더 없음" 이라는 목록으로
+            길게 늘어놓았습니다. 그러면 폴더를 셋 만들어 놓고도 정작 화면의
+            대부분은 안 넣은 여행들이 차지합니다 — 정리한 보람이 없습니다.
+
+            <p>같은 칸으로 둡니다. 폴더에 넣는 것과 안 넣는 것은 <b>같은
+            종류의 자리</b>이고, 누르면 그 안이 열리는 것도 같습니다.
+          */}
+          {loose.length > 0 ? (
+            <Press
+              onPress={() => setOpened(LOOSE)}
+              scale={0.98}
+              accessibilityLabel="아직 안 넣은 여행 보기"
+              style={styles.folder}>
+              <Icon name="folder" size={24} tone="muted" />
+              <Text style={styles.folderName} numberOfLines={1}>
+                {LOOSE.name}
+              </Text>
+              <Caption tone="muted">여행 {loose.length}개</Caption>
+            </Press>
+          ) : null}
+
+          {/*
+            새 폴더.
+
+            <p>전에는 폴더를 만드는 길이 <b>여행 줄의 폴더 단추 안에만</b>
+            있었습니다. 그래서 폴더를 먼저 만들어 두고 나중에 넣는 순서로는
+            시작할 수가 없었고, 빈 화면의 안내도 "여행 오른쪽의 폴더 단추로
+            만듭니다" 라고 길을 설명해야 했습니다.
+          */}
+          <Press
+            onPress={() => setNaming(true)}
+            scale={0.98}
+            accessibilityLabel="새 폴더 만들기"
+            style={[styles.folder, styles.folderNew]}>
+            <Icon name="plus" size={24} tone="muted" />
+            <Text style={styles.folderName} numberOfLines={1}>
+              새 폴더
+            </Text>
+          </Press>
+        </Row>
       ) : null}
 
       {/*
@@ -382,22 +389,27 @@ export default function Trips() {
         <p>묶음마다 흰 카드 한 장이었습니다. 바닥이 흰색이 되면서 그 카드는
         바닥에 녹아 없어졌고, 옅은 그림자만 남아 화면이 흐릿해졌습니다.
 
-        <p>묶음 사이는 <b>회색 띠</b>가 가릅니다. 제목은 띠 아래에 작게
-        앉습니다 — 제목은 묶음의 이름이고, 읽는 것은 그 아래 여행 이름들
-        입니다.
+        <p>묶음 사이는 <b>회색 띠</b>가 가릅니다. 머리는 공용 부품
+        ({@code SectionHeader})이 그립니다 — 여기서 손으로 만들고 있었더니
+        글자 크기도 여백도 이 화면만의 값이었고, 홈의 구역 제목과 나란히
+        놓으면 둘이 다른 앱처럼 보였습니다. 개수는 머리 오른쪽에 붙입니다.
       */}
       {sections.map((section, at) => (
         <View key={section.title}>
           {at > 0 ? <Band /> : null}
-          <Split align="baseline" style={styles.bunchHead}>
-            <Text style={styles.bunchTitle}>{section.title}</Text>
-            <Caption tone="muted">{section.trips.length}</Caption>
-          </Split>
-          {section.trips.map((trip) => (
+          <SectionHeader
+            tight={at > 0}
+            title={section.title}
+            action={<Caption tone="muted">{section.trips.length}</Caption>}
+          />
+          {section.trips.map((trip, i) => (
             <TripRow
               key={trip.id}
               trip={trip}
               showGroup={manyGroups}
+              /* 묶음의 마지막 줄에는 선을 안 긋습니다. 아래가 띠로 끊기는데
+                 선까지 있으면 줄이 하나 더 있는 줄 압니다. */
+              last={i === section.trips.length - 1}
               onOpen={() => open(trip.id)}
               onFolder={() => setActing(trip)}
             />
@@ -416,16 +428,17 @@ export default function Trips() {
         갑니다. 여행이 하나도 없으면 안 답니다 — 적을 것이 없습니다.
       */}
       {data && everything.length > 0 ? (
-        <>
+        <View>
           <Band />
           <ListRow
             left={<Icon name="credit-card" size={24} tone="secondary" />}
             title="가계부 모아 보기"
             subtitle="여행마다 얼마 썼는지 한 자리에서"
             right={<Icon name="chevron-right" size={20} tone="muted" />}
+            last
             onPress={() => router.push('/(app)/money')}
           />
-        </>
+        </View>
       ) : null}
 
       <TripForm
@@ -444,11 +457,12 @@ export default function Trips() {
           {inFolder(opened).length === 0 ? (
             <Empty message="이 폴더는 아직 비어 있어요." />
           ) : null}
-          {inFolder(opened).map((trip) => (
+          {inFolder(opened).map((trip, i, rows) => (
               <TripRow
                 key={trip.id}
                 trip={trip}
                 showGroup={manyGroups}
+                last={i === rows.length - 1}
                 onOpen={() => {
                   setOpened(null);
                   router.push({ pathname: '/trip/[id]', params: { id: trip.id } });
@@ -634,18 +648,22 @@ function NewFolderSheet({
 function TripRow({
   trip,
   showGroup,
+  last,
   onOpen,
   onFolder,
 }: {
   trip: TripSummary;
   /** 모임 이름을 달지. 모임이 둘 이상일 때만 뜻이 있습니다. */
   showGroup?: boolean;
+  /** 목록의 마지막 줄인지. 그 줄에는 아래 선을 안 긋습니다. */
+  last?: boolean;
   onOpen: () => void;
   /** 폴더에 넣는 단추. 폴더를 다루지 않는 자리에서는 넘기지 않습니다. */
   onFolder?: () => void;
 }) {
   return (
     <ListRow
+      last={last}
       left={<TripMark theme={trip.theme} emoji={trip.emoji} />}
       title={trip.title}
       subtitle={`${formatSpan(trip.startIso, trip.endIso)} · ${formatNights(trip.dayCount)} · 장소 ${trip.placeCount}곳`}
@@ -774,21 +792,6 @@ const styles = StyleSheet.create({
     fontWeight: Weight.semibold,
     color: Colors.danger,
   },
-  /*
-    묶음의 이름.
-
-    <p>위는 띠가 이미 띄워 놓았으므로 아래만 좁힙니다 — 제목은 아래 것의
-    이름이라 아래와 가까워야 합니다.
-  */
-  bunchHead: {
-    paddingBottom: Spacing.s1,
-  },
-  bunchTitle: {
-    ...Type.caption,
-    fontWeight: Weight.semibold,
-    color: Colors.textSecondary,
-  },
-
   /* 줄 오른쪽 꼬리. 안 줄어듭니다 — 줄어들 수 있게 두면 표가 버티고 제목이
      눌립니다. 대신 표를 적게 답니다. */
   tail: {

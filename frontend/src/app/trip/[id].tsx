@@ -87,7 +87,6 @@ import {
   Chip,
   ConfirmDialog,
   Divider,
-  DragSheet,
   Empty,
   ErrorNote,
   Field,
@@ -108,6 +107,8 @@ import {
   type UndoNote,
   useUndo,
 } from '@/ui';
+import { SidePanelWidth, useWide } from '@/ui/layout';
+import { MapAside } from '@/ui/map-aside';
 import { TripTabs } from '@/ui/tab-bar';
 import { TripMark } from '@/components/trip-mark';
 
@@ -384,7 +385,16 @@ export default function TripScreen() {
     띠가 스스로 챙기므로 여기서는 띠 몸통만 셉니다.
   */
   const insets = useSafeAreaInsets();
-  const dock = Math.max(insets.bottom, Spacing.s2) + TabDock;
+  /*
+    넓은 화면에서는 아래 띠가 없습니다.
+
+    <p>갈래가 왼쪽 기둥으로 서고(ui/tab-bar), 끌어올리던 판도 왼쪽 패널이
+    됩니다(ui/map-aside). 그러면 화면 아래를 먹는 것이 하나도 없는데,
+    그래도 띠 높이를 비워 두면 지도 아래쪽 64 픽셀이 까닭 없이 비고 떠
+    있는 단추들이 그만큼 올라앉습니다.
+  */
+  const wide = useWide();
+  const dock = wide ? 0 : Math.max(insets.bottom, Spacing.s2) + TabDock;
   /** 단추 줄이 실제로 몇 픽셀인지. 판을 내렸을 때 여기까지 보입니다. */
   const [railTall, setRailTall] = useState(0);
   const { undo, show: showUndo, hide: hideUndo } = useUndo();
@@ -1076,6 +1086,15 @@ export default function TripScreen() {
         판이 덮는 만큼 아래를 비워 둡니다. 그러지 않으면 그림의 한가운데가
         판 뒤로 들어가, 정작 보려던 동선이 안 보입니다.
       */}
+      {/*
+        지도가 앉는 자리.
+
+        <p>폰에서는 화면 전체입니다. 넓은 화면에서는 왼쪽 420 을 패널이
+        쓰므로 그만큼 비켜 앉습니다 — 패널은 떠 있어서(absolute) 자리를
+        차지하지 못합니다. 비켜 주지 않으면 지도의 왼쪽 420 이 패널 뒤로
+        들어가고, 거기 찍힌 핀은 영영 안 보입니다.
+      */}
+      <View style={[styles.mapPane, wide ? styles.mapPaneWide : null]}>
       {keptMap ? (
         <View style={[styles.keptMap, { paddingBottom: covered }]}>
           <Image
@@ -1113,6 +1132,7 @@ export default function TripScreen() {
         panTo={lookAt}
       />
       )}
+      </View>
 
       {/*
         지도 위 단추 줄.
@@ -1126,7 +1146,12 @@ export default function TripScreen() {
       */}
       <View
         pointerEvents="box-none"
-        style={[styles.floatTop, styles.mapBar, { top: insets.top + Spacing.s2 }]}>
+        style={[
+          styles.floatTop,
+          styles.mapBar,
+          wide ? styles.floatPast : null,
+          { top: insets.top + Spacing.s2 },
+        ]}>
         <IconButton
           name="chevron-left"
           label="내 여행으로"
@@ -1259,7 +1284,12 @@ export default function TripScreen() {
         만한 것이 아닙니다. 단추 하나로 접어 두고 눌렀을 때만 펼칩니다.
       */}
       {pins.length > 0 ? (
-        <View style={[styles.floatLeft, { bottom: covered + dock + Spacing.s3 }]}>
+        <View
+          style={[
+            styles.floatLeft,
+            wide ? styles.floatLeftPast : null,
+            { bottom: covered + dock + Spacing.s3 },
+          ]}>
           <IconButton
             name="flag"
             label={`꽂아 둔 깃발 ${pins.length}개 보기`}
@@ -1280,7 +1310,11 @@ export default function TripScreen() {
       */}
       <View
         pointerEvents="box-none"
-        style={[styles.floatTop, { bottom: covered + dock + Spacing.s3 }]}>
+        style={[
+          styles.floatTop,
+          wide ? styles.floatPast : null,
+          { bottom: covered + dock + Spacing.s3 },
+        ]}>
         <View style={styles.snackRail}>
           <Snack undo={undo} onHide={hideUndo} />
         </View>
@@ -1296,10 +1330,12 @@ export default function TripScreen() {
       <TripTabs
         tripId={id}
         active="plan"
+        /* 넓은 화면의 기둥 위쪽에 섭니다. 아래 띠는 안 씁니다. */
+        title={data.trip.title}
         onBack={() => (navigation.canGoBack() ? navigation.goBack() : router.push('/(app)/home'))}
       />
 
-      <DragSheet
+      <MapAside
         ref={sheet}
         /* 아래 띠만큼 띄웁니다. 안 띄우면 판이 띠 뒤로 들어가 판의 마지막
            줄과 띠가 겹칩니다. 띠도 판도 화면 바닥을 기준으로 서므로 여기서
@@ -1489,7 +1525,7 @@ export default function TripScreen() {
           ) : null,
         )}
 
-      </DragSheet>
+      </MapAside>
 
       <RecommendSheet
         visible={asking}
@@ -1595,12 +1631,13 @@ export default function TripScreen() {
         <Caption tone="secondary">
           여섯 시간 뒤 저절로 사라져요. 누르면 지도가 그 자리로 가요.
         </Caption>
-        {pins.map((pin) => (
+        {pins.map((pin, i) => (
           <Row key={pin.id} style={styles.pinRow}>
             <View style={styles.grow}>
               <ListRow
                 title={pin.label || (pin.mine ? '내가 꽂은 곳' : `${pin.authorName} 님이 꽂은 곳`)}
                 subtitle={pin.mine ? '내가 꽂음' : `${pin.authorName} 님`}
+                last={i === pins.length - 1}
                 onPress={() => {
                   setFlags(false);
                   setLookAt({ lat: pin.lat, lng: pin.lng, at: Date.now() });
@@ -1676,6 +1713,7 @@ export default function TripScreen() {
           left={<Icon name="copy" tone="secondary" />}
           title="이 일정으로 새 여행 만들기"
           subtitle="장소는 그대로 오고 날짜만 새로 잡아요."
+          last
           onPress={() => {
             setMore(false);
             setCloning(true);
@@ -1695,7 +1733,7 @@ export default function TripScreen() {
             <Divider />
             <Button
               label="여행 지우기"
-              variant="danger"
+              variant="dangerText"
               onPress={() => {
                 setMore(false);
                 setDropping(true);
@@ -3193,6 +3231,7 @@ function PlaceRow({
             left={<Icon name="plus" tone="secondary" />}
             title="여기 다음에 장소 넣기"
             subtitle="맨 뒤가 아니라 이 곳 바로 다음 자리에 들어가요."
+            last
             onPress={() => {
               setFolded(false);
               onAddAfter();
@@ -3203,7 +3242,7 @@ function PlaceRow({
           <Divider />
           <Button
             label="이 장소 지우기"
-            variant="danger"
+            variant="dangerText"
             onPress={() => {
               setFolded(false);
               setConfirming(true);
@@ -3909,7 +3948,7 @@ function StaySheet({
       />
 
       {day.stay ? (
-        <Button label="잘 곳 지우기" variant="danger" onPress={() => save(true)} busy={busy} />
+        <Button label="잘 곳 지우기" variant="dangerText" onPress={() => save(true)} busy={busy} />
       ) : null}
 
       {failed ? <ErrorNote message={failed} /> : null}
@@ -4115,6 +4154,24 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: Colors.abyss,
+  },
+  /* 지도가 쓰는 자리. */
+  mapPane: {
+    flex: 1,
+  },
+  /* 넓은 화면에서는 왼쪽을 패널에 내줍니다. 여백(margin)으로 비킵니다 —
+     안쪽 여백(padding)으로 두면 떠 있는 것들의 왼쪽 0 이 그 안으로
+     들어가, 패널이 제 자리에서 420 더 밀려 섭니다. */
+  mapPaneWide: {
+    marginLeft: SidePanelWidth,
+  },
+  /* 지도 위에 뜬 것들도 패널을 피합니다. 왼쪽 끝에 두면 패널 뒤에
+     깔립니다. */
+  floatPast: {
+    left: SidePanelWidth,
+  },
+  floatLeftPast: {
+    left: SidePanelWidth + Gutter,
   },
 
   /* 지도 위에 얹는 것들. 막대와 겹치지 않게 안전영역만큼 내려서 놓습니다. */

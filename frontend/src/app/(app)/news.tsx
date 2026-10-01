@@ -1,14 +1,29 @@
-import { useRouter } from 'expo-router';
+import { Stack, useNavigation, useRouter } from 'expo-router';
 import { useEffect, useRef } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { api } from '@/api/client';
 import type { News, NewsItem } from '@/api/types';
 import { useAsync } from '@/api/use-async';
-import { Colors, Gutter, Palette, Radius, Spacing, Type, Weight } from '@/constants/theme';
+import { Colors, Gutter, Radius, Spacing } from '@/constants/theme';
 import { ago } from '@/lib/countdown';
-import { Band, Body, Caption, Empty, ErrorNote, Icon, Loading, Press, Screen } from '@/ui';
+import {
+  Band,
+  Body,
+  Caption,
+  Empty,
+  ErrorNote,
+  Grow,
+  Icon,
+  Loading,
+  Press,
+  Row,
+  Screen,
+  SectionHeader,
+  Title,
+} from '@/ui';
 import type { IconName } from '@/ui';
+import { NavLeft } from '@/ui/nav';
 
 /**
  * 소식함 — 내가 없는 동안 무엇이 바뀌었나.
@@ -46,8 +61,18 @@ import type { IconName } from '@/ui';
  * 보이는데, 특히 줄이 두 줄짜리면 점이 어느 줄의 것인지도 모호했습니다.
  * 옅은 바탕을 깔고 점을 하나 더 키웁니다 — 바탕은 훑을 때, 점은 들여다볼
  * 때 쓰입니다.
+ *
+ * <h3>제목이 상단바에서 본문으로 내려왔습니다</h3>
+ *
+ * <p>작은 제목이 막대 가운데에 있었습니다. 둘러보기·모임·저장은 이미 큰
+ * 제목을 본문 맨 위에 두고 있어서, 갈래에서 바로 열리는 화면들끼리 <b>제목이
+ * 서는 자리가 달랐습니다</b> — 화면을 옮겨 다니면 제목이 위아래로 뛰었습니다.
+ *
+ * <p>여기도 큰 제목으로 내립니다. 다만 이 화면은 홈에서 들어오는 곳이라
+ * 돌아갈 길이 있어야 하므로, 제목 왼쪽에 뒤로·처음 단추를 함께 둡니다.
  */
 export default function NewsScreen() {
+  const navigation = useNavigation();
   const { data, error, loading, reload } = useAsync<News>(
     (signal) => api.get('/api/news', signal),
     [],
@@ -66,16 +91,34 @@ export default function NewsScreen() {
     api.put('/api/news/seen').catch(() => {});
   }, [data]);
 
+  /*
+    제목 줄은 어느 갈래에서도 똑같이 섭니다.
+
+    <p>받아 오는 동안에도, 못 받아 왔을 때도 같은 줄이 서야 합니다. 세
+    갈래에 따로 적어 두면 받아 오는 동안에는 제목도 돌아갈 단추도 없는
+    흰 화면이 됩니다.
+  */
+  const head = (
+    <Row gap={Spacing.s2}>
+      <NavLeft navigation={navigation} up="/(app)/home" />
+      <Grow>
+        <Title>알림</Title>
+      </Grow>
+    </Row>
+  );
+
   if (loading && !data) {
     return (
-      <Screen scroll={false}>
+      <Screen safeTop header={head} scroll={false}>
+        <Stack.Screen options={{ headerShown: false }} />
         <Loading />
       </Screen>
     );
   }
   if (error) {
     return (
-      <Screen scroll={false}>
+      <Screen safeTop header={head} scroll={false}>
+        <Stack.Screen options={{ headerShown: false }} />
         <ErrorNote message={error} onRetry={reload} />
       </Screen>
     );
@@ -84,16 +127,28 @@ export default function NewsScreen() {
   const items = data?.items ?? [];
 
   return (
-    <Screen>
+    <Screen safeTop header={head}>
+      {/* 큰 제목이 본문 위에 서므로 상단바는 걷습니다. 둘 다 두면 같은 말이
+          한 화면에 두 번 적힙니다. */}
+      <Stack.Screen options={{ headerShown: false }} />
+
       {items.length === 0 ? (
         <Empty message="아직 온 알림이 없어요. 같이 보는 사람이 일정을 고치면 여기에 쌓여요." />
       ) : (
         <>
-          {group(items).map((lot) => (
+          {group(items).map((lot, at) => (
             <View key={lot.label}>
-              <Text style={styles.lotLabel}>{lot.label}</Text>
+              {/* 날짜 묶음도 구역입니다. 묶음 사이를 띠가 가르고 이름은
+                  다른 화면의 구역 제목과 같은 부품이 씁니다 — 「오늘」이
+                  여기서만 다른 크기면 화면이 또 제각각이 됩니다. */}
+              {at > 0 ? <Band /> : null}
+              <SectionHeader title={lot.label} tight={at > 0} />
               {lot.items.map((item, index) => (
-                <NewsRow key={`${item.kind}-${item.at}-${index}`} item={item} />
+                <NewsRow
+                  key={`${item.kind}-${item.at}-${index}`}
+                  item={item}
+                  last={index === lot.items.length - 1}
+                />
               ))}
             </View>
           ))}
@@ -158,17 +213,19 @@ function MineNote({ tipCount, viewCount }: { tipCount: number; viewCount: number
       {/* 선 한 가닥으로 갈랐습니다. 이 앱에서 구역을 가르는 것은 선이
           아니라 8픽셀 띠입니다 — 선은 목록 줄 사이에서만 씁니다. */}
       <Band />
-      <View style={styles.mine}>
-        <Body>
-          {viewCount > 0
-            ? `남긴 한 줄 ${tipCount}개가 ${viewCount}번 쓰였어요.`
-            : `남긴 한 줄 ${tipCount}개. 아직 읽은 사람이 없어요.`}
-        </Body>
-        {/* 부풀리지 않습니다. 손님이 읽은 것은 셀 수가 없고(사람 번호가 없어
-            "하루 한 번" 이 성립하지 않습니다), 그것을 안 밝히면 이 수 하나
-            때문에 나머지 화면까지 못 믿게 됩니다. */}
-        <Caption>로그인하고 본 것만 세어요. 실제로는 더 쓰였을 수 있어요.</Caption>
-      </View>
+      {/* 위 묶음들과 같은 부품으로 이름을 답니다. 이름 없이 글 두 줄만
+          떠 있으면 위 목록의 꼬리말처럼 읽히는데, 이것은 성격이 다른
+          구역입니다. */}
+      <SectionHeader title="내가 남긴 한 줄" />
+      <Body>
+        {viewCount > 0
+          ? `남긴 한 줄 ${tipCount}개가 ${viewCount}번 쓰였어요.`
+          : `남긴 한 줄 ${tipCount}개. 아직 읽은 사람이 없어요.`}
+      </Body>
+      {/* 부풀리지 않습니다. 손님이 읽은 것은 셀 수가 없고(사람 번호가 없어
+          "하루 한 번" 이 성립하지 않습니다), 그것을 안 밝히면 이 수 하나
+          때문에 나머지 화면까지 못 믿게 됩니다. */}
+      <Caption>로그인하고 본 것만 세어요. 실제로는 더 쓰였을 수 있어요.</Caption>
     </>
   );
 }
@@ -179,43 +236,64 @@ function MineNote({ tipCount, viewCount }: { tipCount: number; viewCount: number
  * <p>누르면 그 일이 벌어진 자리로 갑니다. 어디로 갈지는 서버가 정해
  * 내려보냅니다 — 여행이냐 글이냐를 화면이 다시 판단하면, 갈래가 하나 늘 때
  * 두 군데를 고쳐야 합니다.
+ *
+ * <h3>{@code ListRow} 를 안 쓰는 까닭</h3>
+ *
+ * <p>목록 줄은 {@link ListRow} 로 통일했지만 이 줄은 둘을 더 해야 합니다 —
+ * 안 읽은 줄의 바탕이 좌우 여백 밖까지 물들어야 하고, 문장이 두 줄까지
+ * 늘어나야 합니다({@link ListRow} 의 제목은 한 줄에서 잘립니다). 알림은
+ * 문장 자체가 내용이라 자르면 무슨 일이 있었는지가 사라집니다.
+ *
+ * <p>생김새는 맞춥니다. 높이·여백·아래 선을 {@link ListRow} 와 같게 두고
+ * 마지막 줄에는 선을 안 긋습니다.
  */
-function NewsRow({ item }: { item: NewsItem }) {
+function NewsRow({ item, last }: { item: NewsItem; last?: boolean }) {
   const router = useRouter();
   const where = item.tripTitle ?? item.postTitle;
 
+  /*
+    바탕은 밖으로, 선은 안으로.
+
+    <p>안 읽은 줄의 색은 좌우 여백을 뚫고 나가야 줄 전체가 물든 것으로
+    읽히고, 줄을 가르는 선은 글이 시작하는 자리에 맞아야 띠로 안 보입니다.
+    한 겹으로는 둘을 같이 할 수 없어 바탕을 겉껍데기가 쥡니다.
+  */
   return (
-    <Press
-      onPress={() => router.push(item.url as never)}
-      scale={1}
-      style={[styles.row, item.fresh ? styles.unread : null]}>
-      {/* 선 아이콘은 맨몸으로 서지 않고 회색 원에 담깁니다. 줄마다 그림
-          넓이가 달라지면 그 오른쪽 글자도 함께 흔들립니다. */}
-      <View style={styles.mark}>
-        <Icon name={iconOf(item.kind)} size={20} tone={item.fresh ? 'default' : 'muted'} />
-      </View>
-      <View style={styles.text}>
-        {/* 이름이 없는 줄이 있습니다. 여럿이 한 줄로 접힌 것이고, 그때는
-            몇 사람인지가 문장 안에 이미 들어 있습니다. */}
-        <Body small>
-          {item.actorName ? (
-            <>
-              <Body small strong>
-                {item.actorName}
-              </Body>
-              {' 님이 '}
-            </>
-          ) : null}
-          {item.text}
-        </Body>
-        {/* 어느 여행·어느 글인지와 얼마나 지났는지를 한 줄에 둡니다. 둘 다
-            그 자체로는 볼 것이 아니고, 위 문장을 어디에 놓을지 정해 줍니다. */}
-        <Caption>{where ? `${where} · ${ago(Date.parse(item.at))}` : ago(Date.parse(item.at))}</Caption>
-      </View>
-      {/* 새것에만 점을 답니다. 숫자는 안 적습니다 — 목록에서 셀 일이
-          없습니다. */}
-      {item.fresh ? <View style={styles.dot} /> : null}
-    </Press>
+    <View style={[styles.rowBleed, item.fresh ? styles.unread : null]}>
+      <Press
+        onPress={() => router.push(item.url as never)}
+        scale={1}
+        style={[styles.row, last ? null : styles.rowLine]}>
+        {/* 선 아이콘은 맨몸으로 서지 않고 회색 원에 담깁니다. 줄마다 그림
+            넓이가 달라지면 그 오른쪽 글자도 함께 흔들립니다. */}
+        <View style={styles.mark}>
+          <Icon name={iconOf(item.kind)} size={20} tone={item.fresh ? 'default' : 'muted'} />
+        </View>
+        <View style={styles.text}>
+          {/* 이름이 없는 줄이 있습니다. 여럿이 한 줄로 접힌 것이고, 그때는
+              몇 사람인지가 문장 안에 이미 들어 있습니다. */}
+          <Body small>
+            {item.actorName ? (
+              <>
+                <Body small strong>
+                  {item.actorName}
+                </Body>
+                {' 님이 '}
+              </>
+            ) : null}
+            {item.text}
+          </Body>
+          {/* 어느 여행·어느 글인지와 얼마나 지났는지를 한 줄에 둡니다. 둘 다
+              그 자체로는 볼 것이 아니고, 위 문장을 어디에 놓을지 정해 줍니다. */}
+          <Caption>
+            {where ? `${where} · ${ago(Date.parse(item.at))}` : ago(Date.parse(item.at))}
+          </Caption>
+        </View>
+        {/* 새것에만 점을 답니다. 숫자는 안 적습니다 — 목록에서 셀 일이
+            없습니다. */}
+        {item.fresh ? <View style={styles.dot} /> : null}
+      </Press>
+    </View>
   );
 }
 
@@ -244,33 +322,28 @@ function iconOf(kind: NewsItem['kind']): IconName {
 
 const styles = StyleSheet.create({
   /*
-    묶음 이름.
+    안 읽은 줄의 바탕.
 
-    <p>읽으라고 있는 것이 아니라 「여기서부터 다른 날」 이라는 표시입니다.
-    그래서 본문보다 작고 흐리되 굵습니다.
+    <p>바탕은 좌우 여백을 뚫고 나가야 줄 전체가 물든 것으로 읽힙니다 —
+    여백 안에서만 칠하면 글자 뒤에 색 상자를 얹은 것처럼 보입니다.
   */
-  lotLabel: {
-    ...Type.caption,
-    fontWeight: Weight.semibold,
-    color: Palette.gray[500],
-    paddingTop: Spacing.s6,
-    paddingBottom: Spacing.s2,
+  rowBleed: {
+    marginHorizontal: -Gutter,
   },
-  /*
-    소식 한 줄.
-
-    <p>안 읽은 줄은 바탕이 옅게 물듭니다. 바탕은 좌우 여백을 뚫고 나가야
-    줄 전체가 물든 것으로 읽힙니다 — 여백 안에서만 칠하면 글자 뒤에 색
-    상자를 얹은 것처럼 보입니다.
-  */
+  /* 소식 한 줄. 높이와 여백을 목록 줄({@code ListRow})에 맞춥니다. */
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.s3,
     minHeight: 72,
     paddingVertical: Spacing.s3,
-    marginHorizontal: -Gutter,
     paddingHorizontal: Gutter,
+  },
+  /* 줄을 가르는 선. 마지막 줄에는 안 긋습니다 — 목록이 끝났는데 선이
+     하나 더 있으면 아래에 뭔가 더 있는 줄 압니다. */
+  rowLine: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.divider,
   },
   unread: {
     backgroundColor: Colors.accentSoft,
@@ -292,9 +365,5 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: Radius.full,
     backgroundColor: Colors.accent,
-  },
-  mine: {
-    gap: Spacing.s1,
-    paddingTop: Spacing.s4,
   },
 });
