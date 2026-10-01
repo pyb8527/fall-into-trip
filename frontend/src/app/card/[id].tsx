@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { api, API_BASE } from '@/api/client';
-import type { Books, Companion, TripDetail } from '@/api/types';
+import type { Books, Person, TripDetail } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { PublishForm } from '@/components/publish-form';
 import { TripMap } from '@/components/trip-map';
@@ -68,8 +68,8 @@ export default function Card() {
     (signal) => api.get(`/api/trip?trip=${encodeURIComponent(id)}`, signal),
     [id],
   );
-  const { data: mates } = useAsync<{ members: Companion[] }>(
-    (signal) => api.get(`/api/trips/${encodeURIComponent(id)}/members`, signal),
+  const { data: mates } = useAsync<{ people: Person[] }>(
+    (signal) => api.get(`/api/trips/${encodeURIComponent(id)}/people`, signal),
     [id],
   );
   /* 통화마다 하나씩 옵니다. 곁다리라 못 받아 와도 영수증은 뜹니다 —
@@ -110,7 +110,7 @@ export default function Card() {
       <SegmentedTabs items={FACES} value={face} onChange={setFace} />
 
       {face === 'receipt' ? (
-        <Receipt trip={data} mates={mates?.members ?? []} books={spent?.books ?? []} />
+        <Receipt trip={data} mates={mates?.people ?? []} books={spent?.books ?? []} />
       ) : (
         <Replay trip={data} />
       )}
@@ -180,7 +180,7 @@ function Receipt({
   books,
 }: {
   trip: TripDetail;
-  mates: Companion[];
+  mates: Person[];
   /** 통화마다 하나. 적어 둔 것이 없으면 빈 배열입니다. */
   books: Books[];
 }) {

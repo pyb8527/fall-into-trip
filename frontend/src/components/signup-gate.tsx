@@ -52,7 +52,7 @@ const SAY: Record<ComebackDo, { title: string; why: string }> = {
   },
   join: {
     title: '함께 짜려면 계정이 필요해요',
-    why: '동행자로 들어가면 같은 일정을 같이 고치고, 서로 고친 것이 알림으로 와요.',
+    why: '모임에 들어가면 같은 일정을 같이 고치고, 서로 고친 것이 알림으로 와요.',
   },
 };
 

@@ -16,7 +16,8 @@ import {
 } from 'react-native';
 
 import { api, ApiError, UNEXPECTED } from '@/api/client';
-import type { Companion,Day,
+import type { Day,
+  Person,
   Gap,
   GapOption,
   LivePin,
@@ -31,7 +32,7 @@ import type { Companion,Day,
 } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
-import { CompanionsSheet } from '@/components/companions-sheet';
+import { PeopleSheet } from '@/components/people-sheet';
 import type { RouteLine } from '@/components/map-types';
 import { PlaceForm } from '@/components/place-form';
 import { SavedPicker } from '@/components/saved-picker';
@@ -258,16 +259,17 @@ export default function TripScreen() {
     적는 자리는 가계부 화면이고, 돌아오면 이 화면이 다시 뜹니다.
   */
   /*
-    동행자 이름표.
+    이름표.
 
     장소에는 누가 고쳤는지가 사람 번호로만 남습니다(Place.updatedBy). 그
     번호를 이름으로 바꾸려면 목록이 필요한데, 서버가 이미 내려 줍니다.
 
-    지금 어디 있는지를 켜 둔 사람들(mates)과는 다릅니다 — 그쪽은 안 켠
-    사람이 빠집니다.
+    혼자 여행이면 한 사람, 모임 여행이면 그 모임 사람 전부입니다. 지금 어디
+    있는지를 켜 둔 사람들(mates)과는 다릅니다 — 그쪽은 안 켠 사람이
+    빠집니다.
   */
-  const { data: crew } = useAsync<{ members: Companion[] }>(
-    (signal) => api.get(`/api/trips/${encodeURIComponent(id)}/members`, signal),
+  const { data: crew } = useAsync<{ people: Person[] }>(
+    (signal) => api.get(`/api/trips/${encodeURIComponent(id)}/people`, signal),
     [id],
   );
 
@@ -297,7 +299,7 @@ export default function TripScreen() {
       if (!Number.isFinite(at) || Date.now() - at > TOUCHED_FOR) {
         return null;
       }
-      const name = (crew?.members ?? []).find((m) => m.id === place.updatedBy)?.name;
+      const name = (crew?.people ?? []).find((p) => p.id === place.updatedBy)?.name;
       return name ? `${name} 님 · ${ago(at)}` : null;
     },
     [crew, user?.id],
@@ -355,7 +357,7 @@ export default function TripScreen() {
     return box;
   }, [spending]);
 
-  const [companions, setCompanions] = useState(false);
+  const [people, setPeople] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [dropping, setDropping] = useState(false);
   const me = useHere();
@@ -1028,7 +1030,9 @@ export default function TripScreen() {
   /* 저장해 둔 것을 보고 있으면 고치지 못하게 둡니다. 눌러 봐야 서버에
      닿지 못해 되돌아가는데, 그러면 고쳐진 줄 알았다가 아닌 것을 나중에
      알게 됩니다. */
-  const canEdit = data.myRole === 'EDITOR' && !kept;
+  /* 볼 수 있으면 고칠 수 있습니다 — 「보기만」을 없앴습니다. 남은 것은
+     저장해 둔 것을 보고 있는지 하나입니다. */
+  const canEdit = data.canEdit && !kept;
   const shown = activeDay === ALL ? days : days.filter((_, i) => i === activeDay);
   const total = shown.reduce((n, d) => n + d.places.length, 0);
   const mine = data.trip.ownerId === user?.id;
@@ -1083,7 +1087,12 @@ export default function TripScreen() {
           */
           headerRight: () => (
             <Row gap={Spacing.xs}>
-              <IconButton name="users" label="동행자" bare onPress={() => setCompanions(true)} />
+              <IconButton
+                name="users"
+                label="같이 보는 사람"
+                bare
+                onPress={() => setPeople(true)}
+              />
               <IconButton
                 name="more-horizontal"
                 label="이 여행 다루기"
@@ -1238,7 +1247,7 @@ export default function TripScreen() {
               ) : (
                 <IconButton
                   name="share-2"
-                  label="동행자에게 내 위치 알리기"
+                  label="같이 보는 사람에게 내 위치 알리기"
                   tone="accent"
                   onMap
                   onPress={toggleSharing}
@@ -1579,7 +1588,7 @@ export default function TripScreen() {
       <PackSheet
         visible={packing}
         tripId={id}
-        people={crew?.members ?? []}
+        people={crew?.people ?? []}
         onClose={() => setPacking(false)}
       />
 
@@ -1710,12 +1719,13 @@ export default function TripScreen() {
         ) : null}
       </BottomSheet>
 
-      <CompanionsSheet
-        visible={companions}
+      <PeopleSheet
+        visible={people}
         tripId={data.trip.id}
-        ownerId={data.trip.ownerId}
-        onClose={() => setCompanions(false)}
-        onLeft={() => router.replace('/(app)/trips')}
+        groupId={data.trip.groupId ?? null}
+        amOwner={data.trip.ownerId === user?.id}
+        onClose={() => setPeople(false)}
+        onChanged={reload}
       />
 
       <PublishForm
@@ -1742,7 +1752,7 @@ export default function TripScreen() {
       <ConfirmDialog
         visible={dropping}
         title="이 여행을 지울까요?"
-        message="날짜와 장소가 모두 사라져요. 동행자도 더 볼 수 없게 돼요. 되돌릴 수 없어요."
+        message="날짜와 장소가 모두 사라져요. 같이 보던 사람도 더 볼 수 없게 돼요. 되돌릴 수 없어요."
         confirmLabel="지우기"
         danger
         onCancel={() => setDropping(false)}
@@ -3452,7 +3462,7 @@ function PackSheet({
   visible: boolean;
   tripId: string;
   /** 동행자. 화면이 이미 받아 둔 것을 그대로 씁니다. */
-  people: Companion[];
+  people: Person[];
   onClose: () => void;
 }) {
   const { data, reload } = useAsync<{ items: Packed[] }>(

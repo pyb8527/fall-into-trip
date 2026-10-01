@@ -83,7 +83,7 @@ export async function turnOn(api: ApiClient): Promise<'on' | 'blocked' | 'failed
     */
     if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync('default', {
-        name: '동행자 소식',
+        name: '같이 보는 사람 소식',
         importance: Notifications.AndroidImportance.DEFAULT,
       });
     }

@@ -6,7 +6,14 @@
  */
 
 export type Role = 'ADMIN' | 'MEMBER';
-export type TripRole = 'EDITOR' | 'VIEWER' | 'NONE';
+
+/**
+ * 모임에서의 자리.
+ *
+ * <p>둘뿐입니다. 운영진·부방장 같은 것은 안 둡니다 — 스무 명짜리 모임에
+ * 결재선이 필요하지 않습니다.
+ */
+export type GroupRole = 'OWNER' | 'MEMBER';
 
 export type User = {
   id: string;
@@ -56,6 +63,14 @@ export type TripSummary = {
   endIso: string | null;
   dayCount: number;
   placeCount: number;
+  /**
+   * 어느 모임의 여행인지. 비어 있으면 혼자 여행입니다.
+   *
+   * <p>내 여행 화면이 이 값으로 「혼자」와 「모임」 두 칸을 가릅니다.
+   */
+  groupId: Maybe<string>;
+  /** 모임 이름. 모임 칸에서 여행을 모임별로 묶는 데 씁니다. */
+  groupName: Maybe<string>;
 };
 
 export type Trip = {
@@ -71,6 +86,8 @@ export type Trip = {
   theme: Maybe<string>;
   /** 이름 앞에 붙는 표식 하나. 안 정했으면 비어 있습니다. */
   emoji: Maybe<string>;
+  /** 어느 모임의 여행인지. 비어 있으면 혼자 여행입니다. */
+  groupId: Maybe<string>;
   createdAt: string;
 };
 
@@ -175,7 +192,15 @@ export type TripDetail = {
    * 넣어 둔 것이지 남에게 보이려고 넣은 것이 아닙니다.
    */
   refs: PlaceRefs[];
-  myRole: TripRole;
+  /**
+   * 고칠 수 있는가.
+   *
+   * <p>볼 수 있으면 늘 참입니다 — 「보기만」을 없앴습니다. 모임에 구경꾼을
+   * 두는 것은 앞뒤가 안 맞습니다. 보여 주기만 하려면 여행기를 올립니다.
+   */
+  canEdit: boolean;
+  /** 내가 만든 여행인지. 지우기와 모임 옮기기가 여기에 걸립니다. */
+  owner: boolean;
 };
 
 /** 다니면서 볼 사진. 장소 칸마다, 여행기에는 안 실립니다. */
@@ -236,15 +261,47 @@ export type AdminStats = {
  */
 export type Maybe<T> = T | null | undefined;
 
-/* ------------------------------------------------------- 동행자와 초대 */
+/* --------------------------------------------------------- 모임과 초대 */
 
-/** 여행을 같이 보는 사람. */
-export type Companion = {
+/**
+ * 모임.
+ *
+ * <p>사람이 사는 자리입니다. 여행은 그 안에서 생깁니다. 사람 수와 여행 수가
+ * 함께 오는 것은 목록에서 어느 것이 살아 있는 모임인지 보여야 하기
+ * 때문입니다.
+ */
+export type Group = {
   id: string;
   name: string;
-  email: string;
+  about: Maybe<string>;
+  /** 이름 앞에 붙는 표식 하나. 안 정했으면 비어 있습니다. */
+  emoji: Maybe<string>;
+  coverPhotoId: Maybe<string>;
+  ownerId: string;
+  memberCount: number;
+  tripCount: number;
+};
+
+/** 모임에 있는 사람. 주인이 맨 앞으로 옵니다. */
+export type Mate = {
+  id: string;
+  name: string;
   mark: Maybe<string>;
-  role: TripRole;
+  role: GroupRole;
+  owner: boolean;
+};
+
+/**
+ * 이 여행을 같이 보는 사람.
+ *
+ * <p>만든 사람과, 모임 여행이면 그 모임 사람 전부입니다. 일정의 이름표,
+ * 챙길 것의 맡은 사람, 정산의 "누가 냈나" 가 이것을 씁니다.
+ */
+export type Person = {
+  id: string;
+  name: string;
+  mark: Maybe<string>;
+  /** 이 여행을 만든 사람인지. 이름 옆에 표를 다는 데 씁니다. */
   owner: boolean;
 };
 
@@ -256,7 +313,6 @@ export type Companion = {
 export type NewInvite = {
   id: string;
   token: string;
-  role: TripRole;
   /** 비어 있으면 기한 없는 링크입니다. */
   expiresAt: Maybe<string>;
   maxUses: number;
@@ -265,20 +321,25 @@ export type NewInvite = {
 /** 발급해 둔 초대. 토큰은 실리지 않습니다. */
 export type InviteRow = {
   id: string;
-  role: TripRole;
-  createdAt: string;
   /** 비어 있으면 기한 없는 링크입니다. */
   expiresAt: Maybe<string>;
   maxUses: number;
   usedCount: number;
-  revoked: boolean;
+  /** 아직 쓸 수 있는지. 기한·한도·막은 것을 서버가 한 번에 봐 줍니다. */
+  usable: boolean;
 };
 
-/** 링크를 받은 사람이 들어가기 전에 보는 것. 로그인 없이도 볼 수 있습니다. */
+/**
+ * 링크를 받은 사람이 들어가기 전에 보는 것. 로그인 없이도 볼 수 있습니다.
+ *
+ * <p>아는 이름이 하나라도 있으면 들어갈지를 바로 정할 수 있습니다.
+ */
 export type InvitePreview = {
-  tripTitle: string;
-  ownerName: string | null;
-  role: TripRole;
+  name: string;
+  about: Maybe<string>;
+  emoji: Maybe<string>;
+  someNames: string[];
+  memberCount: number;
   /** 비어 있으면 기한 없는 링크입니다. */
   expiresAt: Maybe<string>;
 };

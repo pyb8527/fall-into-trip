@@ -45,6 +45,7 @@ export default function AppLayout() {
           뒤로를 눌러 「내 여행」이 뜨면, 보석함을 보다가 엉뚱한 데로
           옮겨진 셈이 됩니다. */}
       <Stack.Screen name="trips" options={stackHeader('내 여행', { up: '/(app)/home' })} />
+      <Stack.Screen name="groups" options={stackHeader('모임', { up: '/(app)/home' })} />
       <Stack.Screen name="saved" options={stackHeader('보석함', { up: '/(app)/home' })} />
       {/* 제목을 화면 안에 두므로 막대를 감춥니다 — 홈과 같은 방식입니다. */}
       <Stack.Screen name="money" options={{ headerShown: false }} />

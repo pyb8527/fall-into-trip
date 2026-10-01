@@ -39,8 +39,16 @@ import { AppTabs } from '@/ui/tab-bar';
 /**
  * 내 여행.
  *
- * <p>여행이 쌓이면 그냥 늘어놓는 것만으로는 다음 여행을 찾기 어려워집니다.
- * 두 가지로 나눠 볼 수 있게 합니다.
+ * <h3>혼자와 모임을 먼저 가릅니다</h3>
+ *
+ * <p>모임 여행은 모임 사람 모두의 목록에 뜹니다. 그래서 섞어 놓으면 목록이
+ * 순식간에 길어지고, 무엇보다 <b>혼자 짜던 것</b>을 찾기 어려워집니다 —
+ * 혼자 여행은 나만 보는 것이라 성격이 다릅니다.
+ *
+ * <p>든 모임이 없으면 띠를 안 둡니다. 한 칸이 늘 비어 있는 띠는 자리만
+ * 차지합니다.
+ *
+ * <p>그 안에서 다시 두 가지로 나눠 볼 수 있습니다.
  *
  * <ul>
  *   <li><b>일정순</b> — 가는 중 · 다가올 · 다녀온. 대개 궁금한 것은 다음
@@ -64,6 +72,14 @@ type Group = 'when' | 'folder';
 const GROUPS: { value: Group; label: string }[] = [
   { value: 'when', label: '일정순' },
   { value: 'folder', label: '폴더별' },
+];
+
+/** 혼자 짠 것인지, 모임 것인지. */
+type Whose = 'solo' | 'group';
+
+const WHOSE: { value: Whose; label: string }[] = [
+  { value: 'solo', label: '혼자' },
+  { value: 'group', label: '모임' },
 ];
 
 /**
@@ -91,6 +107,7 @@ export default function Trips() {
   /* 첫걸음 안내에서 "첫 여행 만들기" 로 들어왔으면 만드는 판을 바로 엽니다.
      목록만 띄워 놓고 어디를 눌러야 하는지 다시 찾게 하면 안내가 아닙니다. */
   const [creating, setCreating] = useState(fresh === '1');
+  const [whose, setWhose] = useState<Whose>('solo');
   const [group, setGroup] = useState<Group>('when');
   const [placing, setPlacing] = useState<TripSummary | null>(null);
 
@@ -117,7 +134,25 @@ export default function Trips() {
   */
   const [q, setQ] = useState('');
 
-  const all = useMemo(() => data?.trips ?? [], [data]);
+  const everything = useMemo(() => data?.trips ?? [], [data]);
+
+  /** 모임 여행이 하나라도 있는지. 없으면 가를 것이 없습니다. */
+  const hasGroupTrips = useMemo(() => everything.some((t) => t.groupId != null), [everything]);
+
+  /*
+    고른 칸의 것들만.
+
+    찾기와 묶기는 <b>이 칸 안에서</b> 돕니다. 혼자 칸을 보면서 모임 여행이
+    셈에 들어가면 「셋」 이라고 적혀 있는데 둘만 보이는 일이 생깁니다.
+  */
+  const all = useMemo(
+    () =>
+      hasGroupTrips
+        ? everything.filter((t) => (whose === 'group' ? t.groupId != null : t.groupId == null))
+        : everything,
+    [everything, hasGroupTrips, whose],
+  );
+
   const trips = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return needle ? all.filter((t) => t.title.toLowerCase().includes(needle)) : all;
@@ -173,8 +208,26 @@ export default function Trips() {
       {loading && !data ? <Loading /> : null}
       {error ? <ErrorNote message={error} onRetry={reload} /> : null}
 
+      {/*
+        혼자와 모임.
+
+        <p>묶기 띠(일정순·폴더별) <b>위에</b> 섭니다. 먼저 가르는 것이
+        이쪽이라 아래에 두면 묶기를 고친 뒤에 다시 칸을 고르게 됩니다.
+      */}
+      {data && hasGroupTrips ? (
+        <SegmentedTabs items={WHOSE} value={whose} onChange={setWhose} />
+      ) : null}
+
       {data && all.length === 0 ? (
-        <Empty message="아직 그려 둔 여행이 없어요. 아래에서 첫 줄을 그어 보세요." />
+        <Empty
+          message={
+            !hasGroupTrips
+              ? '아직 그려 둔 여행이 없어요. 아래에서 첫 줄을 그어 보세요.'
+              : whose === 'group'
+                ? '모임에서 짠 여행이 아직 없어요.'
+                : '혼자 짜 둔 여행이 없어요.'
+          }
+        />
       ) : null}
       {data && all.length > 0 && trips.length === 0 ? (
         <Empty message={`"${q.trim()}" 로는 찾은 것이 없어요.`} />
@@ -346,7 +399,10 @@ export default function Trips() {
  * 여행 한 줄.
  *
  * <p>"내 여행" 표는 달지 않습니다. 대개가 내 여행이라 거의 모든 줄에 같은 표가
- * 붙어 아무것도 구별해 주지 못했습니다. 남의 여행에 끼어 있는 것만 표시합니다.
+ * 붙어 아무것도 구별해 주지 못했습니다. 남이 만든 것만 표시합니다.
+ *
+ * <p>모임 칸에서는 어느 모임의 것인지를 답니다. 한 모임에서 여행을 여러 번
+ * 가는 것이 이 기능의 뜻이라, 모임이 둘만 되어도 이름 없이는 섞입니다.
  */
 /**
  * 폴더 하나 만들기.
@@ -424,7 +480,8 @@ function TripRow({
       right={
         <Row gap={Spacing.xs}>
           {countdownBadge(trip.startIso, trip.endIso)}
-          {mine ? null : <Badge label="동행" tone="muted" />}
+          {trip.groupName ? <Badge label={trip.groupName} tone="muted" /> : null}
+          {mine ? null : <Badge label="같이" tone="muted" />}
         </Row>
       }
       /*

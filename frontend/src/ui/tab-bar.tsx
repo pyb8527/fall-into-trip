@@ -127,9 +127,9 @@ export function TabBar({ items, onBack }: { items: TabItem[]; onBack?: () => voi
  * <p>다섯입니다. 여섯을 넘기면 좁은 폰에서 글자가 잘리고, 넷이면 아래가
  * 휑합니다.
  *
- * <p>가계부가 여기 있는 것은 <b>여행을 고르는 것부터</b>가 가계부를 여는
- * 일의 절반이기 때문입니다. 누르면 여행 목록이 뜨고, 고르면 곧장 그 여행의
- * 가계부로 갑니다.
+ * <p>모임이 여기 있는 것은 <b>사람을 부르는 길이 모임 하나</b>이기
+ * 때문입니다. 여행에 사람을 따로 부르는 길을 없앴으니, 같이 짤 사람을
+ * 찾는 사람이 들어갈 자리가 띠에 있어야 합니다.
  */
 export function AppTabs() {
   const router = useRouter();
@@ -164,6 +164,13 @@ export function AppTabs() {
           icon: 'calendar',
           active: here.startsWith('/trips'),
           onPress: go('/(app)/trips'),
+        },
+        {
+          key: 'groups',
+          label: '모임',
+          icon: 'users',
+          active: here.startsWith('/groups'),
+          onPress: go('/(app)/groups'),
         },
         {
           key: 'saved',

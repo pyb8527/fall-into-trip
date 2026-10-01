@@ -102,6 +102,9 @@ export default function RootLayout() {
             <Stack.Screen name="vote/[id]" options={stackHeader(WANT, { toTrip: true })} />
             <Stack.Screen name="card/[id]" options={stackHeader('여행 카드', { toTrip: true })} />
             <Stack.Screen name="money/[id]" options={stackHeader('가계부', { toTrip: true })} />
+            {/* 모임 이름은 화면이 받아 온 뒤에 스스로 답니다. 여기 적는
+                것은 아직 못 받았을 때 잠깐 보일 이름입니다. */}
+            <Stack.Screen name="group/[id]" options={stackHeader('모임', { up: '/(app)/groups' })} />
             <Stack.Screen name="community" options={{ headerShown: false }} />
             <Stack.Screen name="admin" options={{ headerShown: false }} />
           </Stack>

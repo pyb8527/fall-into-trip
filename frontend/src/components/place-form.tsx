@@ -174,7 +174,7 @@ export function PlaceForm({
       onDone();
     } catch (e) {
       if (e instanceof ApiError && e.code === 'STALE') {
-        setError('동행자가 먼저 고쳤어요. 화면을 새로 불러온 뒤 다시 저장해 주세요.');
+        setError('다른 사람이 먼저 고쳤어요. 화면을 새로 불러온 뒤 다시 저장해 주세요.');
       } else {
         setError(e instanceof ApiError ? e.message : UNEXPECTED);
       }

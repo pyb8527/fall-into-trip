@@ -185,7 +185,7 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
             label="이름"
             value={name}
             onChangeText={setName}
-            placeholder="동행자에게 보일 이름"
+            placeholder="같이 가는 사람에게 보일 이름"
             maxLength={80}
             returnKeyType="next"
           />

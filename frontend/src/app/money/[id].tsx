@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { api, ApiError, UNEXPECTED } from '@/api/client';
-import type { Books, Companion, Spend, TripDetail } from '@/api/types';
+import type { Books, Person, Spend, TripDetail } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { Colors, Spacing, dayColor } from '@/constants/theme';
 import { decimalsOf, money, unitsOf } from '@/lib/money';
@@ -56,8 +56,8 @@ export default function Money() {
     (signal) => api.get(`/api/trip?trip=${encodeURIComponent(id)}`, signal),
     [id],
   );
-  const { data: mates } = useAsync<{ members: Companion[] }>(
-    (signal) => api.get(`/api/trips/${encodeURIComponent(id)}/members`, signal),
+  const { data: mates } = useAsync<{ people: Person[] }>(
+    (signal) => api.get(`/api/trips/${encodeURIComponent(id)}/people`, signal),
     [id],
   );
   const spent = useAsync<{ expenses: Spend[]; currencies: string[] }>(
@@ -95,7 +95,7 @@ export default function Money() {
     days.forEach((d) => d.places.forEach((p) => box.set(p.id, p.name)));
     return box;
   }, [days]);
-  const people = mates?.members ?? [];
+  const people = mates?.people ?? [];
   const list = spent.data?.expenses ?? [];
 
   function refresh() {
@@ -293,7 +293,7 @@ function SpendRow({
   onOpen,
 }: {
   spend: Spend;
-  people: Companion[];
+  people: Person[];
   /** 어디서 썼는지. 안 정했거나 그 장소가 지워졌으면 비어 있습니다. */
   placeName: string | null;
   onOpen: () => void;
@@ -426,7 +426,7 @@ function SpendSheet({
   spend: Spend | null;
   tripId: string;
   days: TripDetail['days'];
-  people: Companion[];
+  people: Person[];
   currencies: string[];
   onDone: () => void;
   onCancel: () => void;

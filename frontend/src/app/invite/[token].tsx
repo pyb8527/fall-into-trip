@@ -13,9 +13,12 @@ import { LogoLockup } from '@/ui/logo';
 /**
  * 초대 링크를 눌렀을 때.
  *
- * <p>이 화면은 로그인 없이도 열립니다. 어떤 여행에 불렸는지 먼저 보여 주고
+ * <p>이 화면은 로그인 없이도 열립니다. 어떤 모임에 불렸는지 먼저 보여 주고
  * 나서 들어갈지 묻는 편이, 무엇인지도 모르고 가입부터 하라는 것보다 낫기
  * 때문입니다. 서버도 미리보기만 열어 두었습니다.
+ *
+ * <p>아는 이름을 함께 냅니다. 모임 이름만으로는 어떤 모임인지 모르는 일이
+ * 흔한데, 아는 이름이 하나라도 보이면 들어갈지를 바로 정할 수 있습니다.
  *
  * <p>들어가는 것은 로그인해야 합니다. 로그인하고 나면 여기로 돌아와야 하므로
  * 어디서 왔는지를 주소에 실어 보냅니다.
@@ -26,7 +29,7 @@ export default function InviteScreen() {
   const { ready, user } = useAuth();
 
   const { data, error, loading } = useAsync<{ invite: InvitePreview }>(
-    (signal) => api.get(`/api/invites/${encodeURIComponent(token)}/preview`, signal),
+    (signal) => api.get(`/api/group-invites/${encodeURIComponent(token)}/preview`, signal),
     [token],
   );
 
@@ -37,11 +40,11 @@ export default function InviteScreen() {
     setFailed(null);
     setJoining(true);
     try {
-      const res = await api.post<{ tripId: string }>(
-        `/api/invites/${encodeURIComponent(token)}/accept`,
+      const res = await api.post<{ groupId: string }>(
+        `/api/group-invites/${encodeURIComponent(token)}/accept`,
       );
       /* 들어왔으면 초대 화면은 뒤로 가기에 남기지 않습니다. */
-      router.replace(`/trip/${res.tripId}`);
+      router.replace({ pathname: '/group/[id]', params: { id: res.groupId } });
     } catch (e) {
       setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
       setJoining(false);
@@ -72,17 +75,22 @@ export default function InviteScreen() {
       {invite ? (
         <>
           <View style={styles.head}>
-            <Title>{invite.tripTitle}</Title>
+            <Title>
+              {invite.emoji ? `${invite.emoji} ` : ''}
+              {invite.name}
+            </Title>
             <Body tone="secondary">
-              {invite.ownerName ? `${invite.ownerName} 님이 초대했어요.` : '초대를 받았어요.'}
+              {invite.someNames.length > 0
+                ? `${invite.someNames.join(', ')} 님이 있는 모임이에요.`
+                : '모임에 초대를 받았어요.'}
             </Body>
           </View>
 
           <Card>
+            {invite.about ? <Caption tone="secondary">{invite.about}</Caption> : null}
             <Caption tone="secondary">
-              {invite.role === 'EDITOR'
-                ? '일정을 같이 짤 수 있어요. 장소를 넣고 고칠 수 있어요.'
-                : '일정을 볼 수 있어요. 고치지는 못해요.'}
+              지금 {invite.memberCount}명이 있어요. 들어오면 이 모임의 여행이 보이고,
+              일정을 함께 고칠 수 있어요.
             </Caption>
             <Caption tone="secondary">
               {invite.expiresAt
@@ -96,7 +104,7 @@ export default function InviteScreen() {
           {!ready ? (
             <Loading />
           ) : user ? (
-            <Button label="여행 함께하기" onPress={join} busy={joining} />
+            <Button label="모임에 들어가기" onPress={join} busy={joining} />
           ) : (
             <>
               <Button
