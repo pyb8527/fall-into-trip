@@ -252,6 +252,21 @@ export default function Travel() {
           ) : null}
         </Split>
 
+        {/*
+          길을 다 못 구한 날.
+
+          <p>구간마다 구글에 따로 물어야 해서 한 날에 구하는 수를 막아 두었고
+          (RouteService.MAX_LEGS), 넘는 구간은 이동 시간이 안 나옵니다.
+
+          <p>이 말을 안 하면 없는 것이 고장으로 읽힙니다 — 앞쪽 구간에는
+          시간이 붙어 있는데 뒤쪽에만 없으니, 더 그렇게 보입니다.
+        */}
+        {route?.trimmed ? (
+          <Caption tone="muted">
+            장소가 많아 뒷부분은 이동 시간을 못 구했어요. 길찾기는 그대로 돼요.
+          </Caption>
+        ) : null}
+
         {days.length > 1 ? (
           <Row gap={Spacing.xs}>
             {days.map((d, i) => (

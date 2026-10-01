@@ -53,10 +53,32 @@ public class RouteService {
     /**
      * 한 번에 물어볼 구간의 최대치.
      *
-     * <p>구간마다 요금이 붙습니다. 하루에 열 곳을 넘게 넣는 일정은 드물고,
-     * 실수로 큰 여행을 통째로 계산해 요금이 튀는 일을 막습니다.
+     * <p>구간마다 요금이 붙습니다. 대중교통은 경유지를 못 받으므로(구글 제약)
+     * 한 구간씩 따로 묻고, 다른 수단도 같은 길로 통일했습니다. 그래서
+     * <b>장소 N곳이면 호출이 N−1번</b>입니다.
+     *
+     * <p>열둘이었습니다. "하루에 열 곳을 넘게 넣는 일정은 드물다" 고 봤는데,
+     * 실제로는 열셋째 구간부터 그냥 없었습니다 — 잘렸다는 말도 없이요.
+     * 스물넷이면 하루 스물다섯 곳까지 끊김 없이 나옵니다.
+     *
+     * <p>구글 쪽 한도가 아닙니다. Routes API 는 경유지를 스물다섯까지 받지만
+     * 우리는 경유지를 안 쓰므로 거기서 오는 제약이 없습니다. 이 숫자는 순전히
+     * <b>요금 울타리</b>입니다.
      */
-    private static final int MAX_LEGS = 12;
+    private static final int MAX_LEGS = 24;
+
+    /**
+     * 셋을 견줄 때의 최대치.
+     *
+     * <p>위보다 작습니다. 견주기는 구간마다 세 수단을 다 물으므로 <b>요금이
+     * 세 배</b>입니다 — 스물넷으로 두면 하루를 한 번 펼치는 데 일흔두 번을
+     * 부르고, 그것만으로 시간당 문턱(GoogleQuota.PER_HOUR = 150)의 절반이
+     * 나갑니다.
+     *
+     * <p>견주는 일은 "어떻게 갈지 아직 안 정한" 구간에서 합니다. 하루에 그런
+     * 구간이 열둘을 넘기는 일은, 스물다섯 곳을 넣는 일보다 훨씬 드뭅니다.
+     */
+    private static final int MAX_COMPARE_LEGS = 12;
 
     /**
      * 답을 들고 있는 시간.
@@ -211,7 +233,7 @@ public class RouteService {
             return new Compared(List.of(), null);
         }
 
-        int pairs = Math.min(list.size() - 1, MAX_LEGS);
+        int pairs = Math.min(list.size() - 1, MAX_COMPARE_LEGS);
         List<Gap> out = new ArrayList<>(pairs);
         /* 이 지역에 대중교통 안내가 아예 없는지 보려고 셉니다 — 아래 noteFor. */
         int longEnough = 0;
