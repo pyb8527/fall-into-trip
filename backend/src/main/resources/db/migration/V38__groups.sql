@@ -67,6 +67,14 @@ CREATE INDEX idx_trips_group ON trips (group_id) WHERE group_id IS NOT NULL;
 -- 한 질의로 하려면 「방금 만든 그룹」과 「그 여행」을 다시 짝지어야 하는데,
 -- 이름과 주인으로는 못 짝짓습니다(같은 이름의 여행이 둘일 수 있습니다).
 -- 줄마다 돕니다 — 지금 여행 수가 적어 값이 들지 않습니다.
+--
+-- 「사람이 둘 이상」이 아니라 「주인 말고 또 있나」로 고릅니다. 세어서 고르면
+-- 주인이 멤버 표에서 빠진 여행(한 명인데 그 한 명이 주인이 아닌)이 하나로
+-- 세어져 그룹을 못 얻고, 그러면 그 사람이 보던 여행이 말없이 사라집니다.
+-- 묻는 것은 처음부터 「이 여행을 주인 말고 누가 더 보고 있었나」입니다.
+--
+-- 들어온 때는 안 옮깁니다 — trip_members 가 그것을 적어 둔 적이 없습니다.
+-- 모두 지금으로 둡니다(DEFAULT now()). 없는 것을 지어내는 것보다 낫습니다.
 DO $$
 DECLARE
     t        RECORD;
@@ -75,7 +83,10 @@ BEGIN
     FOR t IN
         SELECT id, title, owner_id
         FROM trips
-        WHERE (SELECT count(*) FROM trip_members m WHERE m.trip_id = trips.id) > 1
+        WHERE EXISTS (
+            SELECT 1 FROM trip_members m
+            WHERE m.trip_id = trips.id AND m.user_id <> trips.owner_id
+        )
     LOOP
         new_id := substr(md5(random()::text || clock_timestamp()::text || t.id), 1, 16);
 
@@ -83,13 +94,19 @@ BEGIN
         VALUES (new_id, left(t.title, 40), '🧳', t.owner_id);
 
         -- 여행 멤버를 그대로 옮깁니다. 여행 주인이 그룹 주인입니다.
-        INSERT INTO group_members (group_id, user_id, role, joined_at)
+        --
+        -- 주인을 따로 더합니다(UNION). 멤버 표에 주인이 없는 여행이 있으면
+        -- groups.owner_id 는 그 사람을 가리키는데 group_members 에는 없는
+        -- 모임이 되고, 그러면 주인이 제 모임을 못 엽니다.
+        INSERT INTO group_members (group_id, user_id, role)
         SELECT new_id,
-               m.user_id,
-               CASE WHEN m.user_id = t.owner_id THEN 'OWNER' ELSE 'MEMBER' END,
-               m.joined_at
-        FROM trip_members m
-        WHERE m.trip_id = t.id
+               u.user_id,
+               CASE WHEN u.user_id = t.owner_id THEN 'OWNER' ELSE 'MEMBER' END
+        FROM (
+            SELECT m.user_id FROM trip_members m WHERE m.trip_id = t.id
+            UNION
+            SELECT t.owner_id
+        ) AS u
         ON CONFLICT DO NOTHING;
 
         UPDATE trips SET group_id = new_id WHERE id = t.id;
