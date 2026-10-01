@@ -261,7 +261,9 @@ export default function Home() {
       tabs={<AppTabs />}
       header={
         <Split>
-          <LogoMark size={34} />
+          {/* 줄 높이는 그 안에서 가장 큰 것이 정합니다. 여백만 줄이고
+              로고를 그대로 두면 줄이 안 낮아집니다. */}
+          <LogoMark size={28} />
           {/* 오른쪽 위에 둘입니다.
 
               소식을 메뉴 카드로 만들면 넷이 다섯이 되어 2열 배치가
@@ -378,22 +380,27 @@ export default function Home() {
         <p>맨 위로 올라오면서 셋에서 다섯으로 늘렸습니다. 첫머리에 셋만
         있으면 그 아래가 곧바로 남의 여행이라, 내 것이 곁다리처럼 보입니다.
       */}
-      {/* 전체보기를 카드 안 맨 아래 큰 단추로 두었었습니다. 그런데 그것은
-          이 카드에서 제일 굵은 것이 아닌데 제일 커 보였습니다. 제목 옆,
-          작은 글자 단추로 둡니다. */}
+      {/*
+        전체보기를 카드 안 맨 아래 큰 단추로 두었었습니다. 그런데 그것은 이
+        카드에서 제일 굵은 것이 아닌데 제일 커 보였습니다. 제목 옆, 작은 글자
+        단추로 둡니다.
+
+        <p>다섯을 넘을 때만 냈었습니다. 그러면 구역 셋 중 하나만 머리에
+        단추가 없어서, 같은 모양의 카드인데 <b>하나만 어딘가 덜 된 것</b>처럼
+        보입니다. 아래 둘과 같은 말로 늘 둡니다 — 넘지 않아도 거기서 할 일이
+        있습니다(폴더로 묶기, 지난 여행 보기).
+      */}
       {mine && mine.trips.length > 0 ? (
         <Section
           title="내 여행"
           flush
           action={
-            mine.trips.length > shortlist.length ? (
-              <Button
-                label="전체보기"
-                variant="ghost"
-                compact
-                onPress={() => router.push('/(app)/trips')}
-              />
-            ) : null
+            <Button
+              label="더보기 ›"
+              variant="ghost"
+              compact
+              onPress={() => router.push('/(app)/trips')}
+            />
           }>
           <View style={styles.listBody}>
             {shortlist.map((trip, i) => {

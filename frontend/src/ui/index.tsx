@@ -292,7 +292,7 @@ export const Screen = forwardRef<ScreenHandle, ScreenProps>(function Screen(
          두 쪽 다 직접 밀어야 합니다. */
       behavior="padding">
       {header ? (
-        <View style={[styles.header, { paddingTop: (safeTop ? insets.top : 0) + Spacing.lg }]}>
+        <View style={[styles.header, { paddingTop: (safeTop ? insets.top : 0) + Spacing.sm }]}>
           <View style={styles.headerInner}>{header}</View>
         </View>
       ) : null}
@@ -303,7 +303,14 @@ export const Screen = forwardRef<ScreenHandle, ScreenProps>(function Screen(
           contentContainerStyle={[
             styles.scrollBody,
             {
-              paddingTop: header ? Spacing.lg : (safeTop ? insets.top : 0) + Spacing.xxl,
+              /*
+                맨 위 빈자리.
+
+                <p>xxl(28) 이었습니다. 화면 제목이 본문 안에 있던 시절의
+                크기인데, 지금은 첫 줄이 대개 <b>띠나 카드</b>라 그만큼
+                띄우면 화면을 열 때마다 빈 회색부터 봅니다.
+              */
+              paddingTop: header ? Spacing.md : (safeTop ? insets.top : 0) + Spacing.md,
               /* 아래 버튼이 있으면 그 높이만큼, 없으면 홈 인디케이터만큼 띄웁니다.
                  갈래 띠까지 있으면 그만큼 더 비웁니다 — 마지막 줄이 띠 뒤로
                  들어가면 아무리 굴려도 안 보입니다. */
@@ -319,7 +326,7 @@ export const Screen = forwardRef<ScreenHandle, ScreenProps>(function Screen(
         <View
           style={[
             styles.staticBody,
-            { paddingTop: (safeTop ? insets.top : 0) + Spacing.xxl },
+            { paddingTop: (safeTop ? insets.top : 0) + Spacing.md },
           ]}>
           {body}
         </View>
@@ -2617,9 +2624,15 @@ const styles = StyleSheet.create({
     gap: ScreenGap,
   },
 
+  /*
+    위에 붙어 있는 줄.
+
+    <p>아래 여백이 lg(20) 였습니다. 굴러가는 본문 안에 있던 시절의 크기인데,
+    지금은 <b>늘 보이는 줄</b>이라 그만큼이 화면에서 영영 빠집니다.
+  */
   header: {
     paddingHorizontal: Gutter,
-    paddingBottom: Spacing.lg,
+    paddingBottom: Spacing.sm,
     backgroundColor: Colors.background,
     alignItems: 'center',
   },
@@ -2660,11 +2673,14 @@ const styles = StyleSheet.create({
     /*
       안에 든 것들 사이.
 
-      <p>md(14)였습니다. 판 밖의 간격이 넓어진 지금은 안쪽도 같이 넓어 보여서,
-      제목 한 줄과 그 아래가 서로 다른 이야기처럼 떨어져 있었습니다. 한 칸
-      좁힙니다 — 한 판 안의 것들은 한 덩어리로 읽혀야 합니다.
+      <p>md(14) → sm(10) → xs(6) 으로 두 번 좁혔습니다. 한 판 안의 것들은 한
+      덩어리로 읽혀야 하는데, 사이가 벌어져 있으면 제목과 본문이 서로 다른
+      이야기처럼 보입니다.
+
+      <p>여기서 더 좁히면 글줄 사이와 구별이 안 됩니다. 이 정도가 "붙어
+      있지만 다른 줄" 의 선입니다.
     */
-    gap: Spacing.sm,
+    gap: Spacing.xs,
   },
 
   /* 줄을 담는 구역. 여백은 제목과 줄이 저마다 가집니다. */
@@ -2754,9 +2770,19 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    /* 판 안에도 카드가 놓입니다. 판이 흰색이면 그 위의 흰 카드가 안 보여
-       화면이 다시 밋밋해집니다. 판은 바닥이고 카드가 종이입니다. */
-    backgroundColor: Colors.background,
+    /*
+      판은 흰 종이입니다.
+
+      <p>바닥색을 쓰고 있었습니다. "판 안에도 카드가 놓이니 판이 흰색이면 그
+      위의 흰 카드가 안 보인다" 는 이유였는데, 실제로 안에 들어 있는 것은
+      <b>테두리만 가진 투명한 줄들</b>입니다(여행 상세의 장소, 여행기의 장소).
+      안 보일 흰 카드가 없습니다.
+
+      <p>그러면서 지도 위에 회색 판이 떠 있었습니다. 지도도 회색조라 둘이
+      비슷한 밝기로 붙어, 판이 지도에서 잘 안 떨어졌습니다. 흰 종이는 무엇
+      위에 놓이든 떠 보입니다.
+    */
+    backgroundColor: Colors.surface,
     borderTopLeftRadius: Radius.lg,
     borderTopRightRadius: Radius.lg,
     /*
