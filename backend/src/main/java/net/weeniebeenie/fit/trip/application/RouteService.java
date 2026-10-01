@@ -70,15 +70,21 @@ public class RouteService {
     /**
      * 셋을 견줄 때의 최대치.
      *
-     * <p>위보다 작습니다. 견주기는 구간마다 세 수단을 다 물으므로 <b>요금이
-     * 세 배</b>입니다 — 스물넷으로 두면 하루를 한 번 펼치는 데 일흔두 번을
-     * 부르고, 그것만으로 시간당 문턱(GoogleQuota.PER_HOUR = 150)의 절반이
-     * 나갑니다.
+     * <p>열둘로 두었습니다. 견주기는 구간마다 세 수단을 다 물으므로 요금이
+     * 세 배라, "하루에 열둘을 넘기는 일은 드물다" 고 봤습니다.
      *
-     * <p>견주는 일은 "어떻게 갈지 아직 안 정한" 구간에서 합니다. 하루에 그런
-     * 구간이 열둘을 넘기는 일은, 스물다섯 곳을 넣는 일보다 훨씬 드뭅니다.
+     * <p>그런데 일정 화면이 쓰는 길이 바로 이쪽입니다. 그래서 장소를 열셋째
+     * 넣는 순간 <b>그 아래로는 이동 시간이 통째로 안 나왔습니다</b> — 위는
+     * 나오는데 아래만 비어서, 고장으로 읽힙니다.
+     *
+     * <p>위와 같게 둡니다. 한도가 둘이면 화면마다 다른 데서 잘리고, 어느
+     * 쪽에 걸린 것인지는 쓰는 사람이 알 수 없습니다.
+     *
+     * <p>값은 분당 할당량이 받습니다. 스물넷이면 하루를 한 번 펼치는 데
+     * 일흔두 번이 1분 안에 나가므로, 구글 콘솔의 Routes 분당 한도가 그보다
+     * 넉넉해야 합니다 — 60으로 두면 한 번 펼치다 걸립니다.
      */
-    private static final int MAX_COMPARE_LEGS = 12;
+    private static final int MAX_COMPARE_LEGS = MAX_LEGS;
 
     /**
      * 답을 들고 있는 시간.
@@ -230,10 +236,11 @@ public class RouteService {
 
         List<Place> list = places.findAllByDayIdOrderBySortAsc(dayId);
         if (list.size() < 2) {
-            return new Compared(List.of(), null);
+            return new Compared(List.of(), null, false);
         }
 
         int pairs = Math.min(list.size() - 1, MAX_COMPARE_LEGS);
+        boolean trimmed = list.size() - 1 > MAX_COMPARE_LEGS;
         List<Gap> out = new ArrayList<>(pairs);
         /* 이 지역에 대중교통 안내가 아예 없는지 보려고 셉니다 — 아래 noteFor. */
         int longEnough = 0;
@@ -261,7 +268,7 @@ public class RouteService {
             out.add(new Gap(from.getId(), to.getId(), options,
                     pick(options, true), pick(options, false)));
         }
-        return new Compared(out, noteFor(longEnough, transitFound));
+        return new Compared(out, noteFor(longEnough, transitFound), trimmed);
     }
 
     /**
@@ -312,8 +319,13 @@ public class RouteService {
     /** 이만큼 떨어져 있으면 대중교통이 있을 만합니다. */
     private static final int TRANSIT_WORTH_ASKING = 2000;
 
-    /** 사이사이와, 왜 대중교통이 없는지 한 줄. */
-    public record Compared(List<Gap> gaps, String note) {
+    /**
+     * 사이사이와, 왜 대중교통이 없는지 한 줄.
+     *
+     * @param trimmed 장소가 너무 많아 뒷부분을 못 구했는지. 이 말을 안 하면
+     *                없는 것이 고장으로 읽힙니다
+     */
+    public record Compared(List<Gap> gaps, String note, boolean trimmed) {
     }
 
     /**
@@ -654,9 +666,28 @@ public class RouteService {
                   찍히고 있고, 그 좌표는 사람이 일정에 스스로 넣은 자리라
                   자취가 아닙니다.
                  */
-                log.info("경로가 비었어요: mode={} {},{} -> {},{} | 물은 것={} | 받은 것={}",
-                        mode, from.getLat(), from.getLng(), to.getLat(), to.getLng(),
-                        body, res == null ? "null" : res.toString());
+                /*
+                  가까운 데 전철이 없는 것은 <b>맞는 답</b>입니다.
+
+                  <p>구글은 몇백 미터 구간에 대중교통을 안 태웁니다 — 걸으라는
+                  뜻이고, 우리도 그 구간은 세지 않습니다(farApart).
+
+                  <p>그런데 그것까지 INFO 로 찍고 있었습니다. 하루에 짧은 구간이
+                  여럿이면 그만큼 줄이 쌓여서, 정작 <b>진짜 이상한 것</b>(도쿄
+                  한복판 4km 에 전철이 없다는 답)이 그 사이에 묻힙니다.
+
+                  <p>가까운 구간의 빈 답은 DEBUG 로 내립니다. 평소에는 안 보이고
+                  파고들 때만 켭니다.
+                 */
+                boolean expected = mode == Mode.TRANSIT && !farApart(from, to);
+                if (expected) {
+                    log.debug("가까워서 대중교통이 없어요: {},{} -> {},{}",
+                            from.getLat(), from.getLng(), to.getLat(), to.getLng());
+                } else {
+                    log.info("경로가 비었어요: mode={} {},{} -> {},{} | 물은 것={} | 받은 것={}",
+                            mode, from.getLat(), from.getLng(), to.getLat(), to.getLng(),
+                            body, res == null ? "null" : res.toString());
+                }
                 return Leg.unreachable(from.getId(), to.getId());
             }
 

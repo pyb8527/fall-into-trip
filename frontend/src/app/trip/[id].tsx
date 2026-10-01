@@ -646,10 +646,10 @@ export default function TripScreen() {
     data: compared,
     loading: gapping,
     error: gapError,
-  } = useAsync<{ gaps: Gap[]; note?: string | null }>(
+  } = useAsync<{ gaps: Gap[]; note?: string | null; trimmed?: boolean }>(
     (signal) =>
       dayId && showGaps
-        ? api.get<{ gaps: Gap[]; note?: string | null }>(
+        ? api.get<{ gaps: Gap[]; note?: string | null; trimmed?: boolean }>(
             `/api/days/${dayId}/route/compare`,
             signal,
           )
@@ -667,6 +667,14 @@ export default function TripScreen() {
     전철이 여기만 없으니까요. 서버가 판단해서 한 줄로 보냅니다.
   */
   const gapNote = compared?.note ?? null;
+  /*
+    장소가 너무 많아 뒷부분의 이동 시간을 못 구했는지.
+
+    <p>구간마다 구글에 따로 물어야 해서 한 날에 구하는 수를 막아 두었습니다
+    (RouteService.MAX_LEGS). 넘는 구간은 비어 있는데, 그 말을 안 하면 앞쪽만
+    시간이 붙고 뒤쪽만 비어서 <b>고장으로 읽힙니다.</b>
+  */
+  const gapTrimmed = compared?.trimmed ?? false;
 
   /**
    * 구간마다 어느 수단으로 볼지.
@@ -1516,6 +1524,7 @@ export default function TripScreen() {
               gapAfter={gapAfter}
               gapping={gapping}
               gapNote={gapNote}
+              gapTrimmed={gapTrimmed}
               chosenOf={chosenOf}
               changedGaps={changedGaps}
               onPick={(fromId, mode) => setPicked((p) => ({ ...p, [fromId]: mode }))}
@@ -2047,6 +2056,7 @@ function DayCard({
   gapAfter,
   gapping,
   gapNote,
+  gapTrimmed,
   chosenOf,
   changedGaps,
   onPick,
@@ -2078,6 +2088,8 @@ function DayCard({
   gapping: boolean;
   /** 대중교통이 하나도 안 나온 까닭. 없으면 비어 있습니다. */
   gapNote: string | null;
+  /** 장소가 너무 많아 뒷부분의 이동 시간을 못 구했는지. */
+  gapTrimmed: boolean;
   chosenOf: (gap: Gap) => GapOption | null;
   /** 다시 물은 뒤 달라진 구간들. 출발하는 장소의 id 입니다. */
   changedGaps: Set<string>;
@@ -2515,6 +2527,13 @@ function DayCard({
             맞습니다.
           */}
           {gapNote ? <Caption tone="secondary">{gapNote}</Caption> : null}
+          {/* 없는 것이 고장으로 읽히지 않게. 앞쪽 구간에는 시간이 붙어 있어서
+              뒤쪽만 비면 더 그렇게 보입니다. */}
+          {gapTrimmed ? (
+            <Caption tone="muted">
+              장소가 많아 뒷부분은 이동 시간을 못 구했어요. 길찾기는 그대로 돼요.
+            </Caption>
+          ) : null}
 
           {/* 영업시간과 평점은 구글에서 온 것이라 어디서 왔는지 밝혀야 합니다.
               약관 의무라 지우면 안 됩니다. */}

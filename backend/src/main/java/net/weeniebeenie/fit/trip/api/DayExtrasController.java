@@ -51,6 +51,9 @@ public class DayExtrasController {
         out.put("gaps", got.gaps());
         /* 대중교통이 하나도 없으면 왜인지 한 줄. 없으면 안 실립니다. */
         out.put("note", got.note());
+        /* 장소가 너무 많아 뒷부분을 못 구했는지. 이 말을 안 하면 없는 것이
+           고장으로 읽힙니다. */
+        out.put("trimmed", got.trimmed());
         return out;
     }
 
