@@ -38,6 +38,18 @@ import {
 
 /** 서버 FeedService 의 한도와 같아야 합니다. */
 const MAX_PHOTOS = 10;
+
+/**
+ * 고른 사진을 늘어놓는 네모의 한 변.
+ *
+ * <p>폭을 못 박습니다. {@link OurPhoto} 는 폭을 안 주면 100% 를 쓰는데, 폭이
+ * 정해지지 않은 칸 안에서 100% 는 0 입니다 — 사진이 올라갔는데도 미리보기
+ * 자리가 실오라기처럼 보였습니다.
+ *
+ * <p>네모로 둡니다. 가로세로가 제각각이면 줄이 들쭉날쭉해지고, 여기서 보려는
+ * 것은 「무엇을 골랐나」이지 사진의 생김새가 아닙니다.
+ */
+const THUMB = 88;
 const MAX_TEXT = 2000;
 const MAX_TAGS = 5;
 
@@ -183,7 +195,7 @@ export function FeedForm({
       <Row gap={Spacing.xs} style={styles.wrap}>
         {photoIds.map((id) => (
           <View key={id} style={styles.shot}>
-            <OurPhoto id={id} height={88} />
+            <OurPhoto id={id} width={THUMB} height={THUMB} />
             <View style={styles.pull}>
               <IconButton
                 name="x"
@@ -265,6 +277,8 @@ const styles = StyleSheet.create({
   },
   shot: {
     position: 'relative',
+    width: THUMB,
+    height: THUMB,
   },
   /* 빼는 단추는 사진 위 오른쪽. 사진마다 줄을 따로 두면 아홉 장에 아홉
      줄이 생깁니다. */

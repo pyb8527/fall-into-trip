@@ -263,6 +263,19 @@ export default function Home() {
     return [...head, ...rest.slice(-5).reverse()].slice(0, 5);
   }, [mine, next]);
 
+  /*
+    혼자 짠 것과 모임 것을 가릅니다.
+
+    <p>섞어 놓으면 어느 것이 나만 보는 것이고 어느 것이 모임 사람들에게도
+    보이는 것인지 알 수 없습니다. 그 둘은 <b>고치면 누가 보는가</b>가 달라서,
+    섞여 있으면 안 됩니다.
+
+    <p>가로로 흘립니다. 세로로 두 묶음을 쌓으면 홈이 그만큼 길어지고, 홈이
+    목록이 되면 홈이 아닙니다. 가로면 여행이 몇 개든 높이가 한 장입니다.
+  */
+  const solo = useMemo(() => shortlist.filter((t) => t.groupId == null), [shortlist]);
+  const crew = useMemo(() => shortlist.filter((t) => t.groupId != null), [shortlist]);
+
   return (
     /*
       로고와 단추 줄은 고정합니다.
@@ -414,9 +427,68 @@ export default function Home() {
         보입니다. 아래 둘과 같은 말로 늘 둡니다 — 넘지 않아도 거기서 할 일이
         있습니다(폴더로 묶기, 지난 여행 보기).
       */}
-      {mine && mine.trips.length > 0 ? (
+      {mine && crew.length > 0 ? (
         <Section
-          title="내 여행"
+          title="모임 여행"
+          flush
+          action={
+            <Button
+              label="더보기 ›"
+              variant="ghost"
+              compact
+              onPress={() => router.push('/(app)/trips')}
+            />
+          }>
+          <View style={styles.stripPanel}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <Row gap={Spacing.md} style={styles.strip}>
+                {crew.map((trip) => (
+                  <Press
+                    key={trip.id}
+                    onPress={() => router.push(`/trip/${trip.id}`)}
+                    scale={0.98}
+                    accessibilityLabel={`${trip.title} 열기`}
+                    style={styles.tripCard}>
+                    <Row gap={Spacing.sm}>
+                      <TripMark theme={trip.theme} emoji={trip.emoji} />
+                      <Grow gap={1}>
+                        {/* 어느 모임의 것인지가 이 칸의 뜻입니다. 제목보다
+                            먼저 둡니다 — 같은 이름의 여행이 둘일 수 있어도
+                            모임은 안 겹칩니다. */}
+                        <Caption tone="brand" numberOfLines={1}>
+                          {trip.groupName ?? '모임'}
+                        </Caption>
+                        <Body small strong numberOfLines={1}>
+                          {trip.title}
+                        </Body>
+                      </Grow>
+                    </Row>
+                    <Caption tone="muted" numberOfLines={1}>
+                      {[formatSpan(trip.startIso, trip.endIso), `장소 ${trip.placeCount}곳`]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </Caption>
+                    {countdownOf(trip.startIso, trip.endIso) ? (
+                      <Badge
+                        label={countdownLabel(countdownOf(trip.startIso, trip.endIso)!)}
+                        tone={
+                          countdownIsNear(countdownOf(trip.startIso, trip.endIso)!)
+                            ? 'brand'
+                            : 'muted'
+                        }
+                      />
+                    ) : null}
+                  </Press>
+                ))}
+              </Row>
+            </ScrollView>
+          </View>
+        </Section>
+      ) : null}
+
+      {mine && solo.length > 0 ? (
+        <Section
+          title="혼자 짜는 여행"
           flush
           action={
             <Button
@@ -427,7 +499,7 @@ export default function Home() {
             />
           }>
           <View style={styles.listBody}>
-            {shortlist.map((trip, i) => {
+            {solo.map((trip, i) => {
               /* 가장 가까운 여행인지. 그 줄만 한 마디 더 답니다 — 전에는
                  이 말을 하려고 카드 하나가 따로 서 있었습니다. */
               const ahead = trip.id === next?.trip.id;
@@ -748,6 +820,13 @@ const styles = StyleSheet.create({
   postCard: {
     width: 208,
     gap: Spacing.sm,
+  },
+  /* 모임 여행 한 칸. 날짜 줄이 한 줄에 들어가는 폭입니다 — 좁히면
+     「10.08(목) ~ 10.11(일) · 장소 4곳」이 가운데서 잘립니다. */
+  tripCard: {
+    width: 216,
+    gap: Spacing.xs,
+    alignItems: 'flex-start',
   },
   postText: {
     gap: 2,

@@ -161,6 +161,21 @@ export default function Trips() {
 
   const sections = useMemo(() => (group === 'when' ? byWhen(trips) : []), [group, trips]);
 
+  /*
+    모임 이름을 줄마다 달지 말지.
+
+    <p>모임이 하나뿐이면 그 이름이 모든 줄에 똑같이 붙습니다 — 아무것도
+    구별해 주지 못하면서 제목이 설 자리만 먹습니다. 폰에서는 그 한 칸 때문에
+    여행 이름이 한 글자로 줄어듭니다.
+
+    <p>둘 이상일 때만 답니다. 그때부터는 어느 모임의 것인지가 실제로 갈리는
+    정보입니다.
+  */
+  const manyGroups = useMemo(
+    () => new Set(trips.map((t) => t.groupId).filter(Boolean)).size > 1,
+    [trips],
+  );
+
   /** 어느 폴더에도 안 넣은 것. 폴더별로 볼 때 아래에 따로 모읍니다. */
   const loose = useMemo(() => trips.filter((t) => !t.folderId), [trips]);
 
@@ -324,7 +339,7 @@ export default function Trips() {
               <TripRow
                 key={trip.id}
                 trip={trip}
-                mine={trip.ownerId === user?.id}
+                showGroup={manyGroups}
                 onOpen={() => open(trip.id)}
                 onFolder={() => setPlacing(trip)}
               />
@@ -353,7 +368,7 @@ export default function Trips() {
               <TripRow
                 key={trip.id}
                 trip={trip}
-                mine={trip.ownerId === user?.id}
+                showGroup={manyGroups}
                 onOpen={() => {
                   setOpened(null);
                   router.push({ pathname: '/trip/[id]', params: { id: trip.id } });
@@ -398,11 +413,20 @@ export default function Trips() {
 /**
  * 여행 한 줄.
  *
- * <p>"내 여행" 표는 달지 않습니다. 대개가 내 여행이라 거의 모든 줄에 같은 표가
- * 붙어 아무것도 구별해 주지 못했습니다. 남이 만든 것만 표시합니다.
+ * <h3>오른쪽에 뭘 안 쌓습니다</h3>
  *
- * <p>모임 칸에서는 어느 모임의 것인지를 답니다. 한 모임에서 여행을 여러 번
- * 가는 것이 이 기능의 뜻이라, 모임이 둘만 되어도 이름 없이는 섞입니다.
+ * <p>표를 셋 달아 봤습니다 — 남은 날, 모임 이름, 「같이」. 폰에서 그 셋이
+ * 오른쪽을 다 먹어서 <b>여행 이름이 한 글자로 줄었습니다.</b> 날짜 줄은 한
+ * 글자씩 세로로 흘렀습니다.
+ *
+ * <p>남은 날 하나만 늘 답니다. 목록에서 가장 먼저 보고 싶은 것이고, 짧습니다.
+ *
+ * <p>「내 여행」도 「같이」도 안 답니다. 혼자 칸은 전부 내 것이고 모임 칸은
+ * 대개 같이 가는 것이라, 어느 쪽이든 거의 모든 줄에 같은 표가 붙습니다 —
+ * 모든 줄에 붙는 표는 아무것도 구별해 주지 못합니다.
+ *
+ * <p>모임 이름은 <b>모임이 둘 이상일 때만</b> 답니다. 하나뿐이면 역시 모든
+ * 줄에 같은 이름입니다.
  */
 /**
  * 폴더 하나 만들기.
@@ -462,12 +486,13 @@ function NewFolderSheet({
 
 function TripRow({
   trip,
-  mine,
+  showGroup,
   onOpen,
   onFolder,
 }: {
   trip: TripSummary;
-  mine: boolean;
+  /** 모임 이름을 달지. 모임이 둘 이상일 때만 뜻이 있습니다. */
+  showGroup?: boolean;
   onOpen: () => void;
   /** 폴더에 넣는 단추. 폴더를 다루지 않는 자리에서는 넘기지 않습니다. */
   onFolder?: () => void;
@@ -477,11 +502,14 @@ function TripRow({
       left={<TripMark theme={trip.theme} emoji={trip.emoji} />}
       title={trip.title}
       subtitle={`${formatSpan(trip.startIso, trip.endIso)} · ${formatNights(trip.dayCount)} · 장소 ${trip.placeCount}곳`}
+      /* 안 줄어드는 자리입니다. 줄어들 수 있게 두면 제목이 아니라 이쪽이
+         버티면서 제목만 한 글자로 눌립니다 — 그 반대여야 합니다. */
       right={
-        <Row gap={Spacing.xs}>
+        <Row gap={Spacing.xs} style={styles.tail}>
           {countdownBadge(trip.startIso, trip.endIso)}
-          {trip.groupName ? <Badge label={trip.groupName} tone="muted" /> : null}
-          {mine ? null : <Badge label="같이" tone="muted" />}
+          {showGroup && trip.groupName ? (
+            <Badge label={shortGroup(trip.groupName)} tone="muted" />
+          ) : null}
         </Row>
       }
       /*
@@ -511,6 +539,11 @@ function TripRow({
       onPress={onOpen}
     />
   );
+}
+
+/** 긴 모임 이름은 자릅니다. 표 하나가 줄을 다 먹으면 안 됩니다. */
+function shortGroup(name: string) {
+  return name.length > 8 ? name.slice(0, 8) + '…' : name;
 }
 
 /**
@@ -587,6 +620,12 @@ function byWhen(trips: TripSummary[]): Bunch[] {
 
 
 const styles = StyleSheet.create({
+  /* 줄 오른쪽 꼬리. 안 줄어듭니다 — 줄어들 수 있게 두면 표가 버티고 제목이
+     눌립니다. 대신 표를 적게 답니다. */
+  tail: {
+    flexShrink: 0,
+    flexWrap: 'nowrap',
+  },
   /* 폴더를 늘어놓는 선반. 좁은 폰에서는 두 칸, 넓으면 더 들어갑니다. */
   shelf: {
     alignItems: 'stretch',
