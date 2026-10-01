@@ -199,11 +199,29 @@ public class TripService {
             groups.requireMember(inGroup, me.id());
         }
 
+        /*
+          색을 하나 쥐여 줍니다.
+
+          <p>안 정하고 두었습니다. 「기본값을 억지로 주면 정한 것과 안 정한
+          것을 구별할 수 없다」가 그 이유였는데, 실제로는 <b>아무도 안
+          정했습니다.</b> 색을 고르는 자리는 여행을 만든 뒤 설정 안에 있어서,
+          만들고 바로 목록으로 돌아가는 사람은 거기까지 안 갑니다.
+
+          <p>그래서 목록이 통째로 무채색이었습니다. 구별하라고 비워 둔 것이
+          구별할 것이 하나도 없게 만든 셈입니다.
+
+          <p>돌아가며 줍니다 — 난수로 뽑으면 연달아 만든 둘이 같은 색일 수
+          있고, 그게 가장 헷갈리는 경우입니다. 내가 가진 여행 수를 세어
+          그다음 색을 집으면 적어도 <b>이웃한 둘은 늘 다릅니다.</b>
+        */
+        String tint = DayLabels.colorOf((int) trips.countByOwnerId(me.id()));
+
         Trip trip = trips.save(Trip.builder()
                 .title(cleanTitle)
                 .ownerId(me.id())
                 .groupId(inGroup)
                 .build());
+        trip.setTheme(tint);
 
         /* 0박이면 당일치기라 하루, 3박이면 나흘입니다. */
         for (int i = 0; i <= nightCount; i++) {

@@ -125,8 +125,22 @@ function Inside() {
     return () => sub.remove();
   }, []);
 
+  /*
+    웹뷰가 알려 주는 이동.
+
+    <p>여기서 {@code canGoBack} 을 받아 쓰고 있었습니다. 그런데 이 소식은
+    <b>진짜 쪽 이동</b>에만 옵니다 — 이 앱의 화면 이동은 전부 pushState 라
+    한 번도 안 왔고, 그래서 물리 뒤로가기가 늘 「나갈까요?」로 갔습니다.
+
+    <p>이제는 웹이 길이 바뀔 때마다 직접 알려 줍니다(canGoBack). 여기서는
+    <b>참일 때만</b> 받습니다 — 웹이 아직 말을 안 한 첫 순간에도 진짜 쪽
+    이동이 있었다면 그것은 맞는 말이고, 거짓으로 덮어쓰면 웹이 알려 준 것을
+    지워 버립니다.
+  */
   const moved = useCallback((e: WebViewNavigation) => {
-    canBack.current = e.canGoBack;
+    if (e.canGoBack) {
+      canBack.current = true;
+    }
   }, []);
 
   /*
@@ -179,6 +193,18 @@ function Inside() {
         /* 웹이 제 시작 화면을 띄웠습니다. 이제 우리 것을 내려도 이어집니다.
            답은 안 보냅니다 — 웹이 기다리지 않는 말입니다. */
         shown();
+        return;
+      }
+
+      if (envelope.ask.kind === 'canGoBack') {
+        /*
+          웹이 제 기록을 알려 줬습니다.
+
+          <p>아래 onNavigationStateChange 가 주는 값보다 이쪽을 믿습니다 —
+          저쪽은 진짜 쪽 이동에만 울려서, 화면 안 이동(pushState)으로는 영영
+          false 였습니다. 답은 안 보냅니다.
+        */
+        canBack.current = envelope.ask.can;
         return;
       }
 

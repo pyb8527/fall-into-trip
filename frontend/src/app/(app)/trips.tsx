@@ -17,6 +17,7 @@ import {
   BottomSheet,
   Button,
   Caption,
+  ConfirmDialog,
   Empty,
   ErrorNote,
   Field,
@@ -107,6 +108,25 @@ export default function Trips() {
   const [whose, setWhose] = useState<Whose>('solo');
   const [group, setGroup] = useState<Group>('when');
   const [placing, setPlacing] = useState<TripSummary | null>(null);
+  /** 점 세 개를 누른 여행. 무엇을 할지 고르는 판이 뜹니다. */
+  const [acting, setActing] = useState<TripSummary | null>(null);
+  const [dropping, setDropping] = useState<TripSummary | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
+
+  async function drop(trip: TripSummary) {
+    setBusy(true);
+    setFailed(null);
+    try {
+      await api.delete(`/api/trips/${encodeURIComponent(trip.id)}`);
+      reload();
+      reloadFolders();
+    } catch (e) {
+      setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   const { data, error, loading, reload } = useAsync<{ trips: TripSummary[] }>(
     (signal) => api.get('/api/trips', signal),
@@ -379,7 +399,7 @@ export default function Trips() {
               trip={trip}
               showGroup={manyGroups}
               onOpen={() => open(trip.id)}
-              onFolder={() => setPlacing(trip)}
+              onFolder={() => setActing(trip)}
             />
           ))}
         </View>
@@ -435,7 +455,7 @@ export default function Trips() {
                 }}
                 onFolder={() => {
                   setOpened(null);
-                  setPlacing(trip);
+                  setActing(trip);
                 }}
               />
             ))}
@@ -450,6 +470,73 @@ export default function Trips() {
         onMade={() => {
           setNaming(false);
           reloadFolders();
+        }}
+      />
+
+      {failed ? <ErrorNote message={failed} /> : null}
+
+      {/*
+        점 세 개가 여는 판.
+
+        <p>전에는 누르면 <b>곧바로 폴더 판</b>이 떴습니다. 그래서 이 여행에
+        할 수 있는 일이 폴더에 넣는 것 하나뿐인 것처럼 보였고, 지우려면
+        여행에 들어가 점 세 개를 또 눌러야 했습니다 — 목록에서 지우는 것이
+        가장 자연스러운 자리인데 거기에만 길이 없었습니다.
+
+        <p>지우기는 <b>맨 아래에 빨간 글씨</b>로 둡니다. 되돌릴 수 없는 것은
+        손이 먼저 닿는 자리에 있으면 안 됩니다. 만든 사람만 보입니다 —
+        남의 여행은 서버가 막으므로, 눌러 보고 거절당하는 것보다 안 보이는
+        편이 낫습니다.
+      */}
+      {acting ? (
+        <BottomSheet visible title={acting.title} onClose={() => setActing(null)}>
+          <ListRow
+            left={<Icon name="folder" tone="muted" />}
+            title="폴더에 넣기"
+            last
+            onPress={() => {
+              const trip = acting;
+              setActing(null);
+              setPlacing(trip);
+            }}
+          />
+
+          {acting.ownerId === user?.id ? (
+            <>
+              <Band />
+              <ListRow
+                left={<Icon name="trash-2" tone="danger" />}
+                title={<Text style={styles.dangerRow}>여행 지우기</Text>}
+                last
+                onPress={() => {
+                  const trip = acting;
+                  setActing(null);
+                  setDropping(trip);
+                }}
+              />
+            </>
+          ) : null}
+        </BottomSheet>
+      ) : null}
+
+      <ConfirmDialog
+        visible={dropping !== null}
+        title="이 여행을 지울까요?"
+        message={
+          dropping
+            ? `${dropping.title} 의 날짜와 장소가 모두 사라져요. 같이 보던 사람도 더 볼 수 없게 돼요. 되돌릴 수 없어요.`
+            : undefined
+        }
+        confirmLabel="지우기"
+        danger
+        busy={busy}
+        onCancel={() => setDropping(null)}
+        onConfirm={() => {
+          const trip = dropping;
+          setDropping(null);
+          if (trip) {
+            drop(trip);
+          }
         }}
       />
 
@@ -590,7 +677,7 @@ function TripRow({
         onFolder ? (
           <IconButton
             name="more-horizontal"
-            label={`${trip.title} 폴더에 넣기`}
+            label={`${trip.title} 다루기`}
             bare
             onPress={onFolder}
           />
@@ -680,6 +767,13 @@ function byWhen(trips: TripSummary[]): Bunch[] {
 
 
 const styles = StyleSheet.create({
+  /* 되돌릴 수 없는 줄. 빨간 글씨 하나로 말합니다 — 면을 칠하면 그 줄이
+     주 동작처럼 보입니다. */
+  dangerRow: {
+    ...Type.headline,
+    fontWeight: Weight.semibold,
+    color: Colors.danger,
+  },
   /*
     묶음의 이름.
 

@@ -20,14 +20,18 @@ import { api } from '@/api/client';
  * 그려 줄 수 있으면 여기서 JPEG 으로 다시 그려져 나가고, 못 그리면 고를 때
  * 실패합니다.
  *
- * <p><b>크롬과 안드로이드 웹뷰는 HEIC 를 못 풉니다.</b> 사파리만 됩니다.
- * 그런데 실패하는 모습이 「사진을 열지 못했어요」 한 줄이라, 받는 사람은
- * 파일이 깨진 줄 알고 같은 사진을 몇 번씩 다시 고릅니다 — 몇 번을 해도
- * 안 됩니다.
+ * <p>한동안 앞부분을 읽어 HEIC 면 <b>열어 보지도 않고 막았습니다.</b> 그래서
+ * <b>아이폰에서도 아이폰 사진을 못 올렸습니다</b> — 사파리는 풀 수 있는데
+ * 우리가 먼저 거절했습니다. HEIC 를 찍는 기기가 바로 그 기기인데 말입니다.
  *
- * <p>그래서 앞부분을 보고 HEIC 인지 먼저 가립니다. 맞으면 <b>무엇을 하면
- * 되는지</b>를 말합니다. 아이폰에서 「가장 호환성 높게」로 내보내거나 설정을
- * 바꾸면 JPEG 으로 나오고, 그러면 그대로 올라갑니다.
+ * <p>그렇다고 「브라우저가 풀면 된다」로 두는 것도 반쪽입니다. 갤럭시도
+ * 설정에서 고효율 이미지를 켜면 HEIC 로 찍는데, <b>안드로이드 크롬과 웹뷰는
+ * 못 풉니다.</b> 그 사람들에게는 영영 안 되는 일이 됩니다.
+ *
+ * <p>직접 풉니다. 브라우저가 먼저 해 보고, 못 하면 그때 <b>푸는 코드를 받아
+ * 옵니다</b>({@code heic-to}, wasm). 받아 오는 것이 작지 않아서 묶음에 미리
+ * 싣지 않습니다 — HEIC 를 안 올리는 사람은 그 값을 안 냅니다. HEIF 도 같은
+ * 무리라 같이 풀립니다.
  *
  * <p>여기서 풀어 주는 길도 있습니다(libheif 를 wasm 으로). 그런데 그것
  * 하나가 웹 묶음을 1~2MB 늘리고, 그 값은 HEIC 를 안 올리는 사람까지 함께
@@ -71,34 +75,45 @@ export async function pickAndUpload(room = 1): Promise<Pick> {
     return { ids: [], skipped: 0, failed: 0 };
   }
 
-  /* 풀 수 없는 것은 올려 보지도 않습니다. 앞부분만 읽으므로 큰 파일에도
-     값이 안 듭니다. */
-  for (const file of files.slice(0, Math.max(1, room))) {
-    if (await looksHeic(file)) {
-      throw new PickError(
-        '아이폰 사진(HEIC)은 이 기기에서 못 열어요. ' +
-          '사진 앱에서 공유 → 「옵션」 → 「가장 호환성 높게」로 내보낸 뒤 올려 주세요.',
-      );
-    }
-  }
-
   const taking = files.slice(0, Math.max(1, room));
   const ids: string[] = [];
   let failed = 0;
   /* 한 장씩 차례로 올립니다. 한꺼번에 밀어 넣으면 로밍이 느린 데서
      서로의 대역을 나눠 먹어 다 같이 느려집니다 — 길 위에서 도장을
      찍는 자리가 바로 그런 데입니다. */
+  /* 못 푼 것이 아이폰 사진이었는지. 그때만 무엇을 하면 되는지 말합니다 —
+     여느 실패에 이 말을 붙이면 엉뚱한 데를 고치게 합니다. */
+  let heicFailed = false;
+
   for (const file of taking) {
     try {
-      const small = await shrink(file);
+      /* 아이폰·갤럭시가 찍은 것은 브라우저가 못 그릴 수 있습니다. 그때만
+         푸는 코드를 받아 옵니다. */
+      const usable = (await looksHeic(file)) ? await unHeic(file) : file;
+      const small = await shrink(usable);
       const form = new FormData();
       form.append('file', small, 'photo.jpg');
       const got = await api.upload<{ id: string }>('/api/photos', form);
       ids.push(got.id);
     } catch {
       failed += 1;
+      if (!heicFailed && (await looksHeic(file))) {
+        heicFailed = true;
+      }
     }
   }
+
+  /*
+    한 장도 못 올렸고 그것이 전부 아이폰 사진이면, 「실패」 한 마디로는
+    같은 사진을 몇 번씩 다시 고르게 됩니다. 몇 번을 해도 안 됩니다.
+  */
+  if (ids.length === 0 && heicFailed) {
+    throw new PickError(
+      'HEIC 사진을 푸는 데 실패했어요. 망이 느리면 푸는 코드를 못 받아 올 수 있어요. ' +
+        '잠시 뒤에 다시 해 보세요.',
+    );
+  }
+
   return { ids, skipped: files.length - taking.length, failed };
 }
 
@@ -235,4 +250,32 @@ function draw(file: File): Promise<HTMLImageElement> {
     };
     image.src = url;
   });
+}
+
+/**
+ * 브라우저가 못 푸는 것을 풀어 옵니다.
+ *
+ * <h3>왜 미리 안 싣는가</h3>
+ *
+ * <p>푸는 코드는 wasm 이라 작지 않습니다. 묶음에 미리 실으면 <b>HEIC 를 한
+ * 번도 안 올리는 사람까지</b> 그 값을 냅니다. 만났을 때만 받아 옵니다 —
+ * 처음 한 장이 조금 느리고, 그다음부터는 브라우저가 들고 있습니다.
+ *
+ * <h3>먼저 브라우저에게 맡깁니다</h3>
+ *
+ * <p>사파리는 HEIC 를 그대로 그립니다. 그쪽이 훨씬 빠르고 메모리도 덜 먹으니,
+ * 받아 오는 것은 <b>브라우저가 못 그렸을 때</b>뿐입니다.
+ */
+async function unHeic(file: File): Promise<File> {
+  try {
+    /* 브라우저가 그릴 수 있으면 그대로 둡니다. */
+    await draw(file);
+    return file;
+  } catch {
+    /* 못 그립니다. 풀어 봅니다. */
+  }
+
+  const { heicTo } = await import('heic-to');
+  const jpeg = await heicTo({ blob: file, type: 'image/jpeg', quality: QUALITY });
+  return new File([jpeg], 'photo.jpg', { type: 'image/jpeg' });
 }

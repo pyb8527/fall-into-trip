@@ -466,6 +466,7 @@ export function ListRow({
   left,
   right,
   action,
+  last,
   onPress,
 }: {
   title: React.ReactNode;
@@ -487,6 +488,13 @@ export function ListRow({
    * 눌러도 줄이 열리지 않습니다.
    */
   action?: React.ReactNode;
+  /**
+   * 목록의 마지막 줄인지.
+   *
+   * <p>마지막에는 선을 안 긋습니다. 목록이 끝났는데 선이 하나 더 있으면
+   * 아래에 뭔가 더 있는 줄 압니다.
+   */
+  last?: boolean;
   onPress: () => void;
 }) {
   const inside = (
@@ -504,17 +512,22 @@ export function ListRow({
 
   if (!action) {
     return (
-      <Press onPress={onPress} scale={0.985} style={styles.listRow}>
+      <Press
+        onPress={onPress}
+        /* 크기를 안 줄입니다. 배경이 없는 줄에서 크기가 변하면 글자만
+           들썩이는 것으로 보입니다 — 눌린 것은 바탕색이 말합니다. */
+        scale={1}
+        style={[styles.listRow, last ? null : styles.listRowLine]}>
         {inside}
       </Press>
     );
   }
 
-  /* 판은 겉껍데기가 쓰고, 누르는 자리는 그 안에서 남는 폭을 다 먹습니다.
-     여백도 안쪽이 가집니다 — 겉이 가지면 곁다리가 판 가장자리에 붙습니다. */
+  /* 선은 겉껍데기가 긋습니다. 누르는 자리에 그으면 곁다리 밑만 선이
+     끊겨서 줄이 중간에 잘린 것처럼 보입니다. */
   return (
-    <View style={styles.listRowHeld}>
-      <Press onPress={onPress} scale={0.985} style={styles.listRowTap}>
+    <View style={[styles.listRowHeld, last ? null : styles.listRowLine]}>
+      <Press onPress={onPress} scale={1} style={styles.listRowTap}>
         {inside}
       </Press>
       {action}
@@ -592,6 +605,52 @@ export function Grow({ children, style, gap, ...rest }: ViewProps & { gap?: numb
 /** 카드 안에서 내용을 가르는 얇은 선. */
 export function Divider() {
   return <View style={styles.divider} />;
+}
+
+/**
+ * 구역 머리 — 제목 한 줄, 오른쪽에 곁다리 하나.
+ *
+ * <h3>화면마다 제각각이었습니다</h3>
+ *
+ * <p>구역 제목을 화면이 저마다 만들어 쓰고 있었습니다. 어떤 데는
+ * {@link Section} 의 흰 판 안에, 어떤 데는 {@link Title} 하나로, 어떤 데는
+ * 화면 안에 손으로 만든 머리 묶음으로. 그래서 글자 크기도 위아래 여백도
+ * 「더보기」가 붙는 자리도 다 달랐고, 화면을 옮겨 다니면 <b>같은 앱이
+ * 아닌 것처럼</b> 보였습니다.
+ *
+ * <p>하나로 모읍니다. 바닥이 흰색이 된 뒤로 구역을 가르는 것은 띠와
+ * <b>이 머리</b>뿐이라, 이것이 흔들리면 화면이 「도화지에 아무거나 올려
+ * 둔 것」이 됩니다.
+ *
+ * <h3>위가 넓고 아래가 좁습니다</h3>
+ *
+ * <p>제목은 <b>아래 것의 이름</b>입니다. 위아래 여백이 같으면 제목이 제
+ * 구역보다 위쪽 빈자리에 더 붙어 보여서, 어느 묶음의 이름인지 한 번 더
+ * 봐야 합니다.
+ *
+ * @param action 「더보기」처럼 이 구역에서 바로 하는 일. 없으면 안 섭니다
+ * @param note   제목 아래 한 줄. 이 구역이 무엇인지 설명할 때만
+ */
+export function SectionHeader({
+  title,
+  action,
+  note,
+}: {
+  title: string;
+  action?: React.ReactNode;
+  note?: React.ReactNode;
+}) {
+  return (
+    <View style={styles.sectionHeader}>
+      <View style={styles.sectionHeaderTop}>
+        <Text style={styles.sectionHeaderTitle} numberOfLines={1}>
+          {title}
+        </Text>
+        {action}
+      </View>
+      {note ? <Text style={styles.sectionHeaderNote}>{note}</Text> : null}
+    </View>
+  );
 }
 
 /**
@@ -2812,6 +2871,29 @@ const styles = StyleSheet.create({
     gap: Spacing.xs,
   },
 
+  sectionHeader: {
+    /* 위 32 · 아래 12. 계획서의 「구역 위 여백」과 「제목 아래」입니다. */
+    paddingTop: Spacing.s8,
+    paddingBottom: Spacing.s3,
+    gap: Spacing.s1,
+  },
+  sectionHeaderTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.s3,
+  },
+  sectionHeaderTitle: {
+    ...Type.title2,
+    fontWeight: Weight.bold,
+    color: Colors.text,
+    flexShrink: 1,
+  },
+  sectionHeaderNote: {
+    ...Type.body2,
+    color: Colors.textSecondary,
+  },
+
   band: {
     height: BandHeight,
     marginHorizontal: -Gutter,
@@ -2838,37 +2920,50 @@ const styles = StyleSheet.create({
     gap: 2,
   },
 
+  /*
+    목록 줄.
+
+    <h3>흰 카드를 걷고 선으로 가릅니다</h3>
+
+    <p>줄 하나하나가 흰 카드였습니다. 바닥이 회색이던 시절에는 그 카드들이
+    바닥 위에 떠 보여서 줄이 갈렸는데, <b>바닥을 흰색으로 돌리니 흰 카드가
+    흰 종이 위에 놓인 꼴</b>이 됐습니다 — 글자만 줄줄이 늘어서고 어디서
+    한 줄이 끝나는지 안 보였습니다.
+
+    <p>배경을 걷고 아래에 머리카락 굵기 선을 긋습니다. 선은 <b>글이
+    시작하는 자리</b>에서부터 그어야 앞의 그림이 줄을 이끄는 것으로
+    읽힙니다 — 끝에서 끝까지 그으면 구역을 가르는 띠처럼 보입니다.
+
+    <p>마지막 줄에는 안 긋습니다. 목록이 끝났는데 선이 하나 더 있으면
+    아래에 뭔가 더 있는 줄 압니다.
+  */
   listRow: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.r3,
     paddingVertical: Spacing.s3,
-    paddingHorizontal: Spacing.s4,
     minHeight: Tap.min + Spacing.s3,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: Spacing.md,
+    gap: Spacing.s3,
+  },
+  listRowLine: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.divider,
   },
   /* 곁다리가 있는 줄. 판은 여기가 쓰고 여백은 안쪽이 가집니다. */
   listRowHeld: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.md,
-    minHeight: Tap.min + Spacing.lg,
+    minHeight: Tap.min + Spacing.s3,
     flexDirection: 'row',
     alignItems: 'center',
-    /* 곁다리는 판 오른쪽 끝에서 한 눈금 안쪽에 섭니다. */
-    paddingRight: Spacing.sm,
   },
   listRowTap: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: Spacing.md,
-    paddingVertical: Spacing.lg,
-    paddingLeft: Spacing.xl,
-    /* 오른쪽은 곁다리와의 사이만큼만. 판 여백은 겉껍데기가 안 가집니다. */
-    paddingRight: Spacing.md,
+    gap: Spacing.s3,
+    paddingVertical: Spacing.s3,
+    /* 오른쪽은 곁다리와의 사이만큼만. */
+    paddingRight: Spacing.s2,
   },
   listRowText: {
     flex: 1,

@@ -1,10 +1,11 @@
-import { Stack, ThemeProvider, type Theme as NavTheme } from 'expo-router';
+import { Stack, ThemeProvider, usePathname, type Theme as NavTheme } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AuthProvider, useAuth } from '@/auth/auth-provider';
+import { tellShellCanGoBack } from '@/lib/shell-bridge.web';
 import { ShellInsets } from '@/lib/shell-insets.web';
 import { listenForShellOpen } from '@/lib/shell-open.web';
 import { Colors, Fonts, Type, Weight } from '@/constants/theme';
@@ -67,6 +68,24 @@ export default function RootLayout() {
     주소를 건네면 여기서 엽니다. 브라우저에서는 아무 일도 안 합니다.
   */
   useEffect(() => listenForShellOpen(), []);
+
+  /*
+    물러날 데가 있는지 껍데기에게 알립니다.
+
+    <p>껍데기는 웹뷰가 주는 {@code canGoBack} 을 보고 물리 뒤로가기를
+    처리했습니다. 그런데 그 신호는 <b>진짜 쪽 이동</b>에만 울립니다 — 이
+    앱의 화면 이동은 전부 {@code history.pushState} 라서 한 번도 안
+    울렸습니다. 그래서 여행 상세에 들어가 뒤로가기를 눌러도 껍데기는
+    「물러날 데가 없다」고 알고, 뒤로 가는 대신 「한 번 더 누르면 나가요」를
+    띄웠습니다.
+
+    <p>길이를 아는 쪽이 말합니다. 웹뷰 안에서는 우리 자리가 기록의 처음이라,
+    쌓인 것이 하나라도 있으면 돌아갈 데가 있습니다.
+  */
+  const here = usePathname();
+  useEffect(() => {
+    tellShellCanGoBack(typeof window !== 'undefined' && window.history.length > 1);
+  }, [here]);
 
   return (
     /* 노치·홈 인디케이터 크기를 화면들이 물어볼 수 있게 가장 바깥에 둡니다. */

@@ -125,6 +125,29 @@ export function askShell(ask: Ask, seconds = 90): Promise<unknown> {
  *
  * @return 그만 듣는 함수
  */
+/**
+ * 지금 뒤로 갈 데가 있는지 껍데기에게 알립니다.
+ *
+ * <p>껍데기는 웹뷰의 {@code canGoBack} 을 봤는데, 그 신호는 <b>진짜 쪽
+ * 이동</b>에만 울립니다. 이 앱의 화면 이동은 전부 {@code history.pushState}
+ * 라서 한 번도 안 울렸고, 그래서 여행 상세에서 물리 뒤로가기를 눌러도
+ * 껍데기는 「물러날 데가 없다」고 알았습니다.
+ *
+ * <p>답은 안 기다립니다 — 알려 주기만 하는 한마디입니다.
+ */
+export function tellShellCanGoBack(can: boolean) {
+  if (!inShell) {
+    return;
+  }
+  try {
+    window.ReactNativeWebView!.postMessage(
+      JSON.stringify({ id: 'canGoBack', ask: { kind: 'canGoBack', can } }),
+    );
+  } catch {
+    /* 못 보내도 그만입니다. 껍데기는 전처럼 제 신호로 판단합니다. */
+  }
+}
+
 export function hearShell(hear: (tell: Tell) => void): () => void {
   listeners.add(hear);
   return () => {
