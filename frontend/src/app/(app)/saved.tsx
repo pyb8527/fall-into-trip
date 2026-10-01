@@ -397,6 +397,7 @@ export default function Saved() {
         고른 것만.
       */}
       {kinds.length > 1 || all.length > 2 ? (
+        <Card>
         <Split>
           <Row gap={Spacing.xs} style={styles.applied}>
             <Button
@@ -411,6 +412,7 @@ export default function Saved() {
           </Row>
           <Caption tone="secondary">{shown.length}곳</Caption>
         </Split>
+        </Card>
       ) : null}
 
       {/* 몇 곳이 남는지를 판을 닫기 전에 말합니다. 여기 목록은 이미 받아

@@ -17,6 +17,7 @@ import {
   BottomSheet,
   Button,
   Caption,
+  Card,
   Empty,
   ErrorNote,
   Field,
@@ -144,19 +145,29 @@ export default function Trips() {
       tabs={<AppTabs />}
       /* 주 동작은 아래에 붙입니다. 한 손으로 쥐었을 때 엄지가 닿는 자리입니다. */
       footer={<Button label="새 여행 만들기" onPress={() => setCreating(true)} />}>
-      {/* 무엇 때문에 고르는 중인지. 여느 때는 말할 것이 없습니다. */}
-      {goal === 'money' ? (
-        <Caption tone="secondary">어느 여행의 가계부를 볼까요?</Caption>
-      ) : null}
+      {/*
+        고르는 것들은 한 판에 모읍니다.
 
-      {/* 몇 개 안 될 때는 찾을 것이 없습니다. 칸만 자리를 차지합니다. */}
-      {all.length > 4 ? (
-        <SearchField
-          label="여행 찾기"
-          value={q}
-          onChangeText={setQ}
-          placeholder="오사카, 제주"
-        />
+        <p>안내 한 줄과 찾기 칸이 회색 바탕에 따로 떠 있었습니다. 어디까지가
+        고르는 자리인지 안 보이고, 둘이 따로 서니 그만큼 세로로 길었습니다.
+      */}
+      {(goal === 'money' || all.length > 4) ? (
+        <Card>
+          {/* 무엇 때문에 고르는 중인지. 여느 때는 말할 것이 없습니다. */}
+          {goal === 'money' ? (
+            <Caption tone="secondary">어느 여행의 가계부를 볼까요?</Caption>
+          ) : null}
+
+          {/* 몇 개 안 될 때는 찾을 것이 없습니다. 칸만 자리를 차지합니다. */}
+          {all.length > 4 ? (
+            <SearchField
+              label="여행 찾기"
+              value={q}
+              onChangeText={setQ}
+              placeholder="오사카, 제주"
+            />
+          ) : null}
+        </Card>
       ) : null}
 
       {loading && !data ? <Loading /> : null}

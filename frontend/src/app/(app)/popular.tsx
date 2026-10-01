@@ -121,6 +121,7 @@ export default function Popular() {
             들입니다 — 전에는 칩만으로도 꽉 차 둘째 조건을 놓을 데가
             없었습니다.
           */}
+          <Card>
           <Row gap={Spacing.xs} style={styles.chips}>
             {(kinds?.kinds.length ?? 0) > 1 ? (
               <Picker
@@ -149,6 +150,7 @@ export default function Popular() {
               />
             ) : null}
           </Row>
+          </Card>
 
           {loadingPlaces && !places ? <Loading /> : null}
           {placeError ? <ErrorNote message={placeError} onRetry={reloadPlaces} /> : null}

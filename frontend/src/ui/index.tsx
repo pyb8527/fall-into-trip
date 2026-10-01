@@ -3030,8 +3030,21 @@ const styles = StyleSheet.create({
     이제 고른 칸 아래에만 굵은 선이 그어집니다. 밝기가 아니라 있고 없음
     이라 흑백에서도 한눈에 갈립니다.
   */
+  /*
+    띠도 판 위에 섭니다.
+
+    <p>회색 바탕에 밑줄만 그어 두었습니다. 누르는 것이라 판에 안 넣었는데,
+    그러면 <b>어디까지가 고르는 자리이고 어디부터가 결과인지</b> 안 보입니다.
+    화면 맨 위에 서는 것이라 더 그렇습니다.
+
+    <p>밑줄은 그대로 둡니다. 고른 칸을 말하는 것이 밑줄이고, 판은 그 밑줄이
+    놓일 바닥을 줄 뿐입니다.
+  */
   segment: {
     flexDirection: 'row',
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.xs,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: Colors.border,
   },
