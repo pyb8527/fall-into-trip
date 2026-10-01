@@ -94,11 +94,14 @@ r = await call("PATCH", "/api/places/" + p1, { token: admin, body: { cost: "¥2,
 T("장소 수정", r.status === 200 && r.data.place.cost === "¥2,580", r.data);
 T("고칠 때마다 version 이 오름", r.data.place.version > 0, r.data.place.version);
 
-console.log("\n[4] 방문 체크 — 사람마다 따로");
-r = await call("PUT", "/api/visits/" + p1, { token: admin });
-T("방문 표시", r.status === 200, r.data);
+console.log("\n[4] 다니면서 볼 사진을 챙겨 둔다");
+/* 도장(다녀옴)은 걷었습니다. 남은 것은 메뉴판·예매 화면처럼 가기 전에
+   넣어 두고 가게 앞에서 꺼내 보는 것뿐입니다. */
+r = await call("PUT", "/api/visits/" + p1 + "/refs", { token: admin, body: { photoIds: [] } });
+T("빈 목록도 받는다", r.status === 200, r.data);
 r = await call("GET", "/api/trip?trip=" + tripId, { token: admin });
-T("내 방문에 반영", r.data.visited.includes(p1), r.data.visited);
+T("도장은 이제 안 온다", r.data.visited === undefined, Object.keys(r.data));
+T("챙겨 둔 것 칸은 온다", Array.isArray(r.data.refs), r.data.refs);
 
 console.log("\n[5] 공동 편집 — 두 사람이 같은 여행을");
 /* 동행자 계정을 만들려면 관리자 API 가 필요하다. 아직 없으므로 여기서는

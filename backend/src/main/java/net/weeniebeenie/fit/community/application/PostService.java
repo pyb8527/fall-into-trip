@@ -13,7 +13,6 @@ import net.weeniebeenie.fit.community.domain.*;
 import net.weeniebeenie.fit.shared.error.ApiException;
 import net.weeniebeenie.fit.support.audit.AuditService;
 import net.weeniebeenie.fit.trip.domain.*;
-import net.weeniebeenie.fit.trip.domain.PhotoKind;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -218,23 +217,17 @@ public class PostService {
                   화면이 보여 주어야 합니다.
                 */
                 /*
-                  기록 사진만 담습니다.
+                  장소에 붙은 사진은 사본에 안 담습니다.
 
-                  <p>같은 장소에 「다니면서 볼 사진」(REFERENCE)도 붙어
-                  있습니다 — 메뉴판, 예매 화면, 가는 길 지도. 그건 다니려고
-                  넣어 둔 것이지 남에게 보이려고 넣은 것이 아니라, 여기
-                  따라가면 <b>남의 여행기에 내 예매 QR 이 실립니다.</b>
+                  <p>여기 남은 것은 「다니면서 볼 사진」뿐입니다 — 메뉴판,
+                  예매 화면, 가는 길 지도. 그건 다니려고 넣어 둔 것이지 남에게
+                  보이려고 넣은 것이 아닙니다. 담으면 <b>남의 여행기에 내 예매
+                  QR 이 실립니다.</b>
+
+                  <p>「그 자리에서 남긴 것」은 걷었습니다. 그래서 지금 사본에는
+                  사진이 안 실립니다 — 피드 글을 골라 싣는 길이 3단계에 들어
+                  옵니다(docs/groups/plan.md).
                 */
-                List<String> shotIds = visits.photosOf(p.getId(), PhotoKind.RECORD);
-                if (!shotIds.isEmpty() || p.getStars() != null || p.getReview() != null) {
-                    /* 사진은 여러 장입니다. 사본에도 차례대로 담습니다. */
-                    ArrayNode shots = n.putArray("photos");
-                    for (String id : shotIds) {
-                        shots.add(id);
-                    }
-                    n.put("stars", p.getStars() == null ? null : p.getStars().intValue());
-                    n.put("review", p.getReview());
-                }
             }
         }
         return root.toString();

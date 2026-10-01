@@ -119,11 +119,12 @@ function clusterIcon(color: string, count: number) {
 function pinIcon(
   color: string,
   active: boolean,
-  visited: boolean,
   emoji: boolean,
   order: number,
 ) {
-  const face = visited ? color : '#FFFFFF';
+  /* 다녀온 곳은 속을 날짜 색으로 채웠습니다. 도장을 걷었으니 전부 흰
+     속입니다 — 색은 테두리가 말합니다. */
+  const face = '#FFFFFF';
 
   if (emoji) {
     const r = active ? 17 : 14.5;
@@ -188,7 +189,6 @@ function pinIcon(
  */
 function pinLabel(
   place: MapPlace,
-  visited: boolean,
   active: boolean,
   shape: 'default' | 'star' = 'default',
 ) {
@@ -202,9 +202,8 @@ function pinLabel(
   }
   return {
     text: String(place.order),
-    /* 다녀온 곳은 방울 속이 날짜 색으로 차 있어 흰 글자, 아직인 곳은 속이
-       희어서 짙은 글자. */
-    color: visited ? '#FFFFFF' : Colors.text,
+    /* 속이 희므로 짙은 글자입니다. */
+    color: Colors.text,
     fontSize: '11px',
     fontWeight: '700',
   };
@@ -308,7 +307,7 @@ function markerIcon(
     };
   }
 
-  const made = pinIcon(place.color, active, place.detail.visited, !!place.emoji, place.order);
+  const made = pinIcon(place.color, active, !!place.emoji, place.order);
 
   if (place.emoji) {
     return {
@@ -641,7 +640,7 @@ export function TripMap({
         map: map.current,
         zIndex: 100 + p.order,
         icon: markerIcon(g, p, false, shape),
-        label: pinLabel(p, p.detail.visited, false, shape),
+        label: pinLabel(p, false, shape),
       });
       marker.addListener('click', () => {
         selectRef.current(p.id);
@@ -970,7 +969,7 @@ export function TripMap({
       }
       const active = p.id === activeId;
       marker.setIcon(markerIcon(g, p, active, shape));
-      marker.setLabel(pinLabel(p, p.detail.visited, active, shape));
+      marker.setLabel(pinLabel(p, active, shape));
       marker.setZIndex(active ? 999 : 100 + p.order);
     });
     const chosen = shown.find((p) => p.id === activeId);
@@ -1172,7 +1171,6 @@ function PlaceSheet({ place, onClose }: { place: MapPlace; onClose: () => void }
           </View>
           <Subtitle>{place.name}</Subtitle>
         </Row>
-        {d.visited ? <Badge label="다녀옴" tone="success" /> : null}
       </Row>
 
       {d.sub ? <Caption>{d.sub}</Caption> : null}

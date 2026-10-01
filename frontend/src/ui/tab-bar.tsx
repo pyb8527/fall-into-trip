@@ -179,23 +179,13 @@ export function AppTabs() {
           active: here.startsWith('/community'),
           onPress: go('/community'),
         },
-        {
-          key: 'money',
-          label: '가계부',
-          icon: 'credit-card',
-          active: here.startsWith('/money'),
-          /* 여행 목록을 빌려 쓰고 있었습니다. 그래서 가계부를 눌렀는데
-             주소가 /trips 가 되고, 띠는 그것을 보고 「내 여행」에 불을
-             켰습니다. 가계부만의 목록을 둡니다. */
-          onPress: go('/(app)/money'),
-        },
       ]}
     />
   );
 }
 
 /** 여행 안에서 오갈 수 있는 곳들. 어느 화면에 있든 같은 순서로 섭니다. */
-export type TripTabKey = 'plan' | 'travel' | 'vote' | 'money' | 'card';
+export type TripTabKey = 'plan' | 'vote' | 'money' | 'card';
 
 /**
  * 여행 하나의 갈래.
@@ -216,18 +206,14 @@ export type TripTabKey = 'plan' | 'travel' | 'vote' | 'money' | 'card';
  *
  * @param active 지금 이 화면. 그 칸은 눌러도 아무 일이 없습니다 — 같은 곳을
  *               다시 쌓으면 뒤로가기가 한 번 헛돕니다
- * @param onTrip 오늘이 이 여행의 날 중 하나인지. 맞으면 「여행 중」에 점을
- *               찍습니다
  */
 export function TripTabs({
   tripId,
   active,
-  onTrip = false,
   onBack,
 }: {
   tripId: string;
   active: TripTabKey;
-  onTrip?: boolean;
   /** 나가는 길. 안 주면 일정 화면으로 돌아갑니다. */
   onBack?: () => void;
 }) {
@@ -249,14 +235,6 @@ export function TripTabs({
           icon: 'calendar',
           active: active === 'plan',
           onPress: go('/trip/[id]'),
-        },
-        {
-          key: 'travel',
-          label: '여행 피드',
-          icon: 'flag',
-          active: active === 'travel',
-          dot: onTrip && active !== 'travel',
-          onPress: go('/travel/[id]'),
         },
         {
           key: 'vote',

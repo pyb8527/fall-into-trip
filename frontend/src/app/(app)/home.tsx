@@ -205,6 +205,12 @@ export default function Home() {
     카드가 지금까지처럼 제목만 말합니다.
   */
   const road = useMemo(() => {
+    /* "14:00" → 840. 못 읽으면 아주 큰 값이라 "지금 이후" 에 안 걸립니다. */
+    const toMinutes = (hhmm: string) => {
+      const [h, m] = hhmm.split(':').map((n) => Number(n));
+      return Number.isFinite(h) && Number.isFinite(m) ? h * 60 + m : Number.MAX_SAFE_INTEGER;
+    };
+
     if (!today) {
       return null;
     }
@@ -213,9 +219,21 @@ export default function Home() {
     if (!day || day.places.length === 0) {
       return null;
     }
-    const stamped = new Set(today.visited);
-    const left = day.places.filter((p) => !stamped.has(p.id));
-    return { next: left[0] ?? null, left: left.length, total: day.places.length };
+    /*
+      다음에 갈 곳.
+
+      <p>전에는 <b>도장이 안 찍힌 것</b> 중 첫째였습니다. 도장을 걷었으니
+      다른 기준이 필요한데, 시계가 더 낫습니다 — 도장은 누르는 것을 잊으면
+      틀리지만 시계는 안 틀립니다.
+
+      <p>시각을 적어 둔 곳 중 <b>지금 이후</b>의 첫째입니다. 시각을 아무 데도
+      안 적었으면 그날의 첫 곳을 냅니다 — 그래도 "이따 어디 가나" 에 답이
+      됩니다.
+    */
+    const now = new Date();
+    const mins = now.getHours() * 60 + now.getMinutes();
+    const ahead = day.places.find((p) => p.time && toMinutes(p.time) >= mins);
+    return { next: ahead ?? day.places[0] ?? null, total: day.places.length };
   }, [today]);
 
   /*
@@ -454,9 +472,9 @@ export default function Home() {
                       </Grow>
                     </Row>
                     {going && road ? (
-                      /* 길 위에서는 남은 날이 아니라 남은 곳이 궁금합니다.
+                      /* 길 위에서는 남은 날이 아니라 오늘 할 일이 궁금합니다.
                          "오늘" 이라고 적어 봐야 이미 아는 것입니다. */
-                      <Badge label={`${road.left}곳 남음`} tone="brand" />
+                      <Badge label={`${road.total}곳`} tone="brand" />
                     ) : countdownOf(trip.startIso, trip.endIso) ? (
                       <Badge
                         label={countdownLabel(countdownOf(trip.startIso, trip.endIso)!)}

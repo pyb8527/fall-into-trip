@@ -4,9 +4,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { api, API_BASE } from '@/api/client';
-import type { Books, Companion, PlaceMark, TripDetail } from '@/api/types';
+import type { Books, Companion, TripDetail } from '@/api/types';
 import { useAsync } from '@/api/use-async';
-import { PhotoStrip } from '@/components/photo-strip';
 import { PublishForm } from '@/components/publish-form';
 import { TripMap } from '@/components/trip-map';
 import { Colors, dayColor, Radius, Spacing } from '@/constants/theme';
@@ -19,7 +18,6 @@ import {
   Caption,
   Chip,
   Divider,
-  Empty,
   ErrorNote,
   Loading,
   Panel,
@@ -46,14 +44,20 @@ import { TripTabs } from '@/ui/tab-bar';
  *       훨씬 가볍게 할 수 있습니다.</li>
  * </ul>
  */
-type Face = 'receipt' | 'replay' | 'album';
+/*
+  「남긴 것」 칸이 있었습니다.
+
+  <p>장소마다 남긴 사진과 한 줄을 날짜 순으로 훑는 자리였습니다. 그런데
+  그걸 남기려면 <b>장소를 먼저 골라야</b> 해서, 숙소에서 찍은 단체 사진은
+  올릴 데가 없었습니다. 피드가 그 일을 대신하므로 이 칸은 걷습니다.
+*/
+type Face = 'receipt' | 'replay';
 
 const FACES: { value: Face; label: string }[] = [
   { value: 'receipt', label: '영수증' },
   /* 「다시 보기」 였습니다. 무엇을 다시 보는지가 이름에 없어서, 누르기
      전에는 알 수 없었습니다. */
   { value: 'replay', label: '동선' },
-  { value: 'album', label: '남긴 것' },
 ];
 
 export default function Card() {
@@ -107,10 +111,8 @@ export default function Card() {
 
       {face === 'receipt' ? (
         <Receipt trip={data} mates={mates?.members ?? []} books={spent?.books ?? []} />
-      ) : face === 'replay' ? (
-        <Replay trip={data} />
       ) : (
-        <Album trip={data} />
+        <Replay trip={data} />
       )}
 
       {/*
@@ -120,14 +122,14 @@ export default function Card() {
         그때가 "정리해 둘까" 가 드는 유일한 순간입니다. 여행 상세의 「글 올리기」
         는 여행을 짜는 동안 보는 자리라 그 생각이 안 듭니다.
 
-        <p>다녀온 곳이 하나도 없으면 안 냅니다 — 도장도 안 찍은 여행을
-        여행기로 남기라고 하는 것은 아직 이릅니다.
+        <p>장소가 하나도 없으면 안 냅니다 — 빈 일정을 여행기로 남기라고
+        하는 것은 아직 이릅니다.
       */}
-      {data.visited.length > 0 ? (
+      {data.days.some((d) => d.places.length > 0) ? (
         <Panel>
           <Subtitle>여행기로 남길까요?</Subtitle>
           <Caption tone="secondary">
-            도장 찍으며 남긴 사진과 한 줄이 그대로 따라가요. 나만 볼 수도 있어요.
+            일정이 그대로 따라가요. 나만 볼 수도 있어요.
           </Caption>
           <Button label="여행기 쓰기" onPress={() => setPublishing(true)} />
         </Panel>
@@ -149,75 +151,6 @@ export default function Card() {
         }}
       />
     </Screen>
-  );
-}
-
-/**
- * 다녀와서 남긴 것들.
- *
- * <h3>왜 여기 있는가</h3>
- *
- * <p>여행 중에 도장을 찍으며 남긴 사진·별점·한 줄은 그 자리에서만 보였습니다.
- * 그런데 그것을 다시 보고 싶은 때는 <b>돌아온 뒤</b>이고, 돌아온 뒤에 여는
- * 화면이 여기입니다.
- *
- * <p>영수증은 숫자로 말합니다 — 며칠, 몇 곳, 얼마. 이쪽은 그 여행이 어땠는지를
- * 말합니다. 같은 여행의 두 얼굴이라 나란히 둡니다.
- *
- * <h3>날짜 차례로 섭니다</h3>
- *
- * <p>찍은 차례가 아니라 일정의 차례입니다. 남긴 것을 훑는 일은 "그 여행이
- * 어떻게 흘렀나" 를 다시 밟는 일이고, 그것은 날짜 순입니다.
- */
-function Album({ trip }: { trip: TripDetail }) {
-  /* 장소 칸마다 하나입니다. 기록은 여행의 것이라 사람 수만큼 붙지
-     않습니다 — 멤버면 누구나 같은 것을 고칩니다. */
-  const traceOf = useMemo(() => {
-    const by = new Map<string, PlaceMark>();
-    for (const m of trip.marks ?? []) {
-      by.set(m.placeId, m);
-    }
-    return by;
-  }, [trip]);
-
-  /* 남긴 것이 있는 곳만, 날짜 차례로. */
-  const rows = useMemo(() => {
-    const out: { day: string; place: { id: string; name: string }; mark: PlaceMark }[] = [];
-    for (const day of trip.days) {
-      for (const place of day.places) {
-        const mark = traceOf.get(place.id);
-        if (mark) {
-          out.push({ day: day.date || day.label, place, mark });
-        }
-      }
-    }
-    return out;
-  }, [trip, traceOf]);
-
-  if (rows.length === 0) {
-    return (
-      <Empty message="아직 남긴 것이 없어요. 여행 중에 도장을 찍으면서 사진과 한 줄을 남겨 보세요." />
-    );
-  }
-
-  return (
-    <View style={styles.album}>
-      {rows.map(({ day, place, mark }, i) => (
-        <Panel key={place.id}>
-          {/* 날짜는 바뀔 때만 적습니다. 줄마다 붙이면 같은 날이 몇 번씩
-              되풀이되어, 정작 언제 바뀌는지가 안 보입니다. */}
-          {i === 0 || rows[i - 1].day !== day ? <Caption tone="secondary">{day}</Caption> : null}
-          <Subtitle>{place.name}</Subtitle>
-
-          <View style={styles.albumOne}>
-            {/* 사진과 글이 본문입니다. 별은 있으면 뒤에 붙습니다. */}
-            <PhotoStrip ids={mark.photoIds} height={220} />
-            {mark.note ? <Body>{mark.note}</Body> : null}
-            {mark.stars ? <Caption tone="brand">{'★'.repeat(mark.stars)}</Caption> : null}
-          </View>
-        </Panel>
-      ))}
-    </View>
   );
 }
 
@@ -251,9 +184,7 @@ function Receipt({
   /** 통화마다 하나. 적어 둔 것이 없으면 빈 배열입니다. */
   books: Books[];
 }) {
-  const visited = new Set(trip.visited);
   const places = trip.days.flatMap((d) => d.places);
-  const done = places.filter((p) => visited.has(p.id)).length;
 
   return (
     <View style={styles.paper}>
@@ -280,12 +211,6 @@ function Receipt({
       <Split>
         <Caption>담은 곳</Caption>
         <Caption>{places.length}곳</Caption>
-      </Split>
-      <Split>
-        <Caption>다녀옴</Caption>
-        <Caption>
-          {done}/{places.length}
-        </Caption>
       </Split>
       {/*
         쓴 돈.
@@ -428,7 +353,6 @@ function Replay({ trip }: { trip: TripDetail }) {
               note: p.note,
               sub: p.ja ?? p.en,
               dayLabel: day.date || day.label,
-              visited: trip.visited.includes(p.id),
             },
           })),
       ),

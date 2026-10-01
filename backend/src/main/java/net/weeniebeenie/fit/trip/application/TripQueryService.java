@@ -39,21 +39,13 @@ public class TripQueryService {
                 trip,
                 dayList,
                 byDay,
-                /* 도장도 기록도 여행의 것이라 누가 보든 같습니다. */
-                visits.visitedPlaceIds(trip.getId()),
+                /* 다니면서 볼 사진. 여행의 것이라 누가 보든 같습니다. */
                 visits.photosOfTrip(trip.getId()),
                 access.roleOf(trip.getId(), me.id()));
     }
 
     public record TripDetail(Trip trip, List<Day> days, Map<String, List<Place>> placesByDay,
-                             List<String> visitedPlaceIds,
-                             /**
-                              * 장소마다 붙인 사진들. 기록과 참고가 섞여 옵니다 —
-                              * 가르는 것은 kind 이고, 차례는 그 안에서 셉니다.
-                              *
-                              * <p>별점과 한 줄은 장소 줄이 직접 들고 있습니다
-                              * (Place.stars·review).
-                              */
+                             /** 장소마다 챙겨 둔 사진들. 다니면서 볼 것입니다. */
                              List<net.weeniebeenie.fit.trip.domain.PlacePhoto> photos,
                              TripRole myRole) {
     }

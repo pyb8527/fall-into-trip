@@ -36,7 +36,6 @@ export type MapPlace = {
     note: string | null;
     sub: string | null;
     dayLabel: string;
-    visited: boolean;
   };
 };
 

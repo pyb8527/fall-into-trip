@@ -470,13 +470,7 @@ export default function TripScreen() {
     return () => clearTimeout(timer);
   }, [planted]);
 
-  /* 방문 표시는 나만 보는 것이라, 서버 응답을 기다리지 않고 먼저 칠합니다.
-     걸으면서 누르는 것이라 매번 기다리게 하면 손이 멎습니다. */
-  const [pending, setPending] = useState<Set<string>>(new Set());
-  const [visited, setVisited] = useState<Set<string> | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-
-  const marks = useMemo(() => visited ?? new Set(data?.visited ?? []), [visited, data?.visited]);
 
   /**
    * 다니면서 볼 사진. 여행기에는 안 실립니다.
@@ -550,49 +544,14 @@ export default function TripScreen() {
             note: p.note,
             sub: p.ja ?? p.en,
             dayLabel: day.label,
-            visited: marks.has(p.id),
           },
         });
       });
     });
     return out;
-  }, [days, activeDay, marks]);
-
-  const toggle = useCallback(
-    async (placeId: string) => {
-      const was = marks.has(placeId);
-      const next = new Set(marks);
-      if (was) {
-        next.delete(placeId);
-      } else {
-        next.add(placeId);
-      }
-      setVisited(next);
-      setActionError(null);
-      setPending((p) => new Set(p).add(placeId));
-
-      try {
-        if (was) {
-          await api.delete(`/api/visits/${placeId}`);
-        } else {
-          await api.put(`/api/visits/${placeId}`);
-        }
-      } catch (e) {
-        setVisited(marks);
-        setActionError(e instanceof ApiError ? e.message : UNEXPECTED);
-      } finally {
-        setPending((p) => {
-          const copy = new Set(p);
-          copy.delete(placeId);
-          return copy;
-        });
-      }
-    },
-    [marks],
-  );
+  }, [days, activeDay]);
 
   const refresh = useCallback(() => {
-    setVisited(null);
     reload();
   }, [reload]);
 
@@ -1072,7 +1031,6 @@ export default function TripScreen() {
   const canEdit = data.myRole === 'EDITOR' && !kept;
   const shown = activeDay === ALL ? days : days.filter((_, i) => i === activeDay);
   const total = shown.reduce((n, d) => n + d.places.length, 0);
-  const done = shown.reduce((n, d) => n + d.places.filter((p) => marks.has(p.id)).length, 0);
   const mine = data.trip.ownerId === user?.id;
 
   return (
@@ -1359,7 +1317,6 @@ export default function TripScreen() {
       <TripTabs
         tripId={id}
         active="plan"
-        onTrip={onTrip}
         onBack={() => (navigation.canGoBack() ? navigation.goBack() : router.push('/(app)/home'))}
       />
 
@@ -1384,7 +1341,6 @@ export default function TripScreen() {
         peek={
           <SheetHead
             title={dayIndex >= 0 ? days[dayIndex]?.date || days[dayIndex]?.label || '' : '전체 일정'}
-            done={done}
             total={total}
             gaps={gaps}
             gapping={gapping}
@@ -1512,11 +1468,8 @@ export default function TripScreen() {
               key={day.id}
               day={day}
               index={di}
-              visited={marks}
-              pending={pending}
               canEdit={canEdit}
               activePlaceId={activePlaceId}
-              onToggle={toggle}
               onFocus={setActivePlaceId}
               onChanged={refresh}
               onNote={showUndo}
@@ -1985,7 +1938,6 @@ function Shortcut({
  */
 function SheetHead({
   title,
-  done,
   total,
   gaps,
   gapping,
@@ -1993,7 +1945,6 @@ function SheetHead({
   changedGaps,
 }: {
   title: string;
-  done: number;
   total: number;
   gaps: Gap[] | null;
   gapping: boolean;
@@ -2001,31 +1952,18 @@ function SheetHead({
   /** 다시 물은 뒤 달라진 구간들. 출발하는 장소의 id 입니다. */
   changedGaps: Set<string>;
 }) {
-  const ratio = total === 0 ? 0 : done / total;
   const moving = (gaps ?? []).reduce((n, g) => n + (chosenOf(g)?.seconds ?? 0), 0);
 
   return (
     <View style={styles.head}>
       <Split align="baseline">
         <Subtitle>{title}</Subtitle>
-        <Caption tone={total > 0 && done === total ? 'success' : 'secondary'} strong>
-          {done} / {total} 다녀옴
+        {/* 진행률 띠가 있었습니다 — 「3/8 다녀옴」. 도장을 걷었으니 셀
+            것이 없고, 애초에 여행은 채워야 하는 막대가 아닙니다. */}
+        <Caption tone="secondary" strong>
+          {total}곳
         </Caption>
       </Split>
-
-      {total > 0 ? (
-        <View style={styles.track}>
-          <View
-            style={[
-              styles.fill,
-              {
-                width: `${Math.round(ratio * 100)}%`,
-                backgroundColor: done === total ? Colors.success : Colors.accent,
-              },
-            ]}
-          />
-        </View>
-      ) : null}
 
       {gapping ? (
         /* 글자만 두었더니 멈춰 있는 것과 구별이 안 됐습니다. 도는 것이
@@ -2044,11 +1982,8 @@ function SheetHead({
 function DayCard({
   day,
   index,
-  visited,
-  pending,
   canEdit,
   activePlaceId,
-  onToggle,
   onFocus,
   onChanged,
   onNote,
@@ -2072,11 +2007,8 @@ function DayCard({
 }: {
   day: Day;
   index: number;
-  visited: Set<string>;
-  pending: Set<string>;
   canEdit: boolean;
   activePlaceId: string | null;
-  onToggle: (placeId: string) => void;
   onFocus: (placeId: string) => void;
   onChanged: () => void;
   /** 방금 한 일을 목록 위에 띄웁니다. 물러설 길도 함께 줄 수 있습니다. */
@@ -2260,7 +2192,6 @@ function DayCard({
     }
   }
 
-  const done = day.places.filter((p) => visited.has(p.id)).length;
   const color = day.color || dayColor(index);
 
   /*
@@ -2291,8 +2222,8 @@ function DayCard({
 
         <Row gap={Spacing.sm}>
           {day.places.length > 0 ? (
-            <Caption tone={done === day.places.length ? 'success' : 'muted'} strong>
-              {done}/{day.places.length}
+            <Caption tone="muted" strong>
+              {day.places.length}곳
             </Caption>
           ) : null}
           {/* 셋은 있어야 순서를 바꿀 여지가 생깁니다. 둘이면 갈 데가 하나뿐입니다. */}
@@ -2460,11 +2391,8 @@ function DayCard({
                     place={place}
                     order={i + 1}
                     color={color}
-                    visited={visited.has(place.id)}
-                    busy={pending.has(place.id)}
                     active={activePlaceId === place.id}
                     canEdit={canEdit}
-                    onToggle={() => onToggle(place.id)}
                     onFocus={() => onFocus(place.id)}
                     onEdit={() => setEditing(place)}
                     onAddAfter={() => setAddingAfter(place.id)}
@@ -2643,8 +2571,6 @@ function PlaceRow({
   place,
   order,
   color,
-  visited,
-  busy,
   active,
   canEdit,
   info,
@@ -2658,7 +2584,6 @@ function PlaceRow({
   onDragStart,
   onDragMove,
   onDragEnd,
-  onToggle,
   onFocus,
   onEdit,
   onAddAfter,
@@ -2675,8 +2600,6 @@ function PlaceRow({
   place: Place;
   order: number;
   color: string;
-  visited: boolean;
-  busy: boolean;
   active: boolean;
   canEdit: boolean;
   info?: PlaceInfo;
@@ -2697,7 +2620,6 @@ function PlaceRow({
   onDragStart: (index: number) => void;
   onDragMove: (index: number, dy: number) => void;
   onDragEnd: (index: number) => void;
-  onToggle: () => void;
   onFocus: () => void;
   onEdit: () => void;
   /** 이 장소 다음에 새 장소를 넣습니다. */
@@ -2741,9 +2663,7 @@ function PlaceRow({
       */}
       <View style={styles.when}>
         {place.time ? (
-          <Caption strong tone={visited ? 'muted' : 'default'}>
-            {place.time}
-          </Caption>
+          <Caption strong>{place.time}</Caption>
         ) : null}
       </View>
 
@@ -2771,13 +2691,9 @@ function PlaceRow({
           ]}>
           {/* 날짜 색 여덟은 흰 글씨를 얹어도 읽히도록 고른 것입니다
               (DayLabels 참고). inverse 가 그 흰 글씨입니다. */}
-          {visited ? (
-            <Icon name="check" size={13} tone="inverse" />
-          ) : (
-            <Caption strong tone="inverse">
-              {order}
-            </Caption>
-          )}
+          <Caption strong tone="inverse">
+            {order}
+          </Caption>
         </View>
         <View
           style={[
@@ -2793,7 +2709,6 @@ function PlaceRow({
       <View
         style={[
           styles.place,
-          { opacity: busy ? 0.6 : 1 },
           /*
             고른 줄은 <b>테두리만</b>으로 말합니다.
 
@@ -3007,15 +2922,6 @@ function PlaceRow({
                 dot: tipCount > 0,
                 onPress: () => onLook(place, chosen?.mode ?? null),
               },
-              {
-                key: 'visited',
-                name: 'check' as IconName,
-                label: visited ? '다녀옴 취소' : '다녀옴으로 표시',
-                tone: 'success' as const,
-                active: visited,
-                disabled: busy,
-                onPress: onToggle,
-              },
               /* 고칠 수 없는 사람에게는 접을 것이 없습니다. */
               canEdit
                 ? {
@@ -3038,10 +2944,7 @@ function PlaceRow({
                     bare
                     name={a.name}
                     label={a.label}
-                    tone={a.tone}
-                    active={a.active}
-                    disabled={a.disabled}
-                    dot={a.dot}
+                    dot={'dot' in a ? a.dot : undefined}
                     onPress={a.onPress}
                   />
                 </View>

@@ -53,14 +53,12 @@ r = await call("POST", "/api/places", {
 });
 const placeId = r.data.place.id;
 
-console.log("\n[2] 그 자리에서 도장에 남긴다");
+console.log("\n[2] 다니면서 볼 사진을 챙겨 둔다");
 const shot = await upload(me);
-r = await call("PUT", `/api/visits/${placeId}`, {
-  token: me, body: { photoIds: [shot], stars: 4, note: "국물이 진해요" },
-});
-T("남겼다", r.status === 200 && r.data.photoIds?.[0] === shot, r.data);
+r = await call("PUT", `/api/visits/${placeId}/refs`, { token: me, body: { photoIds: [shot] } });
+T("챙겨 뒀다", r.status === 200 && r.data.photoIds?.[0] === shot, r.data);
 
-console.log("\n[3] 올리면 그 자취가 따라간다");
+console.log("\n[3] 올리면 일정이 따라간다");
 const cover = await upload(me);
 r = await call("POST", `/api/trips/${tripId}/publish`, {
   token: me, body: { title: "히로시마 이틀", coverPhotoId: cover },
@@ -72,9 +70,14 @@ r = await call("GET", `/api/posts/${postId}`);
 T("표지가 실린다", r.data.coverPhotoId === cover, r.data.coverPhotoId);
 T("안 정하면 둘러보기", r.data.visibility === "LISTED", r.data.visibility);
 let place = r.data.itinerary.days[0].places[0];
-T("사진이 따라갔다", place.photos?.[0] === shot, place);
-T("별점도", place.stars === 4, place);
-T("한 줄도", place.review === "국물이 진해요", place);
+T("장소 이름이 따라갔다", place.name === "오노미치 라멘", place);
+/*
+  챙겨 둔 사진은 사본에 안 담깁니다.
+
+  <p>메뉴판과 예매 화면은 다니려고 넣어 둔 것이지 남에게 보이려고 넣은 것이
+  아닙니다. 담으면 남의 여행기에 내 예매 QR 이 실립니다.
+*/
+T("챙겨 둔 사진은 안 따라간다", (place.photos ?? []).length === 0, place);
 
 console.log("\n[4] 남의 사진은 표지로 못 쓴다");
 r = await call("POST", "/api/auth/register", {

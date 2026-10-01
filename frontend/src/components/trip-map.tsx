@@ -939,7 +939,7 @@ function PlacePin({
   shape: 'default' | 'star';
   onPress: (id: string) => void;
 }) {
-  const drawing = useBake([active, place.color, place.order, place.detail.visited]);
+  const drawing = useBake([active, place.color, place.order]);
 
   return (
     <Marker
@@ -974,8 +974,6 @@ function Pin({
   active: boolean;
   shape: 'default' | 'star';
 }) {
-  const visited = place.detail.visited;
-
   /*
     보석함처럼 순서도 갈래도 앞세울 것이 없는 자리.
 
@@ -1037,7 +1035,7 @@ function Pin({
               borderRadius: r / 2,
               borderWidth: active ? 3 : 2.4,
               borderColor: place.color,
-              backgroundColor: visited ? place.color : '#FFFFFF',
+              backgroundColor: '#FFFFFF',
               /* 고른 것만 한 뼘 더 띄웁니다. 나머지는 핀의 기본값
                  (Elevation.pin)을 그대로 씁니다. */
               ...(active ? { elevation: 6, shadowOpacity: 0.32 } : null),
@@ -1112,10 +1110,10 @@ function Pin({
               borderRadius: dot / 2,
               /* 다녀온 곳은 속을 날짜 색으로 채우고, 아직인 곳은 희게 비워
                  둡니다. 지도가 채워지는 체크리스트처럼 읽힙니다. */
-              backgroundColor: visited ? place.color : '#FFFFFF',
+              backgroundColor: '#FFFFFF',
             },
           ]}>
-          <Body small strong style={{ color: visited ? Colors.onDay : Colors.text }}>
+          <Body small strong style={{ color: Colors.text }}>
             {place.order}
           </Body>
         </View>
@@ -1147,7 +1145,6 @@ function PlaceSheet({
           </View>
           <Subtitle>{place.name}</Subtitle>
         </Row>
-        {d.visited ? <Badge label="다녀옴" tone="success" /> : null}
       </Row>
 
       {d.sub ? <Caption>{d.sub}</Caption> : null}

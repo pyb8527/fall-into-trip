@@ -8,9 +8,9 @@ import java.util.List;
 
 public interface PlacePhotoRepository extends JpaRepository<PlacePhoto, PlacePhoto.Key> {
 
-    List<PlacePhoto> findAllByPlaceIdAndKindOrderBySortAsc(String placeId, PhotoKind kind);
+    List<PlacePhoto> findAllByPlaceIdOrderBySortAsc(String placeId);
 
-    /** 이 여행에 붙은 사진 전부. 기록과 참고가 함께 옵니다. */
+    /** 이 여행에 챙겨 둔 사진 전부. */
     @Query("""
            SELECT pp FROM PlacePhoto pp
            WHERE pp.placeId IN (
@@ -23,5 +23,5 @@ public interface PlacePhotoRepository extends JpaRepository<PlacePhoto, PlacePho
     /** 이 사진이 아직 어딘가에 붙어 있는지. 지울 때 봅니다. */
     List<PlacePhoto> findAllByPhotoId(String photoId);
 
-    void deleteAllByPlaceIdAndKind(String placeId, PhotoKind kind);
+    void deleteAllByPlaceId(String placeId);
 }

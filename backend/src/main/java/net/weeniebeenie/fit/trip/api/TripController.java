@@ -159,46 +159,23 @@ public class TripController {
                 .toList();
 
         /*
-          그 자리에 남긴 것.
+          다니면서 볼 사진.
 
-          <h3>한 장소에 하나입니다</h3>
+          <p>메뉴판, 예매 화면, 가는 길 지도. 장소 칸마다 모아서 보냅니다 —
+          없는 곳이 대부분이라 있는 것만 실으면 오가는 것이 그만큼 줄어듭니다.
 
-          <p>사람마다 따로 보냈었습니다. 그래서 셋이 간 여행의 한 장소에 세
-          덩어리가 나란히 섰고, 누가 썼는지를 줄마다 이름표로 갈라 줘야
-          했습니다. 지금은 여행의 것이라 이름표가 필요 없습니다 — 멤버면
-          누구나 같은 것을 고칩니다.
-
-          <p>아무것도 안 남긴 자리는 빼고 보냅니다. 대개 그냥 찍고 지나가므로,
-          다 실으면 장소 수만큼 빈 줄이 오갑니다.
-
-          <h3>같은 가게라도 칸이 다르면 다른 기록입니다</h3>
-
-          <p>여기 열쇠는 일정의 <b>칸</b>(Place.id)이지 가게(Place.placeId)가
-          아닙니다. 같은 가게를 1일차와 3일차에 넣으면 줄이 둘이고, 기록도
-          둘입니다 — 다른 날 다른 시간에 간 것은 다른 일입니다.
+          <p>한동안 여기에 「그 자리에서 남긴 것」도 함께 왔습니다(도장·별점·
+          한 줄·사진). 걷었습니다 — 갔다 왔는지는 본인이 알고, 남기는 것은
+          장소를 먼저 골라야 한다는 것이 문제였습니다. 피드가 그 일을 합니다.
         */
-        /* 장소 → 붙인 사진들. 한 번에 읽어 두고 줄마다 꺼내 씁니다. */
-        Map<String, List<String>> shots = new java.util.HashMap<>();
         Map<String, List<String>> refs = new java.util.HashMap<>();
         for (var pp : d.photos()) {
-            Map<String, List<String>> into =
-                    pp.getKind() == net.weeniebeenie.fit.trip.domain.PhotoKind.RECORD ? shots : refs;
-            into.computeIfAbsent(pp.getPlaceId(), k -> new ArrayList<>()).add(pp.getPhotoId());
+            refs.computeIfAbsent(pp.getPlaceId(), k -> new ArrayList<>()).add(pp.getPhotoId());
         }
 
-        List<Map<String, Object>> marks = new ArrayList<>();
         List<Map<String, Object>> aids = new ArrayList<>();
         for (List<net.weeniebeenie.fit.trip.domain.Place> onDay : d.placesByDay().values()) {
             for (net.weeniebeenie.fit.trip.domain.Place p : onDay) {
-                List<String> kept = shots.getOrDefault(p.getId(), List.of());
-                if (!kept.isEmpty() || p.getStars() != null || p.getReview() != null) {
-                    Map<String, Object> one = new java.util.HashMap<>();
-                    one.put("placeId", p.getId());
-                    one.put("photoIds", kept);
-                    one.put("stars", p.getStars());
-                    one.put("note", p.getReview());
-                    marks.add(one);
-                }
                 List<String> chosen = refs.getOrDefault(p.getId(), List.of());
                 if (!chosen.isEmpty()) {
                     aids.add(Map.of("placeId", p.getId(), "photoIds", chosen));
@@ -209,9 +186,6 @@ public class TripController {
         return Map.of(
                 "trip", TripView.of(d.trip()),
                 "days", days,
-                "visited", d.visitedPlaceIds(),
-                "marks", marks,
-                /* 다니면서 볼 사진. 여행기에는 안 실리므로 기록과 갈라 보냅니다. */
                 "refs", aids,
                 "myRole", d.myRole() == null ? "NONE" : d.myRole().name());
     }

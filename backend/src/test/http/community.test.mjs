@@ -129,7 +129,9 @@ r = await call("GET", "/api/trip?trip=" + copied, { token: reader });
 T("내 여행이 됨", r.status === 200 && r.data.trip.title === "오사카 2박 3일", r.data.trip);
 T("날짜는 내가 정한 날부터", r.data.days[0].iso === "2027-03-05", r.data.days[0]);
 T("장소가 따라옴", r.data.days[0].places.length === 2, r.data.days[0].places);
-T("다녀온 표시는 안 따라옴", r.data.visited.length === 0, r.data.visited);
+/* 도장은 걷었습니다. 챙겨 둔 사진도 안 따라옵니다 — 가져간 사람에게는
+   남의 메뉴판일 뿐입니다. */
+T("챙겨 둔 사진은 안 따라옴", (r.data.refs ?? []).length === 0, r.data.refs);
 r = await call("GET", "/api/trip?trip=" + copied, { token: author });
 T("원본 작성자는 못 봄", r.status === 404 || r.status === 403, r.data);
 

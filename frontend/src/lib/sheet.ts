@@ -29,7 +29,7 @@ export type Sheet = {
 };
 
 /** 일정 시트의 칸 차례. 머리글과 줄이 어긋나지 않게 한 곳에서 씁니다. */
-const PLAN_HEAD = ['순', '시각', '장소', '현지 이름', '갈래', '비용', '금액', '통화', '다녀옴', '메모'];
+const PLAN_HEAD = ['순', '시각', '장소', '현지 이름', '갈래', '비용', '금액', '통화', '메모'];
 const PLAN_WIDTH = [4, 7, 24, 20, 10, 14, 10, 6, 7, 40];
 
 /** 가계부 시트의 칸 차례. */
@@ -55,7 +55,6 @@ function sheetName(raw: string, fallback: string): string {
  *               한 건도 없는 것을 가르지 않습니다. 둘 다 보여 줄 것이 없습니다
  */
 export function tripSheets(trip: TripDetail, spends: Spend[] | null): Sheet[] {
-  const visited = new Set(trip.visited);
   const out: Sheet[] = [];
 
   /*
@@ -68,7 +67,6 @@ export function tripSheets(trip: TripDetail, spends: Spend[] | null): Sheet[] {
     ['여행', trip.trip.title],
     ['날짜 수', trip.days.length],
     ['장소 수', trip.days.reduce((n, d) => n + d.places.length, 0)],
-    ['다녀온 곳', trip.visited.length],
   ];
 
   /* 잡아 둔 비용은 통화마다 따로 셉니다. 엔과 원을 더하면 아무 뜻도 없는
@@ -140,7 +138,6 @@ export function tripSheets(trip: TripDetail, spends: Spend[] | null): Sheet[] {
            엑셀로 빼 가는 까닭의 절반이 그것입니다. */
         place.costAmount ?? null,
         place.costCurrency ?? '',
-        visited.has(place.id) ? 'O' : '',
         place.note ?? '',
       ]);
     });
