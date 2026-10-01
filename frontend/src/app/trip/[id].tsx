@@ -840,43 +840,6 @@ export default function TripScreen() {
   );
   const infoOf = useMemo(() => new Map((placeInfo ?? []).map((i) => [i.id, i])), [placeInfo]);
 
-  /*
-    같은 곳이 두 날에 들어가 있는지.
-
-    "다음에 또 가자" 하고 넣어 둔 것이면 그대로 두면 되고, 실수로 두 번 넣은
-    것이면 하나는 빼야 합니다. 어느 쪽인지는 넣은 사람만 아니까, 지우지 않고
-    알려만 줍니다.
-
-    구글 번호로 봅니다. 이름은 "이치란" 과 "이치란 도톤보리점" 처럼 사람이
-    다르게 적어 둘 수 있고, 좌표는 같은 건물 안에서도 조금씩 다릅니다. 번호가
-    없는 곳(좌표를 직접 넣은 것)은 견주지 않습니다 — 견줄 것이 없습니다.
-  */
-  const twiceIn = useMemo(() => {
-    const dayOf = new Map<string, Set<number>>();
-    days.forEach((day, di) => {
-      day.places.forEach((p) => {
-        if (!p.placeId) {
-          return;
-        }
-        const seen = dayOf.get(p.placeId) ?? new Set<number>();
-        seen.add(di);
-        dayOf.set(p.placeId, seen);
-      });
-    });
-
-    /* 같은 날에 두 번 넣은 것은 세지 않습니다 — 아침에 들렀다 저녁에 다시
-       가는 일은 흔합니다. 날이 갈릴 때만 말해 줍니다. */
-    const out = new Map<string, string[]>();
-    for (const [placeId, seen] of dayOf) {
-      if (seen.size > 1) {
-        out.set(
-          placeId,
-          [...seen].sort((a, b) => a - b).map((i) => days[i]?.date || days[i]?.label || `${i + 1}일차`),
-        );
-      }
-    }
-    return out;
-  }, [days]);
 
   /*
     이 날 장소들에 달린 한 줄 팁이 몇 개인지. 장소마다 물으면 그 수만큼 요청이
@@ -1559,7 +1522,6 @@ export default function TripScreen() {
               infoOf={infoOf}
               holdRow={holdRow}
               onLook={(place, mode) => setLooking({ place, mode })}
-              twiceIn={twiceIn}
               tipCounts={tipCounts}
               refsOf={refsOf}
               onRefs={(place) => setStashing(place)}
@@ -2091,7 +2053,6 @@ function DayCard({
   infoOf,
   holdRow,
   onLook,
-  twiceIn,
   tipCounts,
   refsOf,
   onRefs,
@@ -2128,7 +2089,6 @@ function DayCard({
   /** 장소 하나를 들여다보는 판을 엽니다. 한 줄도 그 판 안에 있습니다. */
   onLook: (place: Place, mode: TravelMode | null) => void;
   /** 두 날에 걸쳐 들어간 곳. 구글 번호 → 그 날들의 이름. */
-  twiceIn: Map<string, string[]>;
   /** 구글 번호별 최근 팁 수. 줄에서는 점으로만 알립니다. */
   tipCounts: Record<string, number>;
   /** 장소 번호 → 다녀와서 남긴 것들. 같이 간 사람 것까지 옵니다. */
@@ -2498,13 +2458,6 @@ function DayCard({
                     onAddAfter={() => setAddingAfter(place.id)}
                     onRemove={() => onRemove(place.id)}
                     info={infoOf.get(place.id)}
-                    alsoOn={
-                      place.placeId
-                        ? (twiceIn.get(place.placeId) ?? []).filter(
-                            (d) => d !== (day.date || day.label),
-                          )
-                        : []
-                    }
                     onLook={onLook}
                     tipCount={place.placeId ? (tipCounts[place.placeId] ?? 0) : 0}
                     refs={refsOf.get(place.id)}
@@ -2676,7 +2629,6 @@ function PlaceRow({
   active,
   canEdit,
   info,
-  alsoOn,
   onLook,
   tipCount,
   refs,
@@ -2710,7 +2662,6 @@ function PlaceRow({
   canEdit: boolean;
   info?: PlaceInfo;
   /** 이 곳이 들어가 있는 다른 날들. 비어 있으면 이 날에만 있습니다. */
-  alsoOn: string[];
   /** 평점·영업시간을 들여다보는 판을 엽니다. 한 줄도 그 판 안에 있습니다. */
   onLook: (place: Place, mode: TravelMode | null) => void;
   /** 이 곳에 달린 한 줄의 개수. 판을 열기 전에는 점으로만 알립니다. */
@@ -2896,11 +2847,17 @@ function PlaceRow({
                 글에서 보는 것이 같은 것이라 다르게 그릴 이유가 없습니다.
               */}
               {info ? <PlaceHours info={info} at={place.time} /> : null}
-              {/* 실수로 두 번 넣었을 수도, 일부러 또 가려는 것일 수도 있습니다.
-                  어느 쪽인지는 넣은 사람만 아니까 지우지 않고 알려만 줍니다. */}
-              {alsoOn.length > 0 ? (
-                <Caption tone="warning">{alsoOn.join(' · ')}에도 넣어 뒀어요</Caption>
-              ) : null}
+              {/*
+                「○일에도 넣어 뒀어요」를 걷었습니다.
+
+                <p>실수로 두 번 넣은 것을 알려 주려던 것인데, 같은 곳을 다른
+                날에 또 가는 일이 <b>실수보다 흔합니다</b> — 숙소 근처 카페,
+                갈아타는 역, 두 번 먹는 집. 그래서 대개 맞는 일정에 경고색
+                글씨가 붙었습니다.
+
+                <p>알려 줘야 할 만큼 잘못된 일이 아니고, 넣은 사람은 넣은 것을
+                압니다.
+              */}
               {/*
                 동행자가 손댄 자취.
 

@@ -2601,7 +2601,14 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     borderRadius: Radius.md,
     padding: Spacing.lg,
-    gap: Spacing.md,
+    /*
+      안에 든 것들 사이.
+
+      <p>md(14)였습니다. 판 밖의 간격이 넓어진 지금은 안쪽도 같이 넓어 보여서,
+      제목 한 줄과 그 아래가 서로 다른 이야기처럼 떨어져 있었습니다. 한 칸
+      좁힙니다 — 한 판 안의 것들은 한 덩어리로 읽혀야 합니다.
+    */
+    gap: Spacing.sm,
   },
 
   /* 줄을 담는 구역. 여백은 제목과 줄이 저마다 가집니다. */
@@ -2609,11 +2616,18 @@ const styles = StyleSheet.create({
     padding: 0,
     gap: 0,
   },
+  /*
+    묶음 제목이 앉는 자리.
+
+    <p>아래 여백이 위와 거의 같았습니다(md·lg). 그래서 제목이 <b>제 묶음보다
+    위쪽 빈자리에 더 붙어</b> 보였습니다 — 제목은 아래 것의 이름이니 아래와
+    가까워야 합니다.
+  */
   sectionHead: {
     paddingTop: Spacing.lg,
-    paddingBottom: Spacing.md,
+    paddingBottom: Spacing.xs,
     paddingHorizontal: Spacing.lg,
-    gap: Spacing.xs,
+    gap: 2,
   },
 
   listRow: {
