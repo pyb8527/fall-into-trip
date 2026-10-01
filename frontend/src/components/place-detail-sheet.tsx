@@ -132,6 +132,11 @@ export function PlaceDetailSheet({
 
   const info = data?.info ?? null;
 
+  /* 영업시간이 상자에 들어갈 것이 있는지. Hours 가 null 을 돌려주는 조건과
+     같아야 합니다 — 어긋나면 빈 상자가 다시 생깁니다. */
+  const hasHours = info != null && !info.permanentlyClosed
+    && (info.onDay != null || info.hours.length > 0);
+
   if (!place) {
     return null;
   }
@@ -204,7 +209,15 @@ export function PlaceDetailSheet({
         모읍니다 — 라벨을 왼쪽에 같은 폭으로 세우면 눈이 값만 따라 내려갈
         수 있습니다.
       */}
-      {place.address || info ? (
+      {/*
+        안이 빌 수 있습니다.
+
+        <p>조건이 {@code place.address || info} 였습니다. 그런데 {@code info}
+        가 있다고 상자에 들어갈 것이 있는 것은 아닙니다 — 주소도 없고 영업시간도
+        안 알려진 곳이면 {@link Hours} 가 null 을 돌려주고, <b>빈 회색 네모</b>
+        만 사진 밑에 남습니다. 뭘 못 불러온 것처럼 보입니다.
+       */}
+      {place.address || hasHours ? (
         <View style={styles.facts0}>
           {place.address ? (
             <Row gap={Spacing.s2} style={styles.fact}>

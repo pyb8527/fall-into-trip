@@ -2,24 +2,31 @@ import { Image } from 'react-native';
 import { StyleSheet, View } from 'react-native';
 
 import { API_BASE } from '@/api/client';
+import { OurPhoto } from '@/components/our-photo';
 import { Colors, Radius } from '@/constants/theme';
 import { Caption } from '@/ui';
 
 /**
- * 여행 한 장 — 동선을 그린 그림.
+ * 여행기 한 장 — 표지 사진, 없으면 동선 그림.
  *
- * <h3>왜 사진이 아닌가</h3>
+ * <h3>표지가 있으면 표지입니다</h3>
  *
- * <p>FIT 은 사진을 안 올립니다. 서버에 쌓아 둘 자리가 없고, 구글 장소 사진은
- * 글쓴이 이름과 프로필을 함께 띄워야 하는 별도의 의무가 붙습니다
- * (place-detail-sheet 에 같은 이야기가 적혀 있습니다).
+ * <p>한동안 <b>늘</b> 동선 그림을 그렸습니다. "FIT 은 사진을 안 올린다" 가
+ * 그때의 전제였는데, 지금은 틀립니다 — 여행기를 올릴 때 표지 사진을 고르는
+ * 칸이 있고(publish-form), 서버도 목록에 {@code coverPhotoId} 를 실어
+ * 보냅니다. 그런데 화면이 그 값을 한 번도 안 봤습니다.
  *
- * <p>대신 <b>이미 그리고 있던 것</b>이 있습니다. 안 터질 때 쓰려고 만들어 둔
- * 한 장짜리 동선 그림입니다. 오사카를 도는 선과 제주를 도는 선은 생김새가
- * 다르고, 그것이 곧 그 여행이 어떤 여행인지입니다.
+ * <p>그래서 <b>표지를 고르고 올린 사람에게도 지도만 보였습니다.</b> 고른
+ * 것이 아무 데도 안 쓰이는 칸이었던 셈입니다.
  *
- * <p>사진만큼 눈을 끌지는 않습니다. 다만 <b>진짜 그 글의 내용</b>이고,
- * 새로 쌓아 둘 것이 하나도 없습니다.
+ * <h3>동선 그림은 뒤로 물립니다</h3>
+ *
+ * <p>표지가 없을 때만 그립니다. 오사카를 도는 선과 제주를 도는 선은 생김새가
+ * 다르고, 그것이 곧 그 여행이 어떤 여행인지라 아무것도 없는 것보다 낫습니다.
+ *
+ * <p>다만 <b>구글 Static Maps 한 번</b>입니다. 한 화면에 여섯 장이 서면 여섯
+ * 번이고, 그래서 표지가 있는 글은 그 호출을 아예 안 하는 편이 맞습니다 —
+ * 돈이 드는 쪽을 기본값으로 두면 안 됩니다.
  *
  * <h3>글의 것은 로그인 없이 열립니다</h3>
  *
@@ -29,6 +36,7 @@ import { Caption } from '@/ui';
 export function TripThumb({
   postId,
   tripId,
+  coverPhotoId,
   height = 120,
   label,
 }: {
@@ -36,10 +44,16 @@ export function TripThumb({
   postId?: string;
   /** 내 여행. 부른 사람만 볼 수 있습니다. */
   tripId?: string;
+  /** 글쓴이가 고른 표지. 있으면 이것이 먼저입니다. */
+  coverPhotoId?: string | null;
   height?: number;
   /** 그림이 없을 때 대신 적을 말. */
   label?: string;
 }) {
+  if (coverPhotoId) {
+    return <OurPhoto id={coverPhotoId} height={height} style={styles.frame} />;
+  }
+
   const path = postId
     ? `/api/posts/${encodeURIComponent(postId)}/map`
     : tripId

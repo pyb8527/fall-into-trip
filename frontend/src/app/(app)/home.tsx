@@ -385,8 +385,12 @@ export default function Home() {
                   scale={0.98}
                   accessibilityLabel={`${post.title} 보기`}
                   style={[styles.postCard, { width: cardWidth }]}>
+                  {/* 글쓴이가 표지를 골랐으면 그것이 먼저입니다. 안 넘기면
+                      고른 것이 아무 데도 안 쓰이고, 대신 구글 지도를 한 번
+                      더 부릅니다. */}
                   <TripThumb
                     postId={post.id}
+                    coverPhotoId={post.coverPhotoId}
                     height={Math.round((cardWidth * 9) / 16)}
                     label={post.title}
                   />
@@ -579,9 +583,22 @@ function Carousel({ children }: { children: (cardWidth: number) => React.ReactNo
  * 다른 줄들과 같은 무게가 되어, 가장 자주 하는 일이 가장 찾기 어려운
  * 자리에 놓입니다.
  *
- * <p>동선 그림을 깔고 아래쪽을 어둡게 덮어 흰 글씨를 얹습니다. 그림이
- * 밝은 데서 끝나면 글씨가 안 읽히므로, 덮개는 그림이 어떻든 같은 어둡기를
- * 만들어 줍니다.
+ * <h3>사진 자리를 안 만듭니다</h3>
+ *
+ * <p>여기에 동선 그림(구글 Static Maps)을 깔고 아래쪽을 어둡게 덮어 흰 글씨를
+ * 얹었습니다. 사진처럼 보여서 눈은 끌었는데, 두 가지가 틀렸습니다.
+ *
+ * <p>하나는 <b>내 여행에는 올릴 사진이 없다</b>는 것입니다. 표지를 고르는
+ * 칸은 여행기(둘러보기에 내놓는 글)에만 있습니다. 그래서 이 자리는 영영
+ * 채워지지 않는 사진 자리였고, 덮개까지 깔려 지도는 지도대로 안 보였습니다 —
+ * 무엇을 보여 주려는 자리인지 알 수 없었습니다.
+ *
+ * <p>다른 하나는 <b>값</b>입니다. 그림 한 장이 구글 Static Maps 한 번이고,
+ * 홈은 이 앱에서 가장 자주 여는 화면입니다. 돈이 드는 것을 가장 자주 열리는
+ * 자리의 기본값으로 두면 안 됩니다.
+ *
+ * <p>여행이 이미 가진 것으로 그립니다 — 사람이 고른 색과 표식입니다. 색을
+ * 옅게 깔고 그 위에 검은 글씨를 얹으면 덮개도 필요 없습니다.
  */
 function Hero({
   trip,
@@ -603,26 +620,14 @@ function Hero({
       onPress={onPress}
       scale={0.98}
       accessibilityLabel={`${trip.title} 열기`}
-      style={styles.hero}>
-      <View style={styles.heroArt}>
-        <TripThumb tripId={trip.id} height={HERO_HEIGHT} label={trip.title} />
-      </View>
-
-      {/*
-        아래쪽을 어둡게.
-
-        <p>참 그라데이션을 쓰려면 꾸러미를 하나 더 들여야 합니다. 투명도가
-        다른 층 넷을 쌓으면 눈에는 같은 것으로 보입니다 — 아래가 가장
-        어둡고 위로 갈수록 묽습니다.
-      */}
-      <View pointerEvents="none" style={styles.heroShade}>
-        <View style={[styles.heroShadeBand, styles.heroShade1]} />
-        <View style={[styles.heroShadeBand, styles.heroShade2]} />
-        <View style={[styles.heroShadeBand, styles.heroShade3]} />
-        <View style={[styles.heroShadeBand, styles.heroShade4]} />
-      </View>
-
+      style={[
+        styles.hero,
+        /* 여행에 색을 안 정했으면 옅은 회색입니다. 억지로 색을 주면 안 정한
+           것과 정한 것이 구별되지 않습니다. */
+        { backgroundColor: trip.theme ? `${trip.theme}1F` : Colors.fill },
+      ]}>
       <View style={styles.heroTop}>
+        <TripMark theme={trip.theme} emoji={trip.emoji} />
         <DayBadge label={going ? `여행 중 ${nth}일째` : countdownLabel(at)} />
       </View>
 
@@ -641,7 +646,7 @@ function Hero({
           </Text>
         </View>
         {/* 눌러서 들어가는 것이라고 말하는 동그라미. 줄 끝의 꺽쇠가 하는
-            일을 사진 위에서는 흰 동그라미가 합니다. */}
+            일을 큰 칸에서는 이것이 합니다. */}
         <View style={styles.heroGo}>
           <Icon name="chevron-right" size={20} />
         </View>
@@ -771,39 +776,10 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.fill,
     justifyContent: 'space-between',
   },
-  heroArt: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
-  },
-  /* 덮개는 아래 절반만 먹습니다. 위까지 덮으면 그림이 안 보입니다. */
-  heroShade: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: HERO_HEIGHT * 0.6,
-    justifyContent: 'flex-end',
-  },
-  heroShadeBand: {
-    height: '25%',
-  },
-  heroShade1: {
-    backgroundColor: 'rgba(0, 0, 0, 0.08)',
-  },
-  heroShade2: {
-    backgroundColor: 'rgba(0, 0, 0, 0.24)',
-  },
-  heroShade3: {
-    backgroundColor: 'rgba(0, 0, 0, 0.42)',
-  },
-  heroShade4: {
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-  },
   heroTop: {
     flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     padding: Spacing.s4,
   },
   heroFoot: {
@@ -815,11 +791,11 @@ const styles = StyleSheet.create({
   heroTitle: {
     ...Type.display,
     fontWeight: Weight.bold,
-    color: Colors.onAccent,
+    color: Colors.text,
   },
   heroMeta: {
     ...Type.body2,
-    color: Colors.onAccent,
+    color: Colors.textSecondary,
   },
   heroGo: {
     width: 40,
