@@ -238,9 +238,30 @@ public class StaticMapService {
               본문에는 키가 들어 있지 않습니다 — 우리가 보낸 주소가 아니라
               구글이 돌려준 설명입니다. 그래도 길게 남기지는 않습니다.
              */
-            String why = e.getResponseBodyAsString();
-            log.warn("지도 그림을 받지 못했어요 ({}): {}", e.getStatusCode(),
-                    why.length() > 200 ? why.substring(0, 200) : why);
+            /*
+              거절도 그림으로 옵니다.
+
+              <p>구글은 정적 지도를 거절할 때 <b>이유를 글자로 그린 PNG</b> 를
+              돌려줍니다. 그것을 그대로 로그에 찍었더니 깨진 바이트만 남아,
+              정작 왜 거절당했는지는 알 수 없었습니다.
+
+              <p>그림이면 그림이라고 적고, 흔한 까닭을 함께 남깁니다 — 403 은
+              거의 다음 셋 중 하나입니다. 글자로 오면(400 따위) 지금까지처럼
+              그 글을 그대로 남깁니다.
+            */
+            byte[] body = e.getResponseBodyAsByteArray();
+            boolean drawn = body.length > 8
+                    && (body[0] & 0xFF) == 0x89 && body[1] == 'P' && body[2] == 'N' && body[3] == 'G';
+            if (drawn) {
+                log.warn("지도 그림을 받지 못했어요 ({}): 구글이 이유를 그림으로 보냈습니다"
+                        + " — 콘솔에서 이 셋을 보세요: Maps Static API 가 켜져 있는지,"
+                        + " 그 API 의 할당량이 0 이 아닌지, 키에 걸어 둔 제한(IP·리퍼러)에"
+                        + " 서버가 들어가는지", e.getStatusCode());
+            } else {
+                String why = e.getResponseBodyAsString();
+                log.warn("지도 그림을 받지 못했어요 ({}): {}", e.getStatusCode(),
+                        why.length() > 200 ? why.substring(0, 200) : why);
+            }
             throw new ApiException(org.springframework.http.HttpStatus.BAD_GATEWAY,
                     "지도 그림을 받지 못했어요.");
         } catch (Exception e) {
