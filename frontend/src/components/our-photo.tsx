@@ -47,7 +47,7 @@ export function OurPhoto({
 
 const styles = StyleSheet.create({
   frame: {
-    borderRadius: Radius.sm,
+    borderRadius: Radius.r3,
     overflow: 'hidden',
     /* 받아 오는 동안 비어 있는 자리. 흰 바탕에 흰 자리를 두면 그림이 뜰 때
        화면이 덜컥합니다. */

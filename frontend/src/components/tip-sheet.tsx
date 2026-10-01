@@ -4,14 +4,14 @@ import { StyleSheet, View } from 'react-native';
 import { api, ApiError, UNEXPECTED } from '@/api/client';
 import type { Tip } from '@/api/types';
 import { useAuth } from '@/auth/auth-provider';
-import { Spacing } from '@/constants/theme';
+import { Colors, Gutter, Spacing } from '@/constants/theme';
 import {
+  Band,
   Body,
   BottomSheet,
   Button,
   Caption,
   ConfirmDialog,
-  Divider,
   Empty,
   ErrorNote,
   Field,
@@ -107,9 +107,16 @@ export function TipSheet({
         <Empty message="아직 아무도 안 남겼어요. 다녀오셨다면 첫 줄을 남겨 주세요." />
       ) : null}
 
-      {tips?.map((tip) => (
-        <View key={tip.id} style={styles.tip}>
-          <Body>{tip.text}</Body>
+      {/*
+        한 줄 하나.
+
+        <p>사이가 4픽셀이었습니다. 그러면 세 사람이 남긴 것이 한 사람이
+        길게 적은 것으로 읽힙니다 — 누가 어디까지 말한 것인지는 선 한
+        가닥이 말합니다. 댓글 목록과 같은 규칙입니다.
+      */}
+      {tips?.map((tip, i) => (
+        <View key={tip.id} style={[styles.tip, i > 0 ? styles.tipEdge : null]}>
+          <Body small>{tip.text}</Body>
           <Split>
             <Caption tone="secondary">
               {tip.authorName} · {sinceOf(tip.createdAt)}
@@ -119,14 +126,17 @@ export function TipSheet({
                 name="trash-2"
                 label="내가 남긴 것 지우기"
                 tone="danger"
+                bare
                 disabled={busy}
                 onPress={() => run(() => api.delete(`/api/tips/${tip.id}`))}
               />
             ) : user ? (
-              <Button
-                label="신고"
-                variant="ghost"
-                compact
+              /* 댓글 목록과 같은 모양입니다. 한쪽은 글자 단추, 한쪽은
+                 깃발이면 같은 일을 두 모양으로 하는 셈입니다. */
+              <IconButton
+                name="flag"
+                label="이 한 줄 신고"
+                bare
                 onPress={() => setReporting(tip)}
               />
             ) : null}
@@ -136,7 +146,7 @@ export function TipSheet({
 
       {user ? (
         <>
-          <Divider />
+          <Band />
           <Field
             label="한 줄 남기기"
             value={text}
@@ -201,6 +211,13 @@ function sinceOf(iso: string) {
 
 const styles = StyleSheet.create({
   tip: {
-    gap: Spacing.xs,
+    gap: Spacing.s1,
+    paddingVertical: Spacing.s3,
+  },
+  /* 첫 줄 위에는 안 긋습니다 — 위의 안내문과 사이가 선으로 막히면 그
+     안내문이 첫 한 줄처럼 보입니다. */
+  tipEdge: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.border,
   },
 });

@@ -8,24 +8,30 @@ import type { Books, Person, TripDetail } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { PublishForm } from '@/components/publish-form';
 import { TripMap } from '@/components/trip-map';
-import { Colors, dayColor, Radius, Spacing } from '@/constants/theme';
+import {
+  Colors,
+  dayColor,
+  Elevation,
+  Gutter,
+  Radius,
+  Spacing,
+} from '@/constants/theme';
 import { iconOf } from '@/constants/place-icons';
 import { money } from '@/lib/money';
 import { shareLink } from '@/lib/share';
 import {
+  Band,
   Body,
   Button,
   Caption,
   Chip,
-  Divider,
   ErrorNote,
+  Grow,
   Loading,
-  Panel,
   Row,
   Screen,
   SegmentedTabs,
   Split,
-  Subtitle,
   Title,
 } from '@/ui';
 import { TripTabs } from '@/ui/tab-bar';
@@ -125,21 +131,40 @@ export default function Card() {
         <p>장소가 하나도 없으면 안 냅니다 — 빈 일정을 여행기로 남기라고
         하는 것은 아직 이릅니다.
       */}
-      {data.days.some((d) => d.places.length > 0) ? (
-        <Panel>
-          <Subtitle>여행기로 남길까요?</Subtitle>
-          <Caption tone="secondary">
-            일정이 그대로 따라가요. 나만 볼 수도 있어요.
-          </Caption>
-          <Button label="여행기 쓰기" onPress={() => setPublishing(true)} />
-        </Panel>
-      ) : null}
+      <Band />
 
-      <Button
-        label="링크 보내기"
-        variant="secondary"
-        onPress={() => shareLink(sharableUrl(id), data.trip.title)}
-      />
+      {/*
+        내놓는 길 둘을 한 자리에 모았습니다.
+
+        <p>「여행기 쓰기」 는 흰 판 안에 있고 「링크 보내기」 는 그 밖에
+        혼자 서 있었습니다. 둘 다 <b>이 여행을 남에게 보이는</b> 일인데
+        한쪽만 설명이 붙어 있어서, 아래 단추는 무엇을 보내는 것인지 적혀
+        있지 않았습니다. 한 구역에 담고 나란히 둡니다 — 왼쪽이 가벼운 쪽,
+        오른쪽이 주된 쪽입니다.
+      */}
+      <View style={styles.share}>
+        <Body strong>이 여행을 남길까요?</Body>
+        <Caption tone="secondary">
+          여행기로 올리면 일정이 그대로 따라가요. 나만 볼 수도 있어요.
+        </Caption>
+        <Row gap={Spacing.s2}>
+          <Grow>
+            <Button
+              label="링크 보내기"
+              variant="secondary"
+              compact
+              onPress={() => shareLink(sharableUrl(id), data.trip.title)}
+            />
+          </Grow>
+          {/* 장소가 하나도 없으면 안 냅니다 — 빈 일정을 여행기로 남기라고
+              하는 것은 아직 이릅니다. */}
+          {data.days.some((d) => d.places.length > 0) ? (
+            <Grow>
+              <Button label="여행기 올리기" compact onPress={() => setPublishing(true)} />
+            </Grow>
+          ) : null}
+        </Row>
+      </View>
       <PublishForm
         visible={publishing}
         tripId={id}
@@ -191,22 +216,27 @@ function Receipt({
       <View style={styles.center}>
         <Title>FIT</Title>
         <Caption tone="secondary">FALL INTO TRIP</Caption>
-        <Subtitle>{trip.trip.title}</Subtitle>
+      </View>
+
+      <View style={styles.center}>
+        <Body strong>{trip.trip.title}</Body>
         <Caption tone="secondary">
           {trip.days[0]?.date ?? ''} — {trip.days[trip.days.length - 1]?.date ?? ''}
         </Caption>
       </View>
 
-      <Divider />
+      {/* 점선입니다. 종이 영수증에서 떼어 내는 자리의 모양이라, 실선보다
+          「여기까지가 머리」 라는 말을 더 잘합니다. */}
+      <View style={styles.tear} />
 
-      {trip.days.map((day, i) => (
+      {trip.days.map((day) => (
         <Split key={day.id}>
           <Body small>{day.date || day.label}</Body>
           <Body small>{day.places.length}곳</Body>
         </Split>
       ))}
 
-      <Divider />
+      <View style={styles.tear} />
 
       <Split>
         <Caption>담은 곳</Caption>
@@ -240,10 +270,9 @@ function Receipt({
         </Split>
       ) : null}
 
-      <Divider />
+      <View style={styles.tear} />
 
       <View style={styles.center}>
-        <Caption tone="muted">* * *</Caption>
         <Caption tone="muted">FIT.WEENIE-BEENIE.NET</Caption>
       </View>
     </View>
@@ -456,7 +485,7 @@ function Replay({ trip }: { trip: TripDetail }) {
           것이 없는 띠가 한 줄 자리만 먹습니다. */}
       {days.length > 1 ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <Row gap={Spacing.xs} style={styles.dayRail}>
+          <Row gap={Spacing.s2} style={styles.dayRail}>
             <Chip label="전체" selected={dayPick === null} onPress={() => setDayPick(null)} />
             {days.map(([index, label]) => (
               <Chip
@@ -482,10 +511,10 @@ function Replay({ trip }: { trip: TripDetail }) {
            "멀리 있으면 끊긴다" 의 정체였습니다. */
         follow
         fitAt={fitAt}
-        height={320}
+        height={360}
       />
 
-      <Row gap={Spacing.sm}>
+      <Row gap={Spacing.s2}>
         <Button
           label={playing ? '멈추기' : done ? '처음부터' : '이어서'}
           variant="secondary"
@@ -504,7 +533,7 @@ function Replay({ trip }: { trip: TripDetail }) {
       </Row>
 
       {now ? (
-        <Row gap={Spacing.sm}>
+        <Row gap={Spacing.s2}>
           <Body strong>
             {now.emoji ? `${now.emoji} ` : ''}
             {now.name}
@@ -525,32 +554,45 @@ function Replay({ trip }: { trip: TripDetail }) {
 }
 
 const styles = StyleSheet.create({
-  /* 남긴 것들. 판 사이를 넉넉히 띄웁니다 — 한 장 한 장이 다른 순간입니다. */
-  album: {
-    gap: Spacing.md,
-  },
-  /* 한 장소에 여럿이 남겼을 때, 사람 사이를 띄웁니다. */
-  albumOne: {
-    gap: Spacing.xs,
-  },
+  /*
+    영수증 한 장.
+
+    <p>테두리를 걷고 옅은 그림자를 둘렀습니다. 바닥이 흰색이 된 뒤로 흰
+    종이와 바닥을 가르는 것이 선밖에 없었는데, 선은 <b>칸</b>으로 보이고
+    그림자는 <b>얹힌 종이</b>로 보입니다. 이 화면에서 영수증은 얹힌
+    종이여야 합니다.
+  */
   paper: {
     backgroundColor: Colors.surface,
-    borderRadius: Radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: Colors.border,
-    padding: Spacing.xl,
-    gap: Spacing.sm,
+    borderRadius: Radius.r4,
+    padding: Spacing.s5,
+    gap: Spacing.s2,
+    ...Elevation.card,
+  },
+  /* 떼어 내는 자리. 영수증의 점선입니다. */
+  tear: {
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    borderStyle: 'dashed',
+    marginVertical: Spacing.s1,
   },
   center: {
     alignItems: 'center',
     gap: 2,
   },
   replay: {
-    gap: Spacing.md,
+    gap: Spacing.s3,
   },
   /* 끝을 띄워 둬야 마지막 날짜가 잘린 것처럼 안 보입니다. */
   dayRail: {
     flexWrap: 'nowrap',
-    paddingRight: Spacing.lg,
+    paddingRight: Spacing.s4,
+  },
+  /* 내놓는 구역. 눌러서 들어가는 물건이 아니라 안내라 회색 면입니다. */
+  share: {
+    backgroundColor: Colors.fill,
+    borderRadius: Radius.r3,
+    padding: Spacing.s4,
+    gap: Spacing.s2,
   },
 });

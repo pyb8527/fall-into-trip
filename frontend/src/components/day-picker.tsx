@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { api, ApiError, UNEXPECTED } from '@/api/client';
 import type { TripDetail, TripSummary } from '@/api/types';
 import { useAsync } from '@/api/use-async';
+import { Colors, dayColor, Radius, Type, Weight } from '@/constants/theme';
 import { BottomSheet, Button, Caption, ErrorNote, ListRow, SearchField, Split, Subtitle } from '@/ui';
 
 /**
@@ -146,11 +148,12 @@ export function DayPicker({
               <Button label="다른 여행" variant="ghost" compact onPress={() => setTrip(null)} />
             </Split>
           ) : null}
-          {shown.map((day) => (
+          {shown.map((day, at) => (
             <ListRow
               key={day.id}
-              title={day.date || day.label}
-              subtitle={`장소 ${day.places.length}곳`}
+              left={<DayDot at={at} />}
+              title={day.label || `${at + 1}일차`}
+              subtitle={[day.date, `장소 ${day.places.length}곳`].filter(Boolean).join(' · ')}
               onPress={() => pour(day.id)}
             />
           ))}
@@ -159,3 +162,39 @@ export function DayPicker({
     </BottomSheet>
   );
 }
+
+/**
+ * 며칟날인지를 가리키는 동그라미.
+ *
+ * <h3>왜 색을 입히는가</h3>
+ *
+ * <p>날짜 줄 넷이 "1일차 / 2일차 / 3일차 / 4일차" 로 서 있으면, 넷이 전부
+ * 같은 모양이라 <b>글자를 읽어야</b> 어느 날인지 압니다. 지도의 핀과 일정의
+ * 날짜 칩이 이미 날마다 다른 색을 쓰고 있으니, 넣을 날을 고르는 자리도 같은
+ * 색을 보여 주는 것이 맞습니다 — 여기서 2일차를 고르면 지도에서 그 색 핀이
+ * 하나 늘어납니다.
+ */
+function DayDot({ at }: { at: number }) {
+  return (
+    <View style={[styles.dayDot, { backgroundColor: dayColor(at) }]}>
+      <Text style={styles.dayDotLabel}>{at + 1}</Text>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  /* 목록 앞에 서는 것들(아이콘 원·Mark)과 같은 자리, 같은 크기입니다. */
+  dayDot: {
+    width: 40,
+    height: 40,
+    borderRadius: Radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dayDotLabel: {
+    ...Type.caption,
+    fontWeight: Weight.bold,
+    /* 날짜 색 여덟은 모두 진해서 흰 글자가 읽힙니다. */
+    color: Colors.onDay,
+  },
+});

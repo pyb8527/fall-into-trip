@@ -103,7 +103,7 @@ export function PhotoViewer({
   /* 띠가 먹는 높이. 사진은 그 사이를 씁니다 — 띠 아래로 사진이 들어가면
      닫는 단추가 다시 사진 위에 얹힌 것과 같아집니다. */
   const barTop = 52 + insets.top;
-  const barBottom = (by ? 44 : 0) + Math.max(insets.bottom, Spacing.md);
+  const barBottom = (by ? 44 : 0) + Math.max(insets.bottom, Spacing.s3);
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
@@ -168,7 +168,7 @@ export function PhotoViewer({
 
         {/* 아래 띠. 찍은 사람이 있을 때만 섭니다 — 구글 사진은 밝혀야 합니다. */}
         {by ? (
-          <View style={[styles.bottom, { paddingBottom: Math.max(insets.bottom, Spacing.md) }]}>
+          <View style={[styles.bottom, { paddingBottom: Math.max(insets.bottom, Spacing.s3) }]}>
             <Caption tone="inverse">{by}</Caption>
           </View>
         ) : null}
@@ -188,7 +188,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: Spacing.sm,
+    paddingHorizontal: Spacing.s2,
   },
   close: {
     width: 44,
@@ -197,7 +197,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   bottom: {
-    paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.sm,
+    paddingHorizontal: Spacing.s3,
+    paddingTop: Spacing.s2,
   },
 });

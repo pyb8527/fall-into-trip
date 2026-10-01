@@ -1,6 +1,6 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { api, query } from '@/api/client';
 import type { PostCard, PostDays, PostPage, PostSort } from '@/api/types';
@@ -9,7 +9,7 @@ import { useAuth } from '@/auth/auth-provider';
 import { OurPhoto } from '@/components/our-photo';
 import { PostMap } from '@/components/post-map';
 import { SignUpGate } from '@/components/signup-gate';
-import { Spacing } from '@/constants/theme';
+import { Colors, Elevation, Gutter, Radius, Spacing, Tap } from '@/constants/theme';
 import type { Comeback } from '@/lib/comeback';
 import {
   Body,
@@ -23,14 +23,16 @@ import {
   ErrorNote,
   FilterChip,
   Grow,
+  IconButton,
   Loading,
   Pager,
+  Press,
   Row,
   Screen,
   SearchField,
   SegmentedTabs,
   Split,
-  Subtitle,
+  Title,
 } from '@/ui';
 import { AppTabs } from '@/ui/tab-bar';
 
@@ -39,6 +41,19 @@ import { AppTabs } from '@/ui/tab-bar';
  *
  * <p>로그인 없이도 열립니다. 추천을 누르거나 가져가려 할 때만 로그인을
  * 요구합니다.
+ *
+ * <h3>제목이 상단바에서 본문으로 내려왔습니다</h3>
+ *
+ * <p>갈래 띠로 오는 화면입니다. 그런 화면의 제목은 상단바 가운데 작게
+ * 적혀 있을 이유가 없습니다 — 뒤로 갈 데가 없으니 상단바가 할 일도 없고,
+ * 작은 글씨 하나를 위해 56픽셀을 먹습니다. 제목을 본문 맨 위로 내려
+ * 크게 적고, 상단바는 걷습니다.
+ *
+ * <h3>찾기 칸은 눌러야 나옵니다</h3>
+ *
+ * <p>늘 펼쳐 두었더니 화면을 열 때마다 <b>목록보다 찾기 칸이 먼저</b>
+ * 보였습니다. 구경하러 들어온 사람이 열에 아홉인데, 그 아홉이 매번 52픽셀을
+ * 지나쳐 내려가야 했습니다. 찾으러 온 사람은 돋보기를 한 번 누르면 됩니다.
  */
 /**
  * 어느 글을 볼지.
@@ -99,6 +114,8 @@ export default function Community() {
   /* 글자를 칠 때마다 부르면 요청이 쏟아집니다. 확인 버튼으로만 보냅니다. */
   const [typed, setTyped] = useState('');
   const [q, setQ] = useState('');
+  /** 찾기 칸을 펼쳐 두었는지. */
+  const [seeking, setSeeking] = useState(false);
   /*
     어디를 보고 있는지.
 
@@ -206,7 +223,29 @@ export default function Community() {
   }
 
   return (
-    <Screen tabs={<AppTabs />}>
+    <Screen
+      safeTop
+      tabs={<AppTabs />}
+      header={
+        <Split>
+          <Grow>
+            <Title>둘러보기</Title>
+          </Grow>
+          {PRIVATE.includes(view) ? null : (
+            <IconButton
+              name="search"
+              label="글 찾기"
+              bare
+              active={seeking}
+              onPress={() => setSeeking((on) => !on)}
+            />
+          )}
+        </Split>
+      }>
+      {/* 큰 제목이 본문 위에 서므로 상단바는 걷습니다. 둘 다 두면 같은 말이
+          한 화면에 두 번 적힙니다. */}
+      <Stack.Screen options={{ headerShown: false }} />
+
       <SegmentedTabs
         items={user ? TABS : TABS.filter((t) => !PRIVATE.includes(t.value))}
         value={view}
@@ -226,40 +265,53 @@ export default function Community() {
         고를 수 있는 것은 판 안으로 넣고, 밖에는 <b>지금 걸려 있는 것</b>만
         남깁니다. 대개 하나나 둘이고, 아무것도 안 걸렸으면 한 줄도 안 먹습니다.
       */}
-      {PRIVATE.includes(view) ? null : (
-        /* 찾기 칸과 지금 걸린 조건. 회색 바탕에 떠 있으면 어디까지가
-           고르는 자리인지 안 보입니다. */
-        <Card style={styles.filters}>
-          <SearchField
-            label="찾기"
-            value={typed}
-            onChangeText={setTyped}
-            placeholder="도쿄, 온천, 아이와 함께"
-            onSearch={() => refilter(() => setQ(typed.trim()))}
-          />
+      {PRIVATE.includes(view) || !(seeking || q !== '') ? null : (
+        <SearchField
+          label="찾기"
+          value={typed}
+          onChangeText={setTyped}
+          placeholder="도쿄, 온천, 아이와 함께"
+          onSearch={() => refilter(() => setQ(typed.trim()))}
+        />
+      )}
 
-          <Split>
-            <Row gap={Spacing.xs} style={styles.applied}>
-              {/* 세우는 법은 늘 걸려 있으므로 조건 칩으로 안 뺍니다. 대신
-                  지금 무엇으로 서 있는지를 단추에 적어 둡니다 — 판 안에만
-                  두면 어떻게 서 있는지 보려고 판을 열어야 합니다. */}
-              <Button
-                label={
-                  picked.length > 0
-                    ? `${SORTS.find((x) => x.value === sort)?.label} · 필터 ${picked.length}`
-                    : (SORTS.find((x) => x.value === sort)?.label ?? '인기순')
-                }
-                variant="secondary"
-                compact
-                onPress={() => setSifting(true)}
-              />
-              {picked.map((p) => (
-                <FilterChip key={p.key} label={p.label} onRemove={() => refilter(p.clear)} />
-              ))}
-            </Row>
-            {data ? <Caption tone="secondary">{data.total.toLocaleString()}개</Caption> : null}
-          </Split>
-        </Card>
+      {PRIVATE.includes(view) ? null : (
+        <>
+          {/*
+            조건 줄은 가로로 흐릅니다.
+
+            <p>줄바꿈으로 두었더니 조건 셋만 걸려도 두 줄이 되어 목록이
+            그만큼 내려갔습니다. 조건은 걸려 있는지만 보이면 되는 것이라,
+            넘치는 쪽은 옆으로 흘려보내고 화면 끝에서 잘리게 둡니다.
+          */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.sieve}
+            /* 줄은 화면 끝까지 흐르되 첫 칩은 글자선에 맞습니다. */
+            style={styles.sieveBleed}>
+            {/* 세우는 법은 늘 걸려 있으므로 조건 칩으로 안 뺍니다. 대신
+                지금 무엇으로 서 있는지를 단추에 적어 둡니다 — 판 안에만
+                두면 어떻게 서 있는지 보려고 판을 열어야 합니다. */}
+            <Button
+              label={
+                picked.length > 0
+                  ? `${SORTS.find((x) => x.value === sort)?.label} · 필터 ${picked.length}`
+                  : (SORTS.find((x) => x.value === sort)?.label ?? '인기순')
+              }
+              variant="secondary"
+              compact
+              onPress={() => setSifting(true)}
+            />
+            {picked.map((p) => (
+              <FilterChip key={p.key} label={p.label} onRemove={() => refilter(p.clear)} />
+            ))}
+          </ScrollView>
+
+          {/* 개수는 조건 줄 아래 한 줄로. 줄 안에 끼우면 조건이 늘어날 때마다
+              밀려 나가 영영 안 보입니다. */}
+          {data ? <Caption tone="secondary">글 {data.total.toLocaleString()}개</Caption> : null}
+        </>
       )}
 
       <BottomSheet
@@ -278,7 +330,7 @@ export default function Community() {
           보이면 마지막 하나는 안 걸게 됩니다.
         */
         footer={
-          <Row gap={Spacing.sm}>
+          <Row gap={Spacing.s2}>
             <Grow>
               <Button
                 label={
@@ -307,7 +359,7 @@ export default function Community() {
         <Body small strong>
           세우는 법
         </Body>
-        <Row gap={Spacing.xs} style={styles.applied}>
+        <Row gap={Spacing.s2} style={styles.applied}>
           {SORTS.map((o) => (
             <Chip
               key={o.value}
@@ -323,7 +375,7 @@ export default function Community() {
         <Body small strong>
           어디
         </Body>
-        <Row gap={Spacing.xs} style={styles.applied}>
+        <Row gap={Spacing.s2} style={styles.applied}>
           <Chip
             label="어디든"
             selected={region === null}
@@ -355,7 +407,7 @@ export default function Community() {
             <Body small strong>
               무엇
             </Body>
-            <Row gap={Spacing.xs} style={styles.applied}>
+            <Row gap={Spacing.s2} style={styles.applied}>
               <Chip
                 label="무엇이든"
                 selected={tag === null}
@@ -376,7 +428,7 @@ export default function Community() {
         <Body small strong>
           며칠
         </Body>
-        <Row gap={Spacing.xs} style={styles.applied}>
+        <Row gap={Spacing.s2} style={styles.applied}>
           <Chip
             label="며칠이든"
             selected={days === null}
@@ -431,6 +483,23 @@ export default function Community() {
   );
 }
 
+/**
+ * 글 한 장.
+ *
+ * <h3>그림이 판 밖으로 나갑니다</h3>
+ *
+ * <p>사진을 판 안쪽 여백 안에 두었습니다. 그러면 사진 둘레에 흰 테가 생겨
+ * 카드가 <b>그림을 담은 액자</b>처럼 보이고, 정작 사진은 양옆 32픽셀만큼
+ * 좁아집니다. 사진이 위를 가득 채우고 글만 여백을 가집니다 — 상용 앱의
+ * 글 카드가 거의 다 이 모양입니다.
+ *
+ * <h3>하트는 사진 위로</h3>
+ *
+ * <p>카드 맨 아래에 글자 단추로 있었습니다. 그러면 같은 자리를 메타 줄과
+ * 나눠 쓰면서 카드가 한 줄 더 길어지고, 무엇보다 <b>목록을 훑는 손이
+ * 닿는 자리</b>가 아닙니다. 사진 오른쪽 위 흰 원으로 올립니다 — 숫자는
+ * 메타 줄로 내려 하트에서 떼어 놓습니다.
+ */
 function PostRow({
   post,
   onOpen,
@@ -444,12 +513,10 @@ function PostRow({
   onTag: (tag: string) => void;
 }) {
   return (
-    <Card>
+    <Card style={styles.post}>
       {/* 글로 들어가는 자리와 하트를 나눕니다. 카드 전체가 눌리면 하트를
           누르려다 글이 열립니다. */}
-      {/* 글자만 늘어놓으면 어떤 동선인지 열어 봐야 압니다. 지도 한 장이면
-          어디를 어떻게 도는지가 한눈에 보입니다. */}
-      <Pressable onPress={onOpen} accessibilityRole="button" style={styles.tap}>
+      <Pressable onPress={onOpen} accessibilityRole="button">
         {/*
           표지가 있으면 표지, 없으면 동선 그림.
 
@@ -457,21 +524,42 @@ function PostRow({
           더 빨리 말하지만, 안 올린 글도 많고 동선 그림은 그것대로 쓸모가
           있습니다 — 오사카를 도는 선과 제주를 도는 선은 생김새가 다릅니다.
         */}
-        {post.coverPhotoId ? (
-          <OurPhoto id={post.coverPhotoId} height={150} />
-        ) : (
-          <PostMap postId={post.id} title={post.title} height={150} />
-        )}
-        <Subtitle>{post.title}</Subtitle>
-        {post.summary ? (
-          <Body small tone="secondary" numberOfLines={2}>
-            {post.summary}
+        <View style={styles.media}>
+          {post.coverPhotoId ? (
+            <OurPhoto id={post.coverPhotoId} height={180} style={styles.flat} />
+          ) : (
+            <PostMap postId={post.id} title={post.title} height={180} />
+          )}
+          {/* 며칠 여행인지는 사진 위에서 가장 빨리 읽힙니다. 글자 줄로
+              내리면 메타에 섞여 묻힙니다. */}
+          <View style={styles.span}>
+            <Text style={styles.spanLabel}>{post.dayCount}일</Text>
+          </View>
+        </View>
+
+        <View style={styles.said}>
+          <Body strong numberOfLines={2}>
+            {post.title}
           </Body>
-        ) : null}
-        <Caption tone="secondary">
-          {post.region ? `${post.region} · ` : ''}
-          {post.authorName} · {post.dayCount}일 · {post.placeCount}곳
-        </Caption>
+          {post.summary ? (
+            <Body small tone="secondary" numberOfLines={2}>
+              {post.summary}
+            </Body>
+          ) : null}
+          {/*
+            조회수를 안 냅니다.
+
+            <p>글이 몇 개 없는 동안에는 "조회 1" 이 붙습니다. 그것을 본 사람에게
+            이 글은 <b>아무도 안 본 글</b>이고, 그런 글이 목록에 늘어서 있으면
+            앱 자체가 비어 보입니다. 세는 것은 계속하되(인기순이 씁니다) 보여
+            주지는 않습니다.
+          */}
+          <Caption tone="secondary">
+            {post.authorName}
+            {post.region ? ` · ${post.region}` : ''} · {post.placeCount}곳 · ♥{' '}
+            {post.likeCount}
+          </Caption>
+        </View>
       </Pressable>
 
       {/*
@@ -485,45 +573,107 @@ function PostRow({
         합니다.
       */}
       {post.tags.length > 0 ? (
-        <Row gap={Spacing.xs} style={styles.applied}>
+        <Row gap={Spacing.s2} style={[styles.applied, styles.tagRow]}>
           {post.tags.map((t) => (
             <Chip key={t} label={t} selected={false} onPress={() => onTag(t)} />
           ))}
         </Row>
       ) : null}
 
-      <Split gap={Spacing.sm}>
-        {/*
-          조회수를 안 냅니다.
-
-          <p>글이 몇 개 없는 동안에는 "조회 1" 이 붙습니다. 그것을 본 사람에게
-          이 글은 <b>아무도 안 본 글</b>이고, 그런 글이 목록에 늘어서 있으면
-          앱 자체가 비어 보입니다. 세는 것은 계속하되(인기순이 씁니다) 보여
-          주지는 않습니다.
-        */}
-        <View />
-        {/* 하트는 목록에서 바로 누릅니다. 글을 열어야만 누를 수 있으면
-            구경하다 마음에 든 것을 지나치게 됩니다. */}
-        <Button
-          label={`${post.liked ? '♥' : '♡'} ${post.likeCount}`}
-          variant="ghost"
-          compact
-          onPress={onLike}
-        />
-      </Split>
+      {/* 하트는 목록에서 바로 누릅니다. 글을 열어야만 누를 수 있으면
+          구경하다 마음에 든 것을 지나치게 됩니다. */}
+      <Press
+        onPress={onLike}
+        scale={0.9}
+        accessibilityLabel={post.liked ? '하트 빼기' : '하트 누르기'}
+        accessibilityState={{ selected: post.liked }}
+        hitSlop={Tap.compactSlop}
+        style={styles.heart}>
+        <Text style={[styles.heartMark, post.liked ? styles.heartOn : null]}>
+          {post.liked ? '♥' : '♡'}
+        </Text>
+      </Press>
     </Card>
   );
 }
 
-
 const styles = StyleSheet.create({
-  filters: {
-    gap: Spacing.md,
-  },
   applied: {
     flexWrap: 'wrap',
   },
-  tap: {
-    gap: Spacing.xs,
+  /* 가로로 흐르는 조건 줄. 왼쪽 글자선에서 시작해 화면 오른쪽 끝까지 흐릅니다. */
+  sieveBleed: {
+    marginRight: -Gutter,
+  },
+  sieve: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.s2,
+    paddingRight: Gutter,
+  },
+
+  /*
+    글 카드.
+
+    <p>여백을 걷습니다 — 사진이 판 끝까지 닿아야 하고, 글은 제 여백을
+    따로 가집니다. 모서리 밖으로 삐져나오는 것은 판이 잘라 냅니다.
+  */
+  post: {
+    padding: 0,
+    overflow: 'hidden',
+    gap: 0,
+  },
+  media: {
+    backgroundColor: Colors.fill,
+  },
+  /* 판이 이미 모서리를 쥐고 있으니 사진은 제 모서리와 테두리를 내놓습니다. */
+  flat: {
+    borderRadius: 0,
+    borderWidth: 0,
+  },
+  said: {
+    padding: Spacing.s4,
+    gap: Spacing.s1,
+  },
+  /* 사진 위에 얹는 꼬리표. 어두운 사진에서도 읽히게 흰 바탕을 깝니다. */
+  span: {
+    position: 'absolute',
+    left: Spacing.s3,
+    bottom: Spacing.s3,
+    paddingHorizontal: Spacing.s2,
+    paddingVertical: 2,
+    borderRadius: Radius.r1,
+    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+  },
+  spanLabel: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '600',
+    color: Colors.text,
+  },
+  tagRow: {
+    paddingHorizontal: Spacing.s4,
+    paddingBottom: Spacing.s4,
+  },
+  /* 사진 오른쪽 위에 떠 있는 흰 원. 지도 위 단추와 같은 생김새입니다. */
+  heart: {
+    position: 'absolute',
+    top: Spacing.s3,
+    right: Spacing.s3,
+    width: 36,
+    height: 36,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Elevation.float,
+  },
+  heartMark: {
+    fontSize: 18,
+    lineHeight: 22,
+    color: Colors.textMuted,
+  },
+  heartOn: {
+    color: Colors.like,
   },
 });

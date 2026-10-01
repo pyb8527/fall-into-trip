@@ -1,6 +1,6 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { api, ApiError, UNEXPECTED } from '@/api/client';
 import type { Folder, TripSummary } from '@/api/types';
@@ -9,15 +9,14 @@ import { useAuth } from '@/auth/auth-provider';
 import { TripMark } from '@/components/trip-mark';
 import { FolderSheet } from '@/components/folder-sheet';
 import { TripForm } from '@/components/trip-form';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Colors, Gutter, Radius, Spacing, Type, Weight } from '@/constants/theme';
 import { countdownIsNear, countdownLabel, countdownOf, formatNights, formatSpan, todayIso } from '@/lib/countdown';
 import {
   Badge,
-  Body,
+  Band,
   BottomSheet,
   Button,
   Caption,
-  Card,
   Empty,
   ErrorNote,
   Field,
@@ -30,9 +29,7 @@ import {
   Screen,
   SearchField,
   SegmentedTabs,
-  Section,
   Split,
-  Subtitle,
 } from '@/ui';
 import { AppTabs } from '@/ui/tab-bar';
 
@@ -133,6 +130,18 @@ export default function Trips() {
     골라내는 것이라, 확인을 누르게 할 이유가 없습니다.
   */
   const [q, setQ] = useState('');
+  /*
+    찾는 칸을 접어 둡니다.
+
+    <p>안내 한 줄과 찾기 칸을 흰 카드에 담아 목록 위에 늘 세워 두었습니다.
+    그런데 찾는 일은 <b>가끔 한 번</b>이고, 이 화면을 여는 대부분의 경우는
+    목록을 보러 오는 것입니다 — 늘 서 있는 칸이 여행 한 줄을 영영 아래로
+    밀고 있었습니다.
+
+    <p>막대 오른쪽의 돋보기가 칸을 엽니다. 닫으면 친 말도 함께 지웁니다 —
+    접힌 칸에 글이 남아 있으면 목록이 왜 짧아졌는지 알 수 없습니다.
+  */
+  const [searching, setSearching] = useState(false);
 
   const everything = useMemo(() => data?.trips ?? [], [data]);
 
@@ -196,28 +205,49 @@ export default function Trips() {
       /* 주 동작은 아래에 붙입니다. 한 손으로 쥐었을 때 엄지가 닿는 자리입니다. */
       footer={<Button label="새 여행 만들기" onPress={() => setCreating(true)} />}>
       {/*
-        고르는 것들은 한 판에 모읍니다.
+        돋보기는 막대 오른쪽에.
 
-        <p>안내 한 줄과 찾기 칸이 회색 바탕에 따로 떠 있었습니다. 어디까지가
-        고르는 자리인지 안 보이고, 둘이 따로 서니 그만큼 세로로 길었습니다.
+        <p>막대는 이 층(_layout)이 만들어 주는데, 화면마다 더 달 것이 있으면
+        이렇게 덧붙입니다 — 여행 상세와 가계부도 같은 방식으로 제목을
+        바꿔 답니다.
+
+        <p>몇 개 안 될 때는 안 답니다. 다섯 줄을 눈으로 훑는 것이 치는 것보다
+        빠릅니다.
       */}
-      {(goal === 'money' || all.length > 4) ? (
-        <Card>
-          {/* 무엇 때문에 고르는 중인지. 여느 때는 말할 것이 없습니다. */}
-          {goal === 'money' ? (
-            <Caption tone="secondary">어느 여행의 가계부를 볼까요?</Caption>
-          ) : null}
+      <Stack.Screen
+        options={{
+          /* 조건은 안쪽에서 가립니다. 이 줄 자체를 조건으로 두면, 여행이
+             다섯 아래로 줄어들 때 막대에 돋보기가 그대로 남습니다 — 안
+             그려진 것은 옛 값을 지우지도 못합니다. */
+          headerRight:
+            all.length > 4
+              ? () => (
+                  <IconButton
+                    name={searching ? 'x' : 'search'}
+                    label={searching ? '찾기 닫기' : '여행 찾기'}
+                    bare
+                    onPress={() => {
+                      setSearching((was) => !was);
+                      setQ('');
+                    }}
+                  />
+                )
+              : undefined,
+        }}
+      />
 
-          {/* 몇 개 안 될 때는 찾을 것이 없습니다. 칸만 자리를 차지합니다. */}
-          {all.length > 4 ? (
-            <SearchField
-              label="여행 찾기"
-              value={q}
-              onChangeText={setQ}
-              placeholder="오사카, 제주"
-            />
-          ) : null}
-        </Card>
+      {/* 무엇 때문에 고르는 중인지. 여느 때는 말할 것이 없습니다. */}
+      {goal === 'money' ? (
+        <Caption tone="secondary">어느 여행의 가계부를 볼까요?</Caption>
+      ) : null}
+
+      {searching ? (
+        <SearchField
+          label="여행 찾기"
+          value={q}
+          onChangeText={setQ}
+          placeholder="오사카, 제주"
+        />
       ) : null}
 
       {loading && !data ? <Loading /> : null}
@@ -264,19 +294,19 @@ export default function Trips() {
       */}
       {group === 'folder' ? (
         <>
-          <Row gap={Spacing.sm} style={styles.shelf}>
+          <Row gap={Spacing.s3} style={styles.shelf}>
             {folders.map((folder) => (
               <Press
                 key={folder.id}
                 onPress={() => setOpened(folder)}
-                scale={0.96}
+                scale={0.98}
                 accessibilityLabel={`${folder.name} 폴더 열기`}
                 style={styles.folder}>
-                <Icon name="folder" size={36} tone="accent" />
-                <Body small strong numberOfLines={1}>
+                <Icon name="folder" size={24} tone="brand" />
+                <Text style={styles.folderName} numberOfLines={1}>
                   {folder.name}
-                </Body>
-                <Caption tone="muted">{folder.tripCount}개</Caption>
+                </Text>
+                <Caption tone="muted">여행 {folder.tripCount}개</Caption>
               </Press>
             ))}
 
@@ -293,14 +323,14 @@ export default function Trips() {
             {loose.length > 0 ? (
               <Press
                 onPress={() => setOpened(LOOSE)}
-                scale={0.96}
+                scale={0.98}
                 accessibilityLabel="아직 안 넣은 여행 보기"
                 style={styles.folder}>
-                <Icon name="folder" size={36} tone="muted" />
-                <Body small strong numberOfLines={1}>
+                <Icon name="folder" size={24} tone="muted" />
+                <Text style={styles.folderName} numberOfLines={1}>
                   {LOOSE.name}
-                </Body>
-                <Caption tone="muted">{loose.length}개</Caption>
+                </Text>
+                <Caption tone="muted">여행 {loose.length}개</Caption>
               </Press>
             ) : null}
 
@@ -314,39 +344,69 @@ export default function Trips() {
             */}
             <Press
               onPress={() => setNaming(true)}
-              scale={0.96}
+              scale={0.98}
               accessibilityLabel="새 폴더 만들기"
               style={[styles.folder, styles.folderNew]}>
-              <Icon name="plus" size={36} tone="muted" />
-              <Body small strong numberOfLines={1}>
+              <Icon name="plus" size={24} tone="muted" />
+              <Text style={styles.folderName} numberOfLines={1}>
                 새 폴더
-              </Body>
+              </Text>
             </Press>
           </Row>
         </>
       ) : null}
 
-      {sections.map((section) => (
-        /* 묶음 제목이 회색 바탕에 그대로 있었습니다. 제목과 그 아래 여행들이
-           한 장에 담겨야 어디까지가 한 묶음인지 보입니다. */
-        <Section
-          key={section.title}
-          title={section.title}
-          flush
-          action={<Caption tone="secondary">{section.trips.length}</Caption>}>
-          <View style={styles.sectionBody}>
-            {section.trips.map((trip) => (
-              <TripRow
-                key={trip.id}
-                trip={trip}
-                showGroup={manyGroups}
-                onOpen={() => open(trip.id)}
-                onFolder={() => setPlacing(trip)}
-              />
-            ))}
-          </View>
-        </Section>
+      {/*
+        묶음을 카드에서 꺼냈습니다.
+
+        <p>묶음마다 흰 카드 한 장이었습니다. 바닥이 흰색이 되면서 그 카드는
+        바닥에 녹아 없어졌고, 옅은 그림자만 남아 화면이 흐릿해졌습니다.
+
+        <p>묶음 사이는 <b>회색 띠</b>가 가릅니다. 제목은 띠 아래에 작게
+        앉습니다 — 제목은 묶음의 이름이고, 읽는 것은 그 아래 여행 이름들
+        입니다.
+      */}
+      {sections.map((section, at) => (
+        <View key={section.title}>
+          {at > 0 ? <Band /> : null}
+          <Split align="baseline" style={styles.bunchHead}>
+            <Text style={styles.bunchTitle}>{section.title}</Text>
+            <Caption tone="muted">{section.trips.length}</Caption>
+          </Split>
+          {section.trips.map((trip) => (
+            <TripRow
+              key={trip.id}
+              trip={trip}
+              showGroup={manyGroups}
+              onOpen={() => open(trip.id)}
+              onFolder={() => setPlacing(trip)}
+            />
+          ))}
+        </View>
       ))}
+
+      {/*
+        가계부 모아 보기.
+
+        <p>아래 갈래 띠에 「가계부」 칸이 있었습니다. 그런데 가계부는 여행
+        하나에 딸린 것이라, 그 칸을 누르면 여행을 <b>먼저 고르는</b> 화면이
+        떴습니다 — 갈래 하나가 "어느 여행?" 을 묻는 데 쓰이고 있었습니다.
+
+        <p>여행을 고르는 자리는 여기입니다. 띠에서 내려오고 이 줄로 들어
+        갑니다. 여행이 하나도 없으면 안 답니다 — 적을 것이 없습니다.
+      */}
+      {data && everything.length > 0 ? (
+        <>
+          <Band />
+          <ListRow
+            left={<Icon name="credit-card" size={24} tone="secondary" />}
+            title="가계부 모아 보기"
+            subtitle="여행마다 얼마 썼는지 한 자리에서"
+            right={<Icon name="chevron-right" size={20} tone="muted" />}
+            onPress={() => router.push('/(app)/money')}
+          />
+        </>
+      ) : null}
 
       <TripForm
         visible={creating}
@@ -505,7 +565,7 @@ function TripRow({
       /* 안 줄어드는 자리입니다. 줄어들 수 있게 두면 제목이 아니라 이쪽이
          버티면서 제목만 한 글자로 눌립니다 — 그 반대여야 합니다. */
       right={
-        <Row gap={Spacing.xs} style={styles.tail}>
+        <Row gap={Spacing.s1} style={styles.tail}>
           {countdownBadge(trip.startIso, trip.endIso)}
           {showGroup && trip.groupName ? (
             <Badge label={shortGroup(trip.groupName)} tone="muted" />
@@ -620,13 +680,28 @@ function byWhen(trips: TripSummary[]): Bunch[] {
 
 
 const styles = StyleSheet.create({
+  /*
+    묶음의 이름.
+
+    <p>위는 띠가 이미 띄워 놓았으므로 아래만 좁힙니다 — 제목은 아래 것의
+    이름이라 아래와 가까워야 합니다.
+  */
+  bunchHead: {
+    paddingBottom: Spacing.s1,
+  },
+  bunchTitle: {
+    ...Type.caption,
+    fontWeight: Weight.semibold,
+    color: Colors.textSecondary,
+  },
+
   /* 줄 오른쪽 꼬리. 안 줄어듭니다 — 줄어들 수 있게 두면 표가 버티고 제목이
      눌립니다. 대신 표를 적게 답니다. */
   tail: {
     flexShrink: 0,
     flexWrap: 'nowrap',
   },
-  /* 폴더를 늘어놓는 선반. 좁은 폰에서는 두 칸, 넓으면 더 들어갑니다. */
+  /* 폴더를 늘어놓는 선반. 좁은 폰에서 두 칸이 들어갑니다. */
   shelf: {
     alignItems: 'stretch',
   },
@@ -634,24 +709,35 @@ const styles = StyleSheet.create({
      그중 하나로 읽힙니다. */
   folderNew: {
     backgroundColor: 'transparent',
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
     borderColor: Colors.border,
     borderStyle: 'dashed',
   },
+  /*
+    폴더 한 칸.
+
+    <p>흰 카드였습니다. 바닥이 흰색이 되면서 테두리 없는 흰 칸은 아무것도
+    아니게 되었습니다 — <b>면 카드</b>(회색 면)로 바꿉니다. 폴더는 눌러서
+    들어가는 물건이지만 그 안이 판으로 열리는 것이라, 떠 있는 카드보다
+    가라앉은 면이 맞습니다.
+
+    <p>두 칸으로 나눕니다. 폰에서 셋을 넣으면 폴더 이름이 두 글자에서
+    잘립니다.
+  */
   folder: {
     flexGrow: 1,
-    flexBasis: 104,
-    maxWidth: 160,
+    flexBasis: '45%',
+    minHeight: 88,
+    justifyContent: 'center',
     alignItems: 'flex-start',
-    gap: Spacing.xs,
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.sm,
-    padding: Spacing.lg,
+    gap: Spacing.s1,
+    backgroundColor: Colors.fill,
+    borderRadius: Radius.r3,
+    padding: Spacing.s4,
   },
-  /* 묶음 안의 여행 줄들. 카드 노릇은 Section 이 하므로 여백만 둡니다.
-     줄은 저마다 흰 바탕을 가지므로 좌우를 조금만 비웁니다. */
-  sectionBody: {
-    gap: Spacing.sm,
-    padding: Spacing.sm,
+  folderName: {
+    ...Type.headline,
+    fontWeight: Weight.semibold,
+    color: Colors.text,
   },
 });

@@ -3,19 +3,18 @@ import { StyleSheet, View } from 'react-native';
 
 import { api, ApiError, UNEXPECTED } from '@/api/client';
 import type { Folder } from '@/api/types';
-import { Spacing } from '@/constants/theme';
+import { Colors, Gutter } from '@/constants/theme';
 import {
-  Badge,
+  Band,
   BottomSheet,
   Button,
   Caption,
   ConfirmDialog,
-  Divider,
   ErrorNote,
   Field,
+  Icon,
   IconButton,
   ListRow,
-  Row,
 } from '@/ui';
 
 /**
@@ -106,38 +105,48 @@ export function FolderSheet({
         정리해요.
       </Caption>
 
+      {/*
+        지금 어디에 들어 있는지.
+
+        <p>「여기」 라고 적은 배지를 달고 있었습니다. 고르는 판에서 고른 것을
+        가리키는 것은 <b>체크</b>입니다 — 글자로 적으면 그 글자가 무슨 뜻인지
+        한 번 읽어야 하고, 폴더가 열이면 「여기」 를 찾아 열 줄을 훑어야
+        합니다. 체크 하나는 훑는 눈에 바로 걸립니다.
+      */}
       <ListRow
         title="폴더 없음"
         subtitle="목록에 그대로 둬요"
-        right={current === null ? <Badge label="여기" tone="accent" /> : undefined}
+        right={current === null ? <Icon name="check" size={20} tone="brand" /> : undefined}
         onPress={() =>
           run(() => api.put(`/api/trips/${tripId}/folder`, {}))
         }
       />
 
+      {/* 지우기는 줄 안에 답니다 — 줄 밖에 붙이면 그 줄만 판이 짧아져서
+          목록 오른쪽 끝이 들쭉날쭉합니다({@link ListRow} 의 action). */}
       {folders.map((folder) => (
-        <Row key={folder.id} style={styles.row}>
-          <View style={styles.grow}>
-            <ListRow
-              title={folder.name}
-              subtitle={`여행 ${folder.tripCount}개`}
-              right={current === folder.id ? <Badge label="여기" tone="accent" /> : undefined}
-              onPress={() =>
-                run(() => api.put(`/api/trips/${tripId}/folder`, { folderId: folder.id }))
-              }
+        <ListRow
+          key={folder.id}
+          title={folder.name}
+          subtitle={`여행 ${folder.tripCount}개`}
+          right={current === folder.id ? <Icon name="check" size={20} tone="brand" /> : undefined}
+          action={
+            <IconButton
+              name="trash-2"
+              label={`${folder.name} 폴더 지우기`}
+              tone="danger"
+              bare
+              disabled={busy}
+              onPress={() => setDropping(folder)}
             />
-          </View>
-          <IconButton
-            name="trash-2"
-            label={`${folder.name} 폴더 지우기`}
-            tone="danger"
-            disabled={busy}
-            onPress={() => setDropping(folder)}
-          />
-        </Row>
+          }
+          onPress={() =>
+            run(() => api.put(`/api/trips/${tripId}/folder`, { folderId: folder.id }))
+          }
+        />
       ))}
 
-      <Divider />
+      <Band />
 
       {/* 넣으려는 순간에야 "그런 폴더가 없네" 를 알게 됩니다. 그때 다른 화면으로
           보내면 하려던 일을 잃습니다. */}
@@ -174,11 +183,4 @@ export function FolderSheet({
 }
 
 const styles = StyleSheet.create({
-  row: {
-    alignItems: 'center',
-    gap: Spacing.xs,
-  },
-  grow: {
-    flex: 1,
-  },
 });

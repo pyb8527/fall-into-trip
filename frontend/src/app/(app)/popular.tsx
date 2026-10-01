@@ -1,17 +1,16 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { api, query } from '@/api/client';
 import type { PopularKind, PopularPlace, PopularRegion } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { PlaceDetailSheet, type Looked } from '@/components/place-detail-sheet';
 import { iconOf, labelOf } from '@/constants/place-icons';
-import { Spacing } from '@/constants/theme';
+import { Colors, Palette, Spacing, Type, Weight } from '@/constants/theme';
 import {
   Body,
   Caption,
-  Card,
   Empty,
   ErrorNote,
   Grow,
@@ -22,10 +21,7 @@ import {
   Row,
   Screen,
   SegmentedTabs,
-  Split,
-  Subtitle,
 } from '@/ui';
-import { AppTabs } from '@/ui/tab-bar';
 
 type Tab = 'places' | 'regions';
 
@@ -51,6 +47,20 @@ const TABS: { value: Tab; label: string }[] = [
  *
  * <p>한 글에서 같은 곳을 두 번 넣었어도 한 번으로 셉니다. 사흘 내내 같은
  * 카페에 갔다고 그 카페가 세 배 인기 있는 것은 아닙니다.
+ *
+ * <h3>안내문을 걷었습니다</h3>
+ *
+ * <p>"어떻게 센 것인가" 를 흰 판에 담아 목록 위에 두었습니다. 그런데 그
+ * 판은 <b>처음 한 번만 읽히고</b> 그다음부터는 순위를 보려면 매번 지나쳐야
+ * 하는 벽이었습니다. 세는 법은 순위 줄 자체가 말합니다 — "여행 12개에
+ * 담김" 이 그 말입니다.
+ *
+ * <h3>갈래 띠를 뗐습니다</h3>
+ *
+ * <p>이 화면은 홈에서 들어오는 곳이고 아래 띠에 제 칸이 없습니다. 그래도
+ * 띠를 달아 두었더니 <b>켜진 칸이 하나도 없는 띠</b>가 아래에 서 있었습니다 —
+ * 지금 어디인지를 말해야 하는 것이 아무 말도 안 하고 자리만 먹었습니다.
+ * 돌아가는 길은 상단바 뒤로가 맡습니다.
  */
 export default function Popular() {
   const router = useRouter();
@@ -96,20 +106,11 @@ export default function Popular() {
   );
 
   return (
-    <Screen tabs={<AppTabs />}>
+    <Screen>
       <SegmentedTabs items={TABS} value={tab} onChange={setTab} />
 
       {tab === 'places' ? (
         <>
-          {/* 이 화면이 무엇인지 말하는 한 줄입니다. 회색 바탕에 두면 가장
-              먼저 읽어야 하는 글자가 가장 허름한 자리에 놓입니다. */}
-          <Card>
-            <Caption tone="secondary">
-              올라온 여행에 여럿이 넣은 곳이에요. 한 여행에서 여러 번 넣었어도 한 번으로
-              세어요.
-            </Caption>
-          </Card>
-
           {/*
             고르는 칸 둘.
 
@@ -120,9 +121,11 @@ export default function Popular() {
             <p>한 줄로 접습니다. 그러면서 남은 자리에 지역을 하나 더
             들입니다 — 전에는 칩만으로도 꽉 차 둘째 조건을 놓을 데가
             없었습니다.
+
+            <p>판에서 꺼냈습니다. 흰 바탕 위의 흰 판은 아무것도 가르지
+            못하면서 칸 둘을 안으로 16픽셀 밀어 넣기만 했습니다.
           */}
-          <Card>
-          <Row gap={Spacing.xs} style={styles.chips}>
+          <Row gap={Spacing.s2} style={styles.chips}>
             {(kinds?.kinds.length ?? 0) > 1 ? (
               <Picker
                 /* "갈래" 는 일상에서 잘 안 쓰는 말이라 무엇을 고르는 칸인지
@@ -150,7 +153,6 @@ export default function Popular() {
               />
             ) : null}
           </Row>
-          </Card>
 
           {loadingPlaces && !places ? <Loading /> : null}
           {placeError ? <ErrorNote message={placeError} onRetry={reloadPlaces} /> : null}
@@ -165,40 +167,31 @@ export default function Popular() {
             />
           ) : null}
 
-          <View style={styles.list}>
-            {places?.places.map((place, i) => (
-              <Rank
-                key={place.key}
-                at={i + 1}
-                mark={<Mark emoji={iconOf(place.icon)} fallback="📍" />}
-                title={place.name}
-                sub={[labelOf(place.icon), `여행 ${place.posts}개에 담김`]
-                  .filter(Boolean)
-                  .join(' · ')}
-                onPress={
-                  place.lat != null && place.lng != null
-                    ? () =>
-                        setLooking({
-                          name: place.name,
-                          lat: place.lat as number,
-                          lng: place.lng as number,
-                          placeId: place.placeId,
-                          icon: place.icon,
-                        })
-                    : undefined
-                }
-              />
-            ))}
-          </View>
+          {places?.places.map((place, i) => (
+            <Rank
+              key={place.key}
+              at={i + 1}
+              mark={<Mark emoji={iconOf(place.icon)} fallback="📍" />}
+              title={place.name}
+              sub={labelOf(place.icon)}
+              meta={`여행 ${place.posts}개`}
+              onPress={
+                place.lat != null && place.lng != null
+                  ? () =>
+                      setLooking({
+                        name: place.name,
+                        lat: place.lat as number,
+                        lng: place.lng as number,
+                        placeId: place.placeId,
+                        icon: place.icon,
+                      })
+                  : undefined
+              }
+            />
+          ))}
         </>
       ) : (
         <>
-          <Card>
-            <Caption tone="secondary">
-              여럿이 다녀온 지역이에요. 누르면 그 지역 글만 봐요.
-            </Caption>
-          </Card>
-
           {loadingRegions && !regions ? <Loading /> : null}
           {regionError ? <ErrorNote message={regionError} onRetry={reloadRegions} /> : null}
 
@@ -206,17 +199,16 @@ export default function Popular() {
             <Empty message="아직 올라온 일정이 없어요. 첫 번째가 되어 보세요." />
           ) : null}
 
-          <View style={styles.list}>
-            {regions?.regions.map((r, i) => (
-              <Rank
-                key={r.region}
-                at={i + 1}
-                title={r.region}
-                sub={`여행 ${r.posts}개${r.likes > 0 ? ` · ♥ ${r.likes}` : ''}`}
-                onPress={() => router.push(`/community?region=${encodeURIComponent(r.region)}`)}
-              />
-            ))}
-          </View>
+          {regions?.regions.map((r, i) => (
+            <Rank
+              key={r.region}
+              at={i + 1}
+              title={r.region}
+              sub={r.likes > 0 ? `♥ ${r.likes}` : '그 지역 글 보기'}
+              meta={`여행 ${r.posts}개`}
+              onPress={() => router.push(`/community?region=${encodeURIComponent(r.region)}`)}
+            />
+          ))}
         </>
       )}
 
@@ -231,27 +223,40 @@ export default function Popular() {
  * <p>번호를 답니다. 순위는 위에서부터 읽으면 알 수 있지만, 번호가 없으면
  * 훑어 내려가다 지금 몇 번째를 보고 있는지 놓칩니다.
  *
- * <p>앞의 셋만 진하게 둡니다. 열 줄이 모두 같은 무게면 순위가 아니라 그냥
- * 목록입니다.
+ * <h3>판을 벗고 줄이 되었습니다</h3>
+ *
+ * <p>줄마다 흰 판을 두르고 있었습니다. 열 줄이면 흰 바탕 위에 흰 사각형이
+ * 열 개 — 테두리도 그림자도 거의 안 보이니 <b>판을 둘렀다는 사실만</b>
+ * 남고, 줄 사이가 4픽셀씩 벌어져 순위가 한 묶음으로 안 읽혔습니다.
+ *
+ * <p>판을 벗기고 줄로 둡니다. 카드는 눌러서 들어가는 <b>물건</b>에만
+ * 씁니다 — 순위는 물건이 아니라 목록입니다.
+ *
+ * <h3>앞의 셋만 색을 씁니다</h3>
+ *
+ * <p>열 줄이 모두 같은 무게면 순위가 아니라 그냥 목록입니다. 1·2·3 만
+ * 브랜드색으로 두고 나머지는 흐린 회색입니다 — 색은 "여기가 위" 라는
+ * 말만 하고 물러섭니다.
  */
 function Rank({
   at,
   mark,
   title,
   sub,
+  meta,
   onPress,
 }: {
   at: number;
   mark?: React.ReactNode;
   title: string;
   sub: string;
+  /** 줄 오른쪽에 붙는 수. 몇 번 담겼는지. */
+  meta: string;
   onPress?: () => void;
 }) {
   const body = (
-    <Row gap={Spacing.md} style={styles.rank}>
-      <Body strong={at <= 3} tone={at <= 3 ? 'default' : 'muted'} style={styles.at}>
-        {at}
-      </Body>
+    <Row gap={Spacing.s3} style={styles.rank}>
+      <Text style={[styles.at, at <= 3 ? styles.atTop : null]}>{at}</Text>
       {mark}
       <Grow gap={2}>
         <Body strong numberOfLines={1}>
@@ -259,15 +264,16 @@ function Rank({
         </Body>
         <Caption tone="secondary">{sub}</Caption>
       </Grow>
+      <Caption tone="secondary">{meta}</Caption>
     </Row>
   );
 
   if (!onPress) {
-    return <Card style={styles.card}>{body}</Card>;
+    return <View>{body}</View>;
   }
   return (
-    <Press onPress={onPress} scale={0.99} accessibilityLabel={`${title} 자세히`}>
-      <Card style={styles.card}>{body}</Card>
+    <Press onPress={onPress} scale={1} accessibilityLabel={`${title} 자세히`}>
+      {body}
     </Press>
   );
 }
@@ -276,19 +282,26 @@ const styles = StyleSheet.create({
   chips: {
     flexWrap: 'wrap',
   },
-  list: {
-    gap: Spacing.xs,
-  },
-  card: {
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.lg,
-  },
   rank: {
     alignItems: 'center',
+    /* 썸네일이 드는 줄의 높이. 번호와 표식이 함께 서도 글자가 눌리지
+       않습니다. */
+    minHeight: 72,
   },
-  /* 번호가 한 자리든 두 자리든 이름이 같은 자리에서 시작해야 합니다. */
+  /*
+    순위 번호.
+
+    <p>한 자리든 두 자리든 이름이 같은 자리에서 시작해야 합니다. 번호가
+    흔들리면 목록 전체가 들쭉날쭉해 보입니다.
+  */
   at: {
-    width: 20,
+    ...Type.title3,
+    fontWeight: Weight.bold,
+    color: Palette.gray[400],
+    width: 22,
     textAlign: 'center',
+  },
+  atTop: {
+    color: Colors.accentInk,
   },
 });

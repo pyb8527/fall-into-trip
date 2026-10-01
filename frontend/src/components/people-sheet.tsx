@@ -6,21 +6,21 @@ import { api, ApiError, UNEXPECTED } from '@/api/client';
 import type { Group, Person } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
-import { Spacing } from '@/constants/theme';
+import { Colors, Gutter, Spacing, Tap } from '@/constants/theme';
 import { faceOf } from '@/constants/user-marks';
 import {
-  Badge,
+  Band,
   Body,
   BottomSheet,
   Button,
   Caption,
   Chip,
   ConfirmDialog,
-  Divider,
   ErrorNote,
+  Grow,
   Loading,
+  Mark,
   Row,
-  Split,
   Subtitle,
 } from '@/ui';
 
@@ -94,20 +94,29 @@ function Inner({
       {loading && !data ? <Loading /> : null}
       {error ? <ErrorNote message={error} onRetry={reload} /> : null}
 
+      {/* 모임 사람들 판(MatesSheet)과 같은 줄 모양입니다. 같은 것을 두 군데서
+          다른 모양으로 내면 같은 앱으로 안 읽힙니다. */}
       {data?.people.map((p) => (
-        <Split key={p.id} gap={Spacing.md}>
-          <Row gap={Spacing.xs} style={styles.who}>
-            {/* 지도에 찍히는 그림을 여기에도 답니다. 지도에서 곰을 보고
-                누구인지 알려면 어딘가에서 한 번은 짝지어져야 합니다. */}
-            <Body>{faceOf(p.mark, p.name)}</Body>
-            <Body strong>{p.name}</Body>
-            {p.id === user?.id ? <Badge label="나" tone="accent" /> : null}
-          </Row>
-          {p.owner ? <Badge label="만든 사람" tone="accent" /> : null}
-        </Split>
+        <Row key={p.id} gap={Spacing.s3} style={styles.mate}>
+          {/* 지도에 찍히는 그림을 여기에도 답니다. 지도에서 곰을 보고
+              누구인지 알려면 어딘가에서 한 번은 짝지어져야 합니다. */}
+          <Mark emoji={faceOf(p.mark, p.name)} />
+          <Grow gap={2}>
+            <Body strong numberOfLines={1}>
+              {p.name}
+            </Body>
+            {p.owner || p.id === user?.id ? (
+              <Caption tone="secondary">
+                {[p.owner ? '만든 사람' : null, p.id === user?.id ? '나' : null]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </Caption>
+            ) : null}
+          </Grow>
+        </Row>
       ))}
 
-      <Divider />
+      <Band />
 
       {groupId ? (
         <>
@@ -184,14 +193,14 @@ function MoveSection({
 
   return (
     <View style={styles.move}>
-      <Divider />
+      <Band />
       <Subtitle>어느 모임의 여행으로</Subtitle>
 
       {failed ? <ErrorNote message={failed} /> : null}
 
       {others.length > 0 ? (
         <>
-          <Row gap={Spacing.xs} style={styles.wrap}>
+          <Row gap={Spacing.s2} style={styles.wrap}>
             {others.map((g) => (
               <Chip
                 key={g.id}
@@ -248,8 +257,13 @@ const styles = StyleSheet.create({
   who: {
     flexShrink: 1,
   },
+  /* 사람 한 줄. 손가락이 닿을 높이를 채웁니다. */
+  mate: {
+    alignItems: 'center',
+    minHeight: Tap.min + Spacing.s3,
+  },
   move: {
-    gap: Spacing.sm,
+    gap: Spacing.s2,
   },
   wrap: {
     flexWrap: 'wrap',

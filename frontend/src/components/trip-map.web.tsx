@@ -162,15 +162,24 @@ function pinIcon(
     };
   }
 
-  const stroke = active ? 3.2 : 2.4;
+  const stroke = active ? 2.5 : 2;
   /*
-    상자 너비를 그림 너비에 맞춥니다. 전에는 44 짜리 상자에 40 만큼 그려 놓고
-    다른 비율로 줄여서, 번호가 물방울 한가운데에서 한 칸 옆으로 밀려 있었습니다.
+    속을 비우지 않습니다.
+
+    <p>날짜 색 방울 안에 다시 흰 동그라미를 넣고 그 안에 먹색 숫자를
+    적었습니다. 그래서 작은 핀 안에 층이 넷(흰 테두리 · 날짜색 · 흰 속 ·
+    먹색 글자)이었고, 정작 숫자가 들어갈 자리는 열일곱 픽셀이었습니다.
+
+    <p>날짜 색을 가득 칠하고 흰 숫자를 바로 얹습니다(pinLabel). 날짜 색
+    여덟은 모두 흰 글씨를 얹어도 읽히도록 고른 것입니다.
+
+    <p>상자 너비를 그림 너비에 맞춥니다. 전에는 44 짜리 상자에 40 만큼
+    그려 놓고 다른 비율로 줄여서, 번호가 물방울 한가운데에서 한 칸 옆으로
+    밀려 있었습니다.
   */
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="52" viewBox="0 0 40 52">
 <path d="M20 3C11.7 3 5 9.7 5 18c0 10.7 13.3 27 13.9 27.7a1.4 1.4 0 0 0 2.2 0C21.7 45 35 28.7 35 18 35 9.7 28.3 3 20 3z"
  fill="${color}" stroke="#FFFFFF" stroke-width="${stroke}"/>
-<circle cx="20" cy="18" r="8.6" fill="${face}"/>
 </svg>`;
   return {
     url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
@@ -202,9 +211,10 @@ function pinLabel(
   }
   return {
     text: String(place.order),
-    /* 속이 희므로 짙은 글자입니다. */
-    color: Colors.text,
-    fontSize: '11px',
+    /* 날짜 색을 가득 칠한 위에 얹으므로 흰 글자입니다. 날짜 색 여덟은 모두
+       흰 글씨를 얹어도 읽히도록 고른 것입니다. */
+    color: Colors.onDay,
+    fontSize: active ? '13px' : '12px',
     fontWeight: '700',
   };
 }
@@ -691,7 +701,9 @@ export function TripMap({
           map: map.current,
           strokeColor: line.color,
           strokeOpacity: 0.9,
-          strokeWeight: 4,
+          /* 4 였습니다. 핀을 한 눈금 줄이면서 선도 함께 줄입니다 — 선이
+             핀보다 굵으면 동선이 아니라 색 띠로 보입니다. */
+          strokeWeight: 3,
           zIndex: 2,
         }),
       );

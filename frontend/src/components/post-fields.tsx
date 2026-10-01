@@ -7,7 +7,7 @@ import { useAsync } from '@/api/use-async';
 import { OurPhoto } from '@/components/our-photo';
 import { PickError, pickAndUpload } from '@/lib/pick-photo';
 import { Spacing } from '@/constants/theme';
-import { Button, Caption, Chip, ErrorNote, Field, Row } from '@/ui';
+import { Button, Caption, Chip, ErrorNote, Field, Row, Switch } from '@/ui';
 
 /**
  * 글의 겉.
@@ -151,7 +151,7 @@ export function PostFields({
         도는 선은 생김새가 다릅니다.
       */}
       {value.coverPhotoId ? <OurPhoto id={value.coverPhotoId} height={180} /> : null}
-      <Row gap={Spacing.sm}>
+      <Row gap={Spacing.s2}>
         <Button
           label={value.coverPhotoId ? '표지 바꾸기' : '표지 고르기'}
           variant="secondary"
@@ -186,7 +186,7 @@ export function PostFields({
 
       {/* 지역은 안 골라도 올라갑니다. 다만 지역으로 거를 때 안 걸립니다. */}
       <Caption tone="secondary">어디로 다녀오셨나요?</Caption>
-      <Row gap={Spacing.xs} style={styles.wrap}>
+      <Row gap={Spacing.s2} style={styles.wrap}>
         {regionList?.regions.map((r) => (
           <Chip
             key={r}
@@ -209,7 +209,7 @@ export function PostFields({
       */}
       <Caption tone="secondary">무엇에 대한 여행인가요?</Caption>
       {value.tags.length > 0 ? (
-        <Row gap={Spacing.xs} style={styles.wrap}>
+        <Row gap={Spacing.s2} style={styles.wrap}>
           {value.tags.map((t) => (
             /* 누르면 뺍니다. 지우는 단추를 따로 두면 태그 하나가 두 칸이
                되어 여덟 개를 달면 줄이 넘칩니다. */
@@ -241,7 +241,7 @@ export function PostFields({
       {/* 이미 쓰인 것들. 누르면 그대로 달립니다 — 같은 뜻을 저마다 다르게
           적으면 어느 것으로도 다 안 걸립니다. */}
       {(tagList?.tags.length ?? 0) > 0 && value.tags.length < MAX_TAGS ? (
-        <Row gap={Spacing.xs} style={styles.wrap}>
+        <Row gap={Spacing.s2} style={styles.wrap}>
           {tagList?.tags
             .filter((t) => !value.tags.includes(t.tag))
             .slice(0, 12)
@@ -251,16 +251,24 @@ export function PostFields({
         </Row>
       ) : null}
 
-      {/* 구경만 하라고 올린 글에 훈수가 달리면 반갑지 않습니다. 열어 둘
-          때만 댓글칸이 생깁니다. */}
-      <Caption tone="secondary">댓글을 받을까요?</Caption>
-      <Row gap={Spacing.xs}>
-        <Chip label="안 받기" selected={!value.feedback} onPress={() => set('feedback', false)} />
-        <Chip label="받기" selected={value.feedback} onPress={() => set('feedback', true)} />
-      </Row>
-      <Caption tone="secondary">
-        받으면 다른 사람이 일정 전체에, 또는 장소 하나하나에 댓글을 달 수 있어요.
-      </Caption>
+      {/*
+        구경만 하라고 올린 글에 훈수가 달리면 반갑지 않습니다. 열어 둘
+        때만 댓글칸이 생깁니다.
+
+        <h3>칩 둘에서 스위치 하나로</h3>
+
+        <p>「안 받기」 와 「받기」 를 칩 둘로 늘어놓고 있었습니다. 칩은
+        <b>여럿 중 하나</b>를 고르는 모양이라, 둘뿐인 것을 칩으로 두면 지금
+        어느 쪽인지 보려고 두 칸을 다 읽어야 합니다. 켜고 끄는 것의 생김새는
+        스위치이고, 스위치는 줄 하나로 「무엇을」과 「지금 어떤지」를 함께
+        말합니다.
+      */}
+      <Switch
+        label="댓글 받기"
+        hint="받으면 다른 사람이 일정 전체에, 또는 장소 하나하나에 댓글을 달 수 있어요."
+        value={value.feedback}
+        onChange={(next) => set('feedback', next)}
+      />
 
       {/*
         어디까지 보일지.
@@ -268,8 +276,8 @@ export function PostFields({
         <p>맨 아래입니다 — 무엇을 올릴지 다 정한 다음에 정하는 것이고, 무엇보다
         <b>내놓기 직전에 한 번 더 보게</b> 하고 싶은 값입니다.
       */}
-      <Caption tone="secondary">누가 볼 수 있나요?</Caption>
-      <Row gap={Spacing.xs} style={styles.wrap}>
+      <Caption strong tone="secondary">누가 볼 수 있나요?</Caption>
+      <Row gap={Spacing.s2} style={styles.wrap}>
         {SEEN.map((s) => (
           <Chip
             key={s.value}

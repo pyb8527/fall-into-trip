@@ -5,22 +5,26 @@ import { api, API_BASE, ApiError, UNEXPECTED } from '@/api/client';
 import type { InviteRow, Mate, NewInvite } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
-import { Spacing } from '@/constants/theme';
+import { Colors, Gutter, Radius, Spacing, Tap } from '@/constants/theme';
 import { faceOf } from '@/constants/user-marks';
 import { shareLink } from '@/lib/share';
 import {
   Badge,
+  Band,
   Body,
   BottomSheet,
   Button,
   Caption,
   Chip,
   ConfirmDialog,
-  Divider,
   Empty,
   ErrorNote,
+  Grow,
+  Icon,
   IconButton,
   Loading,
+  Mark,
+  Press,
   Row,
   Split,
   Stepper,
@@ -118,24 +122,42 @@ function Inner({
     <>
       {actionError ? <ErrorNote message={actionError} /> : null}
 
+      {/*
+        사람 한 줄.
+
+        <p>얼굴을 이름 옆 글자 사이에 그냥 두고 있었습니다. 이모지는 글꼴이
+        제 높이를 갖고 있어 기기마다 다르게 그려지고, 그러면 이름 줄이
+        사람마다 들쭉날쭉합니다. 동그라미에 담으면 어느 줄에서나 같은
+        자리에 섭니다.
+      */}
       {mates.map((m) => (
-        <Split key={m.id} gap={Spacing.md}>
-          <View style={styles.who}>
-            <Row gap={Spacing.xs}>
+        <Split key={m.id} gap={Spacing.s3} style={styles.mate}>
+          <Grow>
+            <Row gap={Spacing.s3}>
               {/* 지도에 찍히는 그림을 여기에도 답니다. 지도에서 곰을 보고
                   누구인지 알려면 어딘가에서 한 번은 짝지어져야 합니다. */}
-              <Body>{faceOf(m.mark, m.name)}</Body>
-              <Body strong>{m.name}</Body>
-              {m.id === user?.id ? <Badge label="나" tone="accent" /> : null}
+              <Mark emoji={faceOf(m.mark, m.name)} />
+              <Grow gap={2}>
+                <Body strong numberOfLines={1}>
+                  {m.name}
+                </Body>
+                {m.owner || m.id === user?.id ? (
+                  <Caption tone="secondary">
+                    {[m.owner ? '만든 사람' : null, m.id === user?.id ? '나' : null]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </Caption>
+                ) : null}
+              </Grow>
             </Row>
-          </View>
+          </Grow>
 
-          <Row gap={Spacing.xs}>
-            {m.owner ? <Badge label="만든 사람" tone="accent" /> : null}
+          <Row gap={Spacing.s2}>
             {amOwner && !m.owner ? (
               <IconButton
                 name="shuffle"
                 label={`${m.name} 님에게 모임 넘기기`}
+                bare
                 disabled={busy}
                 onPress={() => setHanding(m)}
               />
@@ -145,6 +167,7 @@ function Inner({
                 name="user-minus"
                 label={`${m.name} 내보내기`}
                 tone="danger"
+                bare
                 disabled={busy}
                 onPress={() => setDropping(m)}
               />
@@ -157,7 +180,7 @@ function Inner({
         <Empty message="아직 혼자예요. 링크를 만들어 불러 보세요." />
       ) : null}
 
-      <Divider />
+      <Band />
 
       {/* 부르는 것은 멤버도 합니다. 주인이 안 들어온 날에도 사람을 부를 수
           있어야 합니다. */}
@@ -170,12 +193,18 @@ function Inner({
         </Caption>
       ) : (
         <>
-          <Divider />
-          <Button
-            label="이 모임에서 나가기"
-            variant="secondary"
+          {/* 나가는 일은 되돌리기 어렵습니다(링크를 새로 받아야 합니다).
+              그렇다고 꽉 찬 단추로 두면 사람 목록 아래에서 가장 눈에 띄는
+              것이 나가기가 됩니다 — 글자만 빨간 줄로 둡니다. */}
+          <Band />
+          <Press
             onPress={() => setLeaving(true)}
-          />
+            scale={1}
+            accessibilityLabel="이 모임에서 나가기"
+            style={styles.leave}>
+            <Icon name="log-out" size={20} tone="danger" />
+            <Body tone="danger">이 모임에서 나가기</Body>
+          </Press>
         </>
       )}
 
@@ -309,7 +338,7 @@ function InviteSection({ groupId }: { groupId: string }) {
     <>
       <Subtitle>부르는 링크</Subtitle>
 
-      <Row gap={Spacing.xs}>
+      <Row gap={Spacing.s2}>
         <Chip label="기한 두기" selected={dated} onPress={() => setDated(true)} />
         <Chip label="기한 없음" selected={!dated} onPress={() => setDated(false)} />
       </Row>
@@ -362,7 +391,7 @@ function InviteSection({ groupId }: { groupId: string }) {
 
       {data && data.invites.length > 0 ? (
         <>
-          <Divider />
+          <Band />
           <Caption tone="secondary">만들어 둔 링크</Caption>
           {data.invites.map((i) => (
             <InviteRowView key={i.id} invite={i} onChanged={reload} />
@@ -398,7 +427,7 @@ function InviteRowView({ invite, onChanged }: { invite: InviteRow; onChanged: ()
 
   return (
     <View style={styles.invite}>
-      <Split gap={Spacing.md}>
+      <Split gap={Spacing.s3}>
         <View style={styles.who}>
           <Caption strong>
             {invite.usedCount}/{invite.maxUses}명
@@ -408,7 +437,7 @@ function InviteRowView({ invite, onChanged }: { invite: InviteRow; onChanged: ()
           </Caption>
         </View>
 
-        <Row gap={Spacing.xs}>
+        <Row gap={Spacing.s2}>
           {/*
             왜 못 쓰게 되었는지를 가려 말합니다.
 
@@ -455,14 +484,34 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     gap: 2,
   },
+  /* 사람 한 줄. 손가락이 닿을 높이를 채웁니다. */
+  mate: {
+    minHeight: Tap.min + Spacing.s3,
+  },
+  /* 되돌리기 어려운 일. 단추가 아니라 줄입니다. */
+  leave: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.s3,
+    minHeight: Tap.min,
+  },
+  /*
+    만들어 둔 링크.
+
+    <p>눌러서 들어가는 물건이 아니라 <b>적혀 있는 것</b>이라 흰 카드가
+    아니고 회색 면입니다.
+  */
   made: {
-    gap: Spacing.sm,
+    gap: Spacing.s2,
+    backgroundColor: Colors.fill,
+    borderRadius: Radius.r3,
+    padding: Spacing.s4,
   },
   link: {
     /* 주소는 길고 띄어쓰기가 없어 그냥 두면 한 줄로 삐져나갑니다. */
     flexShrink: 1,
   },
   invite: {
-    gap: Spacing.xs,
+    gap: Spacing.s2,
   },
 });

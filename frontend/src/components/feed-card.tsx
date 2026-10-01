@@ -1,13 +1,13 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { api, ApiError, UNEXPECTED } from '@/api/client';
 import type { FeedPost } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
 import { PhotoStrip } from '@/components/photo-strip';
-import { Spacing } from '@/constants/theme';
+import { Colors, Radius, Spacing, Type, Weight } from '@/constants/theme';
 import { faceOf } from '@/constants/user-marks';
 import {
   Body,
@@ -69,16 +69,24 @@ export function FeedCard({
 
   return (
     <Card>
-      <Split gap={Spacing.sm}>
-        <Row gap={Spacing.xs} style={styles.who}>
-          <Body>{faceOf(post.authorMark, post.authorName)}</Body>
-          <Body strong>{post.authorName}</Body>
-          <Caption tone="muted">{ago(post.createdAt)}</Caption>
+      <Split gap={Spacing.s2}>
+        {/* 얼굴은 동그라미에 담습니다. 이모지를 글자 사이에 그냥 두면
+            기기마다 다른 높이로 그려져 이름 줄이 들쭉날쭉합니다. */}
+        <Row gap={Spacing.s3} style={styles.who}>
+          <View style={styles.face}>
+            <Text style={styles.faceEmoji}>{faceOf(post.authorMark, post.authorName)}</Text>
+          </View>
+          <View style={styles.name}>
+            <Body strong numberOfLines={1}>
+              {post.authorName}
+            </Body>
+            <Caption tone="muted">{ago(post.createdAt)}</Caption>
+          </View>
         </Row>
         {/* 지우기는 글쓴이와 모임 주인이 합니다. 주인인지는 서버만 아는데,
             눌러 보고 알게 하는 것보다 눌러서 막히는 편이 낫습니다 — 치울
             길이 아예 안 보이면 치울 수 있다는 것도 모릅니다. */}
-        <Row gap={Spacing.xs}>
+        <Row gap={Spacing.s2}>
           {post.mine && onEdit ? (
             <IconButton name="settings" label="이 글 고치기" bare onPress={() => onEdit(post)} />
           ) : null}
@@ -96,12 +104,20 @@ export function FeedCard({
 
       {post.text ? <Body>{post.text}</Body> : null}
 
+      {/*
+        꼬리표.
+
+        <p>{@code tone="accent"} 로 적고 있었습니다. 그런데 이 앱에서 글자의
+        accent 는 <b>검정</b>이라, "#온천" 이 본문과 똑같은 검정 글씨였습니다 —
+        누를 수 있는 것처럼 보이면서 누를 수도 없었습니다. 작은 회색 면에
+        담아 「붙어 있는 이름표」 로 둡니다.
+      */}
       {post.tags.length > 0 ? (
-        <Row gap={Spacing.xs} style={styles.wrap}>
+        <Row gap={Spacing.s2} style={styles.wrap}>
           {post.tags.map((t) => (
-            <Caption key={t} tone="accent">
-              #{t}
-            </Caption>
+            <View key={t} style={styles.tag}>
+              <Text style={styles.tagLabel}>#{t}</Text>
+            </View>
           ))}
         </Row>
       ) : null}
@@ -124,7 +140,7 @@ export function FeedCard({
         onPress={() => setOpen(!open)}
         accessibilityLabel={open ? '댓글 접기' : '댓글 보기'}
         style={styles.talk}>
-        <Row gap={Spacing.xs}>
+        <Row gap={Spacing.s2}>
           <Icon name="message-square" size={14} tone="muted" />
           <Caption tone="secondary">
             {post.commentCount > 0 ? `댓글 ${post.commentCount}` : '댓글 남기기'}
@@ -214,9 +230,9 @@ function Talk({ postId, onChanged }: { postId: string; onChanged: () => void }) 
       {failed ? <ErrorNote message={failed} /> : null}
 
       {data?.comments.map((c) => (
-        <Split key={c.id} gap={Spacing.sm}>
+        <Split key={c.id} gap={Spacing.s2}>
           <View style={styles.said}>
-            <Row gap={Spacing.xs}>
+            <Row gap={Spacing.s2}>
               <Caption strong>{c.authorName}</Caption>
               <Caption tone="muted">{ago(c.createdAt)}</Caption>
             </Row>
@@ -228,7 +244,7 @@ function Talk({ postId, onChanged }: { postId: string; onChanged: () => void }) 
         </Split>
       ))}
 
-      <Row gap={Spacing.xs}>
+      <Row gap={Spacing.s2}>
         <View style={styles.grow}>
           <Field
             label="한마디"
@@ -277,13 +293,46 @@ const styles = StyleSheet.create({
   who: {
     flexShrink: 1,
   },
+  /* 글쓴이 얼굴. 댓글 줄의 32보다 한 단 큽니다 — 글 한 편의 주인입니다. */
+  face: {
+    width: 40,
+    height: 40,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.fill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  faceEmoji: {
+    fontSize: 20,
+    /* 이모지는 글꼴이 제 높이를 갖고 있어, 줄 높이를 두면 아래로 처집니다. */
+    lineHeight: undefined,
+  },
+  name: {
+    flexShrink: 1,
+    gap: 2,
+  },
   wrap: {
     flexWrap: 'wrap',
+  },
+  /* 못 누르는 꼬리표. 칩(키 34, 둥금, 테두리)과 생김새를 가릅니다. */
+  tag: {
+    height: 22,
+    borderRadius: Radius.r1,
+    paddingHorizontal: 6,
+    backgroundColor: Colors.fill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tagLabel: {
+    ...Type.micro,
+    fontSize: 12,
+    fontWeight: Weight.medium,
+    color: Colors.textSecondary,
   },
   where: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.xs,
+    gap: Spacing.s1,
     backgroundColor: 'transparent',
     paddingVertical: 2,
   },
@@ -292,10 +341,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: 'transparent',
-    paddingVertical: Spacing.xs,
+    paddingVertical: Spacing.s1,
   },
   comments: {
-    gap: Spacing.sm,
+    gap: Spacing.s2,
   },
   said: {
     flexShrink: 1,

@@ -3,12 +3,20 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { api, ApiError, UNEXPECTED } from '@/api/client';
 import { OurPhoto } from '@/components/our-photo';
-import { Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 import { PickError, pickAndUpload } from '@/lib/pick-photo';
 import { BottomSheet, Button, Caption, ErrorNote, Icon } from '@/ui';
 
 /** 서버와 같은 수입니다(VisitService.MAX_PHOTOS). */
 const MAX_PHOTOS = 5;
+
+/**
+ * 그리드 한 칸의 한 변.
+ *
+ * <p>못 박아 둡니다. 비율로 두면 {@link OurPhoto} 가 높이를 숫자로 받아야
+ * 해서 네모가 안 되고, 재서 쓰면 판이 열릴 때 한 번 깜빡입니다.
+ */
+const CELL = 96;
 
 /**
  * 다니면서 볼 사진.
@@ -117,17 +125,30 @@ export function RefSheet({
       </Caption>
       <Caption tone="muted">여행기에는 안 실려요. 여행 피드에서 꺼내 볼 수 있어요.</Caption>
 
-      {photoIds.map((id, at) => (
-        <View key={id} style={styles.shot}>
-          <OurPhoto id={id} height={200} />
-          <Pressable
-            style={styles.drop}
-            onPress={() => setPhotoIds((was) => was.filter((one) => one !== id))}
-            accessibilityLabel={`${at + 1}번째 사진 빼기`}>
-            <Icon name="x" size={18} tone="inverse" />
-          </Pressable>
+      {/*
+        그리드 세 칸.
+
+        <p>한 장을 200 높이로 세로로 쌓고 있었습니다. 다섯 장이면 1000픽셀이라
+        판을 끝까지 올려도 다 안 보이고, 무엇보다 <b>넣어 둔 것을 확인하는</b>
+        자리인데 확인하려면 한참 굴려야 했습니다. 챙겨 둔 사진은 다니면서
+        꺼내 볼 것이지 여기서 감상할 것이 아닙니다 — 작은 네모로 늘어놓으면
+        무엇이 몇 장 들었는지가 한눈에 보입니다.
+      */}
+      {photoIds.length > 0 ? (
+        <View style={styles.grid}>
+          {photoIds.map((id, at) => (
+            <View key={id} style={styles.shot}>
+              <OurPhoto id={id} width={CELL} height={CELL} />
+              <Pressable
+                style={styles.drop}
+                onPress={() => setPhotoIds((was) => was.filter((one) => one !== id))}
+                accessibilityLabel={`${at + 1}번째 사진 빼기`}>
+                <Icon name="x" size={18} tone="inverse" />
+              </Pressable>
+            </View>
+          ))}
         </View>
-      ))}
+      ) : null}
 
       {photoIds.length < MAX_PHOTOS ? (
         <Button
@@ -150,18 +171,24 @@ export function RefSheet({
 }
 
 const styles = StyleSheet.create({
+  /* 세 칸씩. 가장 좁은 폰(360)에서도 판 안쪽 여백 20을 떼고 셋이 듭니다. */
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.s2,
+  },
   shot: {
     position: 'relative',
   },
   drop: {
     position: 'absolute',
-    top: Spacing.xs,
-    right: Spacing.xs,
-    width: 32,
-    height: 32,
+    top: Spacing.s1,
+    right: Spacing.s1,
+    width: 28,
+    height: 28,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 16,
+    borderRadius: Radius.full,
     /* 사진 위에 얹히므로 바탕을 깝니다. */
     backgroundColor: 'rgba(0, 0, 0, 0.55)',
   },

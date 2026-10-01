@@ -74,7 +74,7 @@ export function TripThumb({
 const styles = StyleSheet.create({
   frame: {
     width: '100%',
-    borderRadius: Radius.md,
+    borderRadius: Radius.r3,
     overflow: 'hidden',
     backgroundColor: Colors.fill,
   },

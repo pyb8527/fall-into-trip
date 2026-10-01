@@ -123,11 +123,11 @@ export function PhotoStrip({
 const styles = StyleSheet.create({
   count: {
     position: 'absolute',
-    top: Spacing.xs,
-    right: Spacing.xs,
-    paddingHorizontal: Spacing.xs,
+    top: Spacing.s2,
+    right: Spacing.s2,
+    paddingHorizontal: Spacing.s2,
     paddingVertical: 2,
-    borderRadius: Radius.sm,
+    borderRadius: Radius.r1,
     /* 사진 위에 얹습니다. 밝은 하늘 위에 흰 글씨를 놓으면 안 보여서
        바탕을 깝니다. 판의 색 하나로는 안 됩니다 — 아래가 사진이라
        비쳐야 하고, 그래서 반투명입니다. */

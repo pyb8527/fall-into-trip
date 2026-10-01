@@ -1,33 +1,29 @@
-import { useRouter } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { useNavigation, useRouter } from 'expo-router';
+import { StyleSheet, Text, View, type TextStyle } from 'react-native';
 
 import { api } from '@/api/client';
 import type { Maybe } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { TripMark } from '@/components/trip-mark';
-import { Spacing } from '@/constants/theme';
+import { Colors, Spacing, Tabular, Type, Weight } from '@/constants/theme';
 import { formatSpan } from '@/lib/countdown';
 import { money } from '@/lib/money';
 import {
-  Body,
   Caption,
-  Card,
-  Divider,
   Empty,
   ErrorNote,
-  Grow,
+  IconButton,
+  ListRow,
   Loading,
-  Press,
+  Row,
   Screen,
-  Split,
-  Title,
 } from '@/ui';
-import { AppTabs } from '@/ui/tab-bar';
 
 /** 한 여행에서 한 통화로 쓴 것. */
 type Sum = { currency: string; decimals: number; total: number; items: number };
 
-type Row = {
+/** 목록의 한 줄 — 여행 하나와 그 여행에서 쓴 돈. */
+type TripRow = {
   id: string;
   title: string;
   theme: Maybe<string>;
@@ -51,6 +47,15 @@ type Row = {
  * 목록은 며칠인지 몇 곳인지를 말하고, 이쪽은 얼마를 썼는지 몇 건을 적었는지를
  * 말합니다. 화면이 갈리면 띠도 제자리를 찾습니다.
  *
+ * <h3>아래 갈래 띠를 걷었습니다</h3>
+ *
+ * <p>띠에는 이 화면의 칸이 없습니다. 그래서 띠를 달아 두면 <b>어느 칸에도
+ * 불이 안 켜진</b> 띠가 서 있었습니다 — 띠는 "지금 어디" 를 말하는 것인데
+ * 아무 말도 안 하면서 자리만 먹습니다.
+ *
+ * <p>들어오는 길은 「내 여행」의 모아 보기 줄이고, 나가는 길은 위 막대의
+ * 화살표입니다.
+ *
  * <h3>한 건도 안 적은 여행도 냅니다</h3>
  *
  * <p>오히려 그쪽이 "여기 적어야 하는데" 를 떠올리게 하는 자리입니다. 목록에서
@@ -63,7 +68,8 @@ type Row = {
  */
 export default function MoneyList() {
   const router = useRouter();
-  const { data, error, loading, reload } = useAsync<{ trips: Row[] }>(
+  const navigation = useNavigation();
+  const { data, error, loading, reload } = useAsync<{ trips: TripRow[] }>(
     (signal) => api.get('/api/expenses/summary', signal),
     [],
   );
@@ -74,89 +80,106 @@ export default function MoneyList() {
   const sorted = [...rows].sort((a, b) => b.items - a.items);
 
   return (
-    <Screen safeTop tabs={<AppTabs />}>
-      {/* 제목과 안내가 회색 바탕에 그대로 있었습니다. 판 위로 올립니다 —
-          화면에서 가장 먼저 읽는 글자입니다. */}
-      <Card style={styles.head}>
-        <Title>가계부</Title>
-        <Caption tone="secondary">
-          여행에서 서로 껄끄러워지는 자리는 돈이에요. 쓴 김에 적어 두면 돌아와서 편해요.
-        </Caption>
-      </Card>
+    <Screen
+      safeTop
+      /*
+        제목을 막대에 둡니다.
 
+        <p>본문 맨 위에 큰 제목으로 있었습니다. 탭 루트 화면은 그래도 되는데
+        이 화면은 「내 여행」 에서 들어오는 곳이라, 돌아갈 화살표가 서야 합니다.
+        화살표와 제목이 같은 줄에 있으면 그 줄이 곧 "여기가 어디이고 어디로
+        나가는지" 입니다.
+      */
+      header={
+        <Row gap={Spacing.s1}>
+          <IconButton
+            name="chevron-left"
+            label="뒤로"
+            bare
+            onPress={() =>
+              navigation.canGoBack() ? navigation.goBack() : router.replace('/(app)/trips')
+            }
+          />
+          <Text style={styles.barTitle}>가계부</Text>
+        </Row>
+      }>
       {loading && !data ? <Loading /> : null}
       {error ? <ErrorNote message={error} onRetry={reload} /> : null}
 
+      {/*
+        안내를 빈자리로 옮겼습니다.
+
+        <p>"쓴 김에 적어 두면 돌아와서 편해요" 를 목록 위 카드에 늘 띄워
+        두었습니다. 그런데 이미 적고 있는 사람은 그 말을 읽을 일이 없고,
+        매번 여는 화면에서 같은 설명이 목록을 한 줄씩 아래로 밀었습니다.
+
+        <p>설명이 필요한 사람은 아직 아무것도 없는 사람입니다. 그 자리에서만
+        말합니다.
+      */}
       {data && rows.length === 0 ? (
         <Empty message="아직 여행이 없어요. 여행을 하나 만들면 그 가계부가 여기 서요." />
       ) : null}
 
-      {sorted.length > 0 ? (
-        <Card style={styles.list}>
-          {sorted.map((trip, i) => (
-            <View key={trip.id}>
-              {i > 0 ? <Divider /> : null}
-              <Press
-                onPress={() => router.push({ pathname: '/money/[id]', params: { id: trip.id } })}
-                scale={0.995}
-                accessibilityLabel={`${trip.title} 가계부 열기`}
-                style={styles.row}>
-                <Split align="center">
-                  <TripMark theme={trip.theme} emoji={trip.emoji} />
-                  <Grow gap={2} style={styles.text}>
-                    <Body small strong numberOfLines={1}>
-                      {trip.title}
-                    </Body>
-                    <Caption tone="muted">
-                      {[formatSpan(trip.startIso, trip.endIso), `${trip.items}건`]
-                        .filter(Boolean)
-                        .join(' · ')}
-                    </Caption>
-                  </Grow>
-                  {/* 통화마다 한 줄. 대개 하나고, 두 나라를 도는 여행에서만
-                      둘이 됩니다. */}
-                  <View style={styles.sums}>
-                    {trip.sums.length === 0 ? (
-                      <Caption tone="muted">아직 없음</Caption>
-                    ) : (
-                      trip.sums.map((sum) => (
-                        <Body key={sum.currency} small strong>
-                          {money(sum.total, sum.currency, sum.decimals)}
-                        </Body>
-                      ))
-                    )}
-                  </View>
-                </Split>
-              </Press>
+      {sorted.map((trip) => (
+        <ListRow
+          key={trip.id}
+          left={<TripMark theme={trip.theme} emoji={trip.emoji} />}
+          title={trip.title}
+          subtitle={[formatSpan(trip.startIso, trip.endIso), `${trip.items}건`]
+            .filter(Boolean)
+            .join(' · ')}
+          /* 통화마다 한 줄. 대개 하나고, 두 나라를 도는 여행에서만 둘이 됩니다. */
+          right={
+            <View style={styles.sums}>
+              {trip.sums.length === 0 ? (
+                <Caption tone="muted">아직 없음</Caption>
+              ) : (
+                trip.sums.map((sum) => (
+                  <Text key={sum.currency} style={styles.sum}>
+                    {money(sum.total, sum.currency, sum.decimals)}
+                  </Text>
+                ))
+              )}
             </View>
-          ))}
-        </Card>
-      ) : null}
+          }
+          onPress={() => router.push({ pathname: '/money/[id]', params: { id: trip.id } })}
+        />
+      ))}
     </Screen>
   );
 }
 
+/*
+  고정폭 숫자.
+
+  <p>토큰이 값을 읽기전용 배열로 적어 두어서, 글자 모양으로 그대로 넘기면
+  타입이 안 맞습니다. 한 번 풀어 주고 금액 글자들이 같은 것을 씁니다 —
+  값은 토큰에 하나만 둡니다.
+*/
+const tabular: TextStyle = { fontVariant: [...Tabular.fontVariant] };
+
 const styles = StyleSheet.create({
-  head: {
-    gap: Spacing.xs,
+  /* 막대 제목. 화살표 바로 옆, 왼쪽에 붙습니다. */
+  barTitle: {
+    ...Type.title3,
+    fontWeight: Weight.semibold,
+    color: Colors.text,
   },
-  /* 줄이 제 여백을 가집니다. 카드가 위아래 여백을 가지면 두 겹이 되고,
-     머리카락 선이 카드 끝까지 안 닿습니다. */
-  list: {
-    paddingVertical: Spacing.xs,
-    paddingHorizontal: Spacing.lg,
-    gap: 0,
-  },
-  row: {
-    paddingVertical: Spacing.md,
-  },
-  text: {
-    paddingLeft: Spacing.sm,
-  },
-  /* 금액은 오른쪽 끝에. 자릿수가 다른 숫자들이 왼쪽에서 시작하면 위아래로
-     견줄 수가 없습니다. */
+  /*
+    금액은 오른쪽 끝에.
+
+    <p>자릿수가 다른 숫자들이 왼쪽에서 시작하면 위아래로 견줄 수가 없습니다.
+    고정폭 숫자(tabular-nums)까지 함께 줘야 1 과 8 의 폭이 같아져 자리가
+    맞습니다.
+  */
   sums: {
     alignItems: 'flex-end',
     gap: 1,
+  },
+  sum: {
+    ...Type.headline,
+    ...tabular,
+    fontWeight: Weight.semibold,
+    color: Colors.text,
   },
 });

@@ -45,7 +45,7 @@ export function SortBar({
     return null;
   }
   return (
-    <Row gap={Spacing.xs} style={styles.bar}>
+    <Row gap={Spacing.s2} style={styles.bar}>
       {options.map((o) => (
         <Chip
           key={o.value}

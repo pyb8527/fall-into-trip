@@ -2,7 +2,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { PathTitle } from '@/ui/nav';
 import { AppTabs } from '@/ui/tab-bar';
 import { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { api, ApiError, query, UNEXPECTED } from '@/api/client';
@@ -25,18 +25,26 @@ import { PostMap } from '@/components/post-map';
 import { SignUpGate } from '@/components/signup-gate';
 import { TripMap } from '@/components/trip-map';
 import { iconOf } from '@/constants/place-icons';
-import { Colors, Radius, Spacing, TabDock, dayColor } from '@/constants/theme';
+import {
+  Colors,
+  Gutter,
+  Radius,
+  Spacing,
+  TabDock,
+  Tap,
+  Type,
+  dayColor,
+} from '@/constants/theme';
 import { takeComeback, type Comeback, type ComebackDo } from '@/lib/comeback';
 import {
   Badge,
+  Band,
   Body,
   BottomSheet,
   Button,
   Caption,
-  Card,
   Chip,
   ConfirmDialog,
-  Divider,
   DragSheet,
   ErrorNote,
   Icon,
@@ -116,7 +124,7 @@ export default function Post() {
   const [covered, setCovered] = useState(0);
   const [headTall, setHeadTall] = useState(0);
   const insets = useSafeAreaInsets();
-  const dock = Math.max(insets.bottom, Spacing.sm) + TabDock;
+  const dock = Math.max(insets.bottom, Spacing.s2) + TabDock;
 
   /** 댓글 판을 열어 둔 장소. */
   const [at, setAt] = useState<{ dayIndex: number; placeIndex: number } | null>(null);
@@ -449,7 +457,7 @@ export default function Post() {
         lift={dock}
         /* 내렸을 때 제목 줄과 단추까지는 보여야 합니다. 재서 그만큼 알려
            줍니다 — 화면 높이로 어림하면 작은 폰에서 단추가 반쯤 잘립니다. */
-        revealAtLow={headTall > 0 ? headTall + Spacing.lg : undefined}
+        revealAtLow={headTall > 0 ? headTall + Spacing.s4 : undefined}
         onHeightChange={setCovered}
         peek={
           <View
@@ -475,21 +483,35 @@ export default function Post() {
                 .filter(Boolean)
                 .join(' · ')}
             </Caption>
-            {/* 판을 내려 두어도 이 둘은 누를 수 있어야 합니다. 이 화면에
-                들어온 까닭이 대개 둘 중 하나입니다. */}
-            <Row gap={Spacing.sm}>
-              <Button
-                label={`${data.liked ? '♥' : '♡'} ${data.likeCount}`}
-                variant="secondary"
-                compact
+            {/*
+              판을 내려 두어도 이 둘은 누를 수 있어야 합니다. 이 화면에
+              들어온 까닭이 대개 둘 중 하나입니다.
+
+              <h3>하나는 숫자, 하나는 동작</h3>
+
+              <p>둘을 같은 알약 단추로 두었습니다. 그래서 하트가 「누르는
+              동작」 으로만 보이고 <b>몇 사람이 눌렀는지</b>는 그 안에 끼인
+              숫자였습니다. 하트는 네모 한 칸으로 떼어 내 숫자를 아래에
+              적고, 남은 폭은 전부 주 동작이 먹습니다 — 왼쪽은 상태, 오른쪽은
+              할 일입니다.
+            */}
+            <Row gap={Spacing.s2}>
+              <Press
                 onPress={toggleLike}
-              />
+                scale={0.96}
+                accessibilityLabel={data.liked ? '하트 빼기' : '하트 누르기'}
+                accessibilityState={{ selected: data.liked }}
+                style={styles.heartBox}>
+                <Text style={[styles.heartMark, data.liked ? styles.heartOn : null]}>
+                  {data.liked ? '♥' : '♡'}
+                </Text>
+                <Text style={styles.heartCount}>{data.likeCount}</Text>
+              </Press>
               <View style={styles.grow}>
                 {/* 이 화면에 들어온 까닭입니다. 옅은 코랄로 두었더니 흰 판
                     위에서 못 누르는 단추처럼 보였습니다. */}
                 <Button
                   label="내 여행으로 가져오기"
-                  compact
                   strong
                   onPress={() => (user ? setCopying(true) : needLogin('copy'))}
                 />
@@ -529,6 +551,9 @@ export default function Post() {
       */}
       {data.itinerary.days.map((day, i) => (
         <View key={`day-${i}`} style={styles.lane}>
+        {/* 날과 날 사이를 띠가 가릅니다. 날마다 흰 판을 두르고 있었는데,
+            판 바탕과 시트 바탕이 둘 다 흰색이라 가르는 일을 못 했습니다. */}
+        {i > 0 ? <Band /> : null}
         <DayBlock
           key={i}
           day={day}
@@ -581,7 +606,7 @@ export default function Post() {
       */}
       {data.feedback ? (
         <>
-          <Divider />
+          <Band />
           <CommentList
             postId={id}
             itinerary={data.itinerary}
@@ -594,30 +619,54 @@ export default function Post() {
         </>
       ) : null}
 
-      <Divider />
+      {/*
+        글을 다루는 일들.
 
-      <Row gap={Spacing.sm}>
-        {data.mine ? (
-          <>
-            {/*
-              고치기가 내리기보다 앞입니다.
+        <h3>빨간 단추를 줄로 낮췄습니다</h3>
 
-              <p>내리는 길만 있었습니다. 그런데 제목을 잘못 적었거나 태그를
-              빼먹은 것 때문에 내리면 그동안 받은 추천과 조회수와 댓글이 함께
-              사라집니다 — 그 값이 너무 커서 대개 틀린 채로 둡니다.
-            */}
-            <Button label="고치기" variant="secondary" compact onPress={() => setEditing(true)} />
-            <Button label="내리기" variant="danger" compact onPress={() => setRemoving(true)} />
-          </>
-        ) : (
-          <Button
-            label="신고"
-            variant="ghost"
-            compact
-            onPress={() => (user ? setReporting(true) : needLogin('report'))}
-          />
-        )}
-      </Row>
+        <p>「내리기」 가 꽉 채운 빨간 단추였습니다. 그러면 읽기를 끝낸
+        자리에서 가장 눈에 띄는 것이 <b>가장 하면 안 되는 일</b>입니다.
+        채운 빨강은 「정말 내릴까요?」 를 묻는 다이얼로그의 확인 단추에만
+        씁니다 — 여기서는 글자만 빨간 줄입니다.
+      */}
+      <Band />
+
+      {data.mine ? (
+        <>
+          {/*
+            고치기가 내리기보다 앞입니다.
+
+            <p>내리는 길만 있었습니다. 그런데 제목을 잘못 적었거나 태그를
+            빼먹은 것 때문에 내리면 그동안 받은 추천과 조회수와 댓글이 함께
+            사라집니다 — 그 값이 너무 커서 대개 틀린 채로 둡니다.
+          */}
+          <Press
+            onPress={() => setEditing(true)}
+            scale={1}
+            accessibilityLabel="글 고치기"
+            style={styles.manage}>
+            <Icon name="edit-2" size={20} tone="muted" />
+            <Body>고치기</Body>
+          </Press>
+          <Press
+            onPress={() => setRemoving(true)}
+            scale={1}
+            accessibilityLabel="글 내리기"
+            style={styles.manage}>
+            <Icon name="trash-2" size={20} tone="danger" />
+            <Body tone="danger">내리기</Body>
+          </Press>
+        </>
+      ) : (
+        <Press
+          onPress={() => (user ? setReporting(true) : needLogin('report'))}
+          scale={1}
+          accessibilityLabel="이 글 신고하기"
+          style={styles.manage}>
+          <Icon name="flag" size={20} tone="muted" />
+          <Body tone="secondary">신고</Body>
+        </Press>
+      )}
       </DragSheet>
 
       {/* 아래 띠. 이 화면은 Screen 이 아니라 지도 위에 판을 얹는 얼개라
@@ -626,7 +675,7 @@ export default function Post() {
 
       {/* 떠 있는 띠도 직접 얹습니다. 아래 띠보다 위에 서야 가려지지
           않습니다. */}
-      <View pointerEvents="box-none" style={[styles.snackRail, { bottom: dock + Spacing.md }]}>
+      <View pointerEvents="box-none" style={[styles.snackRail, { bottom: dock + Spacing.s3 }]}>
         <Snack undo={undo} onHide={hideUndo} />
       </View>
 
@@ -845,14 +894,14 @@ function DayBlock({
   const color = day.color || dayColor(index);
 
   return (
-    <Card>
+    <View style={styles.day}>
       {/* 제목 줄 전체가 여닫는 자리입니다. 화살표만 눌러야 하면 손끝으로는
           맞히기 어렵습니다. */}
       <Press
         onPress={onToggle}
         scale={0.995}
         accessibilityLabel={`${day.shortName || day.label || `${index + 1}일차`} ${open ? '접기' : '펼치기'}`}>
-        <Row gap={Spacing.md} style={styles.dayHead}>
+        <Row gap={Spacing.s3} style={styles.dayHead}>
           <View style={[styles.dot, { backgroundColor: color }]} />
           <Subtitle>{day.shortName || day.label || `${index + 1}일차`}</Subtitle>
           <Badge label={`${day.places.length}곳`} tone="muted" />
@@ -898,7 +947,7 @@ function DayBlock({
             </Body>
           </View>
           <View style={styles.placeText}>
-            <Row gap={Spacing.sm}>
+            <Row gap={Spacing.s2}>
               {place.time ? (
                 <Body small strong tone="accent">
                   {place.time}
@@ -918,7 +967,7 @@ function DayBlock({
             ) : null}
 
             {place.cat || place.cost ? (
-              <Row gap={Spacing.sm}>
+              <Row gap={Spacing.s2}>
                 {place.cat ? <Caption>{place.cat}</Caption> : null}
                 {place.cost ? <Caption>{place.cost}</Caption> : null}
               </Row>
@@ -1059,7 +1108,7 @@ function DayBlock({
           ) : null}
         </View>
           ))}
-    </Card>
+    </View>
   );
 }
 
@@ -1229,7 +1278,7 @@ function CopySheet({
           <Body small strong>
             어느 날을 가져올까요?
           </Body>
-          <Row gap={Spacing.xs} style={styles.wrap}>
+          <Row gap={Spacing.s1} style={styles.wrap}>
             <Chip
               label="전부"
               selected={pickedDays.length === 0}
@@ -1284,7 +1333,7 @@ const styles = StyleSheet.create({
   /* 하루와 그날의 글을 한 묶음으로. 사이가 벌어지면 그 글이 어느 날 것인지
      안 보입니다. */
   lane: {
-    gap: Spacing.sm,
+    gap: Spacing.s2,
   },
   /* 지도가 바탕입니다. 판이 아직 안 깔린 자리는 지도 색으로 둡니다 —
      흰 판이 비치면 판이 두 겹인 것처럼 보입니다. */
@@ -1315,21 +1364,69 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.abyss,
   },
   head: {
-    gap: Spacing.xs,
+    gap: Spacing.s1,
   },
   grow: {
     flex: 1,
   },
+  /* 하루. 판을 벗고 사이만 띄웁니다 — 가르는 일은 위의 띠가 합니다. */
+  day: {
+    gap: Spacing.s2,
+  },
   dayHead: {
     alignItems: 'center',
+    /* 줄 전체가 여닫는 자리라 손가락이 닿을 높이를 채웁니다. */
+    minHeight: Tap.min,
   },
+  /*
+    그날 색 점.
+
+    <p>네모였습니다(borderRadius 0). 옛 규칙이 「직각」 이었기 때문인데,
+    지도의 핀은 동그라미입니다 — 같은 날을 가리키는 것이 목록에서는 네모,
+    지도에서는 동그라미면 둘이 같은 것이라는 말을 못 합니다.
+  */
   dot: {
-    width: 10,
-    height: 10,
-    borderRadius: 0,
+    width: 12,
+    height: 12,
+    borderRadius: Radius.full,
+  },
+  /*
+    하트 한 칸.
+
+    <p>알약 단추에서 네모 칸으로 바꿨습니다. 오른쪽의 채운 주 단추와
+    나란히 서는데 둘이 같은 알약이면 어느 쪽이 주된 것인지 크기로만
+    가려야 했습니다. 이쪽은 테두리만 두고 숫자를 아래 적습니다.
+  */
+  heartBox: {
+    width: Tap.control,
+    height: Tap.control,
+    borderRadius: Radius.r3,
+    borderWidth: 1,
+    borderColor: Colors.borderStrong,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heartMark: {
+    fontSize: 17,
+    lineHeight: 20,
+    color: Colors.textMuted,
+  },
+  heartOn: {
+    color: Colors.like,
+  },
+  heartCount: {
+    ...Type.micro,
+    color: Colors.textSecondary,
+  },
+  /* 글을 다루는 줄. 단추가 아니라 줄입니다. */
+  manage: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.s3,
+    minHeight: Tap.min,
   },
   place: {
-    borderRadius: Radius.sm,
+    borderRadius: Radius.r3,
     borderWidth: 1.5,
     borderColor: 'transparent',
     overflow: 'hidden',
@@ -1362,9 +1459,9 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: Spacing.md,
-    paddingVertical: Spacing.xs,
-    paddingHorizontal: Spacing.sm,
+    gap: Spacing.s3,
+    paddingVertical: Spacing.s1,
+    paddingHorizontal: Spacing.s2,
   },
   placeText: {
     flex: 1,
@@ -1378,15 +1475,15 @@ const styles = StyleSheet.create({
     글은 가장자리에 바짝 붙으면 읽기 불편하지만 사진은 넓을수록 잘 보입니다.
   */
   shot: {
-    marginTop: Spacing.xs,
-    marginHorizontal: Spacing.xs,
+    marginTop: Spacing.s1,
+    marginHorizontal: Spacing.s1,
   },
   /* 사진 아래의 별과 한 줄. 사진과 같은 자리에 섭니다. */
   said: {
     gap: 2,
-    paddingTop: Spacing.xs,
-    paddingBottom: Spacing.xs,
-    paddingHorizontal: Spacing.sm,
+    paddingTop: Spacing.s1,
+    paddingBottom: Spacing.s1,
+    paddingHorizontal: Spacing.s2,
   },
   order: {
     width: 22,

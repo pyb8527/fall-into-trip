@@ -1,8 +1,8 @@
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import type { Story } from '@/api/types';
 import { PhotoStrip } from '@/components/photo-strip';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Colors, Radius, Spacing, Type, Weight } from '@/constants/theme';
 import { Body, Caption, Row } from '@/ui';
 
 /**
@@ -23,7 +23,7 @@ export function StoryBlock({ story }: { story: Story }) {
   const shots = story.photos ?? [];
   return (
     <View style={styles.block}>
-      <Row gap={Spacing.xs}>
+      <Row gap={Spacing.s2}>
         <Caption strong>{story.author}</Caption>
         <Caption tone="muted">{story.at.slice(0, 10)}</Caption>
       </Row>
@@ -32,12 +32,21 @@ export function StoryBlock({ story }: { story: Story }) {
 
       {story.text ? <Body small>{story.text}</Body> : null}
 
+      {/*
+        꼬리표.
+
+        <p>{@code tone="accent"} 로 적고 있었습니다. 그런데 이 앱에서 글자의
+        accent 는 <b>검정</b>이라, "#온천" 이 본문과 똑같은 검정 글씨였습니다 —
+        누를 수 있는 것처럼 보이면서 누를 수도 없었습니다.
+        <p>글자색을 바꾸는 대신 작은 면에 담습니다. 누르는 것이 아니라
+        <b>붙어 있는 것</b>이라는 말을 모양이 합니다.
+      */}
       {story.tags.length > 0 ? (
-        <Row gap={Spacing.xs} style={styles.wrap}>
+        <Row gap={Spacing.s2} style={styles.wrap}>
           {story.tags.map((t) => (
-            <Caption key={t} tone="accent">
-              #{t}
-            </Caption>
+            <View key={t} style={styles.tag}>
+              <Text style={styles.tagLabel}>#{t}</Text>
+            </View>
           ))}
         </Row>
       ) : null}
@@ -54,11 +63,32 @@ const styles = StyleSheet.create({
   */
   block: {
     backgroundColor: Colors.fill,
-    borderRadius: Radius.sm,
-    padding: Spacing.lg,
-    gap: Spacing.sm,
+    borderRadius: Radius.r3,
+    padding: Spacing.s4,
+    gap: Spacing.s2,
   },
   wrap: {
     flexWrap: 'wrap',
+  },
+  /*
+    못 누르는 꼬리표.
+
+    <p>칩과 생김새를 가릅니다. 칩은 눌러서 고르는 것이라 키가 34이고 둥글고
+    테두리가 있습니다. 이쪽은 글에 붙어 있는 이름표라 작고 각지고 바탕만
+    있습니다.
+  */
+  tag: {
+    height: 22,
+    borderRadius: Radius.r1,
+    paddingHorizontal: 6,
+    backgroundColor: Colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tagLabel: {
+    ...Type.micro,
+    fontSize: 12,
+    fontWeight: Weight.medium,
+    color: Colors.textSecondary,
   },
 });

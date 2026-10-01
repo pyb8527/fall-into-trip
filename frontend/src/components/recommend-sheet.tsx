@@ -23,7 +23,6 @@ import {
   BottomSheet,
   Button,
   Caption,
-  Divider,
   ErrorNote,
   Chip,
   Field,
@@ -298,7 +297,7 @@ export function RecommendSheet({
       {days.length > 0 ? (
         <View style={styles.from}>
           <Caption tone="secondary">어느 날 갈 곳인가요?</Caption>
-          <Row gap={Spacing.xs} style={styles.chips}>
+          <Row gap={Spacing.s2} style={styles.chips}>
             <Chip
               label="아직 모름"
               selected={onDay === null}
@@ -329,7 +328,7 @@ export function RecommendSheet({
       {here || anchors.length > 0 ? (
         <View style={styles.from}>
           <Caption tone="secondary">어디 근처에서 찾을까요?</Caption>
-          <Row gap={Spacing.xs} style={styles.chips}>
+          <Row gap={Spacing.s2} style={styles.chips}>
             <Chip
               label={
                 day ? `${day.label} 언저리` : tripId ? '여행 전체' : '담아 둔 곳 언저리'
@@ -380,7 +379,7 @@ export function RecommendSheet({
       {betweenFrom ? (
         <View style={styles.from}>
           <Caption tone="secondary">어디까지 가는 길인가요?</Caption>
-          <Row gap={Spacing.xs} style={styles.chips}>
+          <Row gap={Spacing.s2} style={styles.chips}>
             <Chip label="그냥 근처에서" selected={to === null} onPress={() => setTo(null)} />
             {day?.places
               .filter((p) => p.id !== betweenFrom)
@@ -409,7 +408,7 @@ export function RecommendSheet({
             있어요.
           </Caption>
         ) : (
-          <Row gap={Spacing.sm} style={styles.brain}>
+          <Row gap={Spacing.s2} style={styles.brain}>
             <View style={styles.grow}>
               <Caption tone="secondary">
                 지금은 물어본 문장이 서버를 거쳐 구글로 가요. 여기서 먼저 추리게 하면 문장은
@@ -442,17 +441,26 @@ export function RecommendSheet({
         />
       ) : null}
 
+      {/*
+        결과 한 장.
+
+        <p>선 하나로 갈라 늘어놓고 있었습니다. 그러면 추천 다섯 곳이 <b>이
+        판의 본문</b>처럼 이어 붙어서, 어디까지가 한 곳인지는 선을 세어야
+        알았습니다 — 게다가 곳마다 단추가 셋 붙어 있어 그 셋이 어느 곳의
+        것인지도 흐렸습니다.
+
+        <p>한 곳을 한 면에 담습니다. 흰 카드가 아니라 회색 면입니다 — 눌러서
+        들어가는 물건이 아니라 이 판 안에서 보고 고르는 것입니다.
+      */}
       {sorted.map((card) => (
         <View key={`${card.name}${card.placeId ?? ''}`} style={styles.card}>
-          <Divider />
-
           {/* 이름과 평점만으로는 두 곳을 견줄 수가 없습니다. 누르면 지도에
               찍어 보고 영업시간까지 봅니다. */}
           <Press
             onPress={() => setLooking(card)}
             scale={0.995}
             accessibilityLabel={`${card.name} 자세히 보기`}>
-          <Row gap={Spacing.sm} style={styles.head}>
+          <Row gap={Spacing.s2} style={styles.head}>
             <Body strong numberOfLines={2}>
 {card.name}
             </Body>
@@ -465,7 +473,7 @@ export function RecommendSheet({
             {card.address}
           </Caption>
 
-          <Row gap={Spacing.sm}>
+          <Row gap={Spacing.s2}>
             {card.rating ? (
               <Caption tone="secondary">
                 ★ {card.rating.toFixed(1)}
@@ -531,14 +539,27 @@ function Keep({
       </Caption>
     );
   }
+  /*
+    채운 단추를 쓰지 않습니다.
+
+    <p>「일정에」 가 브랜드색으로 꽉 찬 단추였습니다. 추천이 다섯 곳 오면
+    그 색이 다섯 번 서서, 화면에서 <b>가장 센 것</b>이 무엇인지가 없어집니다.
+    가득 찬 브랜드색은 화면에 하나이고, 이 판에서는 그 하나가 아래의
+    「물어보기」 입니다.
+
+    <p>그래도 셋 사이에 무게는 둡니다 — 이 판을 여행 안에서 열었으면 대개
+    일정에 넣으려는 것이라 그것만 회색 면을 가집니다.
+  */
   return (
-    <Row gap={Spacing.sm}>
-      {dayId ? <Button label="일정에" compact onPress={() => onKeep(card, 'trip')} /> : null}
+    <Row gap={Spacing.s2}>
+      {dayId ? (
+        <Button label="일정에" variant="secondary" compact onPress={() => onKeep(card, 'trip')} />
+      ) : null}
       {/* 투표장은 여행에 딸린 자리입니다. 보석함에서 물었으면 갈 데가 없습니다. */}
       {inTrip ? (
         <Button
           label="투표장에"
-          variant="secondary"
+          variant="ghost"
           compact
           onPress={() => onKeep(card, 'candidate')}
         />
@@ -581,11 +602,15 @@ type Card = {
 type Recommended = { places: Card[]; note: string | null };
 
 const styles = StyleSheet.create({
+  /* 추천 한 곳. 판 안에서 한 단 들어간 회색 면입니다. */
   card: {
-    gap: Spacing.xs,
+    gap: Spacing.s1,
+    backgroundColor: Colors.fill,
+    borderRadius: Radius.r3,
+    padding: Spacing.s4,
   },
   from: {
-    gap: Spacing.xs,
+    gap: Spacing.s1,
   },
   chips: {
     flexWrap: 'wrap',

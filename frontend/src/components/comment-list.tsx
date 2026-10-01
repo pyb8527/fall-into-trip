@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { api, ApiError, UNEXPECTED } from '@/api/client';
 import type { Comment, Itinerary } from '@/api/types';
 import { useAuth } from '@/auth/auth-provider';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Colors, Radius, Spacing, Type, Weight } from '@/constants/theme';
 import {
   Badge,
   Body,
@@ -173,43 +173,52 @@ export function CommentList({
         />
       ) : null}
 
-      {shown.map((comment) => {
+      {shown.map((comment, i) => {
         /* 장소별 판 안에서는 어느 장소인지 판 제목이 이미 말하고 있습니다.
            같은 말을 한 번 더 붙이지 않습니다. */
         const where = at ? null : whereOf(comment);
         return (
-          <View key={comment.id} style={styles.item}>
-            {/*
-              누가 말하는지를 먼저 답니다.
+          <View key={comment.id} style={[styles.item, i > 0 ? styles.itemEdge : null]}>
+            {/* 누가 말하는지를 얼굴 자리로 먼저 말합니다. 이름 첫 글자를
+                동그라미에 담습니다 — 그림이 없어도 줄이 누구의 것인지
+                한눈에 갈립니다. */}
+            <View style={styles.face}>
+              <Text style={styles.faceLetter}>{comment.authorName.slice(0, 1)}</Text>
+            </View>
 
-              <p>전에는 글이 먼저고 이름이 아래였습니다. 한둘일 때는 읽혔는데
-              여남은 개가 이어지면 어느 이름이 위의 글 것인지 아래 글 것인지
-              헷갈립니다 — 이름이 두 글 사이에 끼어 있기 때문입니다.
-            */}
-            <Split>
-              <Caption tone="secondary">
-                {comment.authorName} · {comment.createdAt.slice(0, 10)}
-              </Caption>
-              {comment.mine ? (
-                <IconButton
-                  name="trash-2"
-                  label="내가 쓴 댓글 지우기"
-                  tone="danger"
-                  bare
-                  disabled={busy}
-                  onPress={() => run(() => api.delete(`/api/comments/${comment.id}`))}
-                />
-              ) : user ? (
-                <IconButton
-                  name="flag"
-                  label="이 댓글 신고"
-                  bare
-                  onPress={() => setReporting(comment)}
-                />
-              ) : null}
-            </Split>
-            {where ? <Badge label={where} tone="muted" /> : null}
-            <Body>{comment.text}</Body>
+            <View style={styles.said}>
+              {/*
+                누가 말하는지를 먼저 답니다.
+
+                <p>전에는 글이 먼저고 이름이 아래였습니다. 한둘일 때는 읽혔는데
+                여남은 개가 이어지면 어느 이름이 위의 글 것인지 아래 글 것인지
+                헷갈립니다 — 이름이 두 글 사이에 끼어 있기 때문입니다.
+              */}
+              <Split>
+                <Caption tone="secondary">
+                  {comment.authorName} · {comment.createdAt.slice(0, 10)}
+                </Caption>
+                {comment.mine ? (
+                  <IconButton
+                    name="trash-2"
+                    label="내가 쓴 댓글 지우기"
+                    tone="danger"
+                    bare
+                    disabled={busy}
+                    onPress={() => run(() => api.delete(`/api/comments/${comment.id}`))}
+                  />
+                ) : user ? (
+                  <IconButton
+                    name="flag"
+                    label="이 댓글 신고"
+                    bare
+                    onPress={() => setReporting(comment)}
+                  />
+                ) : null}
+              </Split>
+              {where ? <Badge label={where} tone="muted" /> : null}
+              <Body small>{comment.text}</Body>
+            </View>
           </View>
         );
       })}
@@ -293,25 +302,48 @@ export function PlaceComments({
 
 const styles = StyleSheet.create({
   wrap: {
-    gap: Spacing.sm,
+    gap: Spacing.s2,
   },
   /*
-    댓글 하나가 종이 한 장입니다.
+    댓글 하나.
 
-    <h3>바닥 위에 글자만 흐르고 있었습니다</h3>
+    <h3>카드에서 줄로</h3>
 
-    <p>{@code gap} 만 두고 아무 바탕도 안 깔았습니다. 한둘일 때는 그것으로
-    됐는데, 여남은 개가 이어지면 <b>어디서 한 사람 말이 끝나는지</b>가
-    없어집니다. 특히 남의 일정 화면이 판 위로 올라가면서 바닥이 회색이 되어
-    글자만 남았습니다.
+    <p>한동안 댓글마다 흰 판을 둘렀습니다. 회색 바닥 위에서는 그것이 「한
+    장에 한 사람 말」 로 읽혔는데, 바닥이 흰색이 된 뒤로는 <b>판이 아예
+    안 보이면서</b> 안쪽 여백만큼 글자를 밀어 넣는 일만 했습니다.
 
-    <p>이 앱은 회색 바닥에 흰 카드를 얹어 층을 만듭니다. 댓글도 그 규칙을
-    따릅니다 — 한 장에 한 사람 말.
+    <p>어디서 한 사람 말이 끝나는지는 선 한 가닥이 말합니다. 댓글은 눌러서
+    들어가는 물건이 아니라 읽어 내려가는 줄입니다 — 줄 사이를 가르는 것은
+    이 앱에서 선입니다.
   */
   item: {
-    gap: Spacing.xs,
-    padding: Spacing.md,
-    borderRadius: Radius.md,
-    backgroundColor: Colors.surface,
+    flexDirection: 'row',
+    gap: Spacing.s3,
+    paddingVertical: Spacing.s4,
+  },
+  /* 첫 줄 위에는 안 긋습니다 — 위의 제목과 사이가 선으로 막히면 제목이
+     첫 댓글처럼 보입니다. */
+  itemEdge: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.border,
+  },
+  /* 이름 첫 글자가 드는 동그라미. 댓글 줄의 아바타 자리입니다. */
+  face: {
+    width: 32,
+    height: 32,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.fill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  faceLetter: {
+    ...Type.caption,
+    fontWeight: Weight.semibold,
+    color: Colors.textSecondary,
+  },
+  said: {
+    flex: 1,
+    gap: Spacing.s1,
   },
 });

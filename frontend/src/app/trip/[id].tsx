@@ -1,5 +1,4 @@
 import { Stack, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
-import { PathTitle } from '@/ui/nav';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -39,7 +38,7 @@ import { SavedPicker } from '@/components/saved-picker';
 import { PublishForm } from '@/components/publish-form';
 import { TipSheet } from '@/components/tip-sheet';
 import { TripMap, type MapPlace } from '@/components/trip-map';
-import { iconOf } from '@/constants/place-icons';
+import { iconOf, labelOf } from '@/constants/place-icons';
 import { faceOf } from '@/constants/user-marks';
 import { feelDone, feelGrab, feelTick } from '@/lib/feel';
 import { SAME_SPOT, metersBetween, readableMeters } from '@/lib/geo';
@@ -49,7 +48,14 @@ import { PlaceDetailSheet } from '@/components/place-detail-sheet';
 import { RefSheet } from '@/components/ref-sheet';
 import { PlaceSearch } from '@/components/place-search';
 import { RecommendSheet } from '@/components/recommend-sheet';
-import { ago, todayIso } from '@/lib/countdown';
+import {
+  ago,
+  countdownLabel,
+  countdownOf,
+  formatNights,
+  formatSpan,
+  todayIso,
+} from '@/lib/countdown';
 import type { Booking } from '@/lib/intent-types';
 import { canParseBookingHere, intentState, parseBooking } from '@/lib/intent';
 import { canKeep, keepTrip, keepTripMap, keptAgo, keptTrip, keptTripMap } from '@/lib/keep';
@@ -68,10 +74,12 @@ import {
   TabDock,
   Tap,
   Type,
+  Weight,
 } from '@/constants/theme';
 import {
-  Body,
   Badge,
+  Band,
+  Body,
   BottomSheet,
   Button,
   Caption,
@@ -80,23 +88,23 @@ import {
   ConfirmDialog,
   Divider,
   DragSheet,
-  type DragSheetHandle,
   Empty,
   ErrorNote,
   Field,
   Grow,
   Icon,
   IconButton,
-  type IconName,
   ListRow,
   Loading,
+  Mark,
   Press,
   Row,
   Screen,
   Snack,
   Split,
-  Subtitle,
   Switch,
+  type DragSheetHandle,
+  type IconName,
   type UndoNote,
   useUndo,
 } from '@/ui';
@@ -376,7 +384,7 @@ export default function TripScreen() {
     띠가 스스로 챙기므로 여기서는 띠 몸통만 셉니다.
   */
   const insets = useSafeAreaInsets();
-  const dock = Math.max(insets.bottom, Spacing.sm) + TabDock;
+  const dock = Math.max(insets.bottom, Spacing.s2) + TabDock;
   /** 단추 줄이 실제로 몇 픽셀인지. 판을 내렸을 때 여기까지 보입니다. */
   const [railTall, setRailTall] = useState(0);
   const { undo, show: showUndo, hide: hideUndo } = useUndo();
@@ -1039,70 +1047,24 @@ export default function TripScreen() {
 
   return (
     <View style={styles.screen}>
-      <Stack.Screen
-        options={{
-          title: data.trip.title,
-          /* 내 여행 › 도쿄 여행. 어느 목록에서 들어온 것인지가 보여야
-             띠에서 「내 여행」에 불이 들어온 까닭도 읽힙니다. */
-          headerTitle: () => <PathTitle parent="내 여행" title={data.trip.title} />,
-          /*
-            막대를 비쳐 두었더니 여행 이름이 지도 무늬 위에 그냥 얹혀 읽히지
-            않았습니다. 지도 위에 떠 있는 동그란 단추와 맨 글자 제목이 나란히
-            서서 어느 쪽도 아닌 모양이 되기도 했습니다.
+      {/*
+        막대를 걷습니다.
 
-            평범한 막대로 되돌립니다. 지도는 그 아래부터 화면 끝까지 채우므로
-            잃는 것은 막대 높이만큼뿐입니다.
-          */
-          headerLeft: navigation.canGoBack()
-            ? undefined
-            : () => (
-                <IconButton
-                  name="chevron-left"
-                  label="내 여행으로"
-                  bare
-                  onPress={() => router.replace('/(app)/trips')}
-                />
-              ),
-          /* 길 위에서 가장 자주 여는 하나만 둡니다. 나머지는 판 안에 글자로
-             있습니다 — 그림만 늘어놓으면 눌러 보기 전에는 뜻을 모릅니다. */
-          /*
-            상단 오른쪽.
+        <h3>지도 위에 막대가 서 있었습니다</h3>
 
-            <h3>왜 셋만인가</h3>
+        <p>한때 막대를 비쳐 두었다가 되돌린 적이 있습니다 — 여행 이름이 지도
+        무늬 위에 그냥 얹혀 읽히지 않았기 때문입니다. 그때는 <b>제목이 막대에
+        있었기</b> 때문에 그랬습니다.
 
-            <p>판 맨 아래에 글자 단추가 여섯 줄로 쌓여 있었습니다 — 이동 시간,
-            표식, 새 여행, 인쇄, 엑셀, 지우기. 일정을 보려고 판을 올렸다가
-            끝까지 굴리면 나오는 자리라, 찾으려면 굴려야 하고 안 찾을 때는
-            늘 자리를 차지했습니다.
+        <p>제목은 이제 판 맨 위(peek)에 있습니다. 흰 종이 위라 늘 읽히고,
+        날짜 칩과 남은 날이 그 아래 한 덩어리로 붙습니다. 그러면 막대에 남는
+        것은 단추 셋뿐이고, 그 셋은 흰 동그라미로 지도 위에 떠 있는 편이
+        낫습니다 — 지도를 쓰는 앱이라면 어디서나 그렇게 생겼습니다.
 
-            <p>그렇다고 여섯을 다 그림으로 상단에 세우면 폰 머리줄에 아무것도
-            안 읽힙니다. 동행자 하나만 세우고 나머지는 점 세 개 안으로
-            넣습니다.
-
-            <p>이동 시간도 한동안 여기 시계 그림으로 세웠는데, <b>켜짐/꺼짐이
-            있는 것을 그림 하나로 숨긴 셈</b>이었습니다. 머리줄의 옅은 채움
-            으로는 지금 켜져 있는지 알 수가 없습니다. 그것은 아래
-            「이 화면에서 하는 일」 줄로 내렸습니다 — 거기가 원래 이 화면에서
-            켜고 끄는 것들이 서는 자리입니다.
-          */
-          headerRight: () => (
-            <Row gap={Spacing.xs}>
-              <IconButton
-                name="users"
-                label="같이 보는 사람"
-                bare
-                onPress={() => setPeople(true)}
-              />
-              <IconButton
-                name="more-horizontal"
-                label="이 여행 다루기"
-                bare
-                onPress={() => setMore(true)}
-              />
-            </Row>
-          ),
-        }}
-      />
+        <p>막대 높이(56)만큼 지도가 늘어납니다. 이 화면에서 가장 중요한 것이
+        지도와 일정이라, 그 56 픽셀은 둘 중 하나에 쓰는 것이 맞습니다.
+      */}
+      <Stack.Screen options={{ title: data.trip.title, headerShown: false }} />
 
       {/*
         지도가 바탕입니다. 판이 그 위에 얹힙니다.
@@ -1152,45 +1114,53 @@ export default function TripScreen() {
       />
       )}
 
-      {/* 막대 바로 아래, 지도 위에 뜨는 날짜 칩. */}
-      {days.length > 1 ? (
-        /* 폰에서는 날짜가 넷만 돼도 칩이 두 줄, 세 줄로 접혀 지도를 덮습니다.
-           접지 않고 옆으로 흐르게 둡니다. */
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          /* 막대를 되돌리면서 지도가 그 아래부터 시작하는데, 띠는 아직
-             안전영역과 막대 높이만큼 더 내려가 있었습니다. 이제 지도 맨
-             위에서 조금만 띄웁니다. */
-          style={[styles.floatTop, { top: Spacing.md }]}
-          contentContainerStyle={styles.chipRail}>
-          <Row gap={Spacing.xs} style={styles.chipRow}>
-            <Chip
-              label="전체"
-              selected={activeDay === ALL}
-              onPress={() => {
-                setActiveDay(ALL);
-                setActivePlaceId(null);
-              }}
-            />
-            {days.map((day, i) => (
-              <Chip
-                key={day.id}
-                label={
-                  day.iso === todayIso()
-                    ? `오늘 · ${day.date || day.shortName || day.label}`
-                    : day.date || day.shortName || day.label
-                }
-                selected={activeDay === i}
-                onPress={() => {
-                  setActiveDay(i);
-                  setActivePlaceId(null);
-                }}
-              />
-            ))}
-          </Row>
-        </ScrollView>
-      ) : null}
+      {/*
+        지도 위 단추 줄.
+
+        <p>날짜 칩이 여기 떠 있었습니다. 넷만 돼도 지도 위쪽을 한 줄 통째로
+        먹었고, 정작 그 칩이 가리키는 일정은 아래 판 안에 있었습니다 — 고르는
+        것과 그 결과가 화면의 서로 다른 끝에 있었습니다.
+
+        <p>칩은 판 맨 위로 내려갔습니다. 지도 위에는 지도에 대한 것만
+        남습니다 — 나가는 길과, 이 여행을 다루는 두 단추.
+      */}
+      <View
+        pointerEvents="box-none"
+        style={[styles.floatTop, styles.mapBar, { top: insets.top + Spacing.s2 }]}>
+        <IconButton
+          name="chevron-left"
+          label="내 여행으로"
+          onMap
+          onPress={() =>
+            navigation.canGoBack() ? navigation.goBack() : router.replace('/(app)/trips')
+          }
+        />
+        {/*
+          오른쪽에 둘입니다.
+
+          <p>판 맨 아래에 글자 단추가 여섯 줄로 쌓여 있던 때가 있었습니다 —
+          이동 시간, 표식, 새 여행, 인쇄, 엑셀, 지우기. 일정을 보려고 판을
+          올렸다가 끝까지 굴리면 나오는 자리라, 찾으려면 굴려야 하고 안 찾을
+          때는 늘 자리를 차지했습니다.
+
+          <p>그렇다고 여섯을 다 그림으로 세우면 아무것도 안 읽힙니다. 같이
+          보는 사람 하나만 세우고 나머지는 점 세 개 안으로 넣습니다.
+        */}
+        <Row gap={Spacing.s2}>
+          <IconButton
+            name="users"
+            label="같이 보는 사람"
+            onMap
+            onPress={() => setPeople(true)}
+          />
+          <IconButton
+            name="more-horizontal"
+            label="이 여행 다루기"
+            onMap
+            onPress={() => setMore(true)}
+          />
+        </Row>
+      </View>
 
       {/*
         내 위치. 지도에 딸린 일이라 지도 위에 둡니다.
@@ -1214,7 +1184,7 @@ export default function TripScreen() {
           내 자리로 옮기는 것인데 그림은 움직이지 않습니다. 눌러도 아무 일이
           안 일어나면서 자리 알림만 켜지는 것이 가장 나쁩니다. */}
       {me.supported && !keptMap ? (
-        <View style={[styles.floatRight, { bottom: covered + dock + Spacing.md }]}>
+        <View style={[styles.floatRight, { bottom: covered + dock + Spacing.s3 }]}>
           {/*
             십자를 누르면 나오는 둘.
 
@@ -1289,7 +1259,7 @@ export default function TripScreen() {
         만한 것이 아닙니다. 단추 하나로 접어 두고 눌렀을 때만 펼칩니다.
       */}
       {pins.length > 0 ? (
-        <View style={[styles.floatLeft, { bottom: covered + dock + Spacing.md }]}>
+        <View style={[styles.floatLeft, { bottom: covered + dock + Spacing.s3 }]}>
           <IconButton
             name="flag"
             label={`꽂아 둔 깃발 ${pins.length}개 보기`}
@@ -1310,7 +1280,7 @@ export default function TripScreen() {
       */}
       <View
         pointerEvents="box-none"
-        style={[styles.floatTop, { bottom: covered + dock + Spacing.md }]}>
+        style={[styles.floatTop, { bottom: covered + dock + Spacing.s3 }]}>
         <View style={styles.snackRail}>
           <Snack undo={undo} onHide={hideUndo} />
         </View>
@@ -1345,16 +1315,18 @@ export default function TripScreen() {
           <p>단추 줄을 재서 그만큼 알려 줍니다. 아직 못 쟀으면(첫 그림)
           넘기지 않고 지금까지 쓰던 비율에 맡깁니다.
         */
-        revealAtLow={railTall > 0 ? railTall + Spacing.lg : undefined}
+        revealAtLow={railTall > 0 ? railTall + Spacing.s4 : undefined}
         onHeightChange={setCovered}
         peek={
           <SheetHead
-            title={dayIndex >= 0 ? days[dayIndex]?.date || days[dayIndex]?.label || '' : '전체 일정'}
+            title={data.trip.title}
+            days={days}
+            activeDay={activeDay}
             total={total}
-            gaps={gaps}
-            gapping={gapping}
-            chosenOf={chosenOf}
-            changedGaps={changedGaps}
+            onPickDay={(at) => {
+              setActiveDay(at);
+              setActivePlaceId(null);
+            }}
           />
         }>
         {/*
@@ -1407,6 +1379,16 @@ export default function TripScreen() {
           </Caption>
         ) : null}
 
+        {/*
+          오늘 이동에 얼마나 쓰는지.
+
+          <p>판 맨 위(peek)에 있었습니다. 그런데 거기는 판을 내려 둬도 보이는
+          자리라 <b>이 화면이 무엇인지</b>를 적는 데여야 하고, 이것은 이동
+          시간을 켜 둔 사람에게만 뜻이 있는 곁다리입니다. 켜고 끄는 단추
+          바로 위로 내립니다.
+        */}
+        <MovingNote gaps={gaps} gapping={gapping} chosenOf={chosenOf} />
+
 
 
         {/*
@@ -1434,7 +1416,7 @@ export default function TripScreen() {
           따라 하나에서 셋까지 달라지는데 그때마다 줄 모양이 저절로 맞습니다.
         */}
         <Row
-          gap={Spacing.xs}
+          gap={Spacing.s1}
           style={styles.shortcuts}
           /* 판을 내렸을 때 여기까지 보이게 하려고 높이를 재 둡니다. */
           onLayout={(e) => setRailTall(e.nativeEvent.layout.height)}>
@@ -1473,8 +1455,11 @@ export default function TripScreen() {
 
         {days.map((day, di) =>
           activeDay === ALL || activeDay === di ? (
+            <View key={day.id}>
+              {/* 하루와 하루 사이는 띠가 가릅니다. 한 날만 보고 있을 때는
+                  가를 것이 없습니다. */}
+              {activeDay === ALL && di > 0 ? <Band /> : null}
             <DayCard
-              key={day.id}
               day={day}
               index={di}
               canEdit={canEdit}
@@ -1500,6 +1485,7 @@ export default function TripScreen() {
               spentAt={spentByPlace}
               touchedOf={touchedOf}
             />
+            </View>
           ) : null,
         )}
 
@@ -1841,7 +1827,7 @@ function TripMarkPicker({ trip, onChanged }: { trip: Trip; onChanged: () => void
               : '목록에서 이름을 읽기 전에 알아볼 수 있어요.'}
           </Caption>
         </Grow>
-        <Row gap={Spacing.sm}>
+        <Row gap={Spacing.s2}>
           <TripMark theme={trip.theme} emoji={trip.emoji} />
           <Body small numberOfLines={1} tone={chosen ? 'default' : 'muted'}>
             {trip.title}
@@ -1849,7 +1835,7 @@ function TripMarkPicker({ trip, onChanged }: { trip: Trip; onChanged: () => void
         </Row>
       </Split>
 
-      <Row gap={Spacing.xs} style={styles.markRow}>
+      <Row gap={Spacing.s1} style={styles.markRow}>
         {/* 빈 글이 "무채색으로" 라는 뜻입니다. null 로 보내면 서버가 그대로
             두므로 되돌릴 길이 없어집니다. */}
         <Press
@@ -1878,7 +1864,7 @@ function TripMarkPicker({ trip, onChanged }: { trip: Trip; onChanged: () => void
         ))}
       </Row>
 
-      <Row gap={Spacing.xs} style={styles.markRow}>
+      <Row gap={Spacing.s1} style={styles.markRow}>
         <Chip label="없이" selected={!trip.emoji} onPress={() => save({ emoji: '' })} />
         {MARKS.map((mark) => (
           <Chip
@@ -1925,11 +1911,24 @@ function Shortcut({
   return (
     <Press
       onPress={onPress}
-      scale={0.95}
+      scale={0.96}
       accessibilityLabel={label}
       accessibilityState={active === undefined ? undefined : { selected: active }}
-      style={[styles.shortcut, active ? styles.shortcutOn : null]}>
-      <Icon name={icon} size={18} tone={active === false ? 'muted' : 'accent'} />
+      style={styles.shortcut}>
+      {/*
+        네모 칸에서 동그라미로.
+
+        <p>회색 네모 칸 넷이 나란히 서 있었습니다. 칸 자체가 바탕을 갖고
+        테두리까지 두르고 있어서, 일정 위에 <b>또 하나의 상자 줄</b>이
+        얹힌 모양이었습니다.
+
+        <p>동그라미 하나에 글자 한 줄입니다. 칸의 경계가 사라지니 일정이
+        시작되는 자리가 바로 보이고, 켜진 것은 동그라미만 물들어 그 하나가
+        또렷합니다.
+      */}
+      <View style={[styles.shortcutDisc, active ? styles.shortcutDiscOn : null]}>
+        <Icon name={icon} size={24} tone={active ? 'brand' : 'secondary'} />
+      </View>
       <Text
         style={[styles.shortcutLabel, active ? styles.shortcutLabelOn : null]}
         numberOfLines={1}>
@@ -1940,51 +1939,175 @@ function Shortcut({
 }
 
 /**
- * 판 맨 위에 늘 보이는 줄.
+ * 오늘 이동에 얼마나 쓰는지.
  *
- * <p>판을 내려 두어도 이것만은 보입니다. 그래서 여기에는 "지금 어느 날을 보고
- * 있고, 얼마나 돌았고, 오늘 이동에 얼마나 쓰는지" 만 둡니다. 판을 올리지 않고도
- * 답이 되는 것들입니다.
+ * <p>구간을 다시 묻는 동안에는 도는 것을 하나 보여 줍니다. 글자만 두었더니
+ * 멈춰 있는 것과 구별이 안 됐습니다.
  */
-function SheetHead({
-  title,
-  total,
+function MovingNote({
   gaps,
   gapping,
   chosenOf,
-  changedGaps,
 }: {
-  title: string;
-  total: number;
   gaps: Gap[] | null;
   gapping: boolean;
   chosenOf: (gap: Gap) => GapOption | null;
-  /** 다시 물은 뒤 달라진 구간들. 출발하는 장소의 id 입니다. */
-  changedGaps: Set<string>;
 }) {
   const moving = (gaps ?? []).reduce((n, g) => n + (chosenOf(g)?.seconds ?? 0), 0);
 
+  if (gapping) {
+    return (
+      <Row gap={Spacing.s1}>
+        <ActivityIndicator size="small" color={Colors.textMuted} />
+        <Caption tone="secondary">이동 시간을 알아보는 중…</Caption>
+      </Row>
+    );
+  }
+  if (moving > 0) {
+    return <Caption tone="secondary">오늘 이동에 {asDuration(moving)}</Caption>;
+  }
+  return null;
+}
+
+/**
+ * 판 맨 위에 늘 보이는 줄.
+ *
+ * <h3>판을 내려 둬도 이것만은 보입니다</h3>
+ *
+ * <p>그래서 여기에는 <b>이 화면이 무엇인지</b>가 와야 합니다 — 어느 여행이고,
+ * 언제 떠나고, 며칠에 몇 곳인지. 전에는 "지금 보고 있는 날짜" 와 곳 수만
+ * 있었는데, 여행 이름은 위 막대에 있고 날짜 칩은 지도 위에 떠 있어서 한
+ * 여행에 대한 말이 화면 세 군데에 흩어져 있었습니다.
+ *
+ * <p>막대를 걷고 셋을 여기 모읍니다. 날짜 칩까지 여기 있으면, 고르는 것과
+ * 고른 결과(바로 아래 일정)가 붙어 있게 됩니다.
+ */
+function SheetHead({
+  title,
+  days,
+  activeDay,
+  total,
+  onPickDay,
+}: {
+  title: string;
+  days: Day[];
+  /** 지금 고른 날. {@link ALL} 이면 전체입니다. */
+  activeDay: number;
+  total: number;
+  onPickDay: (at: number) => void;
+}) {
+  /* 여행 전체가 언제부터 언제까지인지. 날짜를 안 잡은 여행에는 비어 있습니다. */
+  const from = days[0]?.iso ?? null;
+  const to = days[days.length - 1]?.iso ?? null;
+  const at = countdownOf(from, to);
+
   return (
-    <View style={styles.head}>
-      <Split align="baseline">
-        <Subtitle>{title}</Subtitle>
-        {/* 진행률 띠가 있었습니다 — 「3/8 다녀옴」. 도장을 걷었으니 셀
-            것이 없고, 애초에 여행은 채워야 하는 막대가 아닙니다. */}
-        <Caption tone="secondary" strong>
-          {total}곳
-        </Caption>
+    <View style={styles.peek}>
+      <Split align="center">
+        <Text style={styles.peekTitle} numberOfLines={1}>
+          {title}
+        </Text>
+        {/* 남은 날. 노랑은 「지금 · 곧」을 가리키는 자리에만 씁니다. */}
+        {at ? <DayBadge label={countdownLabel(at)} /> : null}
       </Split>
 
-      {gapping ? (
-        /* 글자만 두었더니 멈춰 있는 것과 구별이 안 됐습니다. 도는 것이
-           하나 있어야 "오는 중" 으로 읽힙니다. */
-        <Row gap={Spacing.xs}>
-          <ActivityIndicator size="small" color={Colors.textMuted} />
-          <Caption tone="secondary">이동 시간을 알아보는 중…</Caption>
-        </Row>
-      ) : moving > 0 ? (
-        <Caption tone="secondary">오늘 이동에 {asDuration(moving)}</Caption>
+      <Caption tone="muted">
+        {[
+          formatSpan(from, to),
+          days.length > 0 ? formatNights(days.length) : '',
+          `${total}곳`,
+        ]
+          .filter(Boolean)
+          .join(' · ')}
+      </Caption>
+
+      {/* 폰에서는 날짜가 넷만 돼도 칩이 두 줄, 세 줄로 접힙니다. 접지 않고
+          옆으로 흐르게 둡니다. */}
+      {days.length > 1 ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.chipRail}
+          contentContainerStyle={styles.chipRow}>
+          <Chip label="전체" selected={activeDay === ALL} onPress={() => onPickDay(ALL)} />
+          {days.map((day, i) => (
+            <DayChip
+              key={day.id}
+              label={
+                day.iso === todayIso()
+                  ? `오늘 · ${day.shortName || day.date || day.label}`
+                  : day.shortName || day.date || day.label
+              }
+              color={day.color || dayColor(i)}
+              selected={activeDay === i}
+              onPress={() => onPickDay(i)}
+            />
+          ))}
+        </ScrollView>
       ) : null}
+    </View>
+  );
+}
+
+/**
+ * 며칟날을 고르는 칩.
+ *
+ * <h3>칩만 날짜 색을 씁니다</h3>
+ *
+ * <p>고른 칩은 보통 검정으로 뒤집습니다 — 한 화면에 여럿 켜질 수 있어서
+ * 브랜드색으로 하면 색이 넘치기 때문입니다. 날짜 칩은 그 예외입니다.
+ *
+ * <p>이 칩이 가리키는 것이 바로 <b>지도의 핀 색</b>입니다. 2일차를 고르면
+ * 지도에 그 색 핀만 남는데, 칩이 검정으로 켜지면 그 둘을 잇는 말이
+ * 끊깁니다. 켜지면 그날 색으로 채우고, 꺼져 있을 때도 앞에 점 하나로
+ * 색을 보여 줍니다.
+ */
+function DayChip({
+  label,
+  color,
+  selected,
+  onPress,
+}: {
+  label: string;
+  color: string;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Press
+      onPress={onPress}
+      hitSlop={Tap.compactSlop}
+      scale={0.96}
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      accessibilityLabel={label}
+      style={[
+        styles.dayChip,
+        selected ? { backgroundColor: color, borderColor: color } : null,
+      ]}>
+      {selected ? null : <View style={[styles.dayChipDot, { backgroundColor: color }]} />}
+      <Text style={[styles.dayChipLabel, selected ? styles.dayChipLabelOn : null]}>
+        {label}
+      </Text>
+    </Press>
+  );
+}
+
+/**
+ * 며칠 남았는지.
+ *
+ * <p>노랑은 「지금 · 곧」을 가리키는 자리에만 씁니다 — 심볼의 노란 알약이
+ * 「일정 칸에 들어가는 한 자리」를 뜻하는 데서 왔습니다. 노란 면 위의 글자는
+ * 늘 먹색입니다(흰 바탕에서 노랑은 대비가 1.6:1 입니다).
+ *
+ * <p>공용 배지를 안 씁니다. 공용 배지에는 아직 노란 종류가 없어서, 옅은
+ * 노랑에 노란 글씨가 되어 아무것도 안 읽힙니다. 부품에 그 종류가 생기면
+ * 이것은 지웁니다.
+ */
+function DayBadge({ label }: { label: string }) {
+  return (
+    <View style={styles.dayBadge}>
+      <Text style={styles.dayBadgeLabel}>{label}</Text>
     </View>
   );
 }
@@ -2216,21 +2339,57 @@ function DayCard({
   */
   const title = day.date ? `${day.label} · ${day.date}` : day.label;
 
+  /*
+    상자를 걷었습니다.
+
+    <h3>왼쪽 4픽셀 띠와 테두리</h3>
+
+    <p>하루를 흰 카드에 담고, 왼쪽에 날짜 색 띠를 세우고, 나머지 세 변에
+    테두리를 둘렀습니다. 판이 회색이던 시절에는 그 흰 카드가 떠 보였는데,
+    판이 흰 종이가 되자 보이는 것은 <b>테두리 쳐진 네모</b>뿐이었습니다 —
+    하루마다 네모가 하나씩 생기고, 그 안에 장소 줄이 또 들어앉습니다.
+
+    <p>날짜 색은 머리의 동그라미 하나가 말합니다(지도의 핀, 날짜 칩과 같은
+    색입니다). 하루와 하루를 가르는 일은 <b>회색 띠</b>가 맡습니다. 그러면
+    장소 줄이 왼쪽 20 선에서 시작해, 판 안의 모든 글자가 같은 선에 섭니다.
+  */
   return (
-    <Card style={[styles.dayBand, { borderLeftColor: color }]}>
-      <Split align="start" gap={Spacing.md}>
+    <View style={styles.day}>
+      <Split align="center" gap={Spacing.s3}>
         <Pressable
           onPress={() => setFolded((v) => !v)}
           accessibilityRole="button"
           accessibilityLabel={`${title} ${folded ? '펴기' : '접기'}`}
           style={styles.dayTap}>
-          <Row gap={Spacing.md} style={styles.dayTitle}>
-            <Subtitle>{title}</Subtitle>
-            <Icon name={folded ? 'chevron-down' : 'chevron-up'} size={21} tone="muted" />
+          <Row gap={Spacing.s3} style={styles.dayTitle}>
+            {/* 머리의 동그라미와 아래 타임라인의 번호는 같은 색, 같은
+                크기입니다 — 둘이 한 날의 것이라는 말입니다. */}
+            <View style={[styles.dayDisc, { backgroundColor: color }]}>
+              <Text style={styles.dayDiscLabel}>{index + 1}</Text>
+            </View>
+            <View style={styles.dayNames}>
+              <Text style={styles.dayName} numberOfLines={1}>
+                {day.label}
+              </Text>
+              {day.date ? <Caption tone="muted">{day.date}</Caption> : null}
+            </View>
+            <Icon name={folded ? 'chevron-down' : 'chevron-up'} size={20} tone="muted" />
           </Row>
         </Pressable>
 
-        <Row gap={Spacing.sm}>
+        {/*
+          머리에는 그림 단추를 하나만 둡니다.
+
+          <p>셋이 서 있었습니다 — 동선 정리, 저장에서 꺼내기, 장소 넣기.
+          글자가 없는 그림 셋이라 눌러 보기 전에는 무엇이 무엇인지 알 수
+          없었고, 하루가 다섯이면 지도 아래에 그림이 열다섯이었습니다.
+
+          <p>넣는 것 둘은 <b>그날 맨 아래</b>로 내려보냅니다. 장소를 넣는
+          일은 그 날의 마지막 줄 다음에 하는 일이라, 거기가 손이 가는
+          자리입니다. 동선 정리만 머리에 남습니다 — 그 날 전체를 다시
+          세우는 일이라 어느 한 줄에 속하지 않습니다.
+        */}
+        <Row gap={Spacing.s2}>
           {day.places.length > 0 ? (
             <Caption tone="muted" strong>
               {day.places.length}곳
@@ -2242,29 +2401,10 @@ function DayCard({
               name="shuffle"
               label={`${day.date || day.label} 동선 정리`}
               disabled={tidying}
+              bare
               onPress={() => {
                 setFolded(false);
                 askTidy();
-              }}
-            />
-          ) : null}
-          {canEdit ? (
-            <IconButton
-              name="bookmark"
-              label={`${day.date || day.label}에 저장한 곳에서 꺼내 넣기`}
-              onPress={() => {
-                setFolded(false);
-                setDigging(true);
-              }}
-            />
-          ) : null}
-          {canEdit ? (
-            <IconButton
-              name="plus"
-              label={`${day.date || day.label}에 장소 넣기`}
-              onPress={() => {
-                setFolded(false);
-                setAdding(true);
               }}
             />
           ) : null}
@@ -2285,23 +2425,37 @@ function DayCard({
             여행 앱인데 잠자리가 없었습니다. 일정에는 들를 곳만 있고, 정작
             매일 돌아가는 자리는 어디에도 안 적혀 있었습니다.
           */}
-          <Row gap={Spacing.sm} style={styles.dayExtra}>
+          <Row gap={Spacing.s2} style={styles.dayExtra}>
             <View style={styles.grow}>
               {day.stay ? (
+                /*
+                  잠자리는 면 카드로.
+
+                  <p>글자 한 줄로 두었습니다. 그래서 장소 줄들 사이에서
+                  <b>그중 하나</b>로 읽혔는데, 잠자리는 들르는 곳이 아니라
+                  그날 돌아오는 자리입니다 — 다른 종류의 것입니다.
+
+                  <p>회색 면에 담습니다. 눌러서 들어가는 물건이 아니라 적어
+                  둔 값이라 떠 있는 카드가 아니고 가라앉은 면입니다.
+                */
                 <Press
                   onPress={() => (canEdit ? setStaying(true) : undefined)}
                   scale={0.995}
-                  accessibilityLabel={`${day.stay.name} 숙소 고치기`}>
-                  <Row gap={Spacing.xs} style={styles.stayRow}>
-                    <Icon name="home" size={18} tone="accent" />
-                    <Body small strong numberOfLines={1}>
-                      {day.stay.name}
-                    </Body>
-                    {day.stay.note ? (
-                      <Caption tone="secondary" numberOfLines={1}>
-                        {day.stay.note}
-                      </Caption>
-                    ) : null}
+                  accessibilityLabel={`${day.stay.name} 숙소 고치기`}
+                  style={styles.stayCard}>
+                  <Row gap={Spacing.s3} style={styles.stayRow}>
+                    <Mark emoji="🛏" />
+                    <View style={styles.grow}>
+                      <Caption tone="muted">숙소</Caption>
+                      <Body small strong numberOfLines={1}>
+                        {day.stay.name}
+                      </Body>
+                      {day.stay.note ? (
+                        <Caption tone="secondary" numberOfLines={1}>
+                          {day.stay.note}
+                        </Caption>
+                      ) : null}
+                    </View>
                   </Row>
                 </Press>
               ) : canEdit ? (
@@ -2314,7 +2468,7 @@ function DayCard({
               ) : null}
 
               {day.flight ? (
-                <Row gap={Spacing.xs} style={styles.stayRow}>
+                <Row gap={Spacing.s1} style={styles.stayRow}>
                   <Icon name="navigation" size={18} tone="muted" />
                   <Caption tone="secondary" numberOfLines={1}>
                     {day.flight}
@@ -2339,7 +2493,7 @@ function DayCard({
                     {readableMeters(tidy.beforeMeters)} → {readableMeters(tidy.afterMeters)} · 시간을 적어 둔 곳은
                     그대로 둬요.
                   </Caption>
-                  <Row gap={Spacing.sm}>
+                  <Row gap={Spacing.s2}>
                     <Button label="이대로 바꾸기" compact onPress={applyTidy} />
                     <Button
                       label="그냥 두기"
@@ -2354,7 +2508,7 @@ function DayCard({
                   <Body small strong>
                     지금 순서로도 충분히 짧아요.
                   </Body>
-                  <Row gap={Spacing.sm}>
+                  <Row gap={Spacing.s2}>
                     <Button
                       label="알겠어요"
                       variant="ghost"
@@ -2378,7 +2532,7 @@ function DayCard({
           />
 
           {day.places.length === 0 ? (
-            <Caption>이 날에는 아직 장소가 없어요.</Caption>
+            <Caption tone="muted">이 날에는 아직 장소가 없어요.</Caption>
           ) : (
             <View style={styles.places}>
               {order.map((place, i) => (
@@ -2454,6 +2608,34 @@ function DayCard({
           )}
 
           {/*
+            그날 맨 아래, 넣는 자리.
+
+            <p>머리에 그림 단추로 서 있었습니다. 그런데 장소를 넣는 일은
+            <b>그 날의 마지막 줄 다음</b>에 하는 일입니다 — 아홉 곳을 훑어
+            내려와 열째를 넣으려면 다시 맨 위로 올라가야 했습니다.
+
+            <p>글자를 답니다. 그림만으로는 「저장에서 꺼내 넣기」가 책갈피
+            그림 하나였고, 그것이 무엇인지 아는 사람은 이미 알던 사람뿐
+            이었습니다.
+          */}
+          {canEdit ? (
+            <Row gap={Spacing.s2} style={styles.dayAdd}>
+              <Button
+                label="＋ 장소 추가"
+                variant="secondary"
+                compact
+                onPress={() => setAdding(true)}
+              />
+              <Button
+                label="저장에서 가져오기"
+                variant="ghost"
+                compact
+                onPress={() => setDigging(true)}
+              />
+            </Row>
+          ) : null}
+
+          {/*
             대중교통이 하나도 안 나왔을 때 왜인지.
 
             조용히 비워 두면 쓰는 사람은 앱이 고장 난 줄 압니다 — 구글 지도
@@ -2527,7 +2709,7 @@ function DayCard({
           onCancel={() => setEditing(null)}
         />
       ) : null}
-    </Card>
+    </View>
   );
 }
 
@@ -2566,7 +2748,7 @@ function DayMoney({
   }
 
   return (
-    <Row gap={Spacing.sm}>
+    <Row gap={Spacing.s2}>
       {budget ? <Caption tone="secondary">예산 {budget}</Caption> : null}
       {totals.length > 0 ? (
         <Caption tone="secondary" strong>
@@ -2692,7 +2874,7 @@ function PlaceRow({
         때문입니다.
       */}
       <View style={styles.rail}>
-        <View style={[styles.railLine, { backgroundColor: color }, order === 1 && styles.railOff]} />
+        <View style={[styles.railLine, order === 1 && styles.railOff]} />
         <View
           style={[
             styles.node,
@@ -2700,19 +2882,10 @@ function PlaceRow({
             active && styles.nodeOn,
           ]}>
           {/* 날짜 색 여덟은 흰 글씨를 얹어도 읽히도록 고른 것입니다
-              (DayLabels 참고). inverse 가 그 흰 글씨입니다. */}
-          <Caption strong tone="inverse">
-            {order}
-          </Caption>
+              (DayColors 참고). */}
+          <Text style={styles.nodeLabel}>{order}</Text>
         </View>
-        <View
-          style={[
-            styles.railLine,
-            styles.railGrow,
-            { backgroundColor: color },
-            last && styles.railOff,
-          ]}
-        />
+        <View style={[styles.railLine, styles.railGrow, last && styles.railOff]} />
       </View>
 
       <View style={styles.stopBody}>
@@ -2743,30 +2916,30 @@ function PlaceRow({
         <Pressable onPress={onFocus} style={styles.placeTap}>
           <View style={styles.placeMain}>
             {/*
-              그림 하나, 또는 번호 하나.
+              그림은 줄 앞의 동그라미로.
 
-              전에는 여기에 날짜 색 테두리를 두르고 다녀온 곳은 속을
-              채웠습니다. 둘 다 아무것도 말하지 않고 있었습니다 — 하루
-              카드 안에서는 모든 줄이 같은 날이라 색이 늘 같고, 다녀왔다는
-              것은 줄 끝의 체크가 이미 말합니다.
+              <p>이름 바로 앞에 이모지 한 글자가 붙어 있었습니다. 그림이 있는
+              줄과 없는 줄이 섞이면 <b>이름이 저마다 다른 자리에서</b>
+              시작했고, 그림 하나하나는 저마다 다른 크기로 그려져 줄이
+              들쭉날쭉했습니다.
 
-              남은 것은 테두리 스물여덟 개뿐이었습니다. 걷어 냅니다. 자리
-              너비는 그대로 두어 이름들이 한 줄로 섭니다.
+              <p>회색 동그라미(Mark) 안에 넣습니다. 크기와 자리가 고정되니
+              이름이 한 줄로 서고, 보석함·검색·가고 싶은 곳에서 쓰는 것과
+              같은 모양이 됩니다.
             */}
+            <Mark emoji={emoji} fallback="📍" />
+
             <View style={styles.placeText}>
-              {/* 번호는 왼쪽 세로선의 노드가, 시각은 그 왼쪽 열이 맡습니다.
-                  여기 남는 것은 그림과 이름입니다. */}
-              <Row gap={Spacing.sm}>
-                {emoji ? (
-                  <Body small style={styles.orderEmoji}>
-                    {emoji}
-                  </Body>
-                ) : null}
-                <Body strong numberOfLines={2}>
-                  {place.name}
-                </Body>
-              </Row>
-              {place.ja || place.en ? <Caption>{place.ja ?? place.en}</Caption> : null}
+              <Text style={styles.placeName} numberOfLines={2}>
+                {place.name}
+              </Text>
+              {/* 갈래와 원어 이름. 둘 다 없으면 줄을 안 둡니다 — 빈 줄은
+                  이름과 아래 것들 사이를 공연히 벌립니다. */}
+              {labelOf(place.icon) || place.ja || place.en ? (
+                <Caption tone="muted" numberOfLines={1}>
+                  {[labelOf(place.icon), place.ja ?? place.en].filter(Boolean).join(' · ')}
+                </Caption>
+              ) : null}
               {/*
                 사람이 적어 둔 글.
 
@@ -2777,7 +2950,11 @@ function PlaceRow({
               */}
               {place.note ? (
                 <View style={styles.noteQuote}>
-                  <Caption tone="secondary">{place.note}</Caption>
+                  {/* 캡션(13)이었습니다. 사람이 쓴 말은 우리가 만든 값보다
+                      한 단 커야 합니다 — 여기서 읽을 것은 이 한 줄입니다. */}
+                  <Body small tone="secondary">
+                    {place.note}
+                  </Body>
                 </View>
               ) : null}
               {/*
@@ -2833,7 +3010,7 @@ function PlaceRow({
                   <p>쓴 돈만 색을 답니다. 잡아 둔 것은 계획이고 쓴 것은
                   사실이라, 둘 중 하나만 눈에 걸려야 한다면 사실입니다.
                 */
-                <Row gap={Spacing.xs} style={styles.facts}>
+                <Row gap={Spacing.s1} style={styles.facts}>
                   {place.cat ? <Badge label={place.cat} /> : null}
                   {costLabel(place) ? <Badge label={`잡은 것 ${costLabel(place)}`} /> : null}
                   {spentHere ? <Badge label={`쓴 돈 ${spentHere}`} tone="accent" /> : null}
@@ -3066,7 +3243,7 @@ function PlaceRow({
           자리를 비워 두지 않고 알아보는 중이라고 적어 둡니다. 줄 높이도
           그대로라 목록이 덜컥거리지 않습니다.
         */
-        <Row gap={Spacing.xs} style={styles.gap}>
+        <Row gap={Spacing.s1} style={styles.gap}>
           <ActivityIndicator size="small" color={Colors.textMuted} />
           <Caption tone="muted">이동 시간을 알아보는 중…</Caption>
         </Row>
@@ -3185,7 +3362,7 @@ function GapBlock({
 }) {
   if (gap.options.length === 0) {
     return (
-      <Row gap={Spacing.xs} style={styles.gap}>
+      <Row gap={Spacing.s1} style={styles.gap}>
         <Caption tone="muted">이어지는 길을 찾지 못했어요</Caption>
       </Row>
     );
@@ -3217,7 +3394,7 @@ function GapBlock({
         바뀌었을 때 눈에 안 걸립니다.
       */}
       {justChanged ? <Badge label="이 구간이 바뀌었어요" tone="accent" /> : null}
-      <Row gap={Spacing.xs}>
+      <Row gap={Spacing.s1}>
         {gap.options.map((option) => {
           const on = chosen?.mode === option.mode;
           return (
@@ -3231,7 +3408,7 @@ function GapBlock({
                 styles.option,
                 on ? { borderColor: Colors.accent, backgroundColor: Colors.accentSoft } : null,
               ]}>
-              <Row gap={Spacing.xs}>
+              <Row gap={Spacing.s1}>
                 <Caption tone={on ? 'accent' : 'muted'}>{MODE_LABEL[option.mode]}</Caption>
                 {!oneAnswer && option.mode === gap.fastest ? (
                   <Caption tone="hot" strong>
@@ -3262,7 +3439,7 @@ function GapBlock({
         길을 안 말하면 사람이 셋을 하나씩 눌러 보며 다시 재야 합니다.
       */}
       {late > 0 ? (
-        <Row gap={Spacing.sm}>
+        <Row gap={Spacing.s2}>
           <Caption tone="danger" strong>
             {arriveBy} 까지 {asDuration(late * 60)} 모자라요
           </Caption>
@@ -3398,7 +3575,7 @@ function PlaceHours({ info, at }: { info: PlaceInfo; at?: string | null }) {
   const off = at ? outsideHours(at, info.spans) : false;
 
   return (
-    <Row gap={Spacing.sm}>
+    <Row gap={Spacing.s2}>
       <Caption tone={off ? 'danger' : 'secondary'} strong={off}>
         {text}
         {info.spans.length > 1 ? ' (브레이크 타임 있음)' : ''}
@@ -3528,7 +3705,7 @@ function PackSheet({
 
       {items.map((item) => (
         <View key={item.id} style={styles.packRow}>
-          <Row gap={Spacing.sm} style={styles.stayRow}>
+          <Row gap={Spacing.s2} style={styles.stayRow}>
             <IconButton
               name="check"
               label={item.done ? `${item.name} 안 챙김으로` : `${item.name} 챙김으로`}
@@ -3559,7 +3736,7 @@ function PackSheet({
 
           {/* 누가 챙길지. 아무도 안 맡으면 "각자 알아서" 가 됩니다. */}
           {people.length > 1 ? (
-            <Row gap={Spacing.xs} style={styles.packWho}>
+            <Row gap={Spacing.s1} style={styles.packWho}>
               {people.map((p) => (
                 <Chip
                   key={p.id}
@@ -3654,7 +3831,7 @@ function StaySheet({
       onClose={onClose}
       footer={<Button label="저장" onPress={() => save()} busy={busy} />}>
       {name ? (
-        <Row gap={Spacing.sm} style={styles.stayRow}>
+        <Row gap={Spacing.s2} style={styles.stayRow}>
           <Icon name="home" size={21} tone="accent" />
           <Body strong numberOfLines={1}>
             {name}
@@ -3803,7 +3980,7 @@ function BookingPaste({
         multiline
         hint="이 기기 안에서 읽어요. 붙여 넣은 글은 서버로 가지 않아요."
       />
-      <Row gap={Spacing.sm}>
+      <Row gap={Spacing.s2}>
         <Button label="읽기" variant="secondary" compact onPress={read} busy={busy} />
         {found?.stayName ? (
           <Caption tone="secondary" numberOfLines={1}>
@@ -3892,7 +4069,7 @@ function CloneSheet({
 const styles = StyleSheet.create({
   /* 붙여 넣는 칸과 그 아래 한 줄을 한 덩이로 묶습니다. */
   pasteBox: {
-    gap: Spacing.xs,
+    gap: Spacing.s1,
   },
   /* 살아 있는 지도가 앉던 자리를 그대로 채웁니다. 바탕색도 같게 두어야
      그림이 letterbox 로 남기는 위아래가 지도의 여백처럼 읽힙니다. */
@@ -3907,11 +4084,11 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   pick: {
-    gap: Spacing.xs,
+    gap: Spacing.s1,
   },
   packRow: {
-    gap: Spacing.xs,
-    paddingVertical: Spacing.xs,
+    gap: Spacing.s1,
+    paddingVertical: Spacing.s1,
   },
   packWho: {
     flexWrap: 'wrap',
@@ -3923,10 +4100,16 @@ const styles = StyleSheet.create({
   stayRow: {
     alignItems: 'center',
   },
+  /* 면 카드. 회색 면에 담아 장소 줄들과 다른 종류임을 말합니다. */
+  stayCard: {
+    backgroundColor: Colors.fill,
+    borderRadius: Radius.r3,
+    padding: Spacing.s3,
+  },
   /* 제안은 목록 위에 얹힙니다. 줄들과 같은 결이면 그중 하나로 읽혀
      지나칩니다. */
   tidyCard: {
-    gap: Spacing.sm,
+    gap: Spacing.s2,
     backgroundColor: Colors.accentSoft,
   },
   screen: {
@@ -3944,7 +4127,7 @@ const styles = StyleSheet.create({
     flexGrow: 0,
   },
   mark: {
-    gap: Spacing.sm,
+    gap: Spacing.s2,
   },
   markRow: {
     flexWrap: 'wrap',
@@ -3975,105 +4158,150 @@ const styles = StyleSheet.create({
   snackRail: {
     paddingHorizontal: Gutter,
   },
+  /*
+    날짜 칩 줄.
+
+    <p>판 머리(dragPeek)가 좌우 20 을 가지고 있습니다. 칩 줄은 그 밖으로
+    밀어 내고 안쪽 여백을 스스로 가집니다 — 그래야 첫 칩이 왼쪽 20 선에
+    맞고, 마지막 칩이 화면 끝까지 흘러갑니다.
+  */
   chipRail: {
-    paddingHorizontal: Gutter,
-    /* 오른쪽 기둥과 겹치지 않게 그만큼 비워 둡니다. 띠를 끝까지 밀면
-       마지막 날짜가 단추 밑으로 들어갑니다. */
-    paddingRight: Gutter + Tap.min,
+    marginHorizontal: -Gutter,
+    flexGrow: 0,
   },
-  /* 접지 않습니다. 접히면 지도를 덮습니다. */
+  /* 접지 않습니다. 접히면 머리가 두 줄, 세 줄로 자랍니다. */
   chipRow: {
     flexWrap: 'nowrap',
+    alignItems: 'center',
+    gap: Spacing.s2,
+    paddingHorizontal: Gutter,
+  },
+  /* 지도 위 단추 줄. 나가는 길은 왼쪽, 이 여행을 다루는 것은 오른쪽. */
+  mapBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Gutter,
   },
   floatRight: {
     position: 'absolute',
     right: Gutter,
-    gap: Spacing.sm,
+    gap: Spacing.s2,
     alignItems: 'center',
   },
   floatLeft: {
     position: 'absolute',
     left: Gutter,
-    gap: Spacing.sm,
+    gap: Spacing.s2,
     alignItems: 'center',
   },
   grow: {
     flex: 1,
   },
 
-  head: {
-    gap: Spacing.sm,
+  /* -------------------------------------------------------- 판 머리 */
+  peek: {
+    gap: Spacing.s1,
   },
+  peekTitle: {
+    ...Type.title3,
+    fontWeight: Weight.semibold,
+    color: Colors.text,
+    flexShrink: 1,
+  },
+  /* 날짜 칩. 켜지면 그날 색으로 채우고, 꺼져 있으면 앞에 그 색 점을 찍습니다. */
+  dayChip: {
+    height: Tap.chip,
+    paddingHorizontal: Spacing.s4 - 2,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    borderColor: Colors.borderStrong,
+    backgroundColor: Colors.surface,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.s2,
+  },
+  dayChipDot: {
+    width: 8,
+    height: 8,
+    borderRadius: Radius.full,
+  },
+  dayChipLabel: {
+    ...Type.caption,
+    fontSize: 14,
+    fontWeight: Weight.medium,
+    color: Colors.textSecondary,
+  },
+  dayChipLabelOn: {
+    fontWeight: Weight.semibold,
+    /* 날짜 색 여덟은 모두 진해서 흰 글자가 읽힙니다. */
+    color: Colors.onDay,
+  },
+  /* 「지금 · 곧」을 가리키는 노란 표. */
+  dayBadge: {
+    height: 20,
+    paddingHorizontal: Spacing.s2,
+    borderRadius: Radius.r1,
+    backgroundColor: Colors.hot,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dayBadgeLabel: {
+    ...Type.micro,
+    fontWeight: Weight.semibold,
+    color: Colors.onHot,
+  },
+
+
   shortcuts: {
     flexWrap: 'nowrap',
-    alignItems: 'stretch',
+    alignItems: 'flex-start',
   },
   shortcut: {
-    /* 칸을 고르게 나눠 가집니다. 개수가 하나에서 셋까지 달라지는데
+    /* 칸을 고르게 나눠 가집니다. 개수가 하나에서 넷까지 달라지는데
        그때마다 줄 모양이 저절로 맞습니다. */
     flex: 1,
     minWidth: 0,
-    /*
-      그림 위에 글자.
-
-      <p>한동안 가로로 눕혀 두었습니다. 칸이 셋일 때는 그것이 낮아서
-      좋았는데, 이동 시간이 더해져 <b>넷</b>이 되자 한 칸에 63픽셀만
-      남습니다 — 그림 18에 여백까지 빼면 글자 자리가 39픽셀이라 "글 올리기"
-      가 잘립니다.
-
-      <p>세로로 쌓으면 글자가 칸 폭을 다 씁니다. 그만큼 높아지지만, 이 줄은
-      판을 내렸을 때 늘 보이는 자리라(revealAtLow 가 이 높이를 씁니다)
-      글자를 작게 두어 메웁니다.
-    */
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 2,
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.xs,
-    borderRadius: Radius.sm,
-    /* 꺼진 것도 테두리 자리를 잡아 둡니다. 안 그러면 켜는 순간 칸이
-       넓어지며 줄이 덜컥합니다. */
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'transparent',
-    /*
-      판이 흰 종이가 되면서 이 넷이 사라졌습니다.
-
-      <p>흰 카드로 두고 있었습니다. 그때는 판이 회색이라 흰 칸이 떠 보였는데,
-      판이 흰 종이가 된 지금은 <b>흰 위에 흰 네모</b>입니다 — 누를 수 있는
-      것인지 그냥 글자인지 안 보입니다.
-
-      <p>회색으로 뒤집습니다. 떠 보이는 것과 파인 것은 둘 다 "여기는 누르는
-      자리" 를 말하고, 어느 쪽이냐는 <b>바탕이 무엇이냐</b>가 정합니다.
-
-      <p>켜진 하나는 그대로 코랄로 물듭니다. 나머지 셋이 조용한 회색이라
-      물든 하나가 더 또렷합니다.
-    */
-    backgroundColor: Colors.fill,
+    gap: Spacing.s1,
+    minHeight: Tap.min,
   },
-  /* 캡션(15)보다 두 눈금 작게. 네 칸이 나란히 서는 자리라 "글 올리기" 같은
-     이름이 잘리지 않아야 합니다. */
+  /*
+    동그라미 안에 그림.
+
+    <p>회색 네모 칸이었습니다. 칸마다 바탕과 테두리가 있어서 일정 위에 또
+    하나의 상자 줄이 얹힌 모양이었고, 그 줄이 어디서 끝나고 일정이 어디서
+    시작하는지가 안 보였습니다.
+  */
+  shortcutDisc: {
+    width: 48,
+    height: 48,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.fill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  /* 켜진 것. 나머지는 조용한 회색이라, 하나만 물들면 그것이 켜진 것으로
+     읽힙니다. */
+  shortcutDiscOn: {
+    backgroundColor: Colors.accentSoft,
+  },
   shortcutLabel: {
     ...Type.caption,
-    fontSize: 13,
-    lineHeight: 17,
     color: Colors.textSecondary,
   },
   shortcutLabelOn: {
-    color: Colors.accentInk,
-  },
-  /* 켜진 것. 나머지 셋은 조용한 회색이라, 하나만 물들면 그것이 켜진 것으로
-     읽힙니다. */
-  shortcutOn: {
-    backgroundColor: Colors.accentSoft,
-    borderColor: Colors.accent,
+    fontWeight: Weight.semibold,
+    color: Colors.accentText,
   },
   live: {
-    gap: Spacing.sm,
+    gap: Spacing.s2,
   },
   pinRow: {
     flexWrap: 'nowrap',
     justifyContent: 'space-between',
-    gap: Spacing.sm,
+    gap: Spacing.s2,
   },
   track: {
     height: 5,
@@ -4086,13 +4314,43 @@ const styles = StyleSheet.create({
     borderRadius: Radius.full,
   },
 
+  /* 하루 한 덩이. 상자가 아니라 여백만 가집니다. */
+  day: {
+    gap: Spacing.s3,
+  },
   dayTap: {
     flexShrink: 1,
-    paddingVertical: Spacing.xs,
+    paddingVertical: Spacing.s1,
   },
   dayTitle: {
     flexShrink: 1,
     alignItems: 'center',
+  },
+  dayNames: {
+    flexShrink: 1,
+  },
+  /* 넣는 단추 줄. 타임라인 줄들과 왼쪽 선을 맞춥니다. */
+  dayAdd: {
+    flexWrap: 'nowrap',
+    paddingTop: Spacing.s1,
+  },
+  /* 머리의 동그라미. 아래 타임라인의 번호와 같은 색, 같은 크기입니다. */
+  dayDisc: {
+    width: 24,
+    height: 24,
+    borderRadius: Radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dayDiscLabel: {
+    ...Type.micro,
+    fontWeight: Weight.bold,
+    color: Colors.onDay,
+  },
+  dayName: {
+    ...Type.headline,
+    fontWeight: Weight.semibold,
+    color: Colors.text,
   },
   /*
     날짜 색은 카드 왼쪽 띠로 답니다.
@@ -4104,25 +4362,6 @@ const styles = StyleSheet.create({
     띠는 카드 높이만큼 섭니다. 하루가 길수록 띠도 길어지므로, 훑어 내려가는
     동안 어느 날의 어디쯤인지가 계속 보입니다.
   */
-  /*
-    <p>판이 흰 종이가 되면서 그 위의 흰 카드가 안 보이게 되었습니다. 하루와
-    하루 사이가 어디서 갈리는지는 왼쪽 띠 색이 바뀌는 것뿐이었는데, 날짜
-    색이 비슷한 이틀이 붙어 있으면 그것도 안 갈립니다.
-
-    <p>테두리 한 가닥을 두릅니다. 왼쪽 띠는 <b>어느 날인지</b>를 말하고
-    테두리는 <b>어디까지가 하루인지</b>를 말합니다 — 다른 일입니다.
-  */
-  dayBand: {
-    borderLeftWidth: 4,
-    paddingLeft: Spacing.lg - 4,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderRightWidth: StyleSheet.hairlineWidth,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderTopColor: Colors.border,
-    borderRightColor: Colors.border,
-    borderBottomColor: Colors.border,
-  },
-
   places: {
     /* 줄 사이를 띄우지 않습니다. 띄우면 세로선이 그만큼 끊깁니다 — 줄 안의
        여백이 그 몫을 합니다. */
@@ -4141,21 +4380,30 @@ const styles = StyleSheet.create({
     나란히 보이게 합니다.
   */
   when: {
-    width: 54,
+    width: 48,
     alignItems: 'flex-end',
-    paddingTop: Spacing.lg,
-    paddingRight: Spacing.xs,
+    paddingTop: Spacing.s3,
+    paddingRight: Spacing.s2,
   },
   /* 세로선이 지나는 열. 노드가 가운데에 섭니다. */
   rail: {
-    width: 26,
+    width: 32,
     alignItems: 'center',
   },
+  /*
+    잇는 선은 회색입니다.
+
+    <p>날짜 색으로 투명도를 깔아 그었습니다. 그런데 색이 뜻하는 것은
+    <b>며칟날</b>이고, 그 말은 번호 동그라미가 이미 하고 있습니다. 선까지
+    물들이면 하루가 색 덩어리가 되어, 정작 장소 이름이 뒤로 물러납니다.
+
+    <p>선은 "이 둘이 이어진다" 만 말하면 됩니다. 구분선과 같은 회색입니다.
+  */
   railLine: {
     width: 2,
     /* 노드 한가운데가 몸통 첫 줄에 오도록 잡은 높이입니다. */
-    height: 22,
-    opacity: 0.35,
+    height: 12,
+    backgroundColor: Colors.border,
   },
   railGrow: {
     flex: 1,
@@ -4166,11 +4414,16 @@ const styles = StyleSheet.create({
     opacity: 0,
   },
   node: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    width: 24,
+    height: 24,
+    borderRadius: Radius.full,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  nodeLabel: {
+    ...Type.micro,
+    fontWeight: Weight.bold,
+    color: Colors.onDay,
   },
   /* 고른 줄의 노드는 테두리 한 겹으로 커집니다. 지도에서 고른 핀이 커지는
      것과 같은 말입니다. */
@@ -4180,10 +4433,10 @@ const styles = StyleSheet.create({
   },
   stopBody: {
     flex: 1,
-    paddingBottom: Spacing.sm,
+    paddingBottom: Spacing.s2,
   },
   place: {
-    borderRadius: Radius.sm,
+    borderRadius: Radius.r3,
     borderWidth: 1.5,
     /* 고르지 않았을 때도 자리는 차지합니다. 안 그러면 고르는 순간 줄이
        3픽셀 넓어지며 목록이 덜컥합니다. */
@@ -4202,22 +4455,29 @@ const styles = StyleSheet.create({
   noteQuote: {
     borderLeftWidth: 2,
     borderLeftColor: Colors.border,
-    paddingLeft: Spacing.sm,
+    paddingLeft: Spacing.s2,
   },
   /* 알갱이들이 많아지면 접힙니다. 한 줄에 우겨넣으면 글자가 잘립니다. */
   facts: {
     flexWrap: 'wrap',
   },
+  /* 위아래 12. 상자가 아니라 줄이라 좌우는 거의 안 둡니다 — 왼쪽은 세로선
+     열이 이미 띄워 놓았습니다. */
   placeTap: {
     flex: 1,
-    padding: Spacing.lg,
-    paddingBottom: Spacing.sm,
+    paddingVertical: Spacing.s3,
+    paddingRight: Spacing.s2,
     minHeight: Tap.min,
   },
   placeMain: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: Spacing.md,
+    gap: Spacing.s3,
+  },
+  placeName: {
+    ...Type.headline,
+    fontWeight: Weight.semibold,
+    color: Colors.text,
   },
   /* 끌어 올린 줄. 다른 줄 위로 떠 있어야 어느 것을 쥐고 있는지 보입니다. */
   lifted: {
@@ -4228,7 +4488,7 @@ const styles = StyleSheet.create({
   landing: {
     height: 2,
     borderRadius: Radius.full,
-    marginBottom: Spacing.xs,
+    marginBottom: Spacing.s1,
   },
   placeTop: {
     flexWrap: 'nowrap',
@@ -4239,8 +4499,8 @@ const styles = StyleSheet.create({
     height: Tap.min,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: Spacing.sm,
-    borderRadius: Radius.sm,
+    marginTop: Spacing.s2,
+    borderRadius: Radius.r3,
     /* 브라우저가 이 자리에서 화면을 굴리지 않게 합니다. 안 막으면 손잡이를
        끌어도 목록만 위아래로 움직입니다. */
     touchAction: 'none',
@@ -4248,13 +4508,9 @@ const styles = StyleSheet.create({
   gripOn: {
     backgroundColor: Colors.accentSoft,
   },
-  orderEmoji: {
-    /* 이모지는 글꼴이 제 높이를 갖고 있어, 줄 높이를 두면 아래로 처집니다. */
-    lineHeight: undefined,
-  },
   placeText: {
     flex: 1,
-    gap: Spacing.xs,
+    gap: Spacing.s1,
   },
   /*
     챙겨 둔 것.
@@ -4266,9 +4522,9 @@ const styles = StyleSheet.create({
     불편하지만 사진은 넓을수록 잘 보입니다.
   */
   refOpen: {
-    gap: Spacing.xs,
-    paddingHorizontal: Spacing.sm,
-    paddingBottom: Spacing.sm,
+    gap: Spacing.s1,
+    paddingHorizontal: Spacing.s2,
+    paddingBottom: Spacing.s2,
   },
   /*
     고른 줄의 단추들.
@@ -4313,15 +4569,15 @@ const styles = StyleSheet.create({
 
   /* --------------------------------------------------- 사이사이 이동 */
   gap: {
-    paddingLeft: Spacing.xl,
-    paddingVertical: Spacing.sm,
-    gap: Spacing.xs,
+    paddingLeft: Spacing.s5,
+    paddingVertical: Spacing.s2,
+    gap: Spacing.s1,
   },
   /* 앞 장소에서 이어진다는 것을 눈으로 잇습니다. */
   gapLine: {
     width: StyleSheet.hairlineWidth,
     height: 10,
-    marginLeft: Spacing.xs,
+    marginLeft: Spacing.s1,
     backgroundColor: Colors.borderStrong,
   },
   option: {
@@ -4329,12 +4585,12 @@ const styles = StyleSheet.create({
     /* 셋이 폭 360 인 폰에서도 한 줄에 서야 합니다. 이보다 넓게 잡으면
        마지막 하나가 아래로 접혀 비교가 안 됩니다. */
     flexBasis: 76,
-    borderRadius: Radius.sm,
+    borderRadius: Radius.r3,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: Colors.border,
     backgroundColor: Colors.fill,
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.s2,
+    paddingHorizontal: Spacing.s3,
     gap: 2,
   },
 });

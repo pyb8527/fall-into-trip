@@ -16,7 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CLUMP_PX, DRAW_MS, EDGE, FOCUS_SPAN, PAD } from '@/components/map-tune';
 import type { MapPlace, TripMapProps } from '@/components/map-types';
 import { QUIET_MAP } from '@/lib/map-style';
-import { Colors, Elevation, Radius, Spacing, Tap } from '@/constants/theme';
+import { Colors, Elevation, Radius, Spacing, Tap, Type, Weight } from '@/constants/theme';
 import { Badge, Body, Caption, Chip, Icon, IconButton, Row, Subtitle } from '@/ui';
 import { HERE, NOTE_PIN } from '@/constants/words';
 
@@ -670,7 +670,9 @@ export function TripMap({
           key={line.id}
           coordinates={line.points.map((p) => ({ latitude: p.lat, longitude: p.lng }))}
           strokeColor={line.color}
-          strokeWidth={4}
+          /* 4 였습니다. 핀을 한 눈금 줄이면서 선도 함께 줄입니다 — 선이
+             핀보다 굵으면 동선이 아니라 색 띠로 보입니다. */
+          strokeWidth={3}
         />
       ))}
       {/* 묻고 있는 동안에는 점선도 안 그립니다. 점선은 "길을 못 찾았다" 는
@@ -1072,13 +1074,25 @@ function Pin({
     );
   }
 
-  const size = active ? 36 : 30;
-  const border = active ? 3 : 2.5;
+  /*
+    번호만 있는 핀.
+
+    <h3>속을 비우지 않습니다</h3>
+
+    <p>날짜 색 방울 안에 다시 흰 동그라미를 넣고 그 안에 먹색 숫자를
+    적었습니다. 그래서 30픽셀 안에 테두리 흰색 · 바탕 날짜색 · 속 흰색 ·
+    글자 먹색으로 <b>층이 넷</b>이었고, 정작 숫자가 들어갈 자리는 열일곱
+    픽셀이었습니다.
+
+    <p>날짜 색을 가득 칠하고 흰 숫자를 바로 얹습니다. 날짜 색 여덟은 모두
+    흰 글씨를 얹어도 읽히도록 고른 것입니다(DayColors). 층이 둘로 줄어
+    숫자가 핀 폭을 다 씁니다.
+  */
+  const size = active ? 36 : 28;
   /* 45도 돌리면 대각선이 가로가 됩니다. 잘리지 않게 그만큼 자리를 잡아 둡니다. */
   const box = Math.ceil(size * 1.42);
   /* 방울 한가운데에서 아래 끝까지. 이 끝이 좌표에 닿습니다. */
   const tall = Math.ceil(size * 1.21);
-  const dot = Math.round(size * 0.58);
 
   return (
     <View style={{ width: box, height: tall }}>
@@ -1092,8 +1106,7 @@ function Pin({
             borderRadius: size / 2,
             borderBottomRightRadius: 2,
             backgroundColor: place.color,
-            borderWidth: border,
-            /* 고른 것을 조금 더 띄웁니다. */
+            borderWidth: 2,
             /* 고른 것만 한 뼘 더 띄웁니다. 나머지는 핀의 기본값
                (Elevation.pin)을 그대로 씁니다. */
             ...(active ? { elevation: 6, shadowOpacity: 0.32 } : null),
@@ -1101,22 +1114,7 @@ function Pin({
         ]}
       />
       <View style={[styles.pinFace, { height: size, width: box }]}>
-        <View
-          style={[
-            styles.dot,
-            {
-              width: dot,
-              height: dot,
-              borderRadius: dot / 2,
-              /* 다녀온 곳은 속을 날짜 색으로 채우고, 아직인 곳은 희게 비워
-                 둡니다. 지도가 채워지는 체크리스트처럼 읽힙니다. */
-              backgroundColor: '#FFFFFF',
-            },
-          ]}>
-          <Body small strong style={{ color: Colors.text }}>
-            {place.order}
-          </Body>
-        </View>
+        <Text style={[styles.pinOrder, { fontSize: active ? 14 : 12 }]}>{place.order}</Text>
       </View>
     </View>
   );
@@ -1319,6 +1317,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#FFFFFF',
+  },
+  /* 핀 속의 순번. 날짜 색을 가득 칠한 위에 흰 글씨로 바로 얹습니다. */
+  pinOrder: {
+    ...Type.micro,
+    fontWeight: Weight.bold,
+    color: Colors.onDay,
+    /* 글꼴이 제 줄 높이를 갖고 있어, 줄 높이를 두면 가운데서 처집니다. */
+    lineHeight: undefined,
   },
   pinText: {
     color: '#FFFFFF',

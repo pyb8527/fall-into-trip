@@ -1,48 +1,56 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { ApiError, UNEXPECTED } from '@/api/client';
 import { useAuth } from '@/auth/auth-provider';
-import { Spacing } from '@/constants/theme';
+import { Colors, Spacing, Type, Weight } from '@/constants/theme';
 import { GoogleButton } from '@/components/google-button';
 import { canSignInWithGoogle } from '@/lib/google-signin';
-import {
-  Body,
-  Button,
-  Caption,
-  Card,
-  ErrorNote,
-  Field,
-  Screen,
-  SegmentedTabs,
-  Title,
-} from '@/ui';
-import { LogoLockup } from '@/ui/logo';
+import { Button, ErrorNote, Field, IconButton, Row, Screen, Title } from '@/ui';
+import { LogoSymbol } from '@/ui/logo';
 
 /** 서버의 AuthService.PASSWORD_MIN 과 같아야 합니다. */
 const PASSWORD_MIN = 8;
 
 export type AuthMode = 'login' | 'register';
 
-const TABS: { value: AuthMode; label: string }[] = [
-  { value: 'login', label: '로그인' },
-  { value: 'register', label: '회원가입' },
-];
-
 /**
  * 로그인과 회원가입.
  *
- * <p>둘은 서로 대신하는 화면이라 한 자리에서 띠로 오갑니다. 링크로 두면
- * 눌러 본 뒤에야 다른 쪽이 있는 줄 압니다.
+ * <h3>띠를 걷고 두 화면으로 나눴습니다</h3>
  *
- * <p>주소는 그대로 둘로 남겨 둡니다(/login, /register). 띠를 누르면 화면을
- * 갈아 끼우므로 뒤로 가기가 쌓이지 않습니다.
+ * <p>둘을 한 자리에 두고 <b>SegmentedTabs</b> 로 오갔습니다. 서로 대신하는
+ * 화면이니 한 자리에 모아 두는 편이 "다른 쪽이 있다" 를 바로 보여 준다는
+ * 이유였습니다.
+ *
+ * <p>그런데 띠는 <b>같은 것의 다른 모습</b>을 고르는 물건입니다 — 받은 돈과
+ * 쓴 돈, 일정과 지도처럼요. 로그인과 가입은 같은 것의 다른 모습이 아니라
+ * <b>다른 일</b>입니다. 들어온 사람은 둘 중 하나만 하려고 왔고, 다른 쪽을
+ * 고르는 일은 많아도 한 번입니다. 그 한 번을 위해 화면 맨 위 한 줄을 늘
+ * 비워 두고 있었습니다.
+ *
+ * <p>게다가 띠가 바뀔 때 <b>칸이 하나 늘었다 줄었다</b> 합니다(이름 칸).
+ * 고르는 것과 바뀌는 것이 한 화면에 함께 있으면, 누른 뒤에 무엇이 달라졌는지
+ * 를 눈이 다시 찾아야 합니다.
+ *
+ * <p>이제 화면 하나에 일 하나입니다. 다른 쪽으로 가는 길은 맨 아래 글자
+ * 링크로 둡니다 — 지나가는 길목에 두면 매번 보이고, 아래에 두면 필요할 때만
+ * 눈에 듭니다.
+ *
+ * <h3>판을 벗겼습니다</h3>
+ *
+ * <p>회색 바닥에 흰 카드를 얹고 그 안에 칸들을 두었습니다. 바닥이 흰색이
+ * 된 뒤에는 그 카드가 <b>흰 종이 위의 흰 종이</b>입니다 — 테두리 하나로
+ * 구역을 만들어 놓고 그 안에 화면 전체를 넣은 셈입니다. 걷습니다.
+ *
+ * <p>주소는 그대로 둘입니다(/login, /register).
  */
 export function AuthPanel({ mode }: { mode: AuthMode }) {
   const router = useRouter();
+  const navigation = useNavigation();
   /* 초대 링크에서 넘어왔다면 로그인 뒤 그리로 돌아가야 합니다.
-     띠를 눌러 가입 쪽으로 갈아탈 때도 잃어버리면 안 됩니다. */
+     다른 쪽으로 갈아탈 때도 잃어버리면 안 됩니다. */
   const { next: back } = useLocalSearchParams<{ next?: string }>();
   const { login, register, signInWithGoogle } = useAuth();
 
@@ -54,13 +62,11 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
 
   const isRegister = mode === 'register';
 
+  /** 다른 쪽(로그인 ↔ 가입)으로. 돌아갈 자리는 들고 갑니다. */
   function switchTo(next: AuthMode) {
-    if (next === mode) {
-      return;
-    }
     setError(null);
-    /* 뒤로 가기에 쌓이지 않게 갈아 끼웁니다. 띠를 몇 번 눌렀다고 그만큼
-       뒤로 가야 하면 답답합니다. */
+    /* 뒤로 가기에 쌓이지 않게 갈아 끼웁니다. 두 화면을 몇 번 오갔다고
+       그만큼 뒤로 가야 하면 답답합니다. */
     const to = next === 'login' ? '/(auth)/login' : '/(auth)/register';
     router.replace(back ? `${to}?next=${encodeURIComponent(back)}` : to);
   }
@@ -140,33 +146,36 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
       있어도 누른 것이 그대로 전해집니다(keyboardShouldPersistTaps).
       비밀번호 칸에서 자판의 완료를 눌러도 똑같이 들어갑니다.
     */
-    <Screen safeTop>
-      <View style={styles.brand}>
-        <LogoLockup size={104} />
-      </View>
-
+    <Screen
+      safeTop
+      header={
+        <Row gap={Spacing.s1}>
+          <IconButton
+            name="chevron-left"
+            label="뒤로"
+            bare
+            /* 링크로 바로 들어오면 밑에 쌓인 것이 없어 화살표가 아무 데도
+               못 갑니다. 그때는 문으로 보냅니다 — 여기까지 온 사람에게
+               돌아갈 곳은 거기입니다. */
+            onPress={() =>
+              navigation.canGoBack() ? navigation.goBack() : router.replace('/(auth)/welcome')
+            }
+          />
+        </Row>
+      }>
       {/*
-        띠와 그 아래가 한 장입니다.
+        심볼만, 워드마크 없이.
 
-        <p>띠만 흰 바닥을 갖고 인사말과 칸들은 회색 위에 떠 있었습니다. 그래서
-        <b>띠가 그 아래와 다른 것</b>처럼 보였습니다 — 「로그인」을 눌러 바뀌는
-        것이 바로 아래 칸들인데요.
-
-        <p>한 판에 담습니다. 띠는 판의 머리가 되고, 고른 것이 무엇을 바꾸는지가
-        같은 종이 안에서 보입니다.
+        <p>카드 머리에 「fit / FALL INTO TRIP」 묶음을 104 크기로 세워
+        두었습니다. 이름이 두 번 나오는 셈이었습니다 — 바로 아래 제목이
+        「로그인」 이고, 여기까지 온 사람은 방금 문에서 이름을 봤습니다.
+        심볼 하나면 "그 앱이 맞다" 가 확인됩니다.
       */}
-      <Card style={styles.panel}>
-        <SegmentedTabs items={TABS} value={mode} onChange={switchTo} />
+      <LogoSymbol size={56} />
 
-        <View style={styles.head}>
-          <Title>{isRegister ? '여행을 시작해요' : '다시 오셨네요'}</Title>
-          <Body tone="secondary">
-            {isRegister ? '계정을 만들면 바로 일정을 짤 수 있어요.' : '여행을 이어서 짜 봅시다.'}
-          </Body>
-        </View>
+      <Title>{isRegister ? '가입하기' : '로그인'}</Title>
 
-        {/* 칸이 줄로 바뀌었으니 그것을 다시 상자에 담지 않습니다. */}
-        <View style={styles.form}>
+      <View style={styles.form}>
         <Field
           label="이메일"
           value={email}
@@ -203,26 +212,34 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
         />
 
         {error ? <ErrorNote message={error} /> : null}
+      </View>
 
+      <View style={styles.submit}>
         <Button
           label={isRegister ? '가입하고 시작하기' : '로그인'}
           onPress={submit}
           busy={busy}
         />
+      </View>
 
-        {/*
-          구글로 들어오기.
+      {/*
+        구글로 들어오기.
 
-          비밀번호 칸 아래에 둡니다. 위에 두면 이미 비밀번호로 쓰던 사람이
-          매번 지나쳐야 합니다.
+        비밀번호 칸 아래에 둡니다. 위에 두면 이미 비밀번호로 쓰던 사람이
+        매번 지나쳐야 합니다.
+      */}
+      <GoogleBlock onDone={withGoogle} />
 
-          클라이언트 ID 가 없거나 앱이면 아무것도 안 그려집니다. 그래서
-          여기 "또는" 줄도 단추가 있을 때만 뜨게 묶어 둡니다 — 아래가 비면
-          "또는" 이 아무것도 안 가리킵니다.
-        */}
-        <GoogleBlock onDone={withGoogle} />
-        </View>
-      </Card>
+      {/* 다른 쪽으로 가는 길. 맨 아래입니다 — 찾는 사람만 찾습니다. */}
+      <Pressable
+        accessibilityRole="link"
+        style={styles.switch}
+        onPress={() => switchTo(isRegister ? 'login' : 'register')}>
+        <Text style={styles.switchText}>
+          {isRegister ? '계정이 있나요? ' : '계정이 없나요? '}
+          <Text style={styles.switchLink}>{isRegister ? '로그인' : '가입하기'}</Text>
+        </Text>
+      </Pressable>
     </Screen>
   );
 }
@@ -249,31 +266,68 @@ function GoogleBlock({ onDone }: { onDone: (credential: string) => void }) {
   }
   return (
     <View style={styles.social}>
-      <Caption tone="muted">또는</Caption>
+      {/*
+        가름 줄.
+
+        <p>글자만 두었습니다. 그러면 「또는」이 위아래 어느 쪽에 붙은
+        말인지가 안 보이고, 가운데 떠 있는 낱말 하나가 됩니다. 양쪽으로
+        선을 뻗으면 그 줄이 <b>경계</b>라는 것이 모양으로 읽힙니다.
+      */}
+      <Row gap={Spacing.s3} style={styles.orRow}>
+        <View style={styles.orLine} />
+        <Text style={styles.orText}>또는</Text>
+        <View style={styles.orLine} />
+      </Row>
       <GoogleButton onCredential={onDone} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  /* 띠부터 단추까지가 한 장입니다. */
-  panel: {
-    gap: Spacing.md,
+  /*
+    칸들.
+
+    <p>Screen 이 자식 사이를 12 씌웁니다. 제목과 첫 칸 사이는 32 라야 제목이
+    칸들의 머리로 읽히므로 20 을 더합니다. 아래 셋도 같은 셈입니다.
+  */
+  form: {
+    marginTop: Spacing.s5,
+    gap: Spacing.s4,
+  },
+  submit: {
+    marginTop: Spacing.s3,
   },
   social: {
-    gap: Spacing.md,
+    marginTop: Spacing.s5,
+    gap: Spacing.s4,
     alignItems: 'center',
   },
-  brand: {
-    alignItems: 'flex-start',
-    paddingTop: Spacing.xxl,
-    paddingBottom: Spacing.lg,
+  orRow: {
+    alignItems: 'center',
+    alignSelf: 'stretch',
   },
-  head: {
-    gap: Spacing.sm,
+  orLine: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: Colors.border,
   },
-  form: {
-    gap: Spacing.xl,
-    paddingTop: Spacing.sm,
+  orText: {
+    ...Type.caption,
+    color: Colors.textDisabled,
+  },
+  switch: {
+    marginTop: Spacing.s4,
+    alignItems: 'center',
+    /* 글자만 있는 링크라 보이는 높이가 글자 한 줄입니다. 누르는 넓이는
+       손가락이 닿을 만큼 채웁니다. */
+    paddingVertical: Spacing.s3,
+  },
+  switchText: {
+    ...Type.body2,
+    color: Colors.textSecondary,
+  },
+  switchLink: {
+    color: Colors.accentInk,
+    fontWeight: Weight.semibold,
   },
 });

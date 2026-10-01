@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
+import { StyleSheet } from 'react-native';
 
 import { api, ApiError, UNEXPECTED } from '@/api/client';
 import type { Group } from '@/api/types';
 import { Spacing } from '@/constants/theme';
-import { BottomSheet, Button, Caption, Chip, ErrorNote, Field, Row } from '@/ui';
+import { Body, BottomSheet, Button, Caption, ChoiceTile, ErrorNote, Field, Row } from '@/ui';
 
 /**
  * 모임을 만들거나 고치는 판.
@@ -120,13 +121,24 @@ export function GroupForm({
         hint="안 적어도 돼요."
       />
 
-      <Caption tone="secondary">표식</Caption>
-      <Row gap={Spacing.xs} style={{ flexWrap: 'wrap' }}>
+      {/*
+        표식.
+
+        <p>칩으로 늘어놓고 있었습니다. 칩은 <b>글자</b>를 고르는 모양이라,
+        이모지 하나만 든 칩은 좌우 여백 14가 그림보다 넓어 「무엇을 고르는
+        것인지」가 안 읽혔습니다. 그림을 고르는 자리는 네모 타일입니다 —
+        칸이 고르게 서서 그리드로 읽힙니다.
+      */}
+      <Body small strong>
+        표식
+      </Body>
+      <Row gap={Spacing.s2} style={styles.tiles}>
         {EMOJIS.map((one) => (
-          <Chip
+          <ChoiceTile
             key={one}
-            label={one}
+            mark={one}
             selected={emoji === one}
+            accessibilityLabel={`표식 ${one}`}
             /* 고른 것을 다시 누르면 뺍니다. 뺄 길이 없으면 한 번 달면 끝입니다. */
             onPress={() => setEmoji(emoji === one ? null : one)}
           />
@@ -137,3 +149,9 @@ export function GroupForm({
     </BottomSheet>
   );
 }
+
+const styles = StyleSheet.create({
+  tiles: {
+    flexWrap: 'wrap',
+  },
+});

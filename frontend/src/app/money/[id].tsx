@@ -1,26 +1,37 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { PathTitle } from '@/ui/nav';
 import { useMemo, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, TextInput, View, type TextStyle } from 'react-native';
 
 import { api, ApiError, UNEXPECTED } from '@/api/client';
 import type { Books, Person, Spend, TripDetail } from '@/api/types';
 import { useAsync } from '@/api/use-async';
-import { Colors, Spacing, dayColor } from '@/constants/theme';
+import { useAuth } from '@/auth/auth-provider';
+import {
+  Colors,
+  Gutter,
+  Radius,
+  Spacing,
+  Tabular,
+  Type,
+  Weight,
+  dayColor,
+} from '@/constants/theme';
 import { decimalsOf, money, unitsOf } from '@/lib/money';
 import {
   Badge,
+  Band,
   Body,
   BottomSheet,
   Button,
   Caption,
-  Card,
   Chip,
   Divider,
   Empty,
   ErrorNote,
   Field,
   Loading,
+  Mark,
   Picker,
   Press,
   Row,
@@ -28,7 +39,6 @@ import {
   SegmentedTabs,
   Snack,
   Split,
-  Subtitle,
   useUndo,
 } from '@/ui';
 import { TripTabs } from '@/ui/tab-bar';
@@ -47,10 +57,21 @@ import { TripTabs } from '@/ui/tab-bar';
  * <p>적는 것과 나누는 것은 다른 일입니다. 여행 중에는 적기만 하고, 정산은
  * 대개 돌아와서 한 번 봅니다. 한 화면에 섞으면 길에서 적을 때마다 정산표가
  * 눈에 들어옵니다.
+ *
+ * <h3>합계가 맨 위에 있습니다</h3>
+ *
+ * <p>「지금까지」 라는 작은 글자 아래에 합계를 적어 두었습니다. 그런데 이
+ * 화면을 여는 이유의 절반은 그 숫자 하나입니다 — 그것이 화면에서 가장 큰
+ * 글자여야 합니다.
+ *
+ * <p>그 아래에 <b>내가 받을 돈과 줄 돈</b>을 나란히 둡니다. 전에는 정산
+ * 장을 열어야 알 수 있었는데, 정작 궁금한 사람은 길 위에서 쓴 돈을 적는
+ * 사람입니다.
  */
 export default function Money() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [tab, setTab] = useState<'list' | 'settle'>('list');
+  const { user } = useAuth();
 
   const { data: trip } = useAsync<TripDetail>(
     (signal) => api.get(`/api/trip?trip=${encodeURIComponent(id)}`, signal),
@@ -157,8 +178,8 @@ export default function Money() {
     }
   }
 
-  /* 통화마다 얼마나 썼는지. 목록 맨 위에 한 줄로 둡니다 — 가계부를 여는
-     이유의 절반은 "얼마나 썼지" 입니다. */
+  /* 통화마다 얼마나 썼는지. 화면 맨 위 요약이 이것으로 섭니다 — 가계부를
+     여는 이유의 절반은 "얼마나 썼지" 입니다. */
   const totals = useMemo(() => {
     const box = new Map<string, { sum: number; decimals: number }>();
     list.forEach((e) => {
@@ -167,6 +188,29 @@ export default function Money() {
     });
     return [...box.entries()];
   }, [list]);
+
+  /*
+    내 몫만 추려 냅니다.
+
+    <p>정산표는 모든 사람의 몫을 늘어놓습니다. 그런데 요약에 적을 것은 <b>내
+    것</b> 하나입니다 — 내가 받을지 줄지는 열 때마다 궁금하고, 남의 몫은
+    정산 장을 열고 나서 봅니다.
+
+    <p>통화가 여럿이면 더하지 않고 각각 셉니다. 엔으로 받을 돈과 원으로 줄
+    돈은 더해지지 않습니다.
+  */
+  const mine = useMemo(() => {
+    const rows = (books.data?.books ?? [])
+      .map((book) => ({
+        book,
+        at: book.balances.find((b) => b.userId === user?.id) ?? null,
+      }))
+      .filter((row) => row.at !== null && row.at.balance !== 0);
+    return {
+      take: rows.filter((r) => (r.at?.balance ?? 0) > 0),
+      give: rows.filter((r) => (r.at?.balance ?? 0) < 0),
+    };
+  }, [books.data, user]);
 
   return (
     <Screen
@@ -186,6 +230,77 @@ export default function Money() {
         }}
       />
 
+      {/*
+        요약.
+
+        <p>흰 바탕에 흰 카드를 얹으면 아무 일도 안 일어납니다. 여기만
+        <b>면 카드</b>(회색 면)를 씁니다 — 눌러서 들어가는 물건이 아니라
+        한 덩어리로 읽어야 하는 숫자 묶음입니다.
+      */}
+      {totals.length > 0 ? (
+        <View style={styles.summary}>
+          <Caption tone="secondary">총 쓴 돈</Caption>
+          {totals.map(([currency, t], at) =>
+            at === 0 ? (
+              /* 첫 통화가 큰 글자입니다. 둘째부터는 한 줄로 이어 붙입니다 —
+                 두 나라를 도는 여행에서만 생기는 일이라, 큰 글자를 둘
+                 세우면 어느 쪽이 이 여행의 셈인지 알 수 없습니다. */
+              <Text key={currency} style={styles.total}>
+                {money(t.sum, currency, t.decimals)}
+              </Text>
+            ) : null,
+          )}
+          {totals.length > 1 ? (
+            <Body small tone="secondary">
+              {totals
+                .slice(1)
+                .map(([c, t]) => money(t.sum, c, t.decimals))
+                .join(' · ')}
+            </Body>
+          ) : null}
+
+          {mine.take.length > 0 || mine.give.length > 0 ? (
+            <>
+              <Divider />
+              <Split align="start">
+                <View style={styles.myHalf}>
+                  <Caption tone="secondary">내가 받을 돈</Caption>
+                  <Text style={[styles.myAmount, styles.take]}>
+                    {mine.take.length === 0
+                      ? '없음'
+                      : mine.take
+                          .map((r) =>
+                            money(
+                              Math.abs(r.at?.balance ?? 0),
+                              r.book.currency,
+                              r.book.decimals,
+                            ),
+                          )
+                          .join(' · ')}
+                  </Text>
+                </View>
+                <View style={styles.myHalf}>
+                  <Caption tone="secondary">내가 줄 돈</Caption>
+                  <Text style={[styles.myAmount, styles.give]}>
+                    {mine.give.length === 0
+                      ? '없음'
+                      : mine.give
+                          .map((r) =>
+                            money(
+                              Math.abs(r.at?.balance ?? 0),
+                              r.book.currency,
+                              r.book.decimals,
+                            ),
+                          )
+                          .join(' · ')}
+                  </Text>
+                </View>
+              </Split>
+            </>
+          ) : null}
+        </View>
+      ) : null}
+
       <SegmentedTabs
         items={[
           { value: 'list', label: '쓴 돈' },
@@ -201,33 +316,33 @@ export default function Money() {
 
       {tab === 'list' ? (
         <>
-          {totals.length > 0 ? (
-            <Card>
-              <Caption tone="secondary">지금까지</Caption>
-              {totals.map(([currency, t]) => (
-                <Split key={currency}>
-                  <Subtitle>{money(t.sum, currency, t.decimals)}</Subtitle>
-                  <Caption tone="muted">{list.filter((e) => e.currency === currency).length}건</Caption>
-                </Split>
-              ))}
-            </Card>
-          ) : null}
-
           {spent.data && list.length === 0 ? (
             <Empty message="아직 적어 둔 것이 없어요. 쓴 김에 적어 두면 돌아와서 편해요." />
           ) : null}
 
           {/* 날짜별로 묶습니다. 여행의 돈은 하루 단위로 기억됩니다 —
               "둘째 날에 많이 썼지" 처럼. */}
-          {byDay(list, days).map((group) => (
-            <View
-              key={group.key}
-              style={[
-                styles.group,
-                group.color ? { borderLeftColor: group.color } : styles.groupPlain,
-              ]}>
-              <Split align="baseline">
-                <Subtitle>{group.label}</Subtitle>
+          {byDay(list, days).map((group, at) => (
+            <View key={group.key}>
+              {at > 0 ? <Band /> : null}
+              {/*
+                날짜 머리.
+
+                <p>왼쪽에 4px 색 띠를 세우고 그 안에 줄을 담았습니다. 띠가
+                세로로 길게 서면 그것이 구역의 테두리가 되어, 화면이 다시
+                <b>테두리 쳐진 상자의 더미</b>가 됩니다.
+
+                <p>색은 날짜를 가리키는 이름표일 뿐입니다. 동그라미 하나로
+                줄이고, 구역을 가르는 일은 회색 띠가 맡습니다 — 일정 화면의
+                날짜 머리와 같은 모양입니다.
+              */}
+              <Split align="baseline" style={styles.groupHead}>
+                <Row gap={Spacing.s2}>
+                  {group.color ? (
+                    <View style={[styles.dayDot, { backgroundColor: group.color }]} />
+                  ) : null}
+                  <Text style={styles.groupLabel}>{group.label}</Text>
+                </Row>
                 <Caption tone="secondary">
                   {group.totals.map(([c, t]) => money(t.sum, c, t.decimals)).join(' · ')}
                 </Caption>
@@ -285,6 +400,12 @@ export default function Money() {
  * — 오타 하나를 고치려면 지우고 처음부터 다시 적어야 했습니다.
  *
  * <p>줄 전체를 누르면 열립니다. 지우는 것도 거기 있습니다.
+ *
+ * <h3>앞에 갈래 그림이 섭니다</h3>
+ *
+ * <p>글자만 열 줄 서 있으면 어느 것이 밥이고 어느 것이 교통인지 <b>읽어야</b>
+ * 압니다. 하루에 열 건을 적는 화면이라 그 열 번이 쌓입니다. 앞에 그림이
+ * 있으면 훑는 눈이 먼저 갈래를 집습니다.
  */
 function SpendRow({
   spend,
@@ -314,14 +435,15 @@ function SpendRow({
       scale={0.995}
       accessibilityLabel={`${spend.name} 고치기`}
       style={styles.row}>
+      <Mark emoji={catMark(spend.cat)} />
       <View style={styles.grow}>
-        <Row gap={Spacing.sm} style={styles.rowHead}>
-          <Body strong numberOfLines={1}>
+        <Row gap={Spacing.s2} style={styles.rowHead}>
+          <Text style={styles.rowTitle} numberOfLines={1}>
             {spend.name}
-          </Body>
+          </Text>
           {spend.cat ? <Badge label={spend.cat} tone="muted" /> : null}
         </Row>
-        <Caption tone="secondary">
+        <Caption tone="secondary" numberOfLines={1}>
           {spend.payerName} 님이 냄{shared ? ` · ${shared} 나눔` : ''}
           {spend.pay ? ` · ${spend.pay}` : ''}
           {placeName ? ` · ${placeName}` : ''}
@@ -329,11 +451,45 @@ function SpendRow({
       </View>
       {/* 금액은 오른쪽 끝에 붙입니다. 지우기 단추가 빠지면서 자리가 났는데,
           숫자가 줄마다 다른 데서 시작하면 위아래로 훑어 견줄 수가 없습니다. */}
-      <Body strong style={styles.amount}>
+      <Text style={styles.amount}>
         {money(spend.amount, spend.currency, spend.decimals)}
-      </Body>
+      </Text>
     </Press>
   );
+}
+
+/**
+ * 갈래를 가리키는 그림.
+ *
+ * <p>갈래는 사람이 적는 글입니다("밥", "저녁값", "교통"). 그래서 정해진
+ * 목록에서 고르는 것이 아니라 <b>적힌 말에서 알아냅니다.</b> 못 알아내면
+ * 지갑 하나로 둡니다 — 틀린 그림을 붙이는 것보다 아무 말 안 하는 쪽이
+ * 낫습니다.
+ */
+function catMark(cat: string | null | undefined) {
+  const word = (cat ?? '').toLowerCase();
+  if (!word) {
+    return '💳';
+  }
+  if (/카페|커피|디저트|cafe/.test(word)) {
+    return '☕';
+  }
+  if (/밥|식|먹|저녁|점심|아침|술|food/.test(word)) {
+    return '🍽';
+  }
+  if (/교통|택시|기차|지하철|버스|렌트|항공|비행|기름/.test(word)) {
+    return '🚃';
+  }
+  if (/숙|호텔|방|집/.test(word)) {
+    return '🛏';
+  }
+  if (/쇼핑|기념|선물|옷/.test(word)) {
+    return '🛍';
+  }
+  if (/입장|관광|티켓|표|체험|놀이/.test(word)) {
+    return '🎟';
+  }
+  return '💳';
 }
 
 /**
@@ -342,6 +498,12 @@ function SpendRow({
  * <p>통화마다 한 장입니다. 엔으로 받을 돈과 원으로 낼 돈은 더해지지 않습니다.
  * 환율로 합칠 수도 있지만 그러면 "언제 환율로" 가 남고, 그 답은 사람마다
  * 다릅니다.
+ *
+ * <h3>카드를 벗겼습니다</h3>
+ *
+ * <p>통화마다 흰 카드 한 장이었습니다. 바닥이 흰색이 되면서 카드가 바닥에
+ * 녹아 없어졌습니다 — 그림자만 남아 화면이 흐릿해 보입니다. 통화 사이는
+ * 회색 띠가 가릅니다.
  */
 function Settle({ books, loading }: { books: Books[]; loading: boolean }) {
   if (loading && books.length === 0) {
@@ -351,30 +513,36 @@ function Settle({ books, loading }: { books: Books[]; loading: boolean }) {
     return <Empty message="아직 나눌 것이 없어요." />;
   }
 
+  /* 주고받을 것이 하나도 없으면 그 말만 합니다. 0 인 줄만 늘어놓은 표는
+     읽을 것이 없습니다. */
+  const done = books.every((book) => book.transfers.length === 0);
+  if (done) {
+    return <Empty message="정산이 끝났어요 🎉" />;
+  }
+
   return (
     <>
-      {books.map((book) => (
-        <Card key={book.currency}>
-          <Split>
-            <Subtitle>{book.currency}</Subtitle>
+      {books.map((book, at) => (
+        <View key={book.currency}>
+          {at > 0 ? <Band /> : null}
+          <Split align="baseline" style={styles.groupHead}>
+            <Text style={styles.groupLabel}>{book.currency}</Text>
             <Caption tone="secondary">
               모두 {money(book.total, book.currency, book.decimals)}
             </Caption>
           </Split>
-
-          <Divider />
 
           {/* 누가 받고 누가 내는지. 0 인 사람은 적지 않습니다 — 줄만
               차지하고 할 일이 없습니다. */}
           {book.balances
             .filter((b) => b.balance !== 0)
             .map((b) => (
-              <Split key={b.userId}>
+              <Split key={b.userId} style={styles.settleRow}>
                 <Body>{b.name}</Body>
-                <Body strong tone={b.balance > 0 ? 'success' : 'danger'}>
-                  {b.balance > 0 ? '받을 ' : '낼 '}
+                <Text style={[styles.amount, b.balance > 0 ? styles.take : styles.give]}>
+                  {b.balance > 0 ? '받을 ' : '줄 '}
                   {money(Math.abs(b.balance), book.currency, book.decimals)}
-                </Body>
+                </Text>
               </Split>
             ))}
 
@@ -383,20 +551,18 @@ function Settle({ books, loading }: { books: Books[]; loading: boolean }) {
               <Divider />
               <Caption tone="secondary">이렇게 주고받으면 끝나요</Caption>
               {book.transfers.map((t, i) => (
-                <Split key={i}>
+                <Split key={i} style={styles.settleRow}>
                   <Body>
                     {t.fromName} → {t.toName}
                   </Body>
-                  <Body strong tone="accent">
+                  <Text style={[styles.amount, styles.give]}>
                     {money(t.amount, book.currency, book.decimals)}
-                  </Body>
+                  </Text>
                 </Split>
               ))}
             </>
-          ) : (
-            <Caption tone="success">주고받을 것이 없어요.</Caption>
-          )}
-        </Card>
+          ) : null}
+        </View>
       ))}
     </>
   );
@@ -408,6 +574,15 @@ function Settle({ books, loading }: { books: Books[]; loading: boolean }) {
  *
  * <p>적는 칸과 고치는 칸이 똑같습니다. 판을 두 벌 두면 한쪽에 칸을 더할
  * 때마다 다른 쪽을 잊게 됩니다.
+ *
+ * <h3>금액이 맨 위, 가장 큰 글자</h3>
+ *
+ * <p>「무엇에」 를 먼저 묻고 금액을 둘째로 두었습니다. 그런데 돈을 적으려고
+ * 판을 여는 사람의 손에는 이미 영수증이 들려 있습니다 — 먼저 치는 것은
+ * 늘 숫자입니다. 자판도 숫자판으로 열립니다.
+ *
+ * <p>통화는 그 옆에 붙입니다. 금액과 통화는 한 값이라 떨어져 있으면 "9000"
+ * 이 원인지 엔인지를 두 군데서 확인해야 합니다.
  *
  * @param spend 고칠 것. {@code null} 이면 새로 적습니다.
  */
@@ -519,6 +694,34 @@ function SpendSheet({
       title={spend ? '고치기' : '쓴 돈 적기'}
       onClose={onCancel}
       footer={<Button label={spend ? '고쳤어요' : '적기'} onPress={submit} busy={busy} />}>
+      {/*
+        금액과 통화는 한 줄입니다.
+
+        <p>라벨을 안 답니다. 큰 숫자 하나와 통화 알약이 나란히 있으면 그것이
+        금액이라는 것은 더 설명할 것이 없습니다. 자리 표시 글자가 그 일을
+        합니다.
+      */}
+      <View style={styles.amountRow}>
+        <TextInput
+          style={styles.amountInput}
+          value={amount}
+          onChangeText={setAmount}
+          placeholder={decimals > 0 ? '12.50' : '0'}
+          placeholderTextColor={Colors.textDisabled}
+          keyboardType="decimal-pad"
+          inputMode="decimal"
+          accessibilityLabel="얼마"
+        />
+        <Row gap={Spacing.s2} style={styles.chips}>
+          {currencies.map((c) => (
+            <Chip key={c} label={c} selected={currency === c} onPress={() => setCurrency(c)} />
+          ))}
+        </Row>
+      </View>
+      {decimals > 0 ? (
+        <Caption tone="muted">소수점 아래 두 자리까지 적을 수 있어요.</Caption>
+      ) : null}
+
       <Field
         label="무엇에"
         value={name}
@@ -527,30 +730,11 @@ function SpendSheet({
         returnKeyType="next"
       />
 
-      <Field
-        label="얼마"
-        value={amount}
-        onChangeText={setAmount}
-        placeholder={decimals > 0 ? '12.50' : '9000'}
-        keyboardType="decimal-pad"
-        inputMode="decimal"
-        hint={decimals > 0 ? '소수점 아래 두 자리까지 적을 수 있어요.' : undefined}
-      />
-
-      <View style={styles.pick}>
-        <Caption tone="secondary">통화</Caption>
-        <Row gap={Spacing.xs} style={styles.chips}>
-          {currencies.map((c) => (
-            <Chip key={c} label={c} selected={currency === c} onPress={() => setCurrency(c)} />
-          ))}
-        </Row>
-      </View>
-
       {/* 안 고르면 적는 사람이 낸 것으로 봅니다. 대개 그렇습니다. */}
       {people.length > 1 ? (
         <View style={styles.pick}>
-          <Caption tone="secondary">누가 냈나요?</Caption>
-          <Row gap={Spacing.xs} style={styles.chips}>
+          <Text style={styles.pickLabel}>누가 냈나요?</Text>
+          <Row gap={Spacing.s2} style={styles.chips}>
             <Chip label="내가" selected={payer === null} onPress={() => setPayer(null)} />
             {people.map((p) => (
               <Chip
@@ -567,8 +751,8 @@ function SpendSheet({
       {/* 여행 경비는 대개 다 같이 나눕니다. 한 사람 것일 때만 골라 줍니다. */}
       {people.length > 1 ? (
         <View style={styles.pick}>
-          <Caption tone="secondary">누가 나눠 내나요?</Caption>
-          <Row gap={Spacing.xs} style={styles.chips}>
+          <Text style={styles.pickLabel}>누가 나눠 내나요?</Text>
+          <Row gap={Spacing.s2} style={styles.chips}>
             <Chip label="다 같이" selected={share.length === 0} onPress={() => setShare([])} />
             {people.map((p) => (
               <Chip
@@ -600,8 +784,8 @@ function SpendSheet({
       */}
       {days.length > 0 ? (
         <View style={styles.pick}>
-          <Caption tone="secondary">어느 날</Caption>
-          <Row gap={Spacing.xs} style={styles.chips}>
+          <Text style={styles.pickLabel}>어느 날</Text>
+          <Row gap={Spacing.s2} style={styles.chips}>
             <Picker
               label="날"
               allLabel="아직 모름"
@@ -630,8 +814,8 @@ function SpendSheet({
       */}
       {dayPlaces.length > 0 ? (
         <View style={styles.pick}>
-          <Caption tone="secondary">어디서</Caption>
-          <Row gap={Spacing.xs} style={styles.chips}>
+          <Text style={styles.pickLabel}>어디서</Text>
+          <Row gap={Spacing.s2} style={styles.chips}>
             <Picker
               label="곳"
               allLabel="어디랄 것 없이"
@@ -687,7 +871,7 @@ function byDay(list: Spend[], days: TripDetail['days']) {
   /*
     날짜 색도 함께 꺼냅니다.
 
-    지도의 핀과 동선, 일정 화면의 날짜 카드가 이미 이 색을 씁니다. 가계부만
+    지도의 핀과 동선, 일정 화면의 날짜 머리가 이미 이 색을 씁니다. 가계부만
     무채색으로 남아 있어서, 같은 "둘째 날" 이 두 화면에서 다른 것처럼
     보였습니다. 색이 날짜를 뜻한다면 그 말을 앱 어디서나 해야 합니다.
   */
@@ -719,28 +903,86 @@ function byDay(list: Spend[], days: TripDetail['days']) {
     });
 }
 
+/*
+  고정폭 숫자.
+
+  <p>토큰이 값을 읽기전용 배열로 적어 두어서 글자 모양에 그대로 못 넘깁니다.
+  한 번 풀어 주고 금액 글자들이 같은 것을 씁니다 — 1 과 8 의 폭이 같아야
+  위아래로 견줄 때 자리가 맞습니다.
+*/
+const tabular: TextStyle = { fontVariant: [...Tabular.fontVariant] };
+
 const styles = StyleSheet.create({
-  /* 일정 화면의 날짜 카드가 쓰는 것과 같은 띠입니다. 같은 날이 두 화면에서
-     같은 색으로 읽혀야 색이 날짜를 뜻하는 말이 됩니다. */
-  group: {
-    gap: Spacing.xs,
-    borderLeftWidth: 4,
-    paddingLeft: Spacing.md,
+
+  /* -------------------------------------------------------------- 요약 */
+  summary: {
+    backgroundColor: Colors.fill,
+    borderRadius: Radius.r4,
+    padding: Spacing.s5,
+    gap: Spacing.s1,
   },
-  /* 어느 날인지 모르는 묶음. 띠 자리는 남겨 두어야 다른 묶음과 줄이 맞습니다. */
-  groupPlain: {
-    borderLeftColor: Colors.border,
+  total: {
+    ...Type.title1,
+    ...tabular,
+    fontWeight: Weight.bold,
+    color: Colors.text,
+  },
+  myHalf: {
+    flex: 1,
+    gap: 2,
+  },
+  myAmount: {
+    ...Type.headline,
+    ...tabular,
+    fontWeight: Weight.semibold,
+  },
+  /** 받을 돈. 완료·정해짐과 같은 초록입니다. */
+  take: {
+    color: Colors.success,
+  },
+  /** 줄 돈. 마감 임박과 같은 주황입니다 — 빨강은 지우기 자리입니다. */
+  give: {
+    color: Colors.warning,
+  },
+
+  /* -------------------------------------------------------------- 목록 */
+  /*
+    묶음의 이름.
+
+    <p>제목은 아래 것의 이름이니 아래와 가까워야 합니다. 위는 띠가 이미
+    띄워 놓았으므로 여기서는 아래만 좁힙니다.
+  */
+  groupHead: {
+    paddingTop: Spacing.s2,
+    paddingBottom: Spacing.s1,
+  },
+  groupLabel: {
+    ...Type.caption,
+    fontWeight: Weight.semibold,
+    color: Colors.textSecondary,
+  },
+  /* 날짜 색. 이름표 하나면 되므로 작습니다. */
+  dayDot: {
+    width: 8,
+    height: 8,
+    borderRadius: Radius.full,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.sm,
-    paddingVertical: Spacing.sm,
+    gap: Spacing.s3,
+    paddingVertical: Spacing.s3,
+    minHeight: 72,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: Colors.border,
   },
   rowHead: {
     alignItems: 'center',
+  },
+  rowTitle: {
+    ...Type.headline,
+    fontWeight: Weight.semibold,
+    color: Colors.text,
   },
   grow: {
     flex: 1,
@@ -748,10 +990,41 @@ const styles = StyleSheet.create({
   /* 오른쪽 끝에 맞춥니다. 자릿수가 다른 숫자들이 왼쪽에서 시작하면
      한눈에 어느 것이 큰지 안 보입니다. */
   amount: {
+    ...Type.headline,
+    ...tabular,
+    fontWeight: Weight.semibold,
+    color: Colors.text,
     textAlign: 'right',
   },
+  settleRow: {
+    minHeight: 44,
+  },
+
+  /* ---------------------------------------------------------------- 판 */
+  amountRow: {
+    gap: Spacing.s2,
+  },
+  /*
+    판에서 가장 큰 글자.
+
+    <p>입력칸 테두리를 두르지 않습니다. 숫자 하나만 받는 자리라 테두리가
+    없어도 어디를 치는지 헷갈리지 않고, 테두리를 두르면 아래 칸들과 같은
+    무게가 되어 「맨 위에 크게」 가 무색해집니다.
+  */
+  amountInput: {
+    ...Type.title1,
+    ...tabular,
+    fontWeight: Weight.bold,
+    color: Colors.text,
+    paddingVertical: Spacing.s1,
+  },
   pick: {
-    gap: Spacing.xs,
+    gap: Spacing.s2,
+  },
+  pickLabel: {
+    ...Type.caption,
+    fontWeight: Weight.medium,
+    color: Colors.textSecondary,
   },
   chips: {
     flexWrap: 'wrap',

@@ -192,15 +192,18 @@ export function FeedForm({
       title={where}
       onClose={onClose}
       footer={<Button label={editing ? '저장' : '올리기'} onPress={submit} busy={busy} />}>
-      <Row gap={Spacing.xs} style={styles.wrap}>
+      <Row gap={Spacing.s2} style={styles.wrap}>
         {photoIds.map((id) => (
           <View key={id} style={styles.shot}>
             <OurPhoto id={id} width={THUMB} height={THUMB} />
             <View style={styles.pull}>
+              /* 사진 위에 얹히는 단추라 바탕 없이 둡니다 — 회색 네모를 두르면
+                 그 네모가 사진의 일부처럼 보입니다. */
               <IconButton
                 name="x"
                 label="이 사진 빼기"
                 tone="danger"
+                bare
                 onPress={() => setPhotoIds(photoIds.filter((x) => x !== id))}
               />
             </View>
@@ -226,15 +229,15 @@ export function FeedForm({
         hint="사진만 올려도 돼요."
       />
 
-      <Caption tone="secondary">태그</Caption>
+      <Caption strong tone="secondary">태그</Caption>
       {tags.length > 0 ? (
-        <Row gap={Spacing.xs} style={styles.wrap}>
+        <Row gap={Spacing.s2} style={styles.wrap}>
           {tags.map((t) => (
             <Chip key={t} label={`#${t}`} selected onPress={() => setTags(tags.filter((x) => x !== t))} />
           ))}
         </Row>
       ) : null}
-      <Row gap={Spacing.xs}>
+      <Row gap={Spacing.s2}>
         <View style={styles.grow}>
           <Field
             label="태그 달기"
@@ -252,7 +255,7 @@ export function FeedForm({
       {trips.length > 0 ? (
         <>
           <Caption tone="secondary">어느 여행 이야기예요? 안 골라도 돼요.</Caption>
-          <Row gap={Spacing.xs} style={styles.wrap}>
+          <Row gap={Spacing.s2} style={styles.wrap}>
             <Chip label="안 고름" selected={tripId === null} onPress={() => setTripId(null)} />
             {trips.map((t) => (
               <Chip

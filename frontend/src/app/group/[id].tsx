@@ -1,6 +1,6 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { api, ApiError, UNEXPECTED } from '@/api/client';
 import type { Group, Mate, Trip } from '@/api/types';
@@ -10,24 +10,23 @@ import { FeedList } from '@/components/feed-list';
 import { GroupForm } from '@/components/group-form';
 import { MatesSheet } from '@/components/mates-sheet';
 import { TripForm } from '@/components/trip-form';
-import { Spacing } from '@/constants/theme';
+import { Colors, Gutter, Radius, Spacing, Tap } from '@/constants/theme';
 import { faceOf } from '@/constants/user-marks';
 import {
+  Band,
   Body,
   Button,
   Caption,
-  Card,
   ConfirmDialog,
   Empty,
   ErrorNote,
+  Grow,
   Icon,
-  IconButton,
   ListRow,
   Loading,
   Press,
   Row,
   Screen,
-  Section,
   SegmentedTabs,
   Split,
   Title,
@@ -47,12 +46,29 @@ import { stackHeader } from '@/ui/nav';
  * <p>모임을 다시 여는 이유가 대개 「다음에 언제 가지」입니다. 피드를 먼저
  * 두면 모임이 게시판처럼 읽히고, 그러면 이미 쓰고 있는 메신저와 겹칩니다.
  *
+ * <h3>머리는 카드를 벗었습니다</h3>
+ *
+ * <p>모임 이름·소개·사람들을 흰 판에 담아 두었습니다. 그런데 바닥도 흰색이
+ * 되었으니 판은 아무것도 가르지 못하고 <b>안쪽 여백만큼 글자를 안으로
+ * 밀어 넣는</b> 일만 했습니다. 판을 벗기면 모임 이름이 화면 왼쪽 선에
+ * 바로 붙습니다 — 이 화면에서 가장 먼저 읽어야 할 글자입니다.
+ *
+ * <p>머리와 아래 목록은 8픽셀 띠가 가릅니다. 판 하나에 담는 것보다 어디까지가
+ * 머리인지가 더 분명합니다.
+ *
  * <h3>지울 때 여행은 안 지웁니다</h3>
  *
  * <p>모임을 지우면 여행은 만든 사람의 혼자 여행으로 남습니다. 방을
  * 정리하려다 지난 여행이 통째로 사라지면 안 됩니다. 그 말을 묻기 전에
  * 해 줘야 합니다 — 안 그러면 「여행도 없어지나?」 를 사람이 눌러 보고
  * 알게 됩니다.
+ *
+ * <h3>지우기는 줄로 낮췄습니다</h3>
+ *
+ * <p>빨간 단추가 목록 끝에 꽉 찬 폭으로 서 있었습니다. 그러면 화면에서
+ * 가장 눈에 띄는 것이 <b>가장 하면 안 되는 일</b>이 됩니다. 맨 아래 띠
+ * 아래로 내려 글자만 빨간 줄로 둡니다 — 찾는 사람은 찾고, 찾지 않는
+ * 사람 눈에는 안 걸립니다.
  */
 /** 모임 안에서 볼 것. 여행이 먼저입니다. */
 type Lane = 'trips' | 'feed';
@@ -104,12 +120,7 @@ export default function GroupScreen() {
   }
 
   return (
-    <Screen
-      footer={
-        group && lane === 'trips' ? (
-          <Button label="이 모임에서 여행 만들기" onPress={() => setAdding(true)} />
-        ) : undefined
-      }>
+    <Screen>
       {/* 받아 온 뒤에는 모임 이름이 머리글입니다. 「모임」 이라고만 적혀
           있으면 어느 모임인지 위에서 알 수 없습니다. */}
       <Stack.Screen
@@ -122,75 +133,96 @@ export default function GroupScreen() {
 
       {group ? (
         <>
-          <Card style={styles.head}>
-            <View style={styles.headBody}>
-              <Split gap={Spacing.md}>
-                <Row gap={Spacing.sm} style={styles.name}>
-                  <Body>{group.emoji ?? '🧳'}</Body>
-                  <Title>{group.name}</Title>
-                </Row>
-                {amOwner ? (
-                  <Row gap={Spacing.xs}>
-                    <IconButton
-                      name="settings"
-                      label="모임 고치기"
-                      bare
-                      onPress={() => setEditing(true)}
-                    />
-                  </Row>
-                ) : null}
-              </Split>
-
-              {group.about ? <Caption tone="secondary">{group.about}</Caption> : null}
-
-              {/*
-                사람들을 얼굴로 늘어놓고, 누르면 판이 열립니다.
-
-                <p>이름을 죽 적어 두면 열 명만 넘어가도 모임 화면의 절반이
-                이름입니다. 여기서 보고 싶은 것은 「누가 있나」 이고, 부르고
-                내보내는 일은 그때 가서 합니다.
-              */}
-              <Press
-                onPress={() => setMates(true)}
-                accessibilityLabel="모임 사람들 보기"
-                style={styles.faces}>
-                <Row gap={Spacing.xs} style={styles.name}>
-                  {data.members.slice(0, 6).map((m) => (
-                    <Body key={m.id}>{faceOf(m.mark, m.name)}</Body>
-                  ))}
-                  <Caption tone="secondary">
-                    {data.members.length}명
-                    {data.members.length > 6 ? ' 모두 보기' : ''}
-                  </Caption>
-                </Row>
-                <Icon name="chevron-right" size={18} tone="muted" />
-              </Press>
+          <View style={styles.head}>
+            <View style={styles.crest}>
+              <Text style={styles.crestEmoji}>{group.emoji ?? '🧳'}</Text>
             </View>
-          </Card>
+
+            <Split>
+              <Grow>
+                <Title>{group.name}</Title>
+              </Grow>
+              {amOwner ? (
+                <Button label="편집" variant="ghost" compact onPress={() => setEditing(true)} />
+              ) : null}
+            </Split>
+
+            {group.about ? (
+              <Body tone="secondary" small>
+                {group.about}
+              </Body>
+            ) : null}
+
+            {/*
+              사람들을 얼굴로 늘어놓고, 누르면 판이 열립니다.
+
+              <p>이름을 죽 적어 두면 열 명만 넘어가도 모임 화면의 절반이
+              이름입니다. 여기서 보고 싶은 것은 「누가 있나」 이고, 부르고
+              내보내는 일은 그때 가서 합니다.
+            */}
+            <Press
+              onPress={() => setMates(true)}
+              accessibilityLabel="모임 사람들 보기"
+              style={styles.faces}>
+              <Row gap={Spacing.s1} style={styles.name}>
+                {data.members.slice(0, 6).map((m) => (
+                  <Body key={m.id}>{faceOf(m.mark, m.name)}</Body>
+                ))}
+                <Caption tone="secondary">{data.members.length}명</Caption>
+              </Row>
+              <Icon name="chevron-right" size={20} tone="muted" />
+            </Press>
+
+            {/* 이 화면에서 하려던 일 둘입니다 — 사람을 부르는 것과 여행을
+                시작하는 것. 나란히 두고 오른쪽만 채웁니다. */}
+            <Split gap={Spacing.s2}>
+              <Grow>
+                <Button
+                  label="초대하기"
+                  variant="secondary"
+                  compact
+                  onPress={() => setMates(true)}
+                />
+              </Grow>
+              <View style={styles.lead}>
+                <Button label="여행 만들기" compact onPress={() => setAdding(true)} />
+              </View>
+            </Split>
+          </View>
+
+          <Band />
 
           <SegmentedTabs items={LANES} value={lane} onChange={setLane} />
 
           {lane === 'trips' ? (
-            <Section title="모임의 여행" flush>
-              <View style={styles.body}>
-                {data.trips.length === 0 ? (
-                  <Empty message="아직 짠 여행이 없어요. 아래에서 첫 줄을 그어 보세요." />
-                ) : null}
-                {data.trips.map((t) => (
-                  <ListRow
-                    key={t.id}
-                    title={t.title}
-                    onPress={() => router.push({ pathname: '/trip/[id]', params: { id: t.id } })}
-                  />
-                ))}
-              </View>
-            </Section>
+            <>
+              {data.trips.length === 0 ? (
+                <Empty message="아직 짠 여행이 없어요. 위에서 첫 줄을 그어 보세요." />
+              ) : null}
+              {data.trips.map((t) => (
+                <ListRow
+                  key={t.id}
+                  title={t.title}
+                  onPress={() => router.push({ pathname: '/trip/[id]', params: { id: t.id } })}
+                />
+              ))}
+            </>
           ) : (
             <FeedList groupId={group.id} groupName={group.name} />
           )}
 
-          {amOwner && lane === 'trips' ? (
-            <Button label="모임 지우기" variant="danger" onPress={() => setDeleting(true)} />
+          {amOwner ? (
+            <>
+              <Band />
+              <Press
+                onPress={() => setDeleting(true)}
+                accessibilityLabel="모임 지우기"
+                scale={1}
+                style={styles.dangerRow}>
+                <Icon name="trash-2" size={20} tone="danger" />
+                <Body tone="danger">모임 지우기</Body>
+              </Press>
+            </>
           ) : null}
 
           <GroupForm
@@ -245,12 +277,22 @@ export default function GroupScreen() {
 }
 
 const styles = StyleSheet.create({
-  /* 머리 칸. 여백은 안쪽 묶음이 쥐고, 판은 자리만 잡습니다. */
+  /* 머리 구역. 판이 아니라 그냥 흐름입니다 — 사이만 벌려 둡니다. */
   head: {
-    gap: 0,
+    gap: Spacing.s3,
+    paddingBottom: Spacing.s6,
   },
-  headBody: {
-    gap: Spacing.sm,
+  /* 모임을 가리키는 이모지. 목록의 40짜리보다 커서 「이 모임」 이 됩니다. */
+  crest: {
+    width: 64,
+    height: 64,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.fill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  crestEmoji: {
+    fontSize: 30,
   },
   name: {
     flexShrink: 1,
@@ -260,10 +302,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: 'transparent',
-    paddingVertical: Spacing.xs,
+    /* 줄 전체가 눌리는 자리라 손가락이 닿을 높이를 채웁니다. */
+    minHeight: Tap.min,
   },
-  body: {
-    gap: Spacing.sm,
-    padding: Spacing.sm,
+  /* 주 동작은 보조의 두 배 폭을 먹습니다. */
+  lead: {
+    flex: 2,
+  },
+  /* 되돌릴 수 없는 일. 단추가 아니라 줄입니다. */
+  dangerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.s3,
+    minHeight: Tap.min,
   },
 });

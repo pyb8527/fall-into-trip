@@ -2,7 +2,7 @@ import { StyleSheet, View } from 'react-native';
 
 import type { SavedPlace } from '@/api/types';
 import { iconOf, labelOf } from '@/constants/place-icons';
-import { Colors, Radius, Spacing, Tap } from '@/constants/theme';
+import { Colors, Gutter, Spacing } from '@/constants/theme';
 import { savedAgo } from '@/lib/saved';
 import { Body, Button, Caption, Checkbox, Mark, Press } from '@/ui';
 
@@ -28,27 +28,34 @@ const STAR = '⭐';
  * 라도 답니다 — 보석함에 순서는 없지만 나이는 있고, 어제 담은 것과 재작년에
  * 담은 것은 지금 짜는 여행과의 거리가 다릅니다.
  *
- * <h3>누르는 자리는 둘뿐입니다</h3>
+ * <h3>판을 벗고 한 줄이 되었습니다</h3>
+ *
+ * <p>줄마다 흰 판을 두르고, 그 안을 다시 위아래로 갈라 아래쪽에 「자세히」를
+ * 두었습니다. 그러면 한 곳이 <b>두 줄 높이</b>를 먹어서 스무 곳을 담아 둔
+ * 사람은 화면에 네 곳만 보였습니다. 게다가 바닥이 흰색이 된 뒤로 그 판은
+ * 보이지도 않으면서 글자를 안으로 밀어 넣는 일만 했습니다.
+ *
+ * <p>한 줄로 폅니다. 그림·이름·설명이 왼쪽에서 읽히고, 「자세히」는 같은
+ * 줄 오른쪽 끝에 작은 단추로 섭니다.
+ *
+ * <h3>고르는 네모는 줄 앞입니다</h3>
+ *
+ * <p>오른쪽 끝에 있었습니다. 그러면 여러 곳을 고를 때 눈은 왼쪽 이름을
+ * 읽고 손은 오른쪽 끝을 짚느라 줄마다 화면을 가로지릅니다. 네모가 앞에
+ * 서면 짚는 자리가 한 줄로 가지런해져 <b>아래로만 내려가며</b> 고를 수
+ * 있습니다.
+ *
+ * <h3>누르는 자리는 셋입니다</h3>
  *
  * <p>전에는 한 줄에 단추가 넷이었습니다 — 그림 바꾸기, 고르기, 길찾기,
  * 빼기. 스무 줄이면 단추가 여든 개라 목록이 아니라 단추밭입니다. 게다가
  * 웹에서는 큰 것 안의 작은 것이 함께 눌려, 그림을 바꾸려다 고르기까지
  * 됐습니다.
  *
- * <p>이제 자리가 셋입니다. 줄을 누르면 <b>지도가 그리로 가고</b>, 「자세히」를
- * 누르면 <b>들여다보고</b>, 네모를 누르면 <b>고릅니다</b>. 길찾기·빼기·그림
+ * <p>이제 줄을 누르면 <b>지도가 그리로 가고</b>, 「자세히」를 누르면
+ * <b>들여다보고</b>, 네모를 누르면 <b>고릅니다</b>. 길찾기·빼기·그림
  * 바꾸기는 들여다보는 판 안으로 들어갔습니다 — 거기서는 무엇을 하는 것인지
  * 이름이 붙어 있습니다.
- *
- * <h3>손대는 것은 줄 아래로</h3>
- *
- * <p>동그라미 단추가 이름 <b>옆</b>에 서 있었습니다. 그러면 이름이 그만큼
- * 좁아져 긴 가게 이름이 잘리고, 좁은 폰에서는 읽는 것과 누르는 것이 한 줄에
- * 끼어 어느 쪽도 넉넉하지 않습니다.
- *
- * <p>아래로 내립니다. 위는 읽는 자리, 아래는 누르는 자리. 선 하나로 가르고
- * 글자를 답니다 — 그림만 있는 동그라미보다 「자세히」라고 적힌 쪽이 눌러
- * 보기 전에 압니다.
  *
  * <h3>지도로 보내기와 들여다보기를 갈랐습니다</h3>
  *
@@ -77,7 +84,7 @@ export function SavedRow({
    * 자리에서는 보낼 데가 없습니다.
    */
   onPress?: () => void;
-  /** 들여다보기. 주면 동그라미 하나가 붙습니다. */
+  /** 들여다보기. 주면 줄 끝에 작은 단추가 붙습니다. */
   onLook?: () => void;
   /** 지도에서 켜 둔 것. 목록의 그 줄도 함께 켜집니다. */
   lit?: boolean;
@@ -99,11 +106,20 @@ export function SavedRow({
   const about = [kind, said].filter(Boolean).join(' · ');
 
   return (
-    <View style={[styles.card, on ? styles.rowOn : lit ? styles.rowLit : null]}>
-      <View style={styles.row}>
+    <View style={[styles.row, on ? styles.rowOn : lit ? styles.rowLit : null]}>
+      {picking ? (
+        <Checkbox
+          checked={on}
+          onChange={onToggle ?? (() => {})}
+          label={`${place.name} ${on ? '고르기 취소' : '고르기'}`}
+        />
+      ) : null}
+
       <Press
         onPress={onPress ?? onToggle}
-        scale={0.99}
+        /* 줄은 크기가 안 변합니다. 목록에서 줄마다 쪼그라들면 아래 줄들이
+           따라 들썩이는 것처럼 보입니다 — 눌린 것은 바탕이 말합니다. */
+        scale={1}
         accessibilityLabel={
           onPress ? `${place.name} 지도에서 보기` : `${place.name} ${on ? '고르기 취소' : '고르기'}`
         }
@@ -120,69 +136,44 @@ export function SavedRow({
         </View>
       </Press>
 
-      {picking ? (
-        <Checkbox
-          checked={on}
-          onChange={onToggle ?? (() => {})}
-          label={`${place.name} ${on ? '고르기 취소' : '고르기'}`}
-        />
-      ) : null}
-      </View>
-
-      {/* 손대는 자리. 위와 선 하나로 가릅니다. */}
-      {onLook ? (
-        <View style={styles.acts}>
-          <Button
-            label="자세히"
-            variant="ghost"
-            compact
-            onPress={onLook}
-          />
-        </View>
-      ) : null}
+      {/* 들여다보는 길. 줄 끝에 작은 단추로 섭니다 — 줄을 두 겹으로 쪼개지
+          않습니다. */}
+      {onLook ? <Button label="자세히" variant="ghost" compact onPress={onLook} /> : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.md,
-    borderWidth: 1.5,
-    borderColor: 'transparent',
-    overflow: 'hidden',
-  },
+  /*
+    줄 하나.
+
+    <p>고른 줄과 켜 둔 줄은 바탕으로 말합니다. 바탕은 좌우 여백을 뚫고
+    나가야 <b>줄 전체</b>가 물든 것으로 읽힙니다 — 여백 안에서만 칠하면
+    글자 뒤에 색 상자를 얹은 것처럼 보입니다.
+  */
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingRight: Spacing.sm,
-  },
-  /* 읽는 자리와 누르는 자리를 선 하나로 가릅니다. 오른쪽 끝에 모읍니다 —
-     왼쪽은 위 글자들이 시작하는 자리라 비워 둬야 줄이 가지런합니다. */
-  acts: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: Colors.border,
-    paddingHorizontal: Spacing.xs,
+    gap: Spacing.s3,
+    /* 썸네일이 드는 줄의 높이. */
+    minHeight: 72,
+    paddingVertical: Spacing.s2,
+    marginHorizontal: -Gutter,
+    paddingHorizontal: Gutter,
   },
   /* 고른 것. 글자로 적지 않고 바탕으로 말합니다. */
   rowOn: {
     backgroundColor: Colors.accentSoft,
-    borderColor: Colors.accent,
   },
-  /* 지도에서 핀만 누른 것. 고른 것과는 다르게, 실선만 옅게. */
+  /* 지도에서 핀만 누른 것. 고른 것과는 다르게, 회색으로 옅게. */
   rowLit: {
-    borderColor: Colors.border,
+    backgroundColor: Colors.surfaceRaised,
   },
   body: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.md,
-    minHeight: Tap.min,
-    paddingVertical: Spacing.sm,
-    paddingLeft: Spacing.md,
+    gap: Spacing.s3,
   },
   text: {
     flex: 1,

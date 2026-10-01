@@ -168,7 +168,7 @@ export function PublishForm({
       {(tripDays?.days.length ?? 0) > 1 ? (
         <>
           <Caption tone="secondary">어느 날을 올릴까요?</Caption>
-          <Row gap={Spacing.xs} style={styles.wrap}>
+          <Row gap={Spacing.s2} style={styles.wrap}>
             <Chip
               label="전부"
               selected={pickedDays.length === 0}
@@ -215,7 +215,7 @@ export function PublishForm({
                   }
                   accessibilityLabel={`${s.text ?? '사진'} 같이 싣기`}
                   style={[styles.story, on ? styles.storyOn : null]}>
-                  <Row gap={Spacing.sm}>
+                  <Row gap={Spacing.s2}>
                     <Checkbox
                       label=""
                       checked={on}
@@ -256,18 +256,25 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   stories: {
-    gap: Spacing.xs,
+    gap: Spacing.s2,
   },
-  /* 고른 것이 보이게 테두리를 둡니다. 체크만으로는 줄이 여럿일 때 어느 것을
-     골랐는지 훑어서 안 보입니다. */
+  /*
+    고른 것이 보이게 테두리를 둡니다. 체크만으로는 줄이 여럿일 때 어느 것을
+    골랐는지 훑어서 안 보입니다.
+
+    <p>테두리가 가장 얇은 선(hairline)이었습니다. 그 굵기로는 회색 면 위에서
+    거의 안 보여서, 고른 것과 안 고른 것이 체크 하나 차이였습니다. 고른
+    칸은 1.5픽셀 테두리에 옅은 바탕까지 갑니다 — 고르기 타일과 같은 규칙입니다.
+  */
   story: {
     backgroundColor: Colors.fill,
-    borderRadius: Radius.sm,
-    padding: Spacing.sm,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: Radius.r3,
+    padding: Spacing.s3,
+    borderWidth: 1.5,
     borderColor: 'transparent',
   },
   storyOn: {
+    backgroundColor: Colors.accentSoft,
     borderColor: Colors.accent,
   },
 });

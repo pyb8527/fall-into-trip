@@ -155,7 +155,7 @@ export function SavedPicker({
 
       {/* 갈래가 둘 이상일 때만 냅니다. 하나뿐이면 누를 것이 없습니다. */}
       {kinds.length > 1 ? (
-        <Row gap={Spacing.xs} style={styles.chips}>
+        <Row gap={Spacing.s2} style={styles.chips}>
           <Chip label="전체" selected={kind === null} onPress={() => setKind(null)} />
           {kinds.map((k) => (
             <Chip
@@ -208,7 +208,9 @@ const styles = StyleSheet.create({
   sort: {
     justifyContent: 'flex-end',
   },
+  /* 줄이 저마다 높이와 여백을 가지므로 사이를 벌리지 않습니다. 벌리면
+     바탕이 깔린 줄들 사이에 흰 틈이 생겨 줄이 토막토막 끊겨 보입니다. */
   list: {
-    gap: Spacing.xs,
+    gap: 0,
   },
 });

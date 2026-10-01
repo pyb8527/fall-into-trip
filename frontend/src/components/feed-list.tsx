@@ -78,13 +78,17 @@ export function FeedList({
 
   return (
     <View style={styles.body}>
+      {/* 채운 단추로 두지 않습니다. 이 띠가 서는 자리(모임 상세)에는 이미
+          머리에 채운 단추가 하나 있고, 한 화면에 가득 찬 브랜드색은 하나여야
+          어느 것이 주된 일인지 보입니다. */}
       <Button
         label={groupName ? `${groupName}에 올리기` : '피드에 올리기'}
+        variant="secondary"
         onPress={() => setWriting(true)}
       />
 
       {(seen.length > 0 || tag) ? (
-        <Row gap={Spacing.xs} style={styles.wrap}>
+        <Row gap={Spacing.s2} style={styles.wrap}>
           <Chip label="전체" selected={tag === null} onPress={() => setTag(null)} />
           {/* 고른 태그가 지금 보이는 글에 없을 수도 있습니다(걸러진 뒤라
               그 태그만 남습니다). 그래도 칸은 서 있어야 풀 수 있습니다. */}
@@ -158,8 +162,10 @@ export function FeedList({
 }
 
 const styles = StyleSheet.create({
+  /* 글 카드 사이. s2(8) 였습니다 — 카드 넷이 거의 붙어 서서 한 덩어리로
+     읽혔습니다. 한 편과 다음 편 사이는 카드 안쪽 여백보다 넓어야 합니다. */
   body: {
-    gap: Spacing.sm,
+    gap: Spacing.s5,
   },
   wrap: {
     flexWrap: 'wrap',

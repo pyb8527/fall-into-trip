@@ -1,13 +1,13 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useRef } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { api } from '@/api/client';
 import type { News, NewsItem } from '@/api/types';
 import { useAsync } from '@/api/use-async';
-import { Colors, Spacing } from '@/constants/theme';
+import { Colors, Gutter, Palette, Radius, Spacing, Type, Weight } from '@/constants/theme';
 import { ago } from '@/lib/countdown';
-import { Body, Caption, Card, Empty, ErrorNote, Icon, Loading, Press, Screen } from '@/ui';
+import { Band, Body, Caption, Empty, ErrorNote, Icon, Loading, Press, Screen } from '@/ui';
 import type { IconName } from '@/ui';
 
 /**
@@ -33,6 +33,19 @@ import type { IconName } from '@/ui';
  * <p>글 하나가 좀 받은 날 추천이 서른 줄이 되면, 동행자가 고친 일정은 그
  * 아래로 밀려납니다. 그래서 서버가 글마다·후보마다 접어서 보냅니다. 여럿이
  * 접힌 줄에는 이름이 없고 몇 사람인지만 있습니다.
+ *
+ * <h3>언제 온 것인지로 묶습니다</h3>
+ *
+ * <p>줄마다 "3시간 전" 이 적혀 있는데도 스무 줄을 훑으면 어디까지가 오늘
+ * 것인지 흐려집니다. 날짜 머리를 세워 두면 <b>안 읽은 동안이 어디까지인지</b>
+ * 한 번에 보이고, 아래로 내려갈 이유도 함께 보입니다.
+ *
+ * <h3>안 읽은 줄은 바탕을 깝니다</h3>
+ *
+ * <p>7픽셀 점 하나만 달아 두었습니다. 그만한 점은 줄 끝에서 거의 안
+ * 보이는데, 특히 줄이 두 줄짜리면 점이 어느 줄의 것인지도 모호했습니다.
+ * 옅은 바탕을 깔고 점을 하나 더 키웁니다 — 바탕은 훑을 때, 점은 들여다볼
+ * 때 쓰입니다.
  */
 export default function NewsScreen() {
   const { data, error, loading, reload } = useAsync<News>(
@@ -76,16 +89,18 @@ export default function NewsScreen() {
         <Empty message="아직 온 알림이 없어요. 같이 보는 사람이 일정을 고치면 여기에 쌓여요." />
       ) : (
         <>
-          <View style={styles.list}>
-            {items.map((item, index) => (
-              <NewsRow key={`${item.kind}-${item.at}-${index}`} item={item} />
-            ))}
-          </View>
+          {group(items).map((lot) => (
+            <View key={lot.label}>
+              <Text style={styles.lotLabel}>{lot.label}</Text>
+              {lot.items.map((item, index) => (
+                <NewsRow key={`${item.kind}-${item.at}-${index}`} item={item} />
+              ))}
+            </View>
+          ))}
           {/* 30일이라고 미리 말해 둡니다. 어제 것이 안 보이는 날에 고장인지
-              지난 것인지 알 수 있어야 합니다. */}
-          <Card>
-            <Caption>지난 30일치예요.</Caption>
-          </Card>
+              지난 것인지 알 수 있어야 합니다. 판에 담지 않습니다 — 읽고
+              지나갈 한 줄이고, 판은 눌러서 들어갈 것에만 씁니다. */}
+          <Caption>30일이 지난 알림은 지워져요.</Caption>
         </>
       )}
       {/* 소식이 하나도 없어도 이 줄은 섭니다. 위 목록과 성격이 달라서입니다 —
@@ -93,6 +108,34 @@ export default function NewsScreen() {
       {data?.mine ? <MineNote tipCount={data.mine.tipCount} viewCount={data.mine.viewCount} /> : null}
     </Screen>
   );
+}
+
+/**
+ * 언제 온 것인지로 묶습니다.
+ *
+ * <p>서버가 내려보내는 순서(새것부터)를 그대로 따릅니다 — 여기서 다시
+ * 세우면 서버가 정한 순서와 어긋날 수 있고, 어긋나면 어느 쪽이 맞는지
+ * 화면만 보고는 알 수 없습니다.
+ *
+ * <p>빈 묶음은 안 냅니다. "이번 주 — 없음" 을 적어 두면 없는 것을 읽게
+ * 하는 셈입니다.
+ */
+function group(items: NewsItem[]): { label: string; items: NewsItem[] }[] {
+  const day = 24 * 60 * 60 * 1000;
+  const now = Date.now();
+  const lots: { label: string; items: NewsItem[] }[] = [
+    { label: '오늘', items: [] },
+    { label: '이번 주', items: [] },
+    { label: '지난 30일', items: [] },
+  ];
+
+  for (const item of items) {
+    const since = now - Date.parse(item.at);
+    const at = since < day ? 0 : since < 7 * day ? 1 : 2;
+    lots[at].items.push(item);
+  }
+
+  return lots.filter((lot) => lot.items.length > 0);
 }
 
 /**
@@ -111,17 +154,22 @@ export default function NewsScreen() {
  */
 function MineNote({ tipCount, viewCount }: { tipCount: number; viewCount: number }) {
   return (
-    <View style={styles.mine}>
-      <Body>
-        {viewCount > 0
-          ? `남긴 한 줄 ${tipCount}개가 ${viewCount}번 쓰였어요.`
-          : `남긴 한 줄 ${tipCount}개. 아직 읽은 사람이 없어요.`}
-      </Body>
-      {/* 부풀리지 않습니다. 손님이 읽은 것은 셀 수가 없고(사람 번호가 없어
-          "하루 한 번" 이 성립하지 않습니다), 그것을 안 밝히면 이 수 하나
-          때문에 나머지 화면까지 못 믿게 됩니다. */}
-      <Caption>로그인하고 본 것만 세어요. 실제로는 더 쓰였을 수 있어요.</Caption>
-    </View>
+    <>
+      {/* 선 한 가닥으로 갈랐습니다. 이 앱에서 구역을 가르는 것은 선이
+          아니라 8픽셀 띠입니다 — 선은 목록 줄 사이에서만 씁니다. */}
+      <Band />
+      <View style={styles.mine}>
+        <Body>
+          {viewCount > 0
+            ? `남긴 한 줄 ${tipCount}개가 ${viewCount}번 쓰였어요.`
+            : `남긴 한 줄 ${tipCount}개. 아직 읽은 사람이 없어요.`}
+        </Body>
+        {/* 부풀리지 않습니다. 손님이 읽은 것은 셀 수가 없고(사람 번호가 없어
+            "하루 한 번" 이 성립하지 않습니다), 그것을 안 밝히면 이 수 하나
+            때문에 나머지 화면까지 못 믿게 됩니다. */}
+        <Caption>로그인하고 본 것만 세어요. 실제로는 더 쓰였을 수 있어요.</Caption>
+      </View>
+    </>
   );
 }
 
@@ -137,17 +185,24 @@ function NewsRow({ item }: { item: NewsItem }) {
   const where = item.tripTitle ?? item.postTitle;
 
   return (
-    <Press onPress={() => router.push(item.url as never)} scale={0.985} style={styles.row}>
+    <Press
+      onPress={() => router.push(item.url as never)}
+      scale={1}
+      style={[styles.row, item.fresh ? styles.unread : null]}>
+      {/* 선 아이콘은 맨몸으로 서지 않고 회색 원에 담깁니다. 줄마다 그림
+          넓이가 달라지면 그 오른쪽 글자도 함께 흔들립니다. */}
       <View style={styles.mark}>
-        <Icon name={iconOf(item.kind)} tone={item.fresh ? 'default' : 'muted'} />
+        <Icon name={iconOf(item.kind)} size={20} tone={item.fresh ? 'default' : 'muted'} />
       </View>
       <View style={styles.text}>
         {/* 이름이 없는 줄이 있습니다. 여럿이 한 줄로 접힌 것이고, 그때는
             몇 사람인지가 문장 안에 이미 들어 있습니다. */}
-        <Body>
+        <Body small>
           {item.actorName ? (
             <>
-              <Body strong>{item.actorName}</Body>
+              <Body small strong>
+                {item.actorName}
+              </Body>
               {' 님이 '}
             </>
           ) : null}
@@ -188,37 +243,58 @@ function iconOf(kind: NewsItem['kind']): IconName {
 }
 
 const styles = StyleSheet.create({
-  list: {
-    gap: Spacing.xs,
-    marginBottom: Spacing.md,
+  /*
+    묶음 이름.
+
+    <p>읽으라고 있는 것이 아니라 「여기서부터 다른 날」 이라는 표시입니다.
+    그래서 본문보다 작고 흐리되 굵습니다.
+  */
+  lotLabel: {
+    ...Type.caption,
+    fontWeight: Weight.semibold,
+    color: Palette.gray[500],
+    paddingTop: Spacing.s6,
+    paddingBottom: Spacing.s2,
   },
+  /*
+    소식 한 줄.
+
+    <p>안 읽은 줄은 바탕이 옅게 물듭니다. 바탕은 좌우 여백을 뚫고 나가야
+    줄 전체가 물든 것으로 읽힙니다 — 여백 안에서만 칠하면 글자 뒤에 색
+    상자를 얹은 것처럼 보입니다.
+  */
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.sm,
-    paddingVertical: Spacing.sm,
+    gap: Spacing.s3,
+    minHeight: 72,
+    paddingVertical: Spacing.s3,
+    marginHorizontal: -Gutter,
+    paddingHorizontal: Gutter,
+  },
+  unread: {
+    backgroundColor: Colors.accentSoft,
   },
   mark: {
-    width: 32,
+    width: 40,
+    height: 40,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.fill,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   text: {
     flex: 1,
     gap: 2,
   },
   dot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
+    width: 8,
+    height: 8,
+    borderRadius: Radius.full,
     backgroundColor: Colors.accent,
   },
-  /* 목록과 다른 것이라고 눈에 보여야 합니다. 선 한 가닥으로 나눕니다 —
-     이 화면에서 층을 나누는 것은 그림자가 아니라 선입니다. */
   mine: {
-    gap: 2,
-    marginTop: Spacing.lg,
-    paddingTop: Spacing.md,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: Colors.border,
+    gap: Spacing.s1,
+    paddingTop: Spacing.s4,
   },
 });

@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
@@ -15,14 +15,13 @@ import { SavedRow } from '@/components/saved-row';
 import { SORT_GIVEN, SORT_NAME, SortBar, type SortBy } from '@/components/sort-bar';
 import { TripMap } from '@/components/trip-map';
 import { labelOf } from '@/constants/place-icons';
-import { Colors, Spacing } from '@/constants/theme';
+import { Colors, Spacing, Tap } from '@/constants/theme';
 import { kindsIn, savedAgo, siftSaved } from '@/lib/saved';
 import {
   Body,
   BottomSheet,
   Button,
   Caption,
-  Card,
   Chip,
   ConfirmButton,
   Divider,
@@ -31,12 +30,15 @@ import {
   Field,
   FilterChip,
   Grow,
+  IconButton,
   Loading,
+  Press,
   Row,
   Screen,
   SearchField,
   Snack,
   Split,
+  Title,
   useUndo,
 } from '@/ui';
 import { AppTabs } from '@/ui/tab-bar';
@@ -74,6 +76,20 @@ import { KEEP, UNKEEP } from '@/constants/words';
  *
  * <p>이제 누르면 장소를 들여다보는 판이 뜹니다. 검색에서 고를 때 쓰는 것과
  * 같은 판이라, 담기 전에 보던 것을 담은 뒤에도 그대로 봅니다.
+ *
+ * <h3>설명 줄을 빈자리로 옮겼습니다</h3>
+ *
+ * <p>「주워 둔 32곳. 골라서 일정 아무 날에나 얹어요」 를 흰 판에 담아 지도
+ * 아래에 늘 두었습니다. 이 말이 필요한 사람은 <b>처음 온 사람 한 번</b>
+ * 인데, 그 한 번을 위해 서른두 곳을 담아 둔 사람도 매번 그 판을 지나쳐
+ * 내려가야 했습니다. 설명은 빈자리(Empty)가 말하고, 담는 일은 제목 옆
+ * <b>+</b> 가 맡습니다.
+ *
+ * <h3>고르는 동안에는 머리가 바뀝니다</h3>
+ *
+ * <p>몇 곳을 골랐는지가 아래 단추 글자에만 적혀 있었습니다. 목록을 내려가며
+ * 고르다 보면 그 단추가 화면 밖으로 밀려나서, 지금 몇 곳인지 보려고 맨
+ * 아래까지 내려야 했습니다. 제목 자리가 「3곳 선택됨 | 취소」 로 바뀝니다.
  */
 export default function Saved() {
   const router = useRouter();
@@ -301,14 +317,31 @@ export default function Saved() {
 
   return (
     <Screen
+      safeTop
       tabs={<AppTabs />}
       snack={<Snack undo={undo} onHide={hideUndo} />}
+      header={
+        picked.size > 0 ? (
+          /* 고르는 동안에는 머리가 「몇 곳 골랐는지」 와 「그만두기」 만
+             말합니다. 담기 단추는 이때 할 일이 아닙니다. */
+          <Split>
+            <Grow>
+              <Title>{picked.size}곳 선택됨</Title>
+            </Grow>
+            <Button label="취소" variant="ghost" compact onPress={() => setPicked(new Set())} />
+          </Split>
+        ) : (
+          <Split>
+            <Grow>
+              <Title>저장</Title>
+            </Grow>
+            <IconButton name="plus" label={KEEP} bare onPress={() => setKeeping(true)} />
+          </Split>
+        )
+      }
       footer={
         picked.size > 0 ? (
-          <Row gap={Spacing.sm}>
-            <Grow>
-              <Button label={`${picked.size}곳 일정에 넣기`} onPress={() => setPouring(true)} />
-            </Grow>
+          <Row gap={Spacing.s2}>
             {/*
               빼는 길이 여기 있어야 합니다.
 
@@ -322,15 +355,36 @@ export default function Saved() {
               거두는 것도 그제야 됩니다.
 
               <p>미리 묻지 않습니다. 뺀 뒤에 되돌리는 띠가 잠깐 뜹니다.
+
+              <p>채운 단추로 두지 않습니다. 바닥에 색을 가득 칠한 것은 화면에
+              하나여야 하고, 그 하나는 이 화면에 들어온 까닭(일정에 넣기)
+              입니다. 빼기는 글자만 빨갛게 둡니다.
             */}
-            <Button
-              label="빼기"
-              variant="secondary"
+            <Press
               onPress={() => dropPicked()}
-            />
+              scale={1}
+              accessibilityLabel={`고른 ${picked.size}곳 빼기`}
+              style={styles.drop}>
+              <Body tone="danger" strong>
+                빼기
+              </Body>
+            </Press>
+            <View style={styles.lead}>
+              <Button label={`${picked.size}곳 일정에 넣기`} onPress={() => setPouring(true)} />
+            </View>
           </Row>
         ) : undefined
       }>
+      {/*
+        큰 제목이 본문 위에 서므로 상단바는 걷습니다.
+
+        <p>갈래 띠로 오는 화면입니다. 뒤로 갈 데가 없으니 상단바가 할 일이
+        없는데, 작은 제목 하나를 위해 56픽셀을 먹고 있었습니다 — 게다가
+        고르는 동안에는 제목 자리가 「3곳 선택됨」 으로 바뀌어야 하는데
+        상단바에 둔 제목은 그 말을 할 수 없었습니다.
+      */}
+      <Stack.Screen options={{ headerShown: false }} />
+
       {/*
         지도가 먼저입니다.
 
@@ -351,31 +405,19 @@ export default function Saved() {
           /* 전부 같은 동그라미에 별 하나. 담아 둔 곳에는 순서가 없고, 갈래는
              아래 거르기가 이미 말해 줍니다. */
           shape="star"
-          height={300}
+          /* 300 이었습니다. 지도가 화면의 3분의 1을 넘게 먹으면 목록이 늘
+             한 줄 반만 보여서, 어디에 뭘 담아 뒀는지는 알아도 그것이
+             무엇인지는 매번 내려야 알았습니다. */
+          height={220}
         />
       ) : null}
-
-{/* 이 화면이 무엇인지 말하는 줄입니다. 회색 바탕에 두면 가장 먼저 읽어야
-          하는 글자가 가장 허름한 자리에 놓입니다. */}
-      <Card>
-        <Split>
-          <Grow>
-            <Body tone="secondary">
-              {all.length > 0
-                ? `주워 둔 ${all.length}곳. 골라서 일정 아무 날에나 얹어요.`
-                : '눈에 띄는 곳을 담아 두었다가 일정에 꺼내 써요.'}
-            </Body>
-          </Grow>
-          <Button label="담기" compact onPress={() => setKeeping(true)} />
-        </Split>
-      </Card>
 
       {loading && !data ? <Loading /> : null}
       {error ? <ErrorNote message={error} onRetry={reload} /> : null}
       {failed ? <ErrorNote message={failed} /> : null}
 
       {data && all.length === 0 ? (
-        <Empty message="아직 주워 둔 보석이 없어요. 여행 둘러보기나 장소 찾기에서 별을 누르면 여기 쌓여요. 위 「담기」 로 바로 찾아 담을 수도 있어요." />
+        <Empty message="눈에 띄는 곳을 담아 두었다가 일정 아무 날에나 꺼내 써요. 여행 둘러보기나 장소 찾기에서 별을 누르면 여기 쌓이고, 제목 옆 ＋ 로 바로 찾아 담을 수도 있어요." />
       ) : null}
 
       {/* 몇 개 안 될 때는 찾을 것이 없습니다. 칸만 자리를 차지합니다. */}
@@ -397,9 +439,8 @@ export default function Saved() {
         고른 것만.
       */}
       {kinds.length > 1 || all.length > 2 ? (
-        <Card>
-        <Split>
-          <Row gap={Spacing.xs} style={styles.applied}>
+        <>
+          <Row gap={Spacing.s2} style={styles.applied}>
             <Button
               label={applied.length > 0 ? `필터 ${applied.length}` : '필터'}
               variant="secondary"
@@ -410,9 +451,10 @@ export default function Saved() {
               <FilterChip key={a.key} label={a.label} onRemove={a.clear} />
             ))}
           </Row>
+          {/* 개수는 조건 줄 아래 한 줄로. 줄 안에 끼우면 조건이 늘어날 때마다
+              밀려 나가 영영 안 보입니다. */}
           <Caption tone="secondary">{shown.length}곳</Caption>
-        </Split>
-        </Card>
+        </>
       ) : null}
 
       {/* 몇 곳이 남는지를 판을 닫기 전에 말합니다. 여기 목록은 이미 받아
@@ -429,7 +471,7 @@ export default function Saved() {
             <Body small strong>
               어떤 곳
             </Body>
-            <Row gap={Spacing.xs} style={styles.applied}>
+            <Row gap={Spacing.s2} style={styles.applied}>
               <Chip label="전체" selected={kind === null} onPress={() => setKind(null)} />
               {kinds.map((k) => (
                 <Chip
@@ -550,7 +592,7 @@ export default function Saved() {
         }
         actions={
           looking ? (
-            <Row gap={Spacing.sm} style={styles.actions}>
+            <Row gap={Spacing.s2} style={styles.actions}>
               <Button
                 label="일정에 넣기"
                 compact
@@ -664,7 +706,7 @@ function Why({
         maxLength={300}
       />
       {dirty ? (
-        <Row gap={Spacing.sm}>
+        <Row gap={Spacing.s2}>
           <Button label="메모 저장" compact onPress={() => onSave(note.trim())} />
           <Button
             label="되돌리기"
@@ -675,7 +717,7 @@ function Why({
         </Row>
       ) : null}
 
-      <Row gap={Spacing.sm} style={styles.whence}>
+      <Row gap={Spacing.s2} style={styles.whence}>
         <Caption tone="muted">{savedAgo(place.createdAt)}</Caption>
         {/* 어느 글에서 담았는지. 검색이나 지도에서 담았으면 비어 있습니다. */}
         {place.fromPost ? (
@@ -692,17 +734,27 @@ function Why({
 }
 
 const styles = StyleSheet.create({
-  grow: {
-    flex: 1,
-  },
   applied: {
     flexWrap: 'wrap',
   },
+  /* 줄이 저마다 높이와 여백을 가지므로 사이를 벌리지 않습니다. 벌리면
+     바탕이 깔린 줄들 사이에 흰 틈이 생겨 줄이 토막토막 끊겨 보입니다. */
   list: {
-    gap: Spacing.xs,
+    gap: 0,
+  },
+  /* 글자만 빨간 동작. 단추가 아니라서 바탕이 없지만 누르는 넓이는 같습니다. */
+  drop: {
+    minHeight: Tap.control,
+    paddingHorizontal: Spacing.s4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  /* 주 동작은 곁다리의 두 배 폭을 먹습니다. */
+  lead: {
+    flex: 2,
   },
   why: {
-    gap: Spacing.sm,
+    gap: Spacing.s2,
   },
   whence: {
     alignItems: 'center',
