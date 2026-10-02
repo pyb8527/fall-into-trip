@@ -532,6 +532,10 @@ export type PostCard = {
   createdAt: string;
   /** 표지 사진. 없으면 동선 그림이 그 자리를 맡습니다. */
   coverPhotoId: string | null;
+  /** 「내 여행으로 가져오기」 한 사람 수. 같은 사람은 한 번 */
+  copyCount?: number;
+  /** 모임 여행에서 나온 여행기인지 */
+  fromGroup?: boolean;
 };
 
 /**
@@ -697,7 +701,8 @@ export type PostPage = {
 };
 
 /** 목록 정렬. 서버가 받는 이름과 같아야 합니다. */
-export type PostSort = 'hot' | 'new' | 'top';
+/** copied — 이번 주 많이 가져간 순(지난 이레 동안 「내 여행으로 가져오기」 한 사람 수) */
+export type PostSort = 'hot' | 'new' | 'top' | 'copied';
 
 /**
  * 기간으로 거르기. 서버가 받는 이름과 같아야 합니다.

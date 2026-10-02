@@ -75,6 +75,7 @@ public interface TripPostRepository extends JpaRepository<TripPost, String> {
              AND (:tag = '' OR FUNCTION('array_position', p.tags, :tag) > 0)
              AND p.dayCount >= :minDays
              AND p.dayCount <= :maxDays
+             AND (:who = '' OR (:who = 'group' AND p.fromGroup = true) OR (:who = 'solo' AND p.fromGroup = false))
              AND (LOWER(p.title) LIKE :pattern
                   OR LOWER(COALESCE(p.summary, '')) LIKE :pattern
                   OR LOWER(FUNCTION('array_to_string', p.tags, ' ')) LIKE :pattern)
@@ -83,6 +84,7 @@ public interface TripPostRepository extends JpaRepository<TripPost, String> {
                           @Param("tag") String tag,
                           @Param("minDays") int minDays,
                           @Param("maxDays") int maxDays,
+                          @Param("who") String who,
                           @Param("pattern") String pattern,
                           Pageable pageable);
 
@@ -111,6 +113,7 @@ public interface TripPostRepository extends JpaRepository<TripPost, String> {
              AND (:tag = '' OR array_position(p.tags, :tag) IS NOT NULL)
              AND p.day_count >= :minDays
              AND p.day_count <= :maxDays
+             AND (:who = '' OR (:who = 'group' AND p.from_group = true) OR (:who = 'solo' AND p.from_group = false))
              AND (LOWER(p.title) LIKE :pattern
                   OR LOWER(COALESCE(p.summary, '')) LIKE :pattern
                   OR LOWER(array_to_string(p.tags, ' ')) LIKE :pattern)
@@ -126,6 +129,7 @@ public interface TripPostRepository extends JpaRepository<TripPost, String> {
              AND (:tag = '' OR array_position(p.tags, :tag) IS NOT NULL)
              AND p.day_count >= :minDays
              AND p.day_count <= :maxDays
+             AND (:who = '' OR (:who = 'group' AND p.from_group = true) OR (:who = 'solo' AND p.from_group = false))
              AND (LOWER(p.title) LIKE :pattern
                   OR LOWER(COALESCE(p.summary, '')) LIKE :pattern
                   OR LOWER(array_to_string(p.tags, ' ')) LIKE :pattern)
@@ -135,8 +139,66 @@ public interface TripPostRepository extends JpaRepository<TripPost, String> {
                            @Param("tag") String tag,
                            @Param("minDays") int minDays,
                            @Param("maxDays") int maxDays,
+                           @Param("who") String who,
                            @Param("pattern") String pattern,
                            Pageable pageable);
+
+    /**
+     * 이번 주 많이 가져간 순 — 지난 이레 동안 「내 여행으로 가져오기」 한 사람 수.
+     *
+     * <p>거르는 조건은 위 둘과 같습니다. 이레 동안 아무도 안 가져간 글은 뒤로
+     * 가고, 그 안에서는 최근 글이 앞입니다.
+     */
+    @Query(value = """
+           SELECT p.* FROM trip_posts p
+           LEFT JOIN (SELECT c.post_id, count(*) AS n FROM post_copies c
+                      WHERE c.created_at > now() - interval '7 days'
+                      GROUP BY c.post_id) w ON w.post_id = p.id
+           WHERE p.hidden = false
+             AND p.visibility = 'LISTED'
+             AND (:region = '' OR p.region = :region)
+             AND (:tag = '' OR array_position(p.tags, :tag) IS NOT NULL)
+             AND p.day_count >= :minDays
+             AND p.day_count <= :maxDays
+             AND (:who = '' OR (:who = 'group' AND p.from_group = true) OR (:who = 'solo' AND p.from_group = false))
+             AND (LOWER(p.title) LIKE :pattern
+                  OR LOWER(COALESCE(p.summary, '')) LIKE :pattern
+                  OR LOWER(array_to_string(p.tags, ' ')) LIKE :pattern)
+           ORDER BY COALESCE(w.n, 0) DESC, p.created_at DESC
+           """,
+           countQuery = """
+           SELECT count(*) FROM trip_posts p
+           WHERE p.hidden = false
+             AND p.visibility = 'LISTED'
+             AND (:region = '' OR p.region = :region)
+             AND (:tag = '' OR array_position(p.tags, :tag) IS NOT NULL)
+             AND p.day_count >= :minDays
+             AND p.day_count <= :maxDays
+             AND (:who = '' OR (:who = 'group' AND p.from_group = true) OR (:who = 'solo' AND p.from_group = false))
+             AND (LOWER(p.title) LIKE :pattern
+                  OR LOWER(COALESCE(p.summary, '')) LIKE :pattern
+                  OR LOWER(array_to_string(p.tags, ' ')) LIKE :pattern)
+           """,
+           nativeQuery = true)
+    Page<TripPost> findCopied(@Param("region") String region,
+                              @Param("tag") String tag,
+                              @Param("minDays") int minDays,
+                              @Param("maxDays") int maxDays,
+                              @Param("who") String who,
+                              @Param("pattern") String pattern,
+                              Pageable pageable);
+
+    /** 처음 가져간 사람이면 1 이 들어갑니다. 이미 가져갔으면 0. */
+    @Modifying
+    @Query(value = """
+           INSERT INTO post_copies (post_id, user_id) VALUES (:postId, :userId)
+           ON CONFLICT DO NOTHING
+           """, nativeQuery = true)
+    int markCopied(@Param("postId") String postId, @Param("userId") String userId);
+
+    @Modifying
+    @Query("UPDATE TripPost p SET p.copyCount = p.copyCount + 1 WHERE p.id = :id")
+    void addCopy(@Param("id") String id);
 
     /**
      * 운영자가 봐야 할 글.

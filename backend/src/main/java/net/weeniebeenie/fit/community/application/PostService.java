@@ -149,6 +149,8 @@ public class PostService {
                 .placeCount(placeList.size())
                 .feedback(feedback)
                 .build());
+        /* 모임 여행에서 나온 여행기인지 — 둘러보기의 혼자 · 모임 조건(V51). */
+        post.setFromGroup(trip.getGroupId() != null);
 
         audit.log(me.id(), "post.publish", post.getId(), Map.of("trip", tripId));
         return post;
@@ -407,6 +409,16 @@ public class PostService {
     @Transactional(readOnly = true)
     public Page<TripPost> list(String sort, String region, String tag, String days, String q,
                                Pageable pageable) {
+        return list(sort, region, tag, days, q, null, pageable);
+    }
+
+    /**
+     * @param who {@code solo} 혼자 여행에서 나온 것만 · {@code group} 모임 여행에서 · 비우면 전부
+     */
+    @Transactional(readOnly = true)
+    public Page<TripPost> list(String sort, String region, String tag, String days, String q,
+                               String who, Pageable pageable) {
+        String cleanWho = "solo".equals(who) || "group".equals(who) ? who : "";
         /* 비어 있는 조건에도 NULL 을 보내지 않습니다. 값이 NULL 로만 오면
            PostgreSQL 이 그 자리의 형을 알 수 없다고 거절합니다. */
         String cleanRegion = known(region) == null ? "" : region;
@@ -435,9 +447,12 @@ public class PostService {
         };
 
         /* 인기 순은 나이로 나눈 값이라 정렬을 질의 안에 박아 두었습니다. */
+        if ("copied".equals(sort)) {
+            return posts.findCopied(cleanRegion, cleanTag, minDays, maxDays, cleanWho, likePattern(q), pageable);
+        }
         return "new".equals(sort) || "top".equals(sort)
-                ? posts.search(cleanRegion, cleanTag, minDays, maxDays, likePattern(q), paged)
-                : posts.findHot(cleanRegion, cleanTag, minDays, maxDays, likePattern(q), pageable);
+                ? posts.search(cleanRegion, cleanTag, minDays, maxDays, cleanWho, likePattern(q), paged)
+                : posts.findHot(cleanRegion, cleanTag, minDays, maxDays, cleanWho, likePattern(q), pageable);
     }
 
     /**
@@ -658,6 +673,12 @@ public class PostService {
                 .title(snap.path("title").asText(post.getTitle()))
                 .ownerId(me.id())
                 .build());
+
+        /* 가져간 사람 수 — 같은 사람이 또 가져가면 안 셉니다. 제 글을 제가
+           가져가는 것도 안 셉니다. */
+        if (!post.getAuthorId().equals(me.id()) && posts.markCopied(post.getId(), me.id()) > 0) {
+            posts.addCopy(post.getId());
+        }
 
         /*
           고른 날만 가져옵니다.
@@ -1061,7 +1082,9 @@ public class PostService {
                        int dayCount, int placeCount, int likeCount, int viewCount,
                        boolean liked, java.time.Instant createdAt,
                        /** 표지 사진. 목록에서 이 글이 무엇인지 가장 빨리 말하는 것입니다. */
-                       String coverPhotoId) {
+                       String coverPhotoId,
+                       /** 「내 여행으로 가져오기」 한 사람 수 · 모임 여행에서 나왔는지 */
+                       int copyCount, boolean fromGroup) {
     }
 
     /**
@@ -1095,7 +1118,8 @@ public class PostService {
             out.add(new Card(p.getId(), p.getTitle(), p.getSummary(), p.getRegion(),
                     List.of(p.getTags()), authorNameOf(p),
                     p.getDayCount(), p.getPlaceCount(), p.getLikeCount(), p.getViewCount(),
-                    mine.contains(p.getId()), p.getCreatedAt(), p.getCoverPhotoId()));
+                    mine.contains(p.getId()), p.getCreatedAt(), p.getCoverPhotoId(),
+                    p.getCopyCount(), p.isFromGroup()));
         }
         return out;
     }

@@ -104,6 +104,14 @@ public class TripPost {
     @Column(name = "view_count", nullable = false)
     private int viewCount;
 
+    /** 모임 여행에서 나온 여행기인지. 내놓을 때 정해집니다(V51). */
+    @Column(name = "from_group", nullable = false)
+    private boolean fromGroup;
+
+    /** 「내 여행으로 가져오기」 한 사람 수. 같은 사람은 한 번만 셉니다. */
+    @Column(name = "copy_count", nullable = false)
+    private int copyCount;
+
     /** 신고를 받아 운영자가 내린 글. 지우지 않고 감춥니다. */
     @Column(nullable = false)
     private boolean hidden;

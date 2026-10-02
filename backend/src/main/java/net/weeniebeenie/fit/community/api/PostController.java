@@ -55,9 +55,13 @@ public class PostController {
                                     @RequestParam(name = "tag", required = false) String tag,
                                     @RequestParam(name = "days", required = false) String days,
                                     @RequestParam(name = "q", required = false) String q,
+                                    @RequestParam(name = "who", required = false) String who,
+                                    @RequestParam(name = "size", required = false) Integer size,
                                     @RequestParam(name = "page", defaultValue = "0") int page) {
+        /* 큐레이션 줄은 몇 장만 받습니다. 한 쪽 크기보다 크게는 못 받습니다. */
+        int take = size == null ? SIZE : Math.max(1, Math.min(SIZE, size));
         Page<TripPost> found =
-                posts.list(sort, region, tag, days, q, PageRequest.of(Math.max(0, page), SIZE));
+                posts.list(sort, region, tag, days, q, who, PageRequest.of(Math.max(0, page), take));
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("posts", posts.cardsOf(found.getContent(), me == null ? null : me.id()));
         out.put("page", found.getNumber());

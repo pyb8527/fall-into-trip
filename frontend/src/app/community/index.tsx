@@ -3,14 +3,16 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { api, query } from '@/api/client';
-import type { PostCard, PostDays, PostPage, PostSort } from '@/api/types';
+import type { PopularPlace, PostCard, PostDays, PostPage, PostSort, TripSummary } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
 import { OurPhoto } from '@/components/our-photo';
 import { PostMap } from '@/components/post-map';
 import { SignUpGate } from '@/components/signup-gate';
+import { glyphOf, labelOf } from '@/constants/place-icons';
 import { Colors, Elevation, Gutter, Radius, Spacing, Tap } from '@/constants/theme';
 import type { Comeback } from '@/lib/comeback';
+import { todayIso } from '@/lib/countdown';
 import {
   Band,
   Body,
@@ -25,7 +27,9 @@ import {
   FilterChip,
   Grow,
   IconButton,
+  ListRow,
   Loading,
+  Mark,
   Pager,
   Press,
   Row,
@@ -99,6 +103,14 @@ const SORTS: { value: PostSort; label: string }[] = [
   { value: 'hot', label: '인기순' },
   { value: 'new', label: '최신순' },
   { value: 'top', label: '추천순' },
+  { value: 'copied', label: '많이 가져간 순' },
+];
+
+/** 혼자 · 모임 — 그 여행기가 어느 쪽 여행에서 나왔는지. */
+type Who = 'solo' | 'group';
+const WHO: { value: Who; label: string }[] = [
+  { value: 'solo', label: '혼자 간 여행' },
+  { value: 'group', label: '여럿이 간 여행' },
 ];
 
 /** 나만 볼 수 있는 것들. 로그인하지 않았으면 띠에서 뺍니다. */
@@ -128,6 +140,7 @@ export default function Community() {
   const { region: fromLink } = useLocalSearchParams<{ region?: string }>();
   const [region, setRegion] = useState<string | null>(fromLink ?? null);
   const [days, setDays] = useState<PostDays | null>(null);
+  const [who, setWho] = useState<Who | null>(null);
 
   /*
     태그.
@@ -166,6 +179,9 @@ export default function Community() {
     q !== '' ? { key: 'q', label: `"${q}"`, clear: () => { setTyped(''); setQ(''); } } : null,
     region !== null ? { key: 'region', label: region, clear: () => setRegion(null) } : null,
     tag !== null ? { key: 'tag', label: `#${tag}`, clear: () => setTag(null) } : null,
+    who !== null
+      ? { key: 'who', label: WHO.find((w) => w.value === who)?.label ?? '', clear: () => setWho(null) }
+      : null,
     days !== null
       ? {
           key: 'days',
@@ -197,8 +213,8 @@ export default function Community() {
     (signal) =>
       view === 'mine' || view === 'liked'
         ? api.get(`/api/posts/${view}${query({ page })}`, signal)
-        : api.get(`/api/posts${query({ sort, region, tag, days, q, page })}`, signal),
-    [view, sort, page, region, tag, days, q],
+        : api.get(`/api/posts${query({ sort, region, tag, days, q, who, page })}`, signal),
+    [view, sort, page, region, tag, days, q, who],
   );
 
   /** 조건을 바꾸면 첫 쪽부터 다시 봅니다. 3쪽에서 걸면 빈 화면이 됩니다. */
@@ -343,6 +359,30 @@ export default function Community() {
           </ScrollView>
 
           {/*
+            지역 칩 — 한 줄만 밖에(plan-review Q8).
+
+            <p>지역 · 기간 · 태그 칩 열셋을 늘 펼쳐 두었다가 걷어 낸 적이 있습니다
+            — 좁은 폰에서 석 줄을 먹어 목록이 늘 화면 밖에서 시작했습니다. 가장
+            먼저 고르는 지역만 한 줄로 흘리고 나머지는 판 안에 그대로 둡니다.
+          */}
+          {(regionList?.regions.length ?? 0) > 0 ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.sieve}
+              style={styles.sieveBleed}>
+              {regionList?.regions.map((r) => (
+                <Chip
+                  key={r}
+                  label={r}
+                  selected={region === r}
+                  onPress={() => refilter(() => setRegion(region === r ? null : r))}
+                />
+              ))}
+            </ScrollView>
+          ) : null}
+
+          {/*
             개수와 세우는 법.
 
             <p>개수는 조건 줄 아래 한 줄로 둡니다 — 줄 안에 끼우면 조건이
@@ -439,6 +479,24 @@ export default function Community() {
               label={r}
               selected={region === r}
               onPress={() => refilter(() => setRegion(region === r ? null : r))}
+            />
+          ))}
+        </Row>
+
+        <Divider />
+
+        {/* 혼자 · 여럿이 — 동선의 빽빽함도 숙소도 다릅니다. */}
+        <Body small strong>
+          누구와
+        </Body>
+        <Row gap={Spacing.s2} style={styles.applied}>
+          <Chip label="누구든" selected={who === null} onPress={() => refilter(() => setWho(null))} />
+          {WHO.map((w) => (
+            <Chip
+              key={w.value}
+              label={w.label}
+              selected={who === w.value}
+              onPress={() => refilter(() => setWho(who === w.value ? null : w.value))}
             />
           ))}
         </Row>
@@ -545,6 +603,17 @@ export default function Community() {
         />
       ) : null}
 
+      {/*
+        큐레이션 줄 — 아무것도 안 걸고 첫 쪽을 볼 때만.
+
+        <p>목록 하나뿐이라 올라온 여행이 적으면 카드 몇 장이 전부였습니다. 같은
+        여행이 여러 줄에 나와도 괜찮습니다 — 여러 기준으로 다시 묶어 보여 주면
+        열 개뿐이어도 고를 맛이 납니다.
+      */}
+      {view === 'all' && !filtered && page === 0 ? (
+        <Curation onOpen={(id) => router.push(`/community/${id}`)} onTag={(t) => refilter(() => setTag(t))} />
+      ) : null}
+
       {/* 넓은 화면에서는 글 카드를 두세 칸으로 늘어놓습니다. 폰에서는
           감싸는 것이 없습니다 — 한 칸일 때는 격자가 아무 일도 안 합니다. */}
       <CardGrid>
@@ -559,6 +628,11 @@ export default function Community() {
         ))}
       </CardGrid>
 
+      {/*
+        여행이 적을 때 — 장소는 많습니다. 그리고 내 여행도 내놓아 보라고.
+      */}
+      {view === 'all' && !filtered && data && data.total < 6 ? <FewPosts /> : null}
+
       <Pager
         page={data?.page ?? 0}
         totalPages={data?.totalPages ?? 0}
@@ -567,6 +641,124 @@ export default function Community() {
 
       <SignUpGate intent={gate} onClose={() => setGate(null)} />
     </Screen>
+  );
+}
+
+/**
+ * 큐레이션 줄들 — 이번 주 많이 가져간 · 내 다음 여행지 · 새로 올라온 · 많이 쓴 태그.
+ *
+ * <p>줄마다 몇 장만 받습니다(size). 줄 하나가 비면 그 줄은 안 그립니다.
+ */
+function Curation({ onOpen, onTag }: { onOpen: (id: string) => void; onTag: (tag: string) => void }) {
+  const { user } = useAuth();
+  const trips = useAsync<{ trips: TripSummary[] }>(
+    (signal) => (user ? api.get('/api/trips', signal) : Promise.resolve({ trips: [] })),
+    [user?.id],
+  );
+  const tags = useAsync<{ tags: { tag: string; posts: number }[] }>((signal) => api.get('/api/posts/tags', signal), []);
+  /* 다음 여행 이름의 첫 낱말 — 「오사카 3박 4일」이면 오사카로 찾습니다. */
+  const nextTrip = (trips.data?.trips ?? [])
+    .filter((t) => (t.startIso ?? '') >= todayIso())
+    .sort((a, b) => (a.startIso ?? '').localeCompare(b.startIso ?? ''))[0];
+  const where = nextTrip?.title.split(/\s+/)[0] ?? null;
+  const topTag = tags.data?.tags[0]?.tag ?? null;
+  return (
+    <>
+      <ShelfRow title="이번 주 많이 가져간 여행" path="/api/posts?sort=copied&size=6" onOpen={onOpen} />
+      {where ? (
+        <ShelfRow
+          title={`${where} 여행 모음`}
+          path={`/api/posts?sort=hot&size=6&q=${encodeURIComponent(where)}`}
+          onOpen={onOpen}
+        />
+      ) : null}
+      <ShelfRow title="새로 올라온 여행" path="/api/posts?sort=new&size=6" onOpen={onOpen} />
+      {topTag ? (
+        <ShelfRow
+          title={`#${topTag}`}
+          path={`/api/posts?sort=hot&size=6&tag=${encodeURIComponent(topTag)}`}
+          onOpen={onOpen}
+          onMore={() => onTag(topTag)}
+        />
+      ) : null}
+    </>
+  );
+}
+
+function ShelfRow({
+  title,
+  path,
+  onOpen,
+  onMore,
+}: {
+  title: string;
+  path: string;
+  onOpen: (id: string) => void;
+  onMore?: () => void;
+}) {
+  const { data } = useAsync<PostPage>((signal) => api.get(path, signal), [path]);
+  const posts = data?.posts ?? [];
+  if (posts.length === 0) {
+    return null;
+  }
+  return (
+    <View style={styles.shelf}>
+      <Split>
+        <Body strong>{title}</Body>
+        {onMore ? <Button label="더 보기" variant="text" size="xs" onPress={onMore} /> : null}
+      </Split>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.shelfRow}>
+        {posts.map((p) => (
+          <Press key={p.id} onPress={() => onOpen(p.id)} scale={0.97} style={styles.shelfCard}>
+            {p.coverPhotoId ? (
+              <OurPhoto id={p.coverPhotoId} height={96} style={styles.flat} />
+            ) : (
+              <PostMap postId={p.id} title={p.title} height={96} />
+            )}
+            <View style={styles.shelfText}>
+              <Body small strong numberOfLines={2}>
+                {p.title}
+              </Body>
+              <Caption tone="muted" numberOfLines={1}>
+                {[p.region, `${p.dayCount}일`, (p.copyCount ?? 0) >= 3 ? `가져간 ${p.copyCount}명` : null]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </Caption>
+            </View>
+          </Press>
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
+/**
+ * 여행기가 적을 때 — 지금 뜨는 곳과 「내 여행도 내놓아 보세요」.
+ *
+ * <p>여행기가 적어도 장소 데이터는 많습니다. 그리고 지금 비어 보이는 까닭이
+ * 내놓은 사람이 적어서라면, 다녀온 여행이 있는 사람에게 그 길을 바로 줍니다.
+ */
+function FewPosts() {
+  const router = useRouter();
+  const { data: top } = useAsync<{ places: PopularPlace[] }>((signal) => api.get('/api/popular/places', signal), []);
+  return (
+    <View style={styles.shelf}>
+      {(top?.places.length ?? 0) > 0 ? <Body strong>지금 뜨는 곳</Body> : null}
+      {top?.places.slice(0, 5).map((p, i, rows) => (
+        <ListRow
+          key={p.key}
+          left={<Mark icon={glyphOf(p.icon)} />}
+          title={p.name}
+          subtitle={labelOf(p.icon) || undefined}
+          last={i === rows.length - 1}
+          onPress={() => router.push('/(app)/popular')}
+        />
+      ))}
+      <Press onPress={() => router.push('/(app)/trips')} scale={0.99} style={styles.invite}>
+        <Body strong>내 여행도 내놓아 보세요</Body>
+        <Caption tone="secondary">다녀온 여행의 요약 화면에서 「여행기 쓰기」로 바로 올릴 수 있어요.</Caption>
+      </Press>
+    </View>
   );
 }
 
@@ -641,10 +833,20 @@ function PostRow({
             앱 자체가 비어 보입니다. 세는 것은 계속하되(인기순이 씁니다) 보여
             주지는 않습니다.
           */}
+          {/* 작은 숫자는 숨깁니다. 「♥ 1」은 세는 말이 아니라 「아무도 안 봤다」로
+              읽힙니다. 셋부터 냅니다. 가져간 수가 하트보다 앞입니다 — 가져간
+              것은 실제로 쓴다는 뜻입니다. */}
           <Caption tone="secondary">
-            {post.authorName}
-            {post.region ? ` · ${post.region}` : ''} · {post.placeCount}곳 · ♥{' '}
-            {post.likeCount}
+            {[
+              post.authorName,
+              post.region,
+              `${post.placeCount}곳`,
+              post.fromGroup ? '여럿이' : null,
+              (post.copyCount ?? 0) >= 3 ? `가져간 ${post.copyCount}명` : null,
+              post.likeCount >= 3 ? `♥ ${post.likeCount}` : null,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
           </Caption>
         </View>
       </Pressable>
@@ -685,6 +887,32 @@ function PostRow({
 }
 
 const styles = StyleSheet.create({
+  shelf: {
+    gap: Spacing.s2,
+    paddingBottom: Spacing.s3,
+  },
+  shelfRow: {
+    gap: Spacing.s3,
+  },
+  /* 큐레이션 카드. 목록 카드라 모서리 12. */
+  shelfCard: {
+    width: 168,
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surface,
+  },
+  shelfText: {
+    padding: Spacing.s2,
+    gap: 2,
+  },
+  invite: {
+    gap: Spacing.s1,
+    padding: Spacing.s4,
+    borderRadius: 12,
+    backgroundColor: Colors.accentSoft,
+  },
   /*
     탭 아래 선은 좌우 여백을 뚫고 나갑니다.
 
