@@ -75,6 +75,12 @@ services:
       # 비워 두면 웹 것 하나만 봅니다 - 앱 로그인을 안 켠 서버는 그대로입니다.
       GOOGLE_AUDIENCES: ${GOOGLE_AUDIENCES:-}
 
+      # 카카오로 로그인하기. REST API 키(서버만 씁니다)와, 콘솔에서 켰을 때만
+      # Client Secret. Redirect URI 는 콘솔에 적은 것과 같아야 합니다.
+      KAKAO_REST_KEY: ${KAKAO_REST_KEY:-}
+      KAKAO_CLIENT_SECRET: ${KAKAO_CLIENT_SECRET:-}
+      KAKAO_REDIRECT_URI: ${KAKAO_REDIRECT_URI:-}
+
       # 서버가 보는 "지금" 과 "오늘".
       #
       # 안 넣으면 컨테이너가 UTC 로 돕니다. 그러면 자바의 LocalDate.now() 가

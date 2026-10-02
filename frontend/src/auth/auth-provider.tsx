@@ -24,6 +24,8 @@ type AuthContextValue = {
    * 비어 있으면 단추를 안 냅니다.
    */
   googleClientId: string;
+  /** 서버가 카카오 로그인을 켰는지. 꺼져 있으면 단추를 안 냅니다 */
+  kakaoEnabled: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, name: string, password: string) => Promise<void>;
   setup: (email: string, name: string, password: string, token: string) => Promise<void>;
@@ -49,6 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [setupNeeded, setSetupNeeded] = useState(false);
   const [googleClientId, setGoogleClientId] = useState('');
+  const [kakaoEnabled, setKakaoEnabled] = useState(false);
 
   const accept = useCallback((res: TokenResponse) => {
     setAccessToken(res.accessToken);
@@ -105,6 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const state = await request<AuthState>('/api/auth/state', { anonymous: true });
         if (alive) {
           setGoogleClientId(state.googleClientId ?? '');
+          setKakaoEnabled(!!state.kakao);
           if (!revived) {
             setSetupNeeded(state.setupNeeded);
           }
@@ -193,6 +197,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user,
       setupNeeded,
       googleClientId,
+      kakaoEnabled,
       signInWithGoogle,
       login,
       register,
@@ -202,7 +207,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       logoutAll,
       refreshUser,
     }),
-    [ready, user, setupNeeded, googleClientId, login, register, setup, changePassword, logout,
+    [ready, user, setupNeeded, googleClientId, kakaoEnabled, login, register, setup, changePassword, logout,
      logoutAll, refreshUser, signInWithGoogle],
   );
 

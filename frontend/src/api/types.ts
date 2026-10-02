@@ -42,6 +42,8 @@ export type AuthState = {
   setupNeeded: boolean;
   /** 구글 로그인이 켜져 있으면 그 클라이언트 ID. 꺼져 있으면 빈 값입니다. */
   googleClientId?: string;
+  /** 카카오 로그인을 켰는지 */
+  kakao?: boolean;
 };
 
 export type TripSummary = {

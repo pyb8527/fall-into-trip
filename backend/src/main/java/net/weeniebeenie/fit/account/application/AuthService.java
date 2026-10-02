@@ -58,6 +58,13 @@ public class AuthService {
         String cleanName = requireName(name);
         validatePassword(password);
 
+        /* 이메일을 안 준 소셜 계정이 자리로 쓰는 끝자리입니다
+           (SocialAuthService). 비밀번호로 먼저 차지해 두면 그 사람이 카카오로
+           처음 들어올 때 부딪힙니다. */
+        if (normalized.endsWith("@users.invalid")) {
+            throw ApiException.badRequest("쓸 수 없는 주소예요.");
+        }
+
         if (users.existsByEmail(normalized)) {
             /* 이미 있다고 그대로 알려 주면 어떤 주소가 가입돼 있는지 확인하는
                통로가 됩니다. 다만 가입 화면에서는 안내가 없으면 막막하므로,

@@ -11,6 +11,7 @@ import net.weeniebeenie.fit.account.infrastructure.security.AuthPrincipal;
 import net.weeniebeenie.fit.account.infrastructure.security.CurrentUser;
 import net.weeniebeenie.fit.account.infrastructure.security.JwtProperties;
 import net.weeniebeenie.fit.account.infrastructure.security.JwtProvider;
+import net.weeniebeenie.fit.account.infrastructure.security.KakaoLogin;
 import net.weeniebeenie.fit.account.application.AuthService;
 import net.weeniebeenie.fit.account.application.SocialAuthService;
 import net.weeniebeenie.fit.account.application.RefreshTokenService;
@@ -49,10 +50,15 @@ public class AuthController {
     private final UserRepository users;
     private final JwtProvider jwt;
     private final JwtProperties props;
+    private final KakaoLogin kakao;
+
+    /** 카카오 로그인의 state 를 그 브라우저에 묶는 쿠키. {@link KakaoLogin} 의 두 겹. */
+    private static final String KAKAO_COOKIE = "fit_kakao_state";
+    private static final String KAKAO_PATH = "/api/auth/kakao";
 
     @GetMapping("/state")
     public AuthStateResponse state() {
-        return new AuthStateResponse(auth.setupNeeded(), social.clientId());
+        return new AuthStateResponse(auth.setupNeeded(), social.clientId(), kakao.enabled());
     }
 
     /**
@@ -103,6 +109,114 @@ public class AuthController {
                                                 HttpServletRequest http) {
         User user = social.signIn(req == null ? null : req.credential());
         return withNewSession(user, http);
+    }
+
+    /* ------------------------------------------------------------ 카카오 */
+
+    /**
+     * 카카오로 들어가기 — 시작.
+     *
+     * <p>화면이 이 주소로 <b>페이지를 옮깁니다</b>(fetch 가 아니라). 카카오
+     * 동의 화면을 거쳐 아래 콜백으로 돌아옵니다.
+     */
+    @GetMapping("/kakao/start")
+    public ResponseEntity<Void> kakaoStart() {
+        if (!kakao.enabled()) {
+            return back("/login", "카카오 로그인이 꺼져 있어요.");
+        }
+        String state = net.weeniebeenie.fit.shared.domain.Ids.secret();
+        return ResponseEntity.status(302)
+                .header(HttpHeaders.SET_COOKIE, kakaoCookie(state).toString())
+                .header(HttpHeaders.LOCATION, kakao.authorizeUrl(state, null))
+                .build();
+    }
+
+    /**
+     * 로그인한 사람이 자기 계정에 카카오를 잇습니다 — 시작.
+     *
+     * <p>콜백에는 로그인 헤더가 안 실리므로, 여기서 「누구의 계정에」를
+     * state 에 적어 두고 갈 주소를 돌려줍니다. 화면은 그 주소로 옮깁니다.
+     */
+    @PostMapping("/link/kakao")
+    public ResponseEntity<Map<String, Object>> kakaoLink(@CurrentUser AuthPrincipal me) {
+        String state = net.weeniebeenie.fit.shared.domain.Ids.secret();
+        String url = kakao.authorizeUrl(state, me.id());
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, kakaoCookie(state).toString())
+                .body(Map.of("url", url));
+    }
+
+    /**
+     * 카카오에서 돌아오는 자리. 카카오 콘솔에 적은 Redirect URI 가 이것입니다.
+     *
+     * <p>들어오기면 세션 쿠키를 심고 첫 화면으로, 잇기면 설정으로 보냅니다.
+     * 화면은 켤 때 늘 쿠키로 세션을 되살리므로(auth-provider) 따로 넘길 것이
+     * 없습니다. 안 됐으면 까닭을 주소에 실어 되돌립니다.
+     */
+    @GetMapping("/kakao/callback")
+    public ResponseEntity<Void> kakaoCallback(
+            @RequestParam(required = false) String code,
+            @RequestParam(required = false) String state,
+            @RequestParam(required = false) String error,
+            @CookieValue(name = KAKAO_COOKIE, required = false) String cookie,
+            HttpServletRequest http) {
+        KakaoLogin.Pending waiting;
+        try {
+            waiting = kakao.take(state, cookie);
+        } catch (ApiException e) {
+            return back("/login", e.getMessage());
+        }
+        String home = waiting.userId() == null ? "/login" : "/settings";
+
+        /* 동의 화면에서 「취소」를 누르면 code 없이 error 만 옵니다. 그건
+           잘못이 아니라 마음을 바꾼 것이라 아무 말 없이 되돌립니다. */
+        if (error != null || code == null) {
+            return back(home, null);
+        }
+        try {
+            var who = kakao.read(code);
+            if (waiting.userId() != null) {
+                social.link(waiting.userId(), who);
+                return back("/settings", null);
+            }
+            User user = social.signIn(who);
+            String refresh = refreshTokens.issue(user.getId(),
+                    http.getHeader(HttpHeaders.USER_AGENT), clientIp(http));
+            return ResponseEntity.status(302)
+                    .header(HttpHeaders.SET_COOKIE, refreshCookie(refresh).toString())
+                    .header(HttpHeaders.SET_COOKIE, kakaoCookie("").toString())
+                    .header(HttpHeaders.LOCATION, "/")
+                    .build();
+        } catch (ApiException e) {
+            return back(home, e.getMessage());
+        }
+    }
+
+    /** 화면으로 돌려보냅니다. 할 말이 있으면 주소에 싣습니다. state 쿠키는 걷습니다. */
+    private ResponseEntity<Void> back(String path, String message) {
+        String to = message == null ? path
+                : path + "?social_error=" + java.net.URLEncoder.encode(message,
+                java.nio.charset.StandardCharsets.UTF_8);
+        return ResponseEntity.status(302)
+                .header(HttpHeaders.SET_COOKIE, kakaoCookie("").toString())
+                .header(HttpHeaders.LOCATION, to)
+                .build();
+    }
+
+    /**
+     * state 쿠키. 비우면 걷습니다.
+     *
+     * <p>{@code Lax} 라야 합니다 — 카카오에서 우리 주소로 넘어오는 것은 남의
+     * 사이트에서 오는 이동이고, {@code Strict} 면 그때 쿠키가 안 실립니다.
+     */
+    private ResponseCookie kakaoCookie(String state) {
+        return ResponseCookie.from(KAKAO_COOKIE, state)
+                .httpOnly(true)
+                .secure(props.isSecureCookie())
+                .sameSite("Lax")
+                .path(KAKAO_PATH)
+                .maxAge(state.isEmpty() ? 0 : 600)
+                .build();
     }
 
     /** 로그인한 사람이 자기 계정에 구글을 잇습니다. */

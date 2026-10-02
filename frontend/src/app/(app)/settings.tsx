@@ -1,10 +1,11 @@
 import Constants from 'expo-constants';
-import { Stack, useNavigation, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { api, ApiError, UNEXPECTED } from '@/api/client';
 import { GoogleButton } from '@/components/google-button';
+import { canSignInWithKakao, KakaoButton } from '@/components/kakao-button';
 import { canNotify, notifyState, turnOff, turnOn } from '@/lib/notify';
 import { useAuth } from '@/auth/auth-provider';
 import { USER_MARKS, markOf } from '@/constants/user-marks';
@@ -413,7 +414,10 @@ function MarkGroup() {
  * 한 가지를 말하는 것이라 한 묶음에 섭니다.
  */
 function AccountGroup() {
-  const { user, googleClientId, refreshUser, changePassword } = useAuth();
+  const { user, googleClientId, kakaoEnabled, refreshUser, changePassword } = useAuth();
+  /* 카카오 잇기에서 돌아왔는데 안 됐으면 서버가 까닭을 주소에 싣습니다. */
+  const { social_error: socialError } = useLocalSearchParams<{ social_error?: string }>();
+  const [kakaoSheet, setKakaoSheet] = useState(false);
   const [providers, setProviders] = useState<string[] | null>(null);
   const [linking, setLinking] = useState(false);
   const [changing, setChanging] = useState(false);
@@ -435,6 +439,46 @@ function AccountGroup() {
   const linked = (providers ?? []).includes('google');
   /* 서버가 구글을 안 켰으면 그 줄 자체가 뜻이 없습니다. */
   const showGoogle = !!googleClientId && providers !== null;
+  const kakaoLinked = (providers ?? []).includes('kakao');
+  const showKakao = kakaoEnabled && canSignInWithKakao && providers !== null;
+
+  /*
+    카카오 잇기.
+
+    <p>구글과 달리 이 화면에서 끝나지 않습니다. 서버에서 갈 주소를 받아
+    페이지째 카카오로 갔다가, 다 되면 서버가 이 화면으로 돌려보냅니다.
+  */
+  async function connectKakao() {
+    if (busy) {
+      return;
+    }
+    setError(null);
+    setBusy(true);
+    try {
+      const got = await api.post<{ url: string }>('/api/auth/link/kakao');
+      window.location.assign(got.url);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : UNEXPECTED);
+      setBusy(false);
+    }
+  }
+
+  async function disconnectKakao() {
+    if (busy) {
+      return;
+    }
+    setError(null);
+    setBusy(true);
+    try {
+      const got = await api.delete<{ providers: string[] }>('/api/auth/link/kakao');
+      setProviders(got.providers);
+      setKakaoSheet(false);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : UNEXPECTED);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function connect(credential: string) {
     if (busy) {
@@ -484,11 +528,41 @@ function AccountGroup() {
         />
       ) : null}
 
+      {showKakao ? (
+        <Line
+          label="카카오로 로그인하기"
+          badge={kakaoLinked ? <Badge label="연결됨" tone="success" /> : null}
+          onPress={() => setKakaoSheet(true)}
+        />
+      ) : null}
+
       <Line label="비밀번호 바꾸기" onPress={() => setChanging(true)} />
       <Line label="가입" value={formatDate(user?.createdAt)} />
       <Line label="마지막 로그인" value={formatDate(user?.lastLoginAt)} last />
 
       {error ? <ErrorNote message={error} /> : null}
+      {!error && socialError ? <ErrorNote message={socialError} /> : null}
+
+      <BottomSheet
+        visible={kakaoSheet}
+        title="카카오로 로그인하기"
+        onClose={() => setKakaoSheet(false)}>
+        {kakaoLinked ? (
+          <>
+            <Body small tone="secondary">
+              이어 뒀어요. 다음부터 카카오 단추 하나로 들어와요.
+            </Body>
+            <Button label="끊기" variant="secondary" onPress={disconnectKakao} busy={busy} />
+          </>
+        ) : (
+          <>
+            <Body small tone="secondary">
+              이어 두면 비밀번호를 안 적고 들어와요. 카카오에 다녀온 뒤 이 화면으로 돌아와요.
+            </Body>
+            <KakaoButton label="카카오 잇기" onPress={connectKakao} />
+          </>
+        )}
+      </BottomSheet>
 
       {/*
         구글 잇기.

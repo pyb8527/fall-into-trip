@@ -92,6 +92,20 @@ fit:
       # 비워 두면 웹 것 하나만 봅니다 - 앱 로그인을 안 켠 서버는 그대로입니다.
       audiences: ${GOOGLE_AUDIENCES:}
 
+    kakao:
+      # 카카오로 로그인하기. 카카오 콘솔 > 앱 키 > REST API 키.
+      # 비워 두면 카카오 로그인이 꺼지고 단추도 안 뜹니다.
+      rest-key: ${KAKAO_REST_KEY:}
+
+      # 카카오 로그인 > 보안 > Client Secret 을 「사용함」으로 켰을 때만.
+      client-secret: ${KAKAO_CLIENT_SECRET:}
+
+      # 카카오 콘솔에 등록한 Redirect URI 와 한 글자도 달라선 안 됩니다.
+      # 비우면 운영 주소(https://fit.weenie-beenie.net/api/auth/kakao/callback)입니다.
+      # 개발에서 쓰려면 http://localhost:8080/api/auth/kakao/callback 을 콘솔에도
+      # 더하고 여기에 넣습니다.
+      redirect-uri: ${KAKAO_REDIRECT_URI:}
+
 logging:
   level:
     net.weeniebeenie.fit: INFO

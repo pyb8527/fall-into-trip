@@ -61,7 +61,15 @@ public class SocialAuthService {
      */
     @Transactional
     public User signIn(String credential) {
-        SocialTokens.Person who = tokens.readGoogle(credential);
+        return signIn(tokens.readGoogle(credential));
+    }
+
+    /**
+     * 누구인지 이미 읽어 낸 사람으로 들어옵니다. 구글과 카카오가 여기서
+     * 만납니다 — 세 갈래 규칙은 제공자마다 갈라지면 안 됩니다.
+     */
+    @Transactional
+    public User signIn(SocialTokens.Person who) {
 
         /* 1. 이미 아는 사람. 여기서 이메일은 안 봅니다 — 그쪽에서 주소를
               바꿨어도 같은 사람입니다. */
@@ -74,8 +82,30 @@ public class SocialAuthService {
                 throw ApiException.unauthorized("사용할 수 없는 계정이에요.");
             }
             user.setLastLoginAt(Instant.now());
-            audit.log(user.getId(), "login.google", user.getId());
+            audit.log(user.getId(), "login." + who.provider(), user.getId());
             return user;
+        }
+
+        /*
+          이메일을 안 준 사람(카카오에서 동의를 안 했거나, 확인 안 된 주소).
+
+          <p>이메일이 없으니 잇지 않고 늘 새로 만듭니다 — 비교할 것이 없습니다.
+          계정에는 이메일 칸이 꼭 있어야 해서, 아무 데도 닿지 않는 주소를
+          자리에 둡니다({@code .invalid} 는 그러라고 남겨 둔 끝자리입니다).
+          비밀번호가 없으니 그 주소로 로그인할 길도 없습니다.
+        */
+        if (who.email() == null || who.email().isBlank()) {
+            String placeholder = who.provider() + "-" + who.subject() + "@users.invalid";
+            User made = users.save(User.builder()
+                    .email(Email.of(placeholder).value())
+                    .name(nameOf(who))
+                    .passwordHash(null)
+                    .role(Role.MEMBER)
+                    .build());
+            identities.save(new UserIdentity(who.provider(), who.subject(), made.getId(), null));
+            made.setLastLoginAt(Instant.now());
+            audit.log(made.getId(), "user.register." + who.provider(), made.getId());
+            return made;
         }
 
         String email = Email.of(who.email()).value();
@@ -91,7 +121,7 @@ public class SocialAuthService {
                     .build());
             identities.save(new UserIdentity(who.provider(), who.subject(), made.getId(), email));
             made.setLastLoginAt(Instant.now());
-            audit.log(made.getId(), "user.register.google", made.getId(), Map.of("email", email));
+            audit.log(made.getId(), "user.register." + who.provider(), made.getId(), Map.of("email", email));
             return made;
         }
 
@@ -105,15 +135,15 @@ public class SocialAuthService {
               방법이 없습니다. 그때는 잇습니다 — 애플로 먼저 들어왔던
               사람이 구글로 들어오는 경우가 여기입니다. */
         if (byEmail.hasPassword()) {
-            throw ApiException.conflict(
-                    "이미 가입된 주소예요. 비밀번호로 로그인한 뒤 설정에서 구글을 이어 주세요.");
+            throw ApiException.conflict("이미 가입된 주소예요. 비밀번호로 로그인한 뒤 설정에서 "
+                    + label(who.provider()) + "을 이어 주세요.");
         }
         if (byEmail.isDisabled()) {
             throw ApiException.unauthorized("사용할 수 없는 계정이에요.");
         }
         identities.save(new UserIdentity(who.provider(), who.subject(), byEmail.getId(), email));
         byEmail.setLastLoginAt(Instant.now());
-        audit.log(byEmail.getId(), "identity.link.google", byEmail.getId());
+        audit.log(byEmail.getId(), "identity.link." + who.provider(), byEmail.getId());
         return byEmail;
     }
 
@@ -126,21 +156,25 @@ public class SocialAuthService {
      */
     @Transactional
     public void link(String userId, String credential) {
-        SocialTokens.Person who = tokens.readGoogle(credential);
+        link(userId, tokens.readGoogle(credential));
+    }
+
+    @Transactional
+    public void link(String userId, SocialTokens.Person who) {
 
         identities.findByProviderAndSubject(who.provider(), who.subject()).ifPresent(already -> {
             if (already.getUserId().equals(userId)) {
                 throw ApiException.badRequest("이미 이어 뒀어요.");
             }
             /* 남의 계정에 이어져 있습니다. 누구인지는 안 알려 줍니다. */
-            throw ApiException.conflict("이 구글 계정은 다른 곳에 이어져 있어요.");
+            throw ApiException.conflict("이 " + label(who.provider()) + " 계정은 다른 곳에 이어져 있어요.");
         });
         if (identities.findByUserIdAndProvider(userId, who.provider()).isPresent()) {
-            throw ApiException.badRequest("이미 다른 구글 계정을 이어 뒀어요. 먼저 끊어 주세요.");
+            throw ApiException.badRequest("이미 다른 " + label(who.provider()) + " 계정을 이어 뒀어요. 먼저 끊어 주세요.");
         }
         identities.save(new UserIdentity(who.provider(), who.subject(), userId,
-                Email.of(who.email()).value()));
-        audit.log(userId, "identity.link.google", userId);
+                who.email() == null || who.email().isBlank() ? null : Email.of(who.email()).value()));
+        audit.log(userId, "identity.link." + who.provider(), userId);
     }
 
     /**
@@ -164,6 +198,10 @@ public class SocialAuthService {
         audit.log(userId, "identity.unlink." + provider, userId);
     }
 
+    private static String label(String provider) {
+        return "kakao".equals(provider) ? "카카오" : "구글";
+    }
+
     /** 화면이 구글 단추를 낼지 정하는 데 씁니다. */
     public String clientId() {
         return tokens.clientId();
@@ -185,6 +223,9 @@ public class SocialAuthService {
         String given = who.name() == null ? "" : who.name().trim();
         if (!given.isEmpty()) {
             return given.length() > 80 ? given.substring(0, 80) : given;
+        }
+        if (who.email() == null || who.email().isBlank()) {
+            return "여행자";
         }
         String local = who.email().split("@", 2)[0];
         return local.isBlank() ? "여행자" : (local.length() > 80 ? local.substring(0, 80) : local);

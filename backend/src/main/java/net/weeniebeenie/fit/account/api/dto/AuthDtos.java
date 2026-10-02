@@ -88,7 +88,8 @@ public final class AuthDtos {
      *                       도는 날이 옵니다. 비밀이 아니라 브라우저에
      *                       나가도 되는 값입니다.
      */
-    public record AuthStateResponse(boolean setupNeeded, String googleClientId) {
+    /** @param kakao 카카오 로그인을 켰는지. 켰으면 화면이 카카오 단추를 그립니다 */
+    public record AuthStateResponse(boolean setupNeeded, String googleClientId, boolean kakao) {
     }
 
     /**

@@ -6,6 +6,7 @@ import { ApiError, UNEXPECTED } from '@/api/client';
 import { useAuth } from '@/auth/auth-provider';
 import { Colors, Spacing, Type, Weight } from '@/constants/theme';
 import { GoogleButton } from '@/components/google-button';
+import { canSignInWithKakao, KakaoButton } from '@/components/kakao-button';
 import { canSignInWithGoogle } from '@/lib/google-signin';
 import { Button, ErrorNote, Field, IconButton, Row, Screen, Title } from '@/ui';
 import { LogoSymbol } from '@/ui/logo';
@@ -51,7 +52,12 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
   const navigation = useNavigation();
   /* 초대 링크에서 넘어왔다면 로그인 뒤 그리로 돌아가야 합니다.
      다른 쪽으로 갈아탈 때도 잃어버리면 안 됩니다. */
-  const { next: back } = useLocalSearchParams<{ next?: string }>();
+  /* social_error — 카카오에서 돌아왔는데 안 됐을 때 서버가 실어 보낸 까닭.
+     카카오는 페이지째 오가서 이 화면이 그 말을 받을 길이 주소뿐입니다. */
+  const { next: back, social_error: socialError } = useLocalSearchParams<{
+    next?: string;
+    social_error?: string;
+  }>();
   const { login, register, signInWithGoogle } = useAuth();
 
   const [email, setEmail] = useState('');
@@ -212,6 +218,7 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
         />
 
         {error ? <ErrorNote message={error} /> : null}
+        {!error && socialError ? <ErrorNote message={socialError} /> : null}
       </View>
 
       <View style={styles.submit}>
@@ -252,7 +259,9 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
  * 것처럼 보입니다.
  */
 function GoogleBlock({ onDone }: { onDone: (credential: string) => void }) {
-  const { googleClientId } = useAuth();
+  const { googleClientId, kakaoEnabled } = useAuth();
+  const google = !!googleClientId && canSignInWithGoogle;
+  const kakao = kakaoEnabled && canSignInWithKakao;
   /*
     두 쪽을 다 봅니다.
 
@@ -261,7 +270,7 @@ function GoogleBlock({ onDone }: { onDone: (credential: string) => void }) {
     빌드에 제 클라이언트 ID 가 박혀 있어야 하는데, 서버 쪽만 보고 있으면
     그것이 없는 앱에서 "또는" 만 덩그러니 남습니다.
   */
-  if (!googleClientId || !canSignInWithGoogle) {
+  if (!google && !kakao) {
     return null;
   }
   return (
@@ -278,7 +287,9 @@ function GoogleBlock({ onDone }: { onDone: (credential: string) => void }) {
         <Text style={styles.orText}>또는</Text>
         <View style={styles.orLine} />
       </Row>
-      <GoogleButton onCredential={onDone} />
+      {/* 카카오가 위입니다. 이 앱을 쓰는 사람 대부분에게 더 가까운 계정입니다. */}
+      {kakao ? <KakaoButton /> : null}
+      {google ? <GoogleButton onCredential={onDone} /> : null}
     </View>
   );
 }
