@@ -138,7 +138,11 @@ export default function Me() {
               {/* 가입한 달 대신 기록. 가입한 달은 그 사람에 대해 아무것도 말하지
                   않습니다. */}
               <Caption tone="secondary">
-                {`여행 ${me.counts.trips}번 · 함께한 사람 ${me.companions ?? 0}명`}
+                {me.mine
+                  ? `여행 ${me.counts.trips}번 · 함께한 사람 ${me.companions ?? 0}명`
+                  : /* 우리 사이 한 줄. 남의 페이지에서 먼저 궁금한 것은 그 사람의 전체가
+                       아니라 나와의 관계입니다. */
+                    `우리 사이 · 같은 모임 ${me.between?.groups.length ?? 0}개 · 함께한 여행 ${me.between?.trips.length ?? 0}번`}
               </Caption>
             </Grow>
             {me.mine ? (
@@ -180,7 +184,11 @@ export default function Me() {
           />
 
           {lane === 'trips' ? (
-            <Journals mine={me.mine} trips={trips.data?.trips ?? []} />
+            me.mine ? (
+              <Journals mine trips={trips.data?.trips ?? []} />
+            ) : (
+              <Between between={me.between ?? null} />
+            )
           ) : lane === 'calendar' ? (
             /*
               나는 언제 어디 가지.
@@ -207,13 +215,8 @@ export default function Me() {
               없습니다 — 그룹 없이 올린 글은 올린 사람 것이고, 남에게
               보이려면 어느 모임을 통해 보이는지부터 정해야 합니다.
             */
-            me.mine ? (
-              <FeedList compact />
-            ) : (
-              <Caption tone="secondary">
-                남의 피드는 아직 못 봐요. 같은 모임의 피드에서 볼 수 있어요.
-              </Caption>
-            )
+            /* 남의 피드는 나와 함께 속한 모임에 올린 글만입니다(서버가 거릅니다). */
+            me.mine ? <FeedList compact /> : <FeedList authorId={me.id} />
           ) : (
             <MyReviews whose={whose} count={me.counts.reviews} />
           )}
@@ -464,6 +467,47 @@ function Journals({ mine, trips }: { mine: boolean; trips: TripSummary[] }) {
           subtitle={`${formatSpan(t.startIso, t.endIso)} · ${t.placeCount}곳`}
           last={i === done.length - 1}
           onPress={() => router.push({ pathname: '/card/[id]', params: { id: t.id } })}
+        />
+      ))}
+    </>
+  );
+}
+
+/**
+ * 남의 페이지의 여행기 칸 — 우리 사이.
+ *
+ * <p>그 사람이 다닌 여행 전부가 아니라 <b>함께 속한 모임과 그 모임의 여행</b>
+ * 입니다. 그 사람이 다른 모임에서 다닌 것은 그 모임 사람의 것입니다.
+ */
+function Between({ between }: { between: NonNullable<Profile['between']> | null }) {
+  const router = useRouter();
+  if (!between) {
+    return null;
+  }
+  return (
+    <>
+      <SectionHeader title="함께 속한 모임" tight />
+      {between.groups.map((g, i) => (
+        <ListRow
+          key={g.id}
+          left={<Mark emoji={g.emoji ?? '🧳'} />}
+          title={g.name}
+          last={i === between.groups.length - 1}
+          onPress={() => router.push({ pathname: '/group/[id]', params: { id: g.id } })}
+        />
+      ))}
+      <SectionHeader title="함께한 여행" tight />
+      {between.trips.length === 0 ? (
+        <Caption tone="secondary">아직 같이 짠 여행이 없어요.</Caption>
+      ) : null}
+      {between.trips.map((t, i) => (
+        <ListRow
+          key={t.id}
+          left={<Mark icon="calendar" />}
+          title={t.title}
+          subtitle={formatSpan(t.startIso ?? null, t.endIso ?? null)}
+          last={i === between.trips.length - 1}
+          onPress={() => router.push({ pathname: '/trip/[id]', params: { id: t.id } })}
         />
       ))}
     </>

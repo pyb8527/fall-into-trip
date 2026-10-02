@@ -9,6 +9,7 @@ import { useAuth } from '@/auth/auth-provider';
 import { PhotoStrip } from '@/components/photo-strip';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { faceOf } from '@/constants/user-marks';
+import { openPerson } from '@/lib/person';
 import {
   Body,
   BottomSheet,
@@ -52,6 +53,7 @@ export function FeedCard({
   onEdit?: (post: FeedPost) => void;
 }) {
   const router = useRouter();
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [dropping, setDropping] = useState(false);
   /* 이 글 다루기 판. 고치기와 지우기를 그림 둘로 세워 두었는데, 지우기가
@@ -78,7 +80,12 @@ export function FeedCard({
       <Split gap={Spacing.s2}>
         {/* 얼굴은 동그라미에 담습니다. 이모지를 글자 사이에 그냥 두면
             기기마다 다른 높이로 그려져 이름 줄이 들쭉날쭉합니다. */}
-        <Row gap={Spacing.s3} style={styles.who}>
+        {/* 글쓴이를 누르면 그 사람 페이지로. */}
+        <Press
+          onPress={() => openPerson(router, post.authorId, user?.id)}
+          scale={0.98}
+          accessibilityLabel={`${post.authorName} 페이지`}
+          style={[styles.who, styles.whoRow]}>
           <View style={styles.face}>
             <Text style={styles.faceEmoji}>{faceOf(post.authorMark, post.authorName)}</Text>
           </View>
@@ -88,7 +95,7 @@ export function FeedCard({
             </Body>
             <Caption tone="muted">{ago(post.createdAt)}</Caption>
           </View>
-        </Row>
+        </Press>
         {/* 지우기는 글쓴이와 모임 주인이 합니다. 주인인지는 서버만 아는데,
             눌러 보고 알게 하는 것보다 눌러서 막히는 편이 낫습니다 — 치울
             길이 아예 안 보이면 치울 수 있다는 것도 모릅니다. */}
@@ -197,12 +204,14 @@ type Comment = {
   id: string;
   text: string;
   authorName: string;
+  authorId?: string;
   mine: boolean;
   createdAt: string;
 };
 
 function Talk({ postId, onChanged }: { postId: string; onChanged: () => void }) {
   const { user } = useAuth();
+  const router = useRouter();
   const { data, error, loading, reload } = useAsync<{ comments: Comment[] }>(
     (signal) => api.get(`/api/feed/${encodeURIComponent(postId)}/comments`, signal),
     [postId],
@@ -257,7 +266,9 @@ function Talk({ postId, onChanged }: { postId: string; onChanged: () => void }) 
         <Split key={c.id} gap={Spacing.s2}>
           <View style={styles.said}>
             <Row gap={Spacing.s2}>
-              <Caption strong>{c.authorName}</Caption>
+              <Press onPress={() => openPerson(router, c.authorId, user?.id)} scale={0.97}>
+                <Caption strong>{c.authorName}</Caption>
+              </Press>
               <Caption tone="muted">{ago(c.createdAt)}</Caption>
             </Row>
             <Body small>{c.text}</Body>
@@ -314,6 +325,11 @@ function ago(iso: string) {
 }
 
 const styles = StyleSheet.create({
+  whoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.s3,
+  },
   who: {
     flexShrink: 1,
   },

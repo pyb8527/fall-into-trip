@@ -45,6 +45,25 @@ public interface PostRepository extends JpaRepository<Post, String> {
                         @Param("tag") String tag,
                         Pageable pageable);
 
+    /**
+     * 한 사람이 <b>이 모임들에</b> 올린 것. 남의 페이지의 피드 칸이 씁니다.
+     *
+     * <p>모임 번호가 비어 있는 글(그룹 없이 올린 내 피드)은 안 걸립니다 —
+     * {@code IN} 이 null 과 같지 않습니다. 그 글은 올린 사람만 보는 자리입니다.
+     */
+    @Query("""
+           SELECT p FROM Post p
+           WHERE p.authorId = :authorId
+             AND p.groupId IN :groupIds
+             AND p.hidden = false
+             AND (:tag = '' OR FUNCTION('array_position', p.tags, :tag) > 0)
+           ORDER BY p.createdAt DESC
+           """)
+    Page<Post> ofAuthorIn(@Param("authorId") String authorId,
+                          @Param("groupIds") java.util.Collection<String> groupIds,
+                          @Param("tag") String tag,
+                          Pageable pageable);
+
     /** 그 여행에 붙은 글들. 여행기에 실을 것을 고를 때도 씁니다. */
     List<Post> findAllByTripIdAndHiddenFalseOrderByCreatedAtDesc(String tripId);
 

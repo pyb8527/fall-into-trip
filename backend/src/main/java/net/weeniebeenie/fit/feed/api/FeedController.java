@@ -40,6 +40,7 @@ public class FeedController {
                                     @RequestParam(required = false) Boolean mine,
                                     @RequestParam(required = false) String trip,
                                     @RequestParam(required = false) String tag,
+                                    @RequestParam(required = false) String author,
                                     @RequestParam(defaultValue = "0") int page) {
         if (group != null && !group.isBlank()) {
             FeedService.Slice slice = feed.ofGroup(me, group, tag, page);
@@ -48,6 +49,10 @@ public class FeedController {
         if (trip != null && !trip.isBlank()) {
             /* 한 여행에 붙는 글은 많아야 몇십 편이라 나눠 주지 않습니다. */
             return Map.of("posts", feed.ofTrip(me, trip), "more", false);
+        }
+        if (author != null && !author.isBlank()) {
+            FeedService.Slice slice = feed.ofAuthor(me, author, tag, page);
+            return Map.of("posts", slice.posts(), "more", slice.more());
         }
         if (Boolean.TRUE.equals(mine)) {
             FeedService.Slice slice = feed.mine(me, tag, page);

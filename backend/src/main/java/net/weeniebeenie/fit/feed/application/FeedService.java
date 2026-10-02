@@ -95,6 +95,8 @@ public class FeedService {
     private final TripAccessPolicy access;
     private final UserRepository users;
     private final AuditService audit;
+    /* 남의 피드를 걸러 낼 때 「함께 속한 모임」을 셉니다. */
+    private final net.weeniebeenie.fit.group.domain.GroupMemberRepository members;
 
     /* ---------------------------------------------------------------- 읽기 */
 
@@ -107,6 +109,30 @@ public class FeedService {
     public Slice ofGroup(AuthPrincipal me, String groupId, String tag, int page) {
         groups.requireMember(groupId, me.id());
         return sliceOf(posts.ofGroup(groupId, tagOrAll(tag), pageOf(page)), me);
+    }
+
+    /**
+     * 남의 피드 — <b>나와 함께 속한 모임</b>에 올린 글만.
+     *
+     * <p>그 사람이 다른 모임에 올린 글은 그 모임 사람의 것이라 안 냅니다.
+     * 그룹 없이 올린 글도 안 냅니다 — 올린 사람만 보는 자리입니다. 함께
+     * 속한 모임이 없으면(프로필이 404 인 사이) 빈 목록입니다.
+     */
+    @Transactional(readOnly = true)
+    public Slice ofAuthor(AuthPrincipal me, String authorId, String tag, int page) {
+        if (authorId.equals(me.id())) {
+            return mine(me, tag, page);
+        }
+        java.util.Set<String> mineGroups = new java.util.HashSet<>();
+        members.findAllByIdUserId(me.id()).forEach(m -> mineGroups.add(m.getId().getGroupId()));
+        java.util.List<String> shared = members.findAllByIdUserId(authorId).stream()
+                .map(m -> m.getId().getGroupId())
+                .filter(mineGroups::contains)
+                .toList();
+        if (shared.isEmpty()) {
+            return new Slice(java.util.List.of(), false);
+        }
+        return sliceOf(posts.ofAuthorIn(authorId, shared, tagOrAll(tag), pageOf(page)), me);
     }
 
     /** 내가 올린 것 전부. 그룹에 올린 것도 함께 옵니다. */

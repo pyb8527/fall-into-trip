@@ -1,5 +1,9 @@
 package net.weeniebeenie.fit.account.application;
 
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+
 import lombok.RequiredArgsConstructor;
 import net.weeniebeenie.fit.account.domain.User;
 import net.weeniebeenie.fit.account.domain.UserRepository;
@@ -45,6 +49,8 @@ public class ProfileService {
     private final PostRepository posts;
     private final PlaceTipRepository tips;
     private final GroupMemberRepository members;
+    private final net.weeniebeenie.fit.group.domain.GroupRepository groupBook;
+    private final net.weeniebeenie.fit.trip.domain.DayRepository days;
 
     /**
      * 한 사람의 프로필.
@@ -65,19 +71,57 @@ public class ProfileService {
         User user = users.findById(target)
                 .orElseThrow(() -> ApiException.notFound("찾을 수 없어요."));
 
+        if (mine) {
+            return new Profile(
+                    user.getId(), user.getName(), user.getMark(), user.getBio(),
+                    user.getCreatedAt(), true,
+                    companionsOf(target, groupsOf(target)),
+                    new Counts(
+                            trips.countByOwnerId(target),
+                            posts.countByAuthorId(target),
+                            tips.countByUserIdAndHiddenFalseAndStarsIsNotNull(target),
+                            members.countByIdUserId(target)),
+                    null);
+        }
+
+        /*
+          남의 페이지 — 숫자를 <b>함께 속한 모임</b> 안으로 좁힙니다.
+
+          <p>「모임 n」이 그 사람의 전체 모임 수였습니다. 그러면 내가 안 든
+          모임이 몇 개인지가 새어 나갑니다 — 여행 수도, 글 수도, 함께한 사람
+          수도 같습니다. 그 사람이 다른 모임에서 한 일은 그 모임 사람의
+          것입니다. 리뷰는 장소에 공개로 달리는 것이라 그대로 셉니다.
+        */
+        Set<String> shared = groupsOf(me.id());
+        shared.retainAll(groupsOf(target));
+        List<net.weeniebeenie.fit.trip.domain.Trip> ours = shared.isEmpty() ? List.of()
+                : trips.findAllByGroupIdIn(new ArrayList<>(shared));
+
+        long theirTrips = ours.stream().filter(t -> t.getOwnerId().equals(target)).count();
+        long theirPosts = shared.isEmpty() ? 0
+                : posts.ofAuthorIn(target, shared, "", org.springframework.data.domain.PageRequest.of(0, 1))
+                        .getTotalElements();
+
+        List<GroupRef> groupRefs = new ArrayList<>();
+        groupBook.findAllById(shared).forEach(g -> groupRefs.add(new GroupRef(g.getId(), g.getName(), g.getEmoji())));
+
+        /* 함께한 여행 — 함께 속한 모임의 여행. 다가오는 것과 지난 것 모두. */
+        List<TripRef> tripRefs = ours.stream().map(t -> {
+            var list = days.findAllByTripIdOrderBySortAsc(t.getId());
+            return new TripRef(t.getId(), t.getTitle(),
+                    list.isEmpty() ? null : list.get(0).getIso(),
+                    list.isEmpty() ? null : list.get(list.size() - 1).getIso());
+        }).sorted(Comparator.comparing((TripRef t) -> t.startIso() == null ? "" : t.startIso().toString()).reversed())
+                .toList();
+
         return new Profile(
-                user.getId(),
-                user.getName(),
-                user.getMark(),
-                user.getBio(),
-                user.getCreatedAt(),
-                mine,
-                companionsOf(target),
-                new Counts(
-                        trips.countByOwnerId(target),
-                        posts.countByAuthorId(target),
+                user.getId(), user.getName(), user.getMark(), user.getBio(),
+                user.getCreatedAt(), false,
+                companionsOf(target, shared),
+                new Counts(theirTrips, theirPosts,
                         tips.countByUserIdAndHiddenFalseAndStarsIsNotNull(target),
-                        members.countByIdUserId(target)));
+                        shared.size()),
+                new Between(groupRefs, tripRefs));
     }
 
     /**
@@ -115,11 +159,7 @@ public class ProfileService {
      * <p>「2026년 9월부터」 대신 서는 기록입니다. 가입한 달은 그 사람에 대해
      * 아무것도 말하지 않지만, 몇 사람과 다녀 왔나는 이 앱에서의 그 사람입니다.
      */
-    private long companionsOf(String userId) {
-        Set<String> groups = new HashSet<>();
-        for (GroupMember m : members.findAllByIdUserId(userId)) {
-            groups.add(m.getId().getGroupId());
-        }
+    private long companionsOf(String userId, Set<String> groups) {
         Set<String> people = new HashSet<>();
         for (String g : groups) {
             for (GroupMember m : members.findAllByIdGroupId(g)) {
@@ -128,6 +168,14 @@ public class ProfileService {
         }
         people.remove(userId);
         return people.size();
+    }
+
+    private Set<String> groupsOf(String userId) {
+        Set<String> out = new HashSet<>();
+        for (GroupMember m : members.findAllByIdUserId(userId)) {
+            out.add(m.getId().getGroupId());
+        }
+        return out;
     }
 
     /**
@@ -157,7 +205,19 @@ public class ProfileService {
      * @param mine 내 것인지. 「내 계정」 줄을 붙일지를 이걸로 정합니다
      */
     public record Profile(String id, String name, String mark, String bio, Instant since,
-                          boolean mine, long companions, Counts counts) {
+                          boolean mine, long companions, Counts counts, Between between) {
+    }
+
+    /**
+     * 우리 사이 — 남의 페이지에만 있습니다. 함께 속한 모임과 그 모임의 여행.
+     */
+    public record Between(List<GroupRef> groups, List<TripRef> trips) {
+    }
+
+    public record GroupRef(String id, String name, String emoji) {
+    }
+
+    public record TripRef(String id, String title, java.time.LocalDate startIso, java.time.LocalDate endIso) {
     }
 
     /**

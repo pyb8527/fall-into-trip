@@ -646,6 +646,8 @@ export type Comment = {
   id: string;
   text: string;
   authorName: string;
+  /** 이름을 누르면 그 사람 페이지로 */
+  authorId?: string;
   /** 내가 남긴 것인지. 지울 수 있는지를 이걸로 정합니다. */
   mine: boolean;
   dayIndex: Maybe<number>;
@@ -875,6 +877,11 @@ export type Profile = {
   mark?: string | null;
   /** 한 줄 소개. 안 적었으면 없습니다 */
   bio?: string | null;
+  /** 우리 사이 — 남의 페이지에만. 함께 속한 모임과 그 모임의 여행 */
+  between?: {
+    groups: { id: string; name: string; emoji?: string | null }[];
+    trips: { id: string; title: string; startIso?: string | null; endIso?: string | null }[];
+  } | null;
   /** 가입한 때 */
   since: string;
   mine: boolean;

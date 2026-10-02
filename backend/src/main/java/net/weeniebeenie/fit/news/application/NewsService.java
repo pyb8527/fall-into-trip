@@ -89,7 +89,10 @@ public class NewsService {
     public record Item(Instant at, String kind, String actorName,
                        String tripId, String tripTitle,
                        String postId, String postTitle,
-                       String text, String url, boolean fresh) {}
+                       String text, String url, boolean fresh,
+                       /* 한 일을 한 사람의 번호 — 이름을 누르면 그 사람 페이지로 갑니다.
+                          여럿이 한 일이면(이름을 안 붙이는 줄) 비어 있습니다. */
+                       String actorId) {}
 
     /**
      * 소식함 한 장.
@@ -240,7 +243,7 @@ public class NewsService {
     private static Item inTrip(Instant at, String kind, String actorId,
                                String tripId, String tripTitle, String text) {
         return new Item(at, kind, actorId, tripId, tripTitle, null, null,
-                text, "/trip/" + tripId, false);
+                text, "/trip/" + tripId, false, actorId);
     }
 
     /**
@@ -259,18 +262,18 @@ public class NewsService {
     private static Item inGroup(Instant at, String kind, String actorId,
                                 String groupId, String groupName, String text) {
         return new Item(at, kind, actorId, null, groupName, null, null,
-                text, groupId == null ? "/(app)/news" : "/group/" + groupId, false);
+                text, groupId == null ? "/(app)/news" : "/group/" + groupId, false, actorId);
     }
 
     private static Item inPost(Instant at, String kind, String actorId,
                                String postId, String postTitle, String text) {
         return new Item(at, kind, actorId, null, null, postId, postTitle,
-                text, "/community/" + postId, false);
+                text, "/community/" + postId, false, actorId);
     }
 
     private static Item withFresh(Item i) {
         return new Item(i.at(), i.kind(), i.actorName(), i.tripId(), i.tripTitle(),
-                i.postId(), i.postTitle(), i.text(), i.url(), true);
+                i.postId(), i.postTitle(), i.text(), i.url(), true, i.actorId());
     }
 
     /**
@@ -298,7 +301,7 @@ public class NewsService {
                 .map(i -> new Item(i.at(), i.kind(),
                         i.actorName() == null ? null : names.getOrDefault(i.actorName(), "누군가"),
                         i.tripId(), i.tripTitle(), i.postId(), i.postTitle(),
-                        i.text(), i.url(), i.fresh()))
+                        i.text(), i.url(), i.fresh(), i.actorName()))
                 .toList();
     }
 }

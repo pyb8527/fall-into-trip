@@ -210,7 +210,8 @@ public class CommentService {
 
     public Card cardOf(PostComment c, String meId) {
         return new Card(c.getId(), c.getText(), nameOf(c.getUserId()),
-                c.getUserId().equals(meId), c.getDayIndex(), c.getPlaceIndex(), c.getCreatedAt());
+                c.getUserId().equals(meId), c.getDayIndex(), c.getPlaceIndex(), c.getCreatedAt(),
+                c.getUserId());
     }
 
     public String nameOf(String userId) {
@@ -221,7 +222,8 @@ public class CommentService {
      * @param mine       내가 남긴 것인지
      * @param dayIndex   가리키는 장소. 없으면 일정 전체에 대한 말입니다.
      */
+    /** @param authorId 이름을 누르면 그 사람 페이지로 갈 때 씁니다 */
     public record Card(String id, String text, String authorName, boolean mine,
-                       Integer dayIndex, Integer placeIndex, Instant createdAt) {
+                       Integer dayIndex, Integer placeIndex, Instant createdAt, String authorId) {
     }
 }

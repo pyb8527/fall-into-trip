@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
@@ -7,6 +8,7 @@ import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
 import { Colors, Gutter, Radius, Spacing, Tap } from '@/constants/theme';
 import { faceOf } from '@/constants/user-marks';
+import { openPerson } from '@/lib/person';
 import { shareLink } from '@/lib/share';
 import {
   Badge,
@@ -98,6 +100,7 @@ function Inner({
   onLeft: () => void;
 }) {
   const { user } = useAuth();
+  const router = useRouter();
 
   const [actionError, setActionError] = useState<string | null>(null);
   const [leaving, setLeaving] = useState(false);
@@ -138,9 +141,18 @@ function Inner({
                   누구인지 알려면 어딘가에서 한 번은 짝지어져야 합니다. */}
               <Mark emoji={faceOf(m.mark, m.name)} />
               <Grow gap={2}>
-                <Body strong numberOfLines={1}>
-                  {m.name}
-                </Body>
+                {/* 이름을 누르면 그 사람 페이지로. 판은 닫고 갑니다. */}
+                <Press
+                  onPress={() => {
+                    onClose();
+                    openPerson(router, m.id, user?.id);
+                  }}
+                  scale={0.98}
+                  accessibilityLabel={`${m.name} 페이지`}>
+                  <Body strong numberOfLines={1}>
+                    {m.name}
+                  </Body>
+                </Press>
                 {m.owner || m.id === user?.id ? (
                   <Caption tone="secondary">
                     {[m.owner ? '만든 사람' : null, m.id === user?.id ? '나' : null]

@@ -26,6 +26,7 @@ export function FeedList({
   groupId,
   groupName,
   compact = false,
+  authorId,
 }: {
   groupId?: string | null;
   groupName?: string | null;
@@ -34,6 +35,11 @@ export function FeedList({
    * 상자 대신 오른쪽 작은 단추로 줄이고, 목록 · 사진 보기를 고를 수 있게 합니다.
    */
   compact?: boolean;
+  /**
+   * 남의 피드. 서버가 나와 함께 속한 모임에 올린 글만 줍니다. 올리기 단추는
+   * 안 둡니다 — 남의 피드에 내가 쓸 일은 없습니다.
+   */
+  authorId?: string | null;
 }) {
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [more, setMore] = useState(false);
@@ -47,7 +53,11 @@ export function FeedList({
   const [grid, setGrid] = useState(false);
   const [editing, setEditing] = useState<FeedPost | null>(null);
 
-  const where = groupId ? `group=${encodeURIComponent(groupId)}` : 'mine=true';
+  const where = groupId
+    ? `group=${encodeURIComponent(groupId)}`
+    : authorId
+      ? `author=${encodeURIComponent(authorId)}`
+      : 'mine=true';
 
   /**
    * 한 쪽 받아 옵니다.
@@ -90,7 +100,7 @@ export function FeedList({
       {/* 채운 단추로 두지 않습니다. 이 띠가 서는 자리(모임 상세)에는 이미
           머리에 채운 단추가 하나 있고, 한 화면에 가득 찬 브랜드색은 하나여야
           어느 것이 주된 일인지 보입니다. */}
-      {compact ? (
+      {authorId ? null : compact ? (
         <Split align="center">
           <SegmentedTabs
             items={[

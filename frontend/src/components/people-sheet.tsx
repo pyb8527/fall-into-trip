@@ -8,6 +8,7 @@ import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
 import { Colors, Gutter, Spacing, Tap } from '@/constants/theme';
 import { faceOf } from '@/constants/user-marks';
+import { openPerson } from '@/lib/person';
 import {
   Band,
   Body,
@@ -20,6 +21,7 @@ import {
   Grow,
   Loading,
   Mark,
+  Press,
   Row,
   Subtitle,
 } from '@/ui';
@@ -183,9 +185,17 @@ function Inner({
               누구인지 알려면 어딘가에서 한 번은 짝지어져야 합니다. */}
           <Mark emoji={faceOf(p.mark, p.name)} />
           <Grow gap={2}>
-            <Body strong numberOfLines={1}>
-              {p.name}
-            </Body>
+            <Press
+              onPress={() => {
+                onClose();
+                openPerson(router, p.id, user?.id);
+              }}
+              scale={0.98}
+              accessibilityLabel={`${p.name} 페이지`}>
+              <Body strong numberOfLines={1}>
+                {p.name}
+              </Body>
+            </Press>
             {/* 못 간다고 한 사람은 그렇게 적습니다. 목록에서 빼지
                 않습니다 — 빼면 「답을 안 한 사람」과 구별이 안 됩니다. */}
             {p.answer !== 'MAYBE' || p.note ? (
