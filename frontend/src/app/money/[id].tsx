@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { StyleSheet, Text, TextInput, View, type TextStyle } from 'react-native';
 
 import { api, ApiError, UNEXPECTED } from '@/api/client';
-import type { Books, Person, Spend, TripDetail } from '@/api/types';
+import type { Books, Person, Spend, TripDetail, TripRates } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
 import {
@@ -89,6 +89,17 @@ export default function Money() {
     (signal) => api.get(`/api/trips/${encodeURIComponent(id)}/settlement`, signal),
     [id],
   );
+  /*
+    환전했을 때의 환율.
+
+    <p>적어 둔 것과 <b>아직 안 적어 둔 통화</b>를 함께 받습니다. 적어 둔
+    것만 받으면 화면이 「무엇을 적어야 합계가 나오는지」를 모릅니다 —
+    처음에는 하나도 안 적어 둔 상태인데, 그때가 바로 물어봐야 할 때입니다.
+  */
+  const rates = useAsync<TripRates>(
+    (signal) => api.get(`/api/trips/${encodeURIComponent(id)}/rates`, signal),
+    [id],
+  );
 
   /*
     판에 무엇을 띄울지.
@@ -98,6 +109,8 @@ export default function Money() {
     판을 두 개 둘 이유가 없습니다.
   */
   const [editing, setEditing] = useState<Spend | 'new' | null>(null);
+  /* 환율을 적는 중인 통화. null 이면 판이 안 떠 있습니다. */
+  const [noting, setNoting] = useState<string | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const { undo, show: showUndo, hide: hideUndo } = useUndo();
 
@@ -122,6 +135,8 @@ export default function Money() {
   function refresh() {
     spent.reload();
     books.reload();
+    /* 통화를 처음 쓴 지출이 들어오면 적어야 할 환율이 하나 늘어납니다. */
+    rates.reload();
   }
 
   /*
@@ -188,6 +203,30 @@ export default function Money() {
     });
     return [...box.entries()];
   }, [list]);
+
+  /*
+    적어 둔 환율로 셈한 원화 합계.
+
+    <h3>서버가 셈한 것을 더합니다</h3>
+
+    <p>통화별 장부에 {@code krw} 가 하나씩 붙어 옵니다. 화면에서 다시
+    셈하지 않습니다 — 반올림을 두 군데서 하면 「합계」와 「통화별 합」이
+    한두 원 어긋나고, 그 어긋남을 보는 사람은 어느 쪽을 믿어야 할지
+    모릅니다.
+
+    <p>하나라도 비어 있으면 합계를 안 냅니다. 엔만 바꿔 더한 값을
+    「합계」로 내놓으면 <b>실제보다 적은 금액</b>이 그럴듯하게 뜹니다.
+  */
+  const krwTotal = useMemo(() => {
+    const rows = books.data?.books ?? [];
+    if (rows.length === 0 || rows.some((b) => b.krw == null)) {
+      return null;
+    }
+    return rows.reduce((sum, b) => sum + (b.krw ?? 0), 0);
+  }, [books.data]);
+
+  /* 적어야 할 환율이 남았는지. 합계 자리에 무엇을 하라고 적을 때 씁니다. */
+  const needed = rates.data?.needed ?? [];
 
   /*
     내 몫만 추려 냅니다.
@@ -259,6 +298,32 @@ export default function Money() {
                 .map(([c, t]) => money(t.sum, c, t.decimals))
                 .join(' · ')}
             </Body>
+          ) : null}
+
+          {/*
+            대충 얼마인지.
+
+            <h3>왜 환율을 받아 오지 않는가</h3>
+
+            <p>어디서 받아 오는 환율은 <b>중간값</b>입니다. 그 값으로 셈하면
+            늘 조금씩 틀립니다 — 공항 환전은 중간값보다 한참 나쁘고, 카드는
+            비자·마스터의 환율에 수수료가 또 붙습니다. 「대충 얼마 썼나」를
+            보려고 띄우는 숫자인데 실제로 나간 돈과 다르면 보여 주는 뜻이
+            없습니다.
+
+            <p>환전할 때 영수증에 찍힌 값을 적어 둡니다. 그것이 그 사람이
+            실제로 겪은 환율입니다.
+          */}
+          {krwTotal != null ? (
+            <Body small tone="secondary">
+              ≈ {money(krwTotal, 'KRW', 0)}
+            </Body>
+          ) : needed.length > 0 ? (
+            <Press onPress={() => setNoting(needed[0])} style={styles.askRate}>
+              <Body small tone="brand">
+                {needed.join(' · ')} 환전 환율을 적으면 원화로 합쳐 봐요 ›
+              </Body>
+            </Press>
           ) : null}
 
           {mine.take.length > 0 || mine.give.length > 0 ? (
@@ -390,7 +455,162 @@ export default function Money() {
           refresh();
         }}
       />
+
+      <RateSheet
+        key={noting ?? 'none'}
+        visible={noting !== null}
+        tripId={id}
+        currency={noting ?? ''}
+        had={rates.data?.rates.find((r) => r.currency === noting)?.rate ?? null}
+        onCancel={() => setNoting(null)}
+        onDone={() => {
+          setNoting(null);
+          rates.reload();
+          books.reload();
+        }}
+      />
     </Screen>
+  );
+}
+
+/**
+ * 환전했을 때의 환율을 적는 판.
+ *
+ * <h3>영수증에 적힌 대로 받습니다</h3>
+ *
+ * <p>「1엔 = ?원」 만 묻는 것으로는 모자랍니다. 환전소 영수증에 찍혀 있는
+ * 것은 <b>준 돈과 받은 돈</b>이고, 거기서 환율을 끌어내려면 500,000 ÷ 54,000
+ * 을 손으로 셈해야 합니다. 그 나눗셈을 하는 사람은 없습니다 — 대신 창구 위
+ * 전광판에 적힌 숫자를 적게 되는데, 그 값에는 수수료가 안 들어 있어서
+ * 실제로 겪은 환율이 아닙니다.
+ *
+ * <p>그래서 두 가지로 받습니다. 영수증 두 숫자를 넣으면 환율이 저절로 나오고,
+ * 환율을 아는 사람은 그것만 적으면 됩니다. 어느 쪽으로 넣어도 저장되는 것은
+ * 환율 하나입니다.
+ */
+function RateSheet({
+  visible,
+  tripId,
+  currency,
+  had,
+  onCancel,
+  onDone,
+}: {
+  visible: boolean;
+  tripId: string;
+  currency: string;
+  /** 전에 적어 둔 값. 고치러 들어온 것이면 채워 둡니다 */
+  had: string | null;
+  onCancel: () => void;
+  onDone: () => void;
+}) {
+  /* 영수증 쪽으로 넣는 중인지. 처음 적는 사람에게는 이쪽이 쉽습니다 —
+     두 숫자를 옮겨 적기만 하면 됩니다. */
+  const [bySlip, setBySlip] = useState(had == null);
+  const [gave, setGave] = useState('');
+  const [got, setGot] = useState('');
+  const [rate, setRate] = useState(had ?? '');
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
+
+  /*
+    영수증 두 숫자에서 끌어낸 환율.
+
+    <p>준 돈 ÷ 받은 돈 입니다 — 500,000원 주고 54,000엔 받았으면
+    1엔에 9.2593원입니다. 수수료가 이미 그 안에 들어 있습니다.
+  */
+  const derived = useMemo(() => {
+    const won = Number(gave.replace(/[^0-9.]/g, ''));
+    const foreign = Number(got.replace(/[^0-9.]/g, ''));
+    if (!(won > 0) || !(foreign > 0)) {
+      return null;
+    }
+    return won / foreign;
+  }, [gave, got]);
+
+  const picked = bySlip ? derived : Number(rate.replace(/[^0-9.]/g, '')) || null;
+
+  async function save() {
+    if (picked == null || !(picked > 0)) {
+      setFailed(
+        bySlip ? '준 돈과 받은 돈을 넣어 주세요.' : `1${currency} 가 몇 원인지 적어 주세요.`,
+      );
+      return;
+    }
+    setBusy(true);
+    setFailed(null);
+    try {
+      await api.put(
+        `/api/trips/${encodeURIComponent(tripId)}/rates/${encodeURIComponent(currency)}`,
+        /* 자릿수를 여섯까지 둡니다. 동(0.0524)처럼 작은 값이 0 으로
+           깎이지 않아야 합니다. */
+        { rate: picked.toFixed(6) },
+      );
+      onDone();
+    } catch (e) {
+      setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <BottomSheet
+      visible={visible}
+      title={`${currency} 환전 환율`}
+      onClose={onCancel}
+      footer={<Button label="적어 두기" busy={busy} onPress={save} />}>
+      <Caption tone="secondary">
+        환전할 때 받은 영수증 그대로 넣어 주세요. 수수료까지 들어간 실제 환율이 나와요.
+      </Caption>
+
+      <SegmentedTabs
+        items={[
+          { value: 'slip', label: '영수증으로' },
+          { value: 'rate', label: '환율 직접' },
+        ]}
+        value={bySlip ? 'slip' : 'rate'}
+        onChange={(v) => setBySlip(v === 'slip')}
+      />
+
+      {bySlip ? (
+        <>
+          <Field
+            label="준 돈 (원)"
+            value={gave}
+            onChangeText={setGave}
+            keyboardType="numeric"
+            placeholder="500000"
+            unit="원"
+          />
+          <Field
+            label={`받은 돈 (${currency})`}
+            value={got}
+            onChangeText={setGot}
+            keyboardType="numeric"
+            placeholder="54000"
+            unit={currency}
+          />
+          {derived != null ? (
+            <Body small tone="secondary">
+              1{currency} = {derived.toLocaleString(undefined, { maximumFractionDigits: 4 })}원
+            </Body>
+          ) : null}
+        </>
+      ) : (
+        <Field
+          label={`1${currency} 는 몇 원인가요`}
+          value={rate}
+          onChangeText={setRate}
+          keyboardType="numeric"
+          placeholder="9.17"
+          unit="원"
+          hint="환전소 전광판 값에는 수수료가 안 들어 있어요."
+        />
+      )}
+
+      {failed ? <ErrorNote message={failed} /> : null}
+    </BottomSheet>
   );
 }
 
@@ -917,6 +1137,11 @@ const tabular: TextStyle = { fontVariant: [...Tabular.fontVariant] };
 const styles = StyleSheet.create({
 
   /* -------------------------------------------------------------- 요약 */
+  /* 환율을 적으러 가는 줄. 글자만 있는 자리라 누르는 넓이를 위아래로
+     조금 넓혀 둡니다. */
+  askRate: {
+    paddingVertical: Spacing.s1,
+  },
   summary: {
     backgroundColor: Colors.fill,
     borderRadius: Radius.r4,

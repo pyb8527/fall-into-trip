@@ -16,10 +16,12 @@ import net.weeniebeenie.fit.trip.domain.TripAccessPolicy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 누가 얼마를 냈고, 누가 누구에게 얼마를 주면 되는지.
@@ -36,6 +38,15 @@ import java.util.Map;
  * 있지만 그러면 "언제 환율로" 가 남고, 그 답은 사람마다 다릅니다. 통화마다
  * 따로 내놓고 어떻게 주고받을지는 사람이 정합니다.
  *
+ * <p>그 "언제 환율로" 를 <b>쓰는 사람이 적어 둡니다</b>({@link TripRate}) —
+ * 환전할 때 영수증에 찍힌 값입니다. 그러면 「대충 얼마 썼나」를 원화 한
+ * 덩어리로 보여 줄 수 있습니다.
+ *
+ * <p>다만 <b>보낼 금액은 합치지 않습니다.</b> 합계가 조금 틀리는 것은
+ * 「대충」이라 괜찮지만, 「민수가 나한테 89,000원 보내」가 틀리면 누군가
+ * 그만큼 손해입니다. 적어 둔 환율은 환전소 하나의 값이고 카드로 긁은 것은
+ * 비자·마스터의 환율이라, 둘이 같을 이유가 없습니다.
+ *
  * <h3>나눠 낼 사람을 안 정하면 전원입니다</h3>
  *
  * <p>여행 경비는 대개 다 같이 나눕니다. 매번 사람을 고르게 하면 그것이 일이
@@ -49,6 +60,7 @@ public class ExpenseService {
     private static final int MAX_PER_TRIP = 500;
 
     private final ExpenseRepository expenses;
+    private final TripRateRepository rates;
     private final DayRepository days;
     private final PlaceRepository places;
     private final UserRepository users;
@@ -82,6 +94,10 @@ public class ExpenseService {
         List<String> memberIds = access.peopleOf(tripId);
         Map<String, String> names = namesOf(tripId);
 
+        /* 적어 둔 환율. 통화별 장부마다 "원화로 얼마" 를 얹는 데 씁니다. */
+        Map<String, BigDecimal> noted = rates.findAllByTripId(tripId).stream()
+                .collect(Collectors.toMap(TripRate::getCurrency, TripRate::getRate));
+
         /* 통화별로 갈라 놓고 각각 셉니다. */
         Map<String, List<Expense>> byCurrency = new LinkedHashMap<>();
         for (Expense e : expenses.findAllByTripIdOrderByCreatedAtAsc(tripId)) {
@@ -104,7 +120,18 @@ public class ExpenseService {
                     .toList();
 
             int total = list.stream().mapToInt(Expense::getAmount).sum();
-            out.add(new Books(currency, Currencies.decimals(currency), total, owes, sends));
+            /*
+              이 통화 합계가 원화로 얼마인지.
+
+              <p>통화별 장부에 한 줄씩 얹습니다. 화면이 "￥54,200" 아래에
+              "≈ 497,000원" 을 적을 수 있게 하려는 것인데, <b>보낼 금액에는
+              안 씁니다</b> — 위 머리말의 까닭입니다.
+
+              <p>환율을 안 적어 두었으면 {@code null} 입니다. 0 을 넣으면
+              화면이 「0원」을 그럴듯하게 띄웁니다.
+            */
+            Long krw = Exchange.toKrw(total, currency, noted.get(currency));
+            out.add(new Books(currency, Currencies.decimals(currency), total, krw, owes, sends));
         });
         return out;
     }
@@ -376,6 +403,99 @@ public class ExpenseService {
     public record Sum(String currency, int decimals, long total, long items) {
     }
 
+    /* ----------------------------------------------------------- 환율 */
+
+    /**
+     * 이 여행에 적어 둔 환율들.
+     *
+     * <p>적어 둘 자리가 <b>있어야 하는</b> 통화도 같이 냅니다. 적어 둔 것만
+     * 내놓으면 화면이 「무엇을 적어야 하는지」를 모릅니다 — 처음에는 적어 둔
+     * 것이 하나도 없는데, 그때가 바로 물어봐야 할 때입니다.
+     */
+    @Transactional(readOnly = true)
+    public Rates ratesOf(AuthPrincipal me, String tripId) {
+        access.requireCanRead(tripId, me.id());
+
+        Map<String, BigDecimal> noted = rates.findAllByTripId(tripId).stream()
+                .collect(Collectors.toMap(TripRate::getCurrency, TripRate::getRate));
+
+        /* 이 여행에서 실제로 쓴 통화들. 안 쓴 통화의 환율을 물어보면
+           화면이 쓸데없는 칸으로 길어집니다. */
+        List<String> used = expenses.findAllByTripIdOrderByCreatedAtAsc(tripId).stream()
+                .map(Expense::getCurrency)
+                .distinct()
+                .sorted()
+                .toList();
+
+        return new Rates(
+                used.stream()
+                        .filter(c -> !"KRW".equals(c))
+                        .map(c -> new Noted(c, Currencies.decimals(c), noted.get(c)))
+                        .toList(),
+                Exchange.missing(used, noted));
+    }
+
+    /**
+     * 환전했을 때의 환율을 적습니다.
+     *
+     * <p>고칠 수 있는 사람만 적습니다. 같이 가는 여행에서 한 사람이 환전하고
+     * 나머지가 그 환율을 보는 것이 보통이라, 보기만 하는 사람이 고치면 남의
+     * 합계가 바뀝니다.
+     */
+    @Transactional
+    public void noteRate(AuthPrincipal me, String tripId, String rawCurrency, BigDecimal rate) {
+        access.requireCanEdit(tripId, me.id());
+
+        String currency = Currencies.clean(rawCurrency);
+        if ("KRW".equals(currency)) {
+            throw ApiException.badRequest("원화는 환율을 적지 않아요. 1원은 1원이에요.");
+        }
+        if (rate == null || rate.signum() <= 0) {
+            throw ApiException.badRequest("환율은 0보다 커야 해요.");
+        }
+        /*
+          터무니없는 값을 막습니다.
+
+          <p>1엔을 9.17 이 아니라 917 로 적는 일(소수점을 잊는 것)이 가장
+          흔한 실수입니다. 그러면 합계가 백 배로 뜨는데, 그 숫자를 보고
+          「환율을 잘못 적었구나」로 돌아오기까지가 멉니다.
+
+          <p>세상의 통화는 1 단위가 0.00001원(짐바브웨)부터 4,400원
+          (쿠웨이트)까지입니다. 그 바깥은 적으려던 값이 아닙니다.
+        */
+        if (rate.compareTo(new BigDecimal("100000")) > 0) {
+            throw ApiException.badRequest("환율이 너무 커요. 1" + currency + " 가 몇 원인지 적어 주세요.");
+        }
+
+        TripRate row = rates.findById(new TripRate.Key(tripId, currency))
+                .orElseGet(() -> new TripRate(tripId, currency, rate));
+        row.setRate(rate);
+        row.setNotedAt(java.time.Instant.now());
+        rates.save(row);
+
+        audit.log(me.id(), "trip.rate.note", tripId,
+                Map.of("currency", currency, "rate", rate.toPlainString()));
+    }
+
+    /** 적어 둔 환율을 지웁니다. 다시 「대충 얼마」가 안 나옵니다. */
+    @Transactional
+    public void dropRate(AuthPrincipal me, String tripId, String rawCurrency) {
+        access.requireCanEdit(tripId, me.id());
+        rates.deleteByTripIdAndCurrency(tripId, Currencies.clean(rawCurrency));
+    }
+
+    /**
+     * 이 여행에 적어 둔 환율들과, 아직 안 적어 둔 통화들.
+     *
+     * @param needed 이것이 비어 있지 않으면 원화 합계를 낼 수 없습니다
+     */
+    public record Rates(List<Noted> rates, List<String> needed) {
+    }
+
+    /** 한 통화의 환율. {@code rate} 가 비어 있으면 아직 안 적어 둔 것입니다. */
+    public record Noted(String currency, int decimals, BigDecimal rate) {
+    }
+
     public record Draft(String dayId, String placeId, String payerId, String cat,
                         String name, Integer amount, String currency, String pay,
                         List<String> share, Long version) {
@@ -403,8 +523,13 @@ public class ExpenseService {
                        String toUserId, String toName, int amount) {
     }
 
-    /** 통화 하나의 장부. */
-    public record Books(String currency, int decimals, int total,
+    /**
+     * 통화 하나의 장부.
+     *
+     * @param krw 이 통화 합계를 적어 둔 환율로 원화로 바꾼 값. 환율을 안
+     *            적어 두었으면 {@code null} — 「대충 얼마」로만 씁니다
+     */
+    public record Books(String currency, int decimals, int total, Long krw,
                         List<Owed> balances, List<Send> transfers) {
     }
 }

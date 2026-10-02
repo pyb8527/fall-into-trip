@@ -846,8 +846,33 @@ export type Books = {
   currency: string;
   decimals: number;
   total: number;
+  /**
+   * 이 통화 합계를 <b>적어 둔 환율</b>로 원화로 바꾼 값.
+   *
+   * <p>환율을 아직 안 적어 두었으면 없습니다. 0 이 아니라 없는 것입니다 —
+   * 0 을 쓰면 화면이 「0원」을 그럴듯하게 띄웁니다.
+   *
+   * <p>「대충 얼마 썼나」에만 씁니다. 아래 {@code transfers}(보낼 금액)에는
+   * 안 씁니다 — 합계가 조금 틀리는 것은 괜찮지만 보낼 금액이 틀리면
+   * 누군가 그만큼 손해입니다.
+   */
+  krw?: number | null;
   balances: { userId: string; name: string; balance: number }[];
   transfers: { fromName: string; toName: string; amount: number }[];
+};
+
+/**
+ * 환전했을 때의 환율.
+ *
+ * <p>어디서 받아 오지 않고 <b>적어 둡니다.</b> 받아 오는 환율은 중간값이라
+ * 지갑에서 나간 돈과 다릅니다 — 공항 환전은 특히 그렇고, 카드는 비자·마스터
+ * 환율에 수수료가 또 붙습니다.
+ */
+export type TripRates = {
+  /** 이 여행에서 쓴 통화들(원화 제외). {@code rate} 가 없으면 아직 안 적은 것 */
+  rates: { currency: string; decimals: number; rate: string | null }[];
+  /** 이것이 비어 있지 않으면 원화 합계를 낼 수 없습니다 */
+  needed: string[];
 };
 
 /**

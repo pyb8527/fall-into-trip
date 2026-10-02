@@ -83,6 +83,44 @@ public class ExpenseController {
         return Map.of("trips", rows);
     }
 
+    /**
+     * 환전했을 때의 환율.
+     *
+     * <p>적어 둔 것과 <b>아직 안 적어 둔 통화</b>를 함께 냅니다. 화면이
+     * 「무엇을 적어야 합계가 나오는지」를 말할 수 있어야 합니다.
+     */
+    @GetMapping("/api/trips/{tripId}/rates")
+    public ExpenseService.Rates rates(@CurrentUser AuthPrincipal me,
+                                      @PathVariable String tripId) {
+        return expenses.ratesOf(me, tripId);
+    }
+
+    @PutMapping("/api/trips/{tripId}/rates/{currency}")
+    public Map<String, Object> noteRate(@CurrentUser AuthPrincipal me,
+                                        @PathVariable String tripId,
+                                        @PathVariable String currency,
+                                        @RequestBody RateBody body) {
+        expenses.noteRate(me, tripId, currency, body.rate());
+        return Map.of("ok", true);
+    }
+
+    @DeleteMapping("/api/trips/{tripId}/rates/{currency}")
+    public Map<String, Object> dropRate(@CurrentUser AuthPrincipal me,
+                                        @PathVariable String tripId,
+                                        @PathVariable String currency) {
+        expenses.dropRate(me, tripId, currency);
+        return Map.of("ok", true);
+    }
+
+    /**
+     * 1 단위가 몇 원인지.
+     *
+     * <p>{@link java.math.BigDecimal} 로 받습니다. {@code double} 로 받으면
+     * 9.17 이 9.169999... 로 들어와 적어 둔 값과 보여 주는 값이 달라집니다.
+     */
+    public record RateBody(java.math.BigDecimal rate) {
+    }
+
     @PostMapping("/api/trips/{tripId}/expenses")
     public Map<String, Object> add(@CurrentUser AuthPrincipal me,
                                    @PathVariable String tripId,
