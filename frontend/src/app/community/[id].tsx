@@ -25,6 +25,7 @@ import { PostMap } from '@/components/post-map';
 import { SignUpGate } from '@/components/signup-gate';
 import { TripMap } from '@/components/trip-map';
 import { iconOf } from '@/constants/place-icons';
+import { glyphOf } from '@/constants/place-icons';
 import {
   Colors,
   Gutter,
@@ -983,9 +984,7 @@ function DayBlock({
                   {place.time}
                 </Body>
               ) : null}
-              {iconOf(place.icon) ? (
-                <Body small>{iconOf(place.icon)}</Body>
-              ) : null}
+              {place.icon ? <Icon name={glyphOf(place.icon)} size={18} tone="secondary" /> : null}
               <Body strong numberOfLines={2}>
                 {place.name}
               </Body>

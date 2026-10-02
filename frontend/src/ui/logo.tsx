@@ -211,6 +211,26 @@ export function LogoMark({ size = 28, tone = Colors.text }: { size?: number; ton
 }
 
 /**
+ * 심볼과 이름을 가로로 — 막대와 종이 머리에 서는 로고.
+ *
+ * <p>홈 막대에 「fit」 글자만, 영수증 머리에 「FIT」 제목만 있었습니다.
+ * 글자만 두면 그냥 UI 글꼴로 적은 낱말이라 로고로 안 읽힙니다. 심볼이 생긴
+ * 뒤로는 그것을 앞에 세웁니다.
+ *
+ * @param size 이름 글자 크기. 심볼은 그보다 조금 크게(1.15배) 섭니다 —
+ *             알약 막대가 글자 높이보다 작으면 점처럼 보입니다
+ */
+export function LogoInline({ size = 22, tone = Colors.text }: { size?: number; tone?: string }) {
+  const mark = Math.round(size * 1.15);
+  return (
+    <View style={styles.inline} accessibilityLabel="fit">
+      <LogoSymbol size={mark} />
+      <Text style={[styles.wordmark, { fontSize: size, color: tone }]}>fit</Text>
+    </View>
+  );
+}
+
+/**
  * 심볼 · 워드마크 · 한 줄을 세로로 쌓은 것.
  *
  * <p>처음 만나는 화면(시작 화면, 초대 링크)에서 한 번 보여 줍니다.
@@ -286,6 +306,11 @@ const styles = StyleSheet.create({
   lockup: {
     alignItems: 'center',
     gap: 2,
+  },
+  inline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   tagline: {
     fontFamily: Fonts.sans,

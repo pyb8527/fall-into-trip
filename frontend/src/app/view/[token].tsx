@@ -4,7 +4,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { request } from '@/api/client';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
-import { Colors, Radius, Spacing, Tabular, Type, Weight, dayColor } from '@/constants/theme';
+import { Colors, Radius, Spacing, Tabular, Type, Weight } from '@/constants/theme';
 import { formatSpan } from '@/lib/countdown';
 import { Band, Body, Button, Caption, Empty, Loading, Screen, Title } from '@/ui';
 import { LogoLockup } from '@/ui/logo';
@@ -82,7 +82,7 @@ export default function ViewScreen() {
           {data.days.map((d, i) => (
             <View key={`${d.label}-${i}`} style={styles.day}>
               <View style={styles.dayHead}>
-                <View style={[styles.mark, { backgroundColor: dayColor(i) }]} />
+                <View style={[styles.mark, { backgroundColor: Colors.accent }]} />
                 <Text style={styles.dayTitle}>{d.label}</Text>
                 {d.date ? <Caption tone="secondary">{d.date}</Caption> : null}
               </View>

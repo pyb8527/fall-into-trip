@@ -9,7 +9,7 @@ import { useAsync } from '@/api/use-async';
 import { DayPicker } from '@/components/day-picker';
 import { PlaceDetailSheet, type Looked } from '@/components/place-detail-sheet';
 import { PlaceSearch } from '@/components/place-search';
-import { iconOf, labelOf } from '@/constants/place-icons';
+import { glyphOf, labelOf } from '@/constants/place-icons';
 import { Colors, Elevation, Radius, Spacing, Tap, Type, Weight } from '@/constants/theme';
 import {
   Badge,
@@ -276,7 +276,7 @@ export default function Vote() {
               scale={0.99}
               accessibilityLabel={`${candidate.name} 자세히 보기`}
               style={styles.cardHead}>
-              <Mark emoji={iconOf(candidate.icon)} fallback="📍" />
+              <Mark icon={glyphOf(candidate.icon)} />
               <View style={styles.grow}>
                 <Text style={styles.name} numberOfLines={1}>
                   {candidate.name}
@@ -325,9 +325,8 @@ export default function Vote() {
               />
             </View>
             <Caption tone="muted">
-              👍 {candidate.yes}
-              {candidate.no > 0 ? ` · 👎 ${candidate.no}` : ''}
-              {` · ${candidate.memberCount}명`}
+              {`${candidate.memberCount}명 중 ${candidate.yes}명 찬성`}
+              {candidate.no > 0 ? ` · ${candidate.no}명 반대` : ''}
             </Caption>
           </Split>
 
@@ -567,7 +566,7 @@ function AddSheet({
             <ListRow
               key={place.id}
               title={place.name}
-              left={<Mark emoji={iconOf(place.icon)} fallback="📍" />}
+              left={<Mark icon={glyphOf(place.icon)} />}
               subtitle={place.note ?? place.cat ?? '메모 없음'}
               last={i === shown.length - 1}
               onPress={() => add({ savedId: place.id })}

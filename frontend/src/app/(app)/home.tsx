@@ -22,7 +22,8 @@ import { markOf } from '@/constants/user-marks';
 import { PlaceDetailSheet, type Looked } from '@/components/place-detail-sheet';
 import { TripMark } from '@/components/trip-mark';
 import { TripThumb } from '@/components/trip-thumb';
-import { iconOf, labelOf } from '@/constants/place-icons';
+import { CountdownBadge } from '@/components/countdown-badge';
+import { glyphOf, labelOf } from '@/constants/place-icons';
 import {
   Colors,
   Elevation,
@@ -36,14 +37,12 @@ import {
 } from '@/constants/theme';
 import type { Countdown } from '@/lib/countdown';
 import {
-  countdownLabel,
   countdownOf,
   daysBetween,
   formatSpan,
   todayIso,
 } from '@/lib/countdown';
 import {
-  Badge,
   Band,
   Button,
   Caption,
@@ -61,7 +60,7 @@ import {
   Split,
 } from '@/ui';
 import { CardGap, useCardColumns } from '@/ui/layout';
-import { LogoMark } from '@/ui/logo';
+import { LogoInline, LogoSymbol } from '@/ui/logo';
 import { AppTabs } from '@/ui/tab-bar';
 
 /**
@@ -219,7 +218,7 @@ export default function Home() {
             22 입니다 — 더 키우면 막대가 그만큼 높아집니다.
           */}
           <Grow>
-            <LogoMark size={22} />
+            <LogoInline size={22} />
           </Grow>
           {/*
             오른쪽에 찾기·소식, 그리고 얼굴.
@@ -274,7 +273,7 @@ export default function Home() {
               {user?.mark ? (
                 <Text style={styles.faceEmoji}>{markOf(user.mark)}</Text>
               ) : (
-                <LogoMark size={16} />
+                <LogoSymbol size={20} />
               )}
             </Press>
           </Row>
@@ -419,7 +418,7 @@ export default function Home() {
                   .join(' · ')}
                 right={
                   at ? (
-                    <Badge tone="hot" solid label={countdownLabel(at)} />
+                    <CountdownBadge at={at} />
                   ) : (
                     <Icon name="chevron-right" size={20} tone="muted" />
                   )
@@ -515,7 +514,7 @@ export default function Home() {
                         색칠이 되고, 위에서 세 번째까지가 사람들이 실제로
                         눈여겨보는 자리입니다. */}
                     <Text style={[styles.rank, i < 3 ? styles.rankTop : null]}>{i + 1}</Text>
-                    <Mark emoji={iconOf(place.icon)} fallback="📍" />
+                    <Mark icon={glyphOf(place.icon)} />
                   </Row>
                 }
                 title={place.name}
@@ -713,15 +712,18 @@ function Hero({
       onPress={onPress}
       scale={0.98}
       accessibilityLabel={`${trip.title} 열기`}
-      style={[
-        styles.hero,
-        /* 여행에 색을 안 정했으면 옅은 회색입니다. 억지로 색을 주면 안 정한
-           것과 정한 것이 구별되지 않습니다. */
-        { backgroundColor: trip.theme ? `${trip.theme}1F` : Colors.fill },
-      ]}>
+      /*
+        바탕은 바이올렛 50 입니다.
+
+        <p>여행 색을 옅게 깔았습니다. 그런데 여행 색 여덟 가운데 첫째가 파랑이라
+        대부분의 첫 여행이 하늘색 카드가 됐고, 주 버튼의 바이올렛 옆에 하늘색이
+        서서 브랜드 색이 둘로 읽혔습니다. 여행이 무슨 색인지는 왼쪽 위 표식이
+        말합니다.
+      */
+      style={styles.hero}>
       <View style={styles.heroTop}>
         <TripMark theme={trip.theme} emoji={trip.emoji} />
-        <Badge tone="hot" solid label={going ? `여행 중 ${nth}일째` : countdownLabel(at)} />
+        <CountdownBadge at={at} label={going ? `여행 중 ${nth}일째` : undefined} />
       </View>
 
       <View style={styles.heroFoot}>
@@ -869,7 +871,7 @@ const styles = StyleSheet.create({
     height: HERO_HEIGHT,
     borderRadius: Radius.r4,
     overflow: 'hidden',
-    backgroundColor: Colors.fill,
+    backgroundColor: Colors.accentSoft,
     justifyContent: 'space-between',
   },
   heroTop: {
@@ -901,7 +903,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-
 
   /* ---------------------------------------------------------- 바로가기 */
   shortcuts: {

@@ -11,7 +11,7 @@ import {
   sortPlaces,
   type SortBy,
 } from '@/components/sort-bar';
-import { iconOf } from '@/constants/place-icons';
+
 import type { IntentState } from '@/lib/intent-types';
 import { canParseHere, intentState, parseIntent } from '@/lib/intent';
 import { readableMeters } from '@/lib/geo';
@@ -129,12 +129,11 @@ export function RecommendSheet({
   const anchors = day
     ? [
         ...(day.stay
-          ? [{ id: 'stay', name: `🏠 ${day.stay.name}`, lat: day.stay.lat, lng: day.stay.lng }]
+          ? [{ id: 'stay', name: `숙소 · ${day.stay.name}`, lat: day.stay.lat, lng: day.stay.lng }]
           : []),
         ...day.places,
       ]
     : [];
-
 
   /*
     "사이" 로 물을 수 있는 출발지인가.

@@ -1,5 +1,5 @@
 import Constants from 'expo-constants';
-import { Stack, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -32,10 +32,8 @@ import {
   Screen,
   SectionHeader,
   Switch,
-  Title,
 } from '@/ui';
-import { LogoMark } from '@/ui/logo';
-import { NavLeft } from '@/ui/nav';
+import { LogoSymbol } from '@/ui/logo';
 
 const PASSWORD_MIN = 8;
 
@@ -68,23 +66,12 @@ const PASSWORD_MIN = 8;
 export default function Settings() {
   const { user, logout, logoutAll } = useAuth();
   const router = useRouter();
-  const navigation = useNavigation();
   const [leaving, setLeaving] = useState(false);
 
   return (
-    <Screen
-      safeTop
-      header={
-        <Row gap={Spacing.s2}>
-          <NavLeft navigation={navigation} up="/(app)/home" />
-          <Grow>
-            <Title>내 계정</Title>
-          </Grow>
-        </Row>
-      }>
-      {/* 큰 제목이 본문 위에 서므로 상단바는 걷습니다. 둘 다 두면 같은 말이
-          한 화면에 두 번 적힙니다. */}
-      <Stack.Screen options={{ headerShown: false }} />
+    /* 막대는 층(_layout)이 답니다 — 뒤로 + 작은 제목, 다른 하위 화면과 같은
+       꼴입니다. 큰 제목을 본문에 따로 세우던 것을 걷었습니다. */
+    <Screen>
       {/*
         누구로 들어와 있는지.
 
@@ -97,7 +84,7 @@ export default function Settings() {
           {user?.mark ? (
             <Text style={styles.faceEmoji}>{markOf(user.mark)}</Text>
           ) : (
-            <LogoMark size={29} />
+            <LogoSymbol size={34} />
           )}
         </View>
         <Grow gap={Spacing.s1}>

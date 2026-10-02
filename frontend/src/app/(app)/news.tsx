@@ -1,4 +1,4 @@
-import { Stack, useNavigation, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 
@@ -13,17 +13,13 @@ import {
   Caption,
   Empty,
   ErrorNote,
-  Grow,
   Icon,
   Loading,
   Press,
-  Row,
   Screen,
   SectionHeader,
-  Title,
 } from '@/ui';
 import type { IconName } from '@/ui';
-import { NavLeft } from '@/ui/nav';
 
 /**
  * 소식함 — 내가 없는 동안 무엇이 바뀌었나.
@@ -72,7 +68,6 @@ import { NavLeft } from '@/ui/nav';
  * 돌아갈 길이 있어야 하므로, 제목 왼쪽에 뒤로·처음 단추를 함께 둡니다.
  */
 export default function NewsScreen() {
-  const navigation = useNavigation();
   const { data, error, loading, reload } = useAsync<News>(
     (signal) => api.get('/api/news', signal),
     [],
@@ -98,27 +93,17 @@ export default function NewsScreen() {
     갈래에 따로 적어 두면 받아 오는 동안에는 제목도 돌아갈 단추도 없는
     흰 화면이 됩니다.
   */
-  const head = (
-    <Row gap={Spacing.s2}>
-      <NavLeft navigation={navigation} up="/(app)/home" />
-      <Grow>
-        <Title>알림</Title>
-      </Grow>
-    </Row>
-  );
 
   if (loading && !data) {
     return (
-      <Screen safeTop header={head} scroll={false}>
-        <Stack.Screen options={{ headerShown: false }} />
+      <Screen scroll={false}>
         <Loading />
       </Screen>
     );
   }
   if (error) {
     return (
-      <Screen safeTop header={head} scroll={false}>
-        <Stack.Screen options={{ headerShown: false }} />
+      <Screen scroll={false}>
         <ErrorNote message={error} onRetry={reload} />
       </Screen>
     );
@@ -127,10 +112,7 @@ export default function NewsScreen() {
   const items = data?.items ?? [];
 
   return (
-    <Screen safeTop header={head}>
-      {/* 큰 제목이 본문 위에 서므로 상단바는 걷습니다. 둘 다 두면 같은 말이
-          한 화면에 두 번 적힙니다. */}
-      <Stack.Screen options={{ headerShown: false }} />
+    <Screen>
 
       {items.length === 0 ? (
         <Empty message="아직 온 알림이 없어요. 같이 보는 사람이 일정을 고치면 여기에 쌓여요." />

@@ -9,8 +9,9 @@ import { useAuth } from '@/auth/auth-provider';
 import { TripMark } from '@/components/trip-mark';
 import { FolderSheet } from '@/components/folder-sheet';
 import { TripForm } from '@/components/trip-form';
+import { CountdownBadge } from '@/components/countdown-badge';
 import { Colors, Gutter, Radius, Spacing, Type, Weight } from '@/constants/theme';
-import { countdownIsNear, countdownLabel, countdownOf, formatNights, formatSpan, todayIso } from '@/lib/countdown';
+import { formatNights, formatSpan, todayIso } from '@/lib/countdown';
 import {
   Badge,
   Band,
@@ -707,7 +708,7 @@ function TripRow({
          버티면서 제목만 한 글자로 눌립니다 — 그 반대여야 합니다. */
       right={
         <Row gap={Spacing.s1} style={styles.tail}>
-          {countdownBadge(trip.startIso, trip.endIso)}
+          <CountdownBadge startIso={trip.startIso} endIso={trip.endIso} />
           {showGroup && trip.groupName ? (
             <Badge label={shortGroup(trip.groupName)} tone="muted" />
           ) : null}
@@ -745,31 +746,6 @@ function TripRow({
 /** 긴 모임 이름은 자릅니다. 표 하나가 줄을 다 먹으면 안 됩니다. */
 function shortGroup(name: string) {
   return name.length > 8 ? name.slice(0, 8) + '…' : name;
-}
-
-/**
- * 며칠 남았는지, 뱃지로.
- *
- * <p>목록에서 가장 먼저 보고 싶은 것입니다. 날짜를 읽고 오늘과 견주는 일을
- * 사람이 하게 두면, 그것만으로 목록을 훑는 데 시간이 걸립니다.
- *
- * <p>세는 일은 <code>lib/countdown</code> 이 합니다. 홈도 같은 답을 써야
- * 하는데, 같은 셈을 각자 들고 있으면 한쪽만 고치는 날이 옵니다. 여기서는
- * 그 답을 뱃지로 그리는 일만 합니다.
- *
- * <p>여행 중은 초록입니다. 남은 날과 다른 종류의 소식이라 색으로 가릅니다.
- */
-function countdownBadge(startIso: string | null, endIso: string | null) {
-  const at = countdownOf(startIso, endIso);
-  if (!at) {
-    return null;
-  }
-  return (
-    <Badge
-      label={countdownLabel(at)}
-      tone={at.kind === 'going' ? 'success' : countdownIsNear(at) ? 'accent' : 'muted'}
-    />
-  );
 }
 
 /*

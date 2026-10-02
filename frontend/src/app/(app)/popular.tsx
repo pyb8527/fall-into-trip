@@ -6,7 +6,7 @@ import { api, query } from '@/api/client';
 import type { PopularKind, PopularPlace, PopularRegion } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { PlaceDetailSheet, type Looked } from '@/components/place-detail-sheet';
-import { iconOf, labelOf } from '@/constants/place-icons';
+import { glyphOf, labelOf } from '@/constants/place-icons';
 import { Colors, Gutter, Palette, Spacing, Type, Weight } from '@/constants/theme';
 import {
   Body,
@@ -171,7 +171,7 @@ export default function Popular() {
                 onChange={setKind}
                 options={(kinds?.kinds ?? []).map((k) => ({
                   value: k.kind,
-                  label: `${iconOf(k.kind)} ${labelOf(k.kind)}`,
+                  label: labelOf(k.kind),
                 }))}
               />
             ) : null}
@@ -230,7 +230,7 @@ export default function Popular() {
               key={place.key}
               at={i + 1}
               last={i === all.length - 1}
-              mark={<Mark emoji={iconOf(place.icon)} fallback="📍" />}
+              mark={<Mark icon={glyphOf(place.icon)} />}
               title={place.name}
               sub={labelOf(place.icon)}
               meta={`여행 ${place.posts}개`}

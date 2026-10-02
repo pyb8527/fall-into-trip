@@ -9,7 +9,7 @@ import { useAuth } from '@/auth/auth-provider';
 import type { Found } from '@/components/map-types';
 import { OurPhoto } from '@/components/our-photo';
 import { PlaceDetailSheet } from '@/components/place-detail-sheet';
-import { iconOf, labelOf } from '@/constants/place-icons';
+import { glyphOf, labelOf } from '@/constants/place-icons';
 import { Colors, Gutter, Palette, Spacing, Tap, Type, Weight } from '@/constants/theme';
 import { formatNights } from '@/lib/countdown';
 import { forgetAll, recentSearches, remember } from '@/lib/recent';
@@ -31,7 +31,6 @@ import {
   SearchField,
   SectionHeader,
   Snack,
-  Tabs,
   useUndo,
 } from '@/ui';
 
@@ -196,7 +195,18 @@ export default function Search() {
 
       {q ? (
         <>
-          <Tabs items={TABS} value={tab} onChange={setTab} />
+          {/*
+            결과 거르기.
+
+            <p>밑줄 탭이었습니다. 밑줄 탭은 <b>다른 내용으로 넘어갈 때</b>
+            씁니다(둘러보기의 둘러보기 · 좋아요 · 내 글). 여기는 한 번 찾은
+            결과를 <b>거르는</b> 것이라 칩입니다 — 거르는 것은 앱 어디서나 칩입니다.
+          */}
+          <Row gap={Spacing.s2} style={styles.filters}>
+            {TABS.map((t) => (
+              <Chip key={t.value} label={t.label} selected={tab === t.value} onPress={() => setTab(t.value)} />
+            ))}
+          </Row>
 
           {busy && placeRows.length === 0 && postRows.length === 0 ? <Loading /> : null}
           {placeError && tab !== 'ideas' ? <ErrorNote message={placeError} /> : null}
@@ -235,7 +245,7 @@ export default function Search() {
               {placeRows.map((found, i) => (
                 <ListRow
                   key={`${found.placeId ?? found.name}-${i}`}
-                  left={<Mark emoji={iconOf(found.icon)} fallback="📍" />}
+                  left={<Mark icon={glyphOf(found.icon)} />}
                   title={found.name}
                   subtitle={[labelOf(found.icon), found.address].filter(Boolean).join(' · ')}
                   /*
@@ -436,6 +446,9 @@ function MoreLink({
 }
 
 const styles = StyleSheet.create({
+  filters: {
+    flexWrap: 'wrap',
+  },
   /*
     탭 아래 선은 좌우 여백을 뚫고 나갑니다.
 

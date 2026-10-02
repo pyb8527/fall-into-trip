@@ -36,7 +36,7 @@ export function IconPicker({
         {PLACE_ICONS.map((kind) => (
           <ChoiceTile
             key={kind.key}
-            mark={kind.emoji}
+            icon={kind.glyph}
             label={kind.label}
             selected={value === kind.key}
             onPress={() => onChange(kind.key)}

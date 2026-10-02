@@ -1797,6 +1797,7 @@ export function Checkbox({
  */
 export function ChoiceTile({
   mark,
+  icon,
   label,
   selected,
   onPress,
@@ -1804,6 +1805,8 @@ export function ChoiceTile({
 }: {
   /** 칸에 그릴 것. 이모지 한 글자거나, 그림이 없으면 비웁니다. */
   mark?: string;
+  /** 선 그림. 앱이 정한 갈래(장소 갈래)는 이모지 대신 이것으로 그립니다. */
+  icon?: IconName;
   /** 그림 아래 적는 말. 없으면 그림만. 그림이 없으면 이것이 대신 들어갑니다. */
   label?: string;
   selected: boolean;
@@ -1817,7 +1820,11 @@ export function ChoiceTile({
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ selected }}
       style={[styles.tile, label ? null : styles.tileBare, selected ? styles.tileOn : null]}>
-      {mark ? <Text style={styles.tileMark}>{mark}</Text> : null}
+      {icon ? (
+        <Icon name={icon} size={24} tone={selected ? 'accent' : 'secondary'} />
+      ) : mark ? (
+        <Text style={styles.tileMark}>{mark}</Text>
+      ) : null}
       {label ? (
         <Text
           style={[
@@ -1850,10 +1857,19 @@ export function ChoiceTile({
  * 글줄이 들쭉날쭉하고, 이모지가 없는 곳만 줄이 어긋납니다.
  */
 export function Mark({
+  icon,
   emoji,
   fallback,
   active,
 }: {
+  /**
+   * 선 그림. 장소 갈래·지출 갈래처럼 <b>앱이 정한 갈래</b>는 이것으로 그립니다.
+   *
+   * <p>이모지는 사람이 고른 표식(모임·여행·얼굴)에만 남깁니다 — 사람이 고른
+   * 것은 기종마다 달라도 그 사람의 것이지만, 앱이 정한 갈래가 폰마다 다르게
+   * 생기면 같은 화면이 다른 앱처럼 보입니다.
+   */
+  icon?: IconName | null;
   /** 이모지 한 글자. 없으면 fallback 을 그립니다. */
   emoji?: string | null;
   /** 그림이 없을 때 대신 적을 것. 순서 번호나 별. */
@@ -1863,7 +1879,9 @@ export function Mark({
 }) {
   return (
     <View style={[styles.mark, active ? styles.markOn : null]}>
-      {emoji ? (
+      {icon ? (
+        <Icon name={icon} size={20} tone={active ? 'accent' : 'secondary'} />
+      ) : emoji ? (
         <Text style={styles.markEmoji}>{emoji}</Text>
       ) : typeof fallback === 'string' || typeof fallback === 'number' ? (
         <Text style={styles.markFallback}>{fallback}</Text>
@@ -2409,7 +2427,26 @@ export type IconName =
   /** 사진. 다니면서 볼 것을 챙겨 두는 자리에 씁니다 */
   | 'image'
   /** 여행 안내판. 여행 내내 볼 것을 붙여 두는 판입니다 */
-  | 'clipboard';
+  | 'clipboard'
+  /* 장소 갈래 · 지출 갈래. 이모지였던 것을 선 그림 한 벌로 옮겼습니다 —
+     이모지는 기종마다 생김새가 달라 같은 화면이 폰마다 다르게 보였습니다. */
+  | 'restaurant'
+  | 'cafe'
+  | 'fish'
+  | 'flame'
+  | 'ice-cream'
+  | 'beer'
+  | 'bag'
+  | 'camera'
+  | 'leaf'
+  | 'water'
+  | 'bed'
+  | 'train'
+  | 'happy'
+  | 'color-palette'
+  | 'ticket'
+  | 'wallet'
+  | 'thumbs-down';
 
 /**
  * 이름 하나가 가리키는 두 가지 — 선과 채움.
@@ -2484,6 +2521,23 @@ const ionicon: Record<IconName, { line: string; solid: string }> = {
   copy: { line: 'copy-outline', solid: 'copy' },
   image: { line: 'image-outline', solid: 'image' },
   clipboard: { line: 'clipboard-outline', solid: 'clipboard' },
+  'restaurant': { line: 'restaurant-outline', solid: 'restaurant' },
+  'cafe': { line: 'cafe-outline', solid: 'cafe' },
+  'fish': { line: 'fish-outline', solid: 'fish' },
+  'flame': { line: 'flame-outline', solid: 'flame' },
+  'ice-cream': { line: 'ice-cream-outline', solid: 'ice-cream' },
+  'beer': { line: 'beer-outline', solid: 'beer' },
+  'bag': { line: 'bag-handle-outline', solid: 'bag-handle' },
+  'camera': { line: 'camera-outline', solid: 'camera' },
+  'leaf': { line: 'leaf-outline', solid: 'leaf' },
+  'water': { line: 'water-outline', solid: 'water' },
+  'bed': { line: 'bed-outline', solid: 'bed' },
+  'train': { line: 'train-outline', solid: 'train' },
+  'happy': { line: 'happy-outline', solid: 'happy' },
+  'color-palette': { line: 'color-palette-outline', solid: 'color-palette' },
+  'ticket': { line: 'ticket-outline', solid: 'ticket' },
+  'wallet': { line: 'wallet-outline', solid: 'wallet' },
+  'thumbs-down': { line: 'thumbs-down-outline', solid: 'thumbs-down' },
 };
 
 export function Icon({

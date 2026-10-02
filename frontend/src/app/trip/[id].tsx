@@ -30,6 +30,7 @@ import { TipSheet } from '@/components/tip-sheet';
 import { TripAlbum } from '@/components/trip-album';
 import { TripMap, type MapPlace } from '@/components/trip-map';
 import { iconOf, labelOf } from '@/constants/place-icons';
+import { glyphOf } from '@/constants/place-icons';
 import { faceOf } from '@/constants/user-marks';
 import { feelDone, feelGrab, feelTick } from '@/lib/feel';
 import { SAME_SPOT, metersBetween, readableMeters } from '@/lib/geo';
@@ -41,7 +42,6 @@ import { PlaceSearch } from '@/components/place-search';
 import { RecommendSheet } from '@/components/recommend-sheet';
 import {
   ago,
-  countdownLabel,
   countdownOf,
   formatNights,
   formatSpan,
@@ -103,6 +103,7 @@ import { SidePanelWidth, useWide } from '@/ui/layout';
 import { MapAside } from '@/ui/map-aside';
 import { TripTabs } from '@/ui/tab-bar';
 import { TripMark } from '@/components/trip-mark';
+import { CountdownBadge } from '@/components/countdown-badge';
 
 /** 전체를 보는 상태. 특정 날짜가 아니라는 뜻입니다. */
 const ALL = -1;
@@ -2130,7 +2131,7 @@ function SheetHead({
           {title}
         </Text>
         {/* 남은 날. 노랑은 「지금 · 곧」을 가리키는 자리에만 씁니다. */}
-        {at ? <Badge tone="hot" solid label={countdownLabel(at)} /> : null}
+        <CountdownBadge at={at} />
       </Split>
 
       <Caption tone="muted">
@@ -2547,7 +2548,7 @@ function DayCard({
                   accessibilityLabel={`${day.stay.name} 숙소 고치기`}
                   style={styles.stayCard}>
                   <Row gap={Spacing.s3} style={styles.stayRow}>
-                    <Mark emoji="🛏" />
+                    <Mark icon="bed" />
                     <View style={styles.grow}>
                       <Caption tone="muted">숙소</Caption>
                       <Body small strong numberOfLines={1}>
@@ -3030,7 +3031,7 @@ function PlaceRow({
               이름이 한 줄로 서고, 보석함·검색·가고 싶은 곳에서 쓰는 것과
               같은 모양이 됩니다.
             */}
-            <Mark emoji={emoji} fallback="📍" />
+            <Mark icon={glyphOf(place.icon)} />
 
             <View style={styles.placeText}>
               <Text style={styles.placeName} numberOfLines={2}>

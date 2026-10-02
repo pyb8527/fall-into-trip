@@ -17,6 +17,7 @@ import {
   Weight,
   dayColor,
 } from '@/constants/theme';
+import type { IconName } from '@/ui';
 import { decimalsOf, money, unitsOf } from '@/lib/money';
 import {
   Badge,
@@ -667,7 +668,7 @@ function SpendRow({
       scale={0.995}
       accessibilityLabel={`${spend.name} 고치기`}
       style={styles.row}>
-      <Mark emoji={catMark(spend.cat)} />
+      <Mark icon={catMark(spend.cat)} />
       <View style={styles.grow}>
         <Row gap={Spacing.s2} style={styles.rowHead}>
           <Text style={styles.rowTitle} numberOfLines={1}>
@@ -698,30 +699,30 @@ function SpendRow({
  * 지갑 하나로 둡니다 — 틀린 그림을 붙이는 것보다 아무 말 안 하는 쪽이
  * 낫습니다.
  */
-function catMark(cat: string | null | undefined) {
+function catMark(cat: string | null | undefined): IconName {
   const word = (cat ?? '').toLowerCase();
   if (!word) {
-    return '💳';
+    return 'wallet';
   }
   if (/카페|커피|디저트|cafe/.test(word)) {
-    return '☕';
+    return 'cafe';
   }
   if (/밥|식|먹|저녁|점심|아침|술|food/.test(word)) {
-    return '🍽';
+    return 'restaurant';
   }
   if (/교통|택시|기차|지하철|버스|렌트|항공|비행|기름/.test(word)) {
-    return '🚃';
+    return 'train';
   }
   if (/숙|호텔|방|집/.test(word)) {
-    return '🛏';
+    return 'bed';
   }
   if (/쇼핑|기념|선물|옷/.test(word)) {
-    return '🛍';
+    return 'bag';
   }
   if (/입장|관광|티켓|표|체험|놀이/.test(word)) {
-    return '🎟';
+    return 'ticket';
   }
-  return '💳';
+  return 'wallet';
 }
 
 /**
@@ -793,7 +794,7 @@ function Settle({
      읽을 것이 없습니다. */
   const done = books.every((book) => book.transfers.length === 0);
   if (done) {
-    return <Empty message="정산이 끝났어요 🎉" />;
+    return <Empty icon="check" message="정산이 끝났어요." />;
   }
 
   return (

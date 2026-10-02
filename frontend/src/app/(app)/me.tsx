@@ -1,4 +1,4 @@
-import { Stack, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -25,8 +25,7 @@ import {
   Tabs,
   Title,
 } from '@/ui';
-import { NavLeft } from '@/ui/nav';
-import { LogoMark } from '@/ui/logo';
+import { LogoSymbol } from '@/ui/logo';
 
 /** 어느 묶음을 보고 있나. */
 type Lane = 'feed' | 'calendar' | 'reviews';
@@ -51,7 +50,6 @@ type Lane = 'feed' | 'calendar' | 'reviews';
  */
 export default function Me() {
   const router = useRouter();
-  const navigation = useNavigation();
   const { user } = useAuth();
   /* 남의 것을 볼 때만 번호가 옵니다. 내 것은 번호 없이 들어옵니다. */
   const { id } = useLocalSearchParams<{ id?: string }>();
@@ -81,17 +79,9 @@ export default function Me() {
   );
 
   return (
-    <Screen
-      safeTop
-      header={
-        <Row gap={Spacing.s2}>
-          <NavLeft navigation={navigation} up="/(app)/home" />
-          <Grow>
-            <Title>{me?.mine === false ? (me.name ?? '프로필') : '내 페이지'}</Title>
-          </Grow>
-        </Row>
-      }>
-      <Stack.Screen options={{ headerShown: false }} />
+    <Screen>
+      {/* 남의 페이지면 막대 제목이 그 사람 이름입니다. */}
+      {me?.mine === false ? <Stack.Screen options={{ title: me.name ?? '프로필' }} /> : null}
 
       {profile.loading && !me ? <Loading /> : null}
       {profile.error ? <ErrorNote message={profile.error} onRetry={profile.reload} /> : null}
@@ -110,7 +100,7 @@ export default function Me() {
               {me.mark ? (
                 <Text style={styles.faceEmoji}>{markOf(me.mark)}</Text>
               ) : (
-                <LogoMark size={29} />
+                <LogoSymbol size={34} />
               )}
             </View>
             <Grow gap={Spacing.s1}>

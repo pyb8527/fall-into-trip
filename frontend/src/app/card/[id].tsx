@@ -1,5 +1,6 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { PathTitle } from '@/ui/nav';
+import { LogoInline } from '@/ui/logo';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
@@ -33,7 +34,6 @@ import {
   SectionHeader,
   SegmentedTabs,
   Split,
-  Title,
 } from '@/ui';
 import { TripTabs } from '@/ui/tab-bar';
 
@@ -221,7 +221,9 @@ function Receipt({
   return (
     <View style={styles.paper}>
       <View style={styles.center}>
-        <Title>FIT</Title>
+        {/* 영수증 머리. 「FIT」 을 제목 글꼴로 적어 두었는데, 로고가 아니라
+            그냥 굵은 낱말로 읽혔습니다. */}
+        <LogoInline size={28} />
         <Caption tone="secondary">FALL INTO TRIP</Caption>
       </View>
 

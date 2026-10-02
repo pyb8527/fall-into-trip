@@ -84,10 +84,13 @@ export default function AppLayout() {
       {/*
         마이페이지.
 
-        <p>제 상단바를 직접 세웁니다(큰 제목 + 뒤로) — 다른 갈래 루트들과
-        같은 꼴입니다. 그래서 여기서는 막대를 걷습니다.
+        <p>제 상단바를 직접 세웠습니다(큰 제목 + 뒤로). 그래서 뒤로 단추가
+        이 화면만 안쪽 80 자리에 섰고, 검색·모임 상세는 왼쪽 끝 40 이었습니다.
+        홈 막대에서 들어오는 하위 화면이라 다른 하위 화면과 같은 막대를
+        씁니다 — 뒤로 + 작은 제목. 남의 페이지면 화면이 제목을 그 사람
+        이름으로 바꿉니다.
       */}
-      <Stack.Screen name="me" options={{ headerShown: false }} />
+      <Stack.Screen name="me" options={stackHeader('내 페이지', { up: '/(app)/home' })} />
       <Stack.Screen name="settings" options={stackHeader('내 계정', { up: '/(app)/me' })} />
     </Stack>
   );

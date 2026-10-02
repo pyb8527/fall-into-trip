@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { StyleSheet, Text, View, type ViewStyle } from 'react-native';
 
 import type { OpenDate, TripSummary } from '@/api/types';
-import { Colors, Radius, Spacing, Tabular, Type, Weight, dayColor } from '@/constants/theme';
+import { Colors, Radius, Spacing, Tabular, Type, Weight } from '@/constants/theme';
 import { formatSpan, todayIso } from '@/lib/countdown';
 import { Caption, Icon, Press, Row } from '@/ui';
 
@@ -209,7 +209,7 @@ export function TripCalendar({
                     {on.slice(0, 3).map((t) => (
                       <View
                         key={t.id}
-                        style={[styles.dot, { backgroundColor: t.theme ?? dayColor(0) }]}
+                        style={[styles.dot, { backgroundColor: t.theme ?? Colors.accent }]}
                       />
                     ))}
                     {pollDay.has(d) && on.length < 3 ? <View style={styles.pollDot} /> : null}
@@ -247,7 +247,7 @@ export function TripCalendar({
       {shown.length > 0 ? (
         shown.map((t) => (
           <Press key={t.id} onPress={() => onOpen(t)} scale={1} style={styles.row}>
-            <View style={[styles.mark, { backgroundColor: t.theme ?? dayColor(0) }]} />
+            <View style={[styles.mark, { backgroundColor: t.theme ?? Colors.accent }]} />
             <View style={styles.rowText}>
               <Text style={styles.rowTitle} numberOfLines={1}>
                 {t.title}
@@ -286,7 +286,7 @@ export function TripCalendar({
           <Caption tone="muted">날짜 미정</Caption>
           {undated.map((t) => (
             <Press key={t.id} onPress={() => onOpen(t)} scale={1} style={styles.row}>
-              <View style={[styles.mark, { backgroundColor: t.theme ?? dayColor(0) }]} />
+              <View style={[styles.mark, { backgroundColor: t.theme ?? Colors.accent }]} />
               <View style={styles.rowText}>
                 <Text style={styles.rowTitle} numberOfLines={1}>
                   {t.title}
