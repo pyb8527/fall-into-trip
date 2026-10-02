@@ -19,6 +19,7 @@ import type { Day, Gap, GapOption, LivePin, LiveWhere, Money, OurStars, Person, 
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
 import { DatePollSheet } from '@/components/date-poll-sheet';
+import { NoticeBox } from '@/components/notice-box';
 import { PeopleSheet } from '@/components/people-sheet';
 import type { RouteLine } from '@/components/map-types';
 import { PlaceForm } from '@/components/place-form';
@@ -1377,6 +1378,16 @@ export default function TripScreen() {
         ) : null}
 
         {actionError ? <ErrorNote message={actionError} /> : null}
+
+        {/*
+          여행 안내판. 판 맨 위, 접힌 채로.
+
+          <p>모임 여행이거나 이미 적힌 것이 있을 때만 세웁니다. 혼자 여행에
+          빈 안내판을 늘 띄우면 일정 위에 쓸 일 없는 줄이 하나 생깁니다.
+        */}
+        {data.notice && (data.trip.groupId || data.notice.text) ? (
+          <NoticeBox tripId={data.trip.id} notice={data.notice} onSaved={reload} />
+        ) : null}
         {gapError && dayId ? <Caption tone="danger">{gapError}</Caption> : null}
         {me.error ? <Caption tone="danger">{me.error}</Caption> : null}
 

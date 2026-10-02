@@ -82,6 +82,31 @@ public class NewsFeed {
                 .getResultList();
     }
 
+    /**
+     * 남이 고친 여행 안내판.
+     *
+     * <p>여행마다 글 한 장이라 접을 것이 없습니다. 마지막으로 고친 사람이
+     * 나 자신이면 안 냅니다 — 내가 고친 것이 소식으로 돌아오면 안 됩니다.
+     */
+    public List<NoticeRow> notices(List<String> tripIds, String me, Instant since, int limit) {
+        if (tripIds.isEmpty()) {
+            return List.of();
+        }
+        return em.createQuery("""
+                       SELECT new %sNoticeRow(t.id, t.title, t.noticeBy, t.noticeAt)
+                       FROM Trip t
+                       WHERE t.id IN :tripIds
+                         AND t.noticeAt > :since
+                         AND t.noticeBy IS NOT NULL AND t.noticeBy <> :me
+                       ORDER BY t.noticeAt DESC
+                       """.formatted(ROW), NoticeRow.class)
+                .setParameter("tripIds", tripIds)
+                .setParameter("me", me)
+                .setParameter("since", since)
+                .setMaxResults(limit)
+                .getResultList();
+    }
+
     /** 남이 올린 후보. */
     public List<CandidateRow> candidates(List<String> tripIds, String me, Instant since, int limit) {
         if (tripIds.isEmpty()) {

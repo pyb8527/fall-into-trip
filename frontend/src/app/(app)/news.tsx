@@ -319,6 +319,8 @@ function iconOf(kind: NewsItem['kind']): IconName {
       return 'image';
     case 'group.join':
       return 'users';
+    case 'notice.edit':
+      return 'clipboard';
     default:
       return 'message-square';
   }

@@ -2407,7 +2407,9 @@ export type IconName =
   /** 이 일정을 본떠 새로 만들기 */
   | 'copy'
   /** 사진. 다니면서 볼 것을 챙겨 두는 자리에 씁니다 */
-  | 'image';
+  | 'image'
+  /** 여행 안내판. 여행 내내 볼 것을 붙여 두는 판입니다 */
+  | 'clipboard';
 
 /**
  * 이름 하나가 가리키는 두 가지 — 선과 채움.
@@ -2481,6 +2483,7 @@ const ionicon: Record<IconName, { line: string; solid: string }> = {
   download: { line: 'download-outline', solid: 'download' },
   copy: { line: 'copy-outline', solid: 'copy' },
   image: { line: 'image-outline', solid: 'image' },
+  clipboard: { line: 'clipboard-outline', solid: 'clipboard' },
 };
 
 export function Icon({

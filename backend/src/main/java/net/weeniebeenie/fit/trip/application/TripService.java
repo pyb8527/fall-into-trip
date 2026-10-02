@@ -328,6 +328,51 @@ public class TripService {
     public record Person(String id, String name, String mark, boolean owner) {
     }
 
+    /* ------------------------------------------------------- 안내판 */
+
+    /** 안내판 한 장의 길이. 이보다 길면 안내판이 아니라 문서입니다. */
+    private static final int NOTICE_MAX = 4000;
+
+    /**
+     * 여행 안내판을 고칩니다.
+     *
+     * <h3>멤버 누구나 고칩니다</h3>
+     *
+     * <p>도어락 번호를 아는 사람이 적고, 모이는 곳이 바뀌면 바꾼 사람이
+     * 고칩니다. 만든 사람만 고치게 하면 그 사람에게 메시지를 보내 「이거
+     * 좀 고쳐 줘」를 부탁하는 일이 생깁니다.
+     *
+     * <h3>합치지 않습니다</h3>
+     *
+     * <p>둘이 동시에 고치면 뒤 사람이 「다른 사람이 먼저 고쳤어요」를
+     * 봅니다({@code Trip.version}). 글 한 장을 줄마다 합치려면 그 자체가
+     * 편집기 하나입니다.
+     *
+     * <p>빈 글이면 안내판을 걷습니다.
+     */
+    @Transactional
+    public Trip writeNotice(AuthPrincipal me, String tripId, String text, Long version) {
+        Trip trip = access.mine(tripId, me.id());
+        access.requireCanEdit(tripId, me.id());
+        net.weeniebeenie.fit.shared.domain.Versioned.check(version, trip.getVersion());
+
+        String clean = text == null || text.isBlank() ? null : text.strip();
+        if (clean != null && clean.length() > NOTICE_MAX) {
+            throw ApiException.badRequest("안내판은 " + NOTICE_MAX + "자까지예요.");
+        }
+        trip.setNotice(clean);
+        trip.setNoticeBy(me.id());
+        trip.setNoticeAt(java.time.Instant.now());
+        /* 여기서 밀어 넣어 판을 올립니다. 끝날 때 올라가게 두면 돌려주는 판이
+           하나 낡아서, 같은 사람이 이어서 고칠 때 제 글과 부딪힙니다. */
+        trips.saveAndFlush(trip);
+
+        /* 글은 기록에 남기지 않습니다 — 도어락 번호가 들어 있을 수 있습니다. */
+        audit.log(me.id(), "trip.notice", tripId,
+                Map.of("length", clean == null ? 0 : clean.length()));
+        return trip;
+    }
+
     /* ------------------------------------------------------- 참석 응답 */
 
     /**

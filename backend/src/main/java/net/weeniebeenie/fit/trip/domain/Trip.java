@@ -49,6 +49,22 @@ public class Trip {
     @Column(name = "group_id", length = 16)
     private String groupId;
 
+    /**
+     * 여행 안내판 — 여행 전체에 걸린 것을 적어 두는 글 한 장.
+     *
+     * <p>숙소 도어락, 모이는 곳, 비상 연락처. 날짜에도 장소에도 안 묶이는
+     * 것들입니다. 멤버 누구나 고치고, 답글과 읽음 표시는 없습니다.
+     */
+    @Column(columnDefinition = "text")
+    private String notice;
+
+    /** 마지막으로 고친 사람. 소식함이 「○○ 님이 고쳤어요」를 쓰는 데 씁니다. */
+    @Column(name = "notice_by", length = 16)
+    private String noticeBy;
+
+    @Column(name = "notice_at")
+    private Instant noticeAt;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 

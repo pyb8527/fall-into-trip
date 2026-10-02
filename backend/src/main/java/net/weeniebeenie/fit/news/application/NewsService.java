@@ -135,6 +135,12 @@ public class NewsService {
             rows.add(inTrip(r.at(), "candidate.add", r.actorId(), r.tripId(), r.tripTitle(),
                     quoted(r.name()) + " 를 후보로 올렸어요."));
         }
+        /* 안내판. 무엇을 고쳤는지는 안 적습니다 — 도어락 번호가 소식함과
+           알림 미리보기에 그대로 뜨면 안 됩니다. 들어가서 봅니다. */
+        for (NoticeRow r : feed.notices(tripIds, me.id(), since, LIMIT)) {
+            rows.add(inTrip(r.at(), "notice.edit", r.actorId(), r.tripId(), r.tripTitle(),
+                    "안내판을 고쳤어요."));
+        }
         for (VoteAggRow r : feed.votes(tripIds, me.id(), since, LIMIT)) {
             /* 한 사람이면 좋다·아니라를 그대로 말합니다. 여럿이면 갈렸을 수
                있어 "답했습니다" 로 둡니다 — 어느 쪽인지는 투표장이 보여

@@ -171,7 +171,8 @@ T("여럿이면 이름을 안 붙임", !likes[0]?.actorName && !said[0]?.actorNa
 T("여행 소식이 안 밀려남",
   find(got.items, (i) => i.kind.startsWith("place.") || i.kind.startsWith("candidate.")).length === 3,
   got.items.map((i) => i.kind));
-T("목록이 짧게 유지됨", got.items.length === 5, got.items.length);
+/* 모임에 들어온 사람(group.join)이 한 줄 더 있습니다 — 모임 소식이 생긴 뒤의 수입니다. */
+T("목록이 짧게 유지됨", got.items.length === 6, got.items.map((i) => i.kind));
 
 console.log("\n[9] 남의 글에 붙은 것은 안 실립니다");
 r = await call("POST", "/api/places", { token: c, body: { dayId: otherDay, name: "또 한 곳", lat: 1, lng: 1 } });

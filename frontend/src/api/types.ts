@@ -201,6 +201,21 @@ export type TripDetail = {
   canEdit: boolean;
   /** 내가 만든 여행인지. 지우기와 모임 옮기기가 여기에 걸립니다. */
   owner: boolean;
+  /** 여행 안내판. 글이 없어도 판(version)은 옵니다 */
+  notice: TripNotice;
+};
+
+/**
+ * 여행 안내판 — 숙소 도어락, 모이는 곳처럼 여행 전체에 걸린 글 한 장.
+ *
+ * <p>고칠 때 {@code version} 을 같이 보냅니다. 그 사이에 누가 고쳤으면
+ * 409 — 합치지 않습니다.
+ */
+export type TripNotice = {
+  text?: Maybe<string>;
+  at?: Maybe<string>;
+  byName?: Maybe<string>;
+  version: number;
 };
 
 /** 다니면서 볼 사진. 장소 칸마다, 여행기에는 안 실립니다. */
@@ -1014,7 +1029,10 @@ export type NewsItem = {
        글이 올라와도 들어가서 보지 않으면 몰랐습니다. */
     | 'feed.post'
     | 'feed.comment'
-    | 'group.join';
+    | 'group.join'
+    /* 여행 안내판. 무엇을 고쳤는지는 안 실립니다 — 도어락 번호가 소식함에
+       그대로 뜨면 안 됩니다. */
+    | 'notice.edit';
   /**
    * 한 일을 한 사람. 지워진 계정이면 "누군가" 입니다.
    *

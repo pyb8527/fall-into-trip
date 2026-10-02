@@ -93,6 +93,38 @@ public class TripController {
     public record GoingBody(net.weeniebeenie.fit.trip.domain.GoingAnswer answer, String note) {
     }
 
+    /**
+     * 여행 안내판을 고칩니다.
+     *
+     * <p>{@code version} 은 화면이 받아 둔 여행의 판입니다. 그 사이에 누가
+     * 고쳤으면 409 — 합치지 않습니다.
+     */
+    @PutMapping("/trips/{id}/notice")
+    public Map<String, Object> notice(@CurrentUser AuthPrincipal me, @PathVariable String id,
+                                      @RequestBody NoticeBody body) {
+        Trip trip = trips.writeNotice(me, id, body.text(), body.version());
+        return Map.of("notice", noticeOf(trip));
+    }
+
+    public record NoticeBody(String text, Long version) {
+    }
+
+    /**
+     * 안내판 한 장 — 글, 누가 언제 고쳤나, 다음에 고칠 때 보낼 판.
+     *
+     * <p>글이 없어도 판은 냅니다. 처음 적을 때도 「그 사이에 누가 먼저
+     * 적었나」를 가려야 합니다.
+     */
+    private Map<String, Object> noticeOf(Trip trip) {
+        Map<String, Object> out = new java.util.HashMap<>();
+        out.put("text", trip.getNotice());
+        out.put("at", trip.getNoticeAt());
+        out.put("byName", trip.getNoticeBy() == null ? null
+                : users.findById(trip.getNoticeBy()).map(u -> u.getName()).orElse(null));
+        out.put("version", trip.getVersion());
+        return out;
+    }
+
     /** 혼자 여행을 모임으로 옮기거나 다시 뺍니다. 만든 사람만 합니다. */
     @PatchMapping("/trips/{id}/group")
     public Map<String, Object> group(@CurrentUser AuthPrincipal me,
@@ -245,6 +277,7 @@ public class TripController {
                 "refs", aids,
                 /* 볼 수 있으면 고칠 수 있습니다. 「보기만」을 없앴습니다. */
                 "canEdit", true,
-                "owner", d.owner());
+                "owner", d.owner(),
+                "notice", noticeOf(d.trip()));
     }
 }
