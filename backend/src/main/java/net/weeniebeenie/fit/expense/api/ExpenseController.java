@@ -37,6 +37,20 @@ public class ExpenseController {
                 "currencies", Currencies.COMMON);
     }
 
+    /** 송금 줄에 「보냈어요 / 받았어요」. 규칙은 ExpenseService.mark. */
+    @PutMapping("/api/trips/{tripId}/settlement/mark")
+    public Map<String, Object> mark(@CurrentUser AuthPrincipal me, @PathVariable String tripId,
+                                    @RequestBody MarkBody body) {
+        expenses.mark(me, tripId, body.fromId(), body.toId(), body.currency(), body.amount(),
+                body.sent(), body.received());
+        return Map.of("books", expenses.settle(me, tripId));
+    }
+
+    /** @param sent·received 바꿀 것만. 비우면 그쪽은 그대로입니다 */
+    public record MarkBody(String fromId, String toId, String currency, Integer amount,
+                           Boolean sent, Boolean received) {
+    }
+
     /** 누가 누구에게 얼마를 주면 되는지. 통화마다 하나씩 옵니다. */
     @GetMapping("/api/trips/{tripId}/settlement")
     public Map<String, Object> settle(@CurrentUser AuthPrincipal me, @PathVariable String tripId) {

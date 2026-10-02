@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { StyleSheet, Text, TextInput, View, type TextStyle } from 'react-native';
 
 import { api, ApiError, UNEXPECTED } from '@/api/client';
-import type { Books, Person, Spend, TripDetail, TripRates } from '@/api/types';
+import type { Books, Person, Spend, Transfer, TripDetail, TripRates } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
 import {
@@ -427,7 +427,13 @@ export default function Money() {
           ))}
         </>
       ) : (
-        <Settle books={books.data?.books ?? []} loading={books.loading} />
+        <Settle
+          tripId={id}
+          me={user?.id ?? null}
+          books={books.data?.books ?? []}
+          loading={books.loading}
+          onChanged={books.reload}
+        />
       )}
 
       {/*
@@ -727,7 +733,51 @@ function catMark(cat: string | null | undefined) {
  * 녹아 없어졌습니다 — 그림자만 남아 화면이 흐릿해 보입니다. 통화 사이는
  * 회색 띠가 가릅니다.
  */
-function Settle({ books, loading }: { books: Books[]; loading: boolean }) {
+function Settle({
+  tripId,
+  me,
+  books,
+  loading,
+  onChanged,
+}: {
+  tripId: string;
+  me: string | null;
+  books: Books[];
+  loading: boolean;
+  onChanged: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
+
+  /*
+    「보냈어요 / 받았어요」.
+
+    <p>제 쪽만 누릅니다 — 보낸 것은 보낸 사람이, 받은 것은 받은 사람이
+    말합니다. 앱은 아무에게도 알리지 않습니다. 앱이 독촉하면 받는 사람에게는
+    공개 망신이 됩니다.
+
+    <p>본 금액을 같이 보냅니다. 그 사이에 지출이 바뀌어 줄이 달라졌으면 서버가
+    물리고, 새로 받아 옵니다.
+  */
+  async function mark(t: Transfer, currency: string, change: { sent?: boolean; received?: boolean }) {
+    setBusy(true);
+    setFailed(null);
+    try {
+      await api.put(`/api/trips/${encodeURIComponent(tripId)}/settlement/mark`, {
+        fromId: t.fromUserId,
+        toId: t.toUserId,
+        currency,
+        amount: t.amount,
+        ...change,
+      });
+    } catch (e) {
+      setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
+    } finally {
+      setBusy(false);
+      onChanged();
+    }
+  }
+
   if (loading && books.length === 0) {
     return <Loading />;
   }
@@ -744,6 +794,7 @@ function Settle({ books, loading }: { books: Books[]; loading: boolean }) {
 
   return (
     <>
+      {failed ? <ErrorNote message={failed} /> : null}
       {books.map((book, at) => (
         <View key={book.currency}>
           {at > 0 ? <Band /> : null}
@@ -772,16 +823,50 @@ function Settle({ books, loading }: { books: Books[]; loading: boolean }) {
             <>
               <Divider />
               <Caption tone="secondary">이렇게 주고받으면 끝나요</Caption>
-              {book.transfers.map((t, i) => (
-                <Split key={i} style={styles.settleRow}>
-                  <Body>
-                    {t.fromName} → {t.toName}
-                  </Body>
-                  <Text style={[styles.amount, styles.give]}>
-                    {money(t.amount, book.currency, book.decimals)}
-                  </Text>
-                </Split>
-              ))}
+              {book.transfers.map((t, i) => {
+                /* 둘 다 눌렀으면 끝난 줄입니다. 접어서 흐리게 둡니다 —
+                   지우면 「아까 그 줄 어디 갔지」가 됩니다. */
+                const settled = !!t.sentAt && !!t.receivedAt;
+                return (
+                  <View key={i} style={styles.sendRow}>
+                    <Split style={styles.settleRow}>
+                      <Body tone={settled ? 'muted' : undefined}>
+                        {t.fromName} → {t.toName}
+                      </Body>
+                      <Text style={[styles.amount, settled ? styles.doneAmount : styles.give]}>
+                        {money(t.amount, book.currency, book.decimals)}
+                      </Text>
+                    </Split>
+                    {settled ? (
+                      <Caption tone="success">주고받았어요</Caption>
+                    ) : (
+                      <Row gap={Spacing.s2}>
+                        {t.sentAt ? (
+                          <Caption tone="secondary">{t.fromName} 님이 보냈대요</Caption>
+                        ) : null}
+                        {me === t.fromUserId ? (
+                          <Button
+                            label={t.sentAt ? '보냈어요 거두기' : '보냈어요'}
+                            variant={t.sentAt ? 'ghost' : 'secondary'}
+                            compact
+                            busy={busy}
+                            onPress={() => mark(t, book.currency, { sent: !t.sentAt })}
+                          />
+                        ) : null}
+                        {me === t.toUserId ? (
+                          <Button
+                            label="받았어요"
+                            variant="secondary"
+                            compact
+                            busy={busy}
+                            onPress={() => mark(t, book.currency, { received: true })}
+                          />
+                        ) : null}
+                      </Row>
+                    )}
+                  </View>
+                );
+              })}
             </>
           ) : null}
         </View>
@@ -1134,6 +1219,16 @@ function byDay(list: Spend[], days: TripDetail['days']) {
 */
 
 const styles = StyleSheet.create({
+  /* 송금 줄 하나 — 금액 줄과 그 아래 「보냈어요」 줄. */
+  sendRow: {
+    gap: Spacing.s1,
+    paddingBottom: Spacing.s2,
+  },
+  /* 끝난 줄의 금액. 주황을 빼고 흐리게 둡니다 — 더 할 일이 없습니다. */
+  doneAmount: {
+    color: Colors.textMuted,
+    textDecorationLine: 'line-through',
+  },
 
   /* -------------------------------------------------------------- 요약 */
   /* 환율을 적으러 가는 줄. 글자만 있는 자리라 누르는 넓이를 위아래로

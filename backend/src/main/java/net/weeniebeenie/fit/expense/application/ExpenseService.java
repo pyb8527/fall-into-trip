@@ -63,6 +63,7 @@ public class ExpenseService {
 
     private final ExpenseRepository expenses;
     private final TripRateRepository rates;
+    private final net.weeniebeenie.fit.expense.domain.SettleMarkRepository marks;
     private final DayRepository days;
     private final PlaceRepository places;
     private final UserRepository users;
@@ -100,6 +101,12 @@ public class ExpenseService {
         Map<String, BigDecimal> noted = rates.findAllByTripId(tripId).stream()
                 .collect(Collectors.toMap(TripRate::getCurrency, TripRate::getRate));
 
+        /* 「보냈어요 / 받았어요」. 금액이 같은 줄에만 붙입니다 — V48 의 까닭. */
+        Map<String, net.weeniebeenie.fit.expense.domain.SettleMark> marked = new java.util.HashMap<>();
+        for (var m : marks.findAllByTripId(tripId)) {
+            marked.put(m.getFromId() + "|" + m.getToId() + "|" + m.getCurrency(), m);
+        }
+
         /* 통화별로 갈라 놓고 각각 셉니다. */
         Map<String, List<Expense>> byCurrency = new LinkedHashMap<>();
         for (Expense e : expenses.findAllByTripIdOrderByCreatedAtAsc(tripId)) {
@@ -115,10 +122,16 @@ public class ExpenseService {
                             b.getValue()))
                     .toList();
             List<Send> sends = made.transfers().stream()
-                    .map(t -> new Send(
-                            t.fromUserId(), names.getOrDefault(t.fromUserId(), "나간 사람"),
-                            t.toUserId(), names.getOrDefault(t.toUserId(), "나간 사람"),
-                            t.amount()))
+                    .map(t -> {
+                        var m = marked.get(t.fromUserId() + "|" + t.toUserId() + "|" + currency);
+                        boolean same = m != null && m.getAmount() == t.amount();
+                        return new Send(
+                                t.fromUserId(), names.getOrDefault(t.fromUserId(), "나간 사람"),
+                                t.toUserId(), names.getOrDefault(t.toUserId(), "나간 사람"),
+                                t.amount(),
+                                same ? m.getSentAt() : null,
+                                same ? m.getReceivedAt() : null);
+                    })
                     .toList();
 
             int total = list.stream().mapToInt(Expense::getAmount).sum();
@@ -565,9 +578,74 @@ public class ExpenseService {
     public record Owed(String userId, String name, int balance) {
     }
 
-    /** 누가 누구에게 얼마를. */
+    /**
+     * 누가 누구에게 얼마를.
+     *
+     * @param sentAt     보낸 사람이 「보냈어요」를 누른 때. 금액이 그때와 같을 때만
+     * @param receivedAt 받은 사람이 「받았어요」를 누른 때. 둘 다 있으면 끝난 줄입니다
+     */
     public record Send(String fromUserId, String fromName,
-                       String toUserId, String toName, int amount) {
+                       String toUserId, String toName, int amount,
+                       java.time.Instant sentAt, java.time.Instant receivedAt) {
+    }
+
+    /**
+     * 「보냈어요」·「받았어요」를 누릅니다.
+     *
+     * <h3>제 쪽만 누릅니다</h3>
+     *
+     * <p>보냈다는 것은 보낸 사람이, 받았다는 것은 받은 사람이 말합니다. 남이
+     * 대신 누를 수 있으면 「받았어요」가 받은 사람 모르게 찍힙니다.
+     *
+     * <h3>지금 줄에만 답니다</h3>
+     *
+     * <p>화면이 본 금액을 함께 보냅니다. 그 사이에 지출이 바뀌어 줄이 달라졌으면
+     * 409 — 4만 원 줄에 3만 원짜리 「보냈어요」를 달지 않습니다. 금액이 바뀐
+     * 줄에 새로 누르면 옛 표시는 지우고 새로 답니다.
+     *
+     * <p>앱이 대신 독촉하지 않습니다. 이 표시는 아무에게도 알림을 보내지 않습니다.
+     */
+    @Transactional
+    public void mark(AuthPrincipal me, String tripId, String fromId, String toId,
+                     String currency, Integer amount, Boolean sent, Boolean received) {
+        access.requireCanRead(tripId, me.id());
+        if (fromId == null || toId == null || currency == null || amount == null) {
+            throw ApiException.badRequest("어느 줄인지 알려 주세요.");
+        }
+        boolean live = settle(me, tripId).stream()
+                .filter(b -> b.currency().equals(currency))
+                .flatMap(b -> b.transfers().stream())
+                .anyMatch(t -> t.fromUserId().equals(fromId) && t.toUserId().equals(toId)
+                        && t.amount() == amount);
+        if (!live) {
+            throw ApiException.conflict("정산이 바뀌었어요. 새로 불러온 뒤 다시 눌러 주세요.");
+        }
+        if (sent != null && !me.id().equals(fromId)) {
+            throw ApiException.forbidden("보낸 사람만 「보냈어요」를 누를 수 있어요.");
+        }
+        if (received != null && !me.id().equals(toId)) {
+            throw ApiException.forbidden("받은 사람만 「받았어요」를 누를 수 있어요.");
+        }
+
+        var key = new net.weeniebeenie.fit.expense.domain.SettleMark.Key(tripId, fromId, toId, currency);
+        var row = marks.findById(key).orElseGet(() ->
+                new net.weeniebeenie.fit.expense.domain.SettleMark(tripId, fromId, toId, currency, amount));
+        if (row.getAmount() != amount) {
+            row.setAmount(amount);
+            row.setSentAt(null);
+            row.setReceivedAt(null);
+        }
+        java.time.Instant now = java.time.Instant.now();
+        if (sent != null) {
+            row.setSentAt(sent ? now : null);
+        }
+        if (received != null) {
+            row.setReceivedAt(received ? now : null);
+        }
+        marks.save(row);
+        audit.log(me.id(), "settle.mark", tripId,
+                Map.of("to", toId, "currency", currency, "sent", String.valueOf(sent),
+                        "received", String.valueOf(received)));
     }
 
     /**

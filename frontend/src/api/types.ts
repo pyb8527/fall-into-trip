@@ -988,7 +988,24 @@ export type Books = {
    */
   krw?: number | null;
   balances: { userId: string; name: string; balance: number }[];
-  transfers: { fromName: string; toName: string; amount: number }[];
+  transfers: Transfer[];
+};
+
+/**
+ * 송금 줄 하나.
+ *
+ * <p>{@code sentAt} 은 보낸 사람이, {@code receivedAt} 은 받은 사람이 누른
+ * 때입니다. 금액이 그때와 같을 때만 옵니다 — 지출이 바뀌어 줄이 달라지면 옛
+ * 표시는 사라집니다. 둘 다 있으면 끝난 줄입니다.
+ */
+export type Transfer = {
+  fromUserId: string;
+  fromName: string;
+  toUserId: string;
+  toName: string;
+  amount: number;
+  sentAt?: Maybe<string>;
+  receivedAt?: Maybe<string>;
 };
 
 /**
