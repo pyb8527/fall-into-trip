@@ -1,9 +1,9 @@
 import { Stack, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { api, ApiError, UNEXPECTED } from '@/api/client';
-import type { SavedPlace, TripDetail, TripSummary } from '@/api/types';
+import type { PopularPlace, PostPage, SavedPlace, TripDetail, TripSummary } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { IconPicker } from '@/components/icon-picker';
 import type { MapPlace } from '@/components/map-types';
@@ -14,9 +14,11 @@ import { DayPicker } from '@/components/day-picker';
 import { SavedRow } from '@/components/saved-row';
 import { SORT_GIVEN, SORT_NAME, SortBar, type SortBy } from '@/components/sort-bar';
 import { TripMap } from '@/components/trip-map';
-import { labelOf } from '@/constants/place-icons';
+import { glyphOf, labelOf } from '@/constants/place-icons';
 import { Colors, Spacing, Tap } from '@/constants/theme';
 import { kindsIn, savedAgo, siftSaved } from '@/lib/saved';
+import { cityOf, ELSEWHERE } from '@/lib/cities';
+import { todayIso } from '@/lib/countdown';
 import {
   Band,
   Body,
@@ -31,12 +33,15 @@ import {
   FilterChip,
   Grow,
   IconButton,
+  ListRow,
   Loading,
+  Mark,
   Press,
   Row,
   Screen,
   SearchField,
   SectionHeader,
+  SegmentedTabs,
   Snack,
   Split,
   Title,
@@ -123,6 +128,13 @@ export default function Saved() {
   const [lookingId, setLookingId] = useState<string | null>(null);
   const { undo, show: showUndo, hide: hideUndo } = useUndo();
   const [taggingId, setTaggingId] = useState<string | null>(null);
+  /* 도시 묶음 하나만 볼 때. 비우면 전부입니다. */
+  const [city, setCity] = useState<string | null>(null);
+  /* 목록 · 지도. 지도가 늘 위에 있어서 목록이 한 줄 반만 보였습니다. */
+  const [view, setView] = useState<'list' | 'map'>('list');
+  /* 담을 여행을 고르는 판. */
+  const [aiming, setAiming] = useState(false);
+  const [aimDays, setAimDays] = useState<TripDetail['days'] | null>(null);
 
   const { data, error, loading, reload, setData } = useAsync<{ places: SavedPlace[] }>(
     (signal) => api.get('/api/saved', signal),
@@ -131,7 +143,90 @@ export default function Saved() {
 
   const all = useMemo(() => data?.places ?? [], [data]);
   const kinds = useMemo(() => kindsIn(all), [all]);
-  const shown = useMemo(() => siftSaved(all, { q, kind, by }), [all, q, kind, by]);
+  /* 장소마다 도시. 좌표에서 가장 가까운 큰 도시입니다(lib/cities). */
+  const cityById = useMemo(
+    () => new Map(all.map((p) => [p.id, cityOf(p.lat, p.lng) ?? ELSEWHERE])),
+    [all],
+  );
+  /* 도시 칩 — 많이 담은 도시부터. 「그 밖」은 늘 끝입니다. */
+  const cities = useMemo(() => {
+    const n = new Map<string, number>();
+    for (const c of cityById.values()) {
+      n.set(c, (n.get(c) ?? 0) + 1);
+    }
+    return [...n.entries()].sort((a, b) =>
+      a[0] === ELSEWHERE ? 1 : b[0] === ELSEWHERE ? -1 : b[1] - a[1],
+    );
+  }, [cityById]);
+  const shown = useMemo(
+    () =>
+      siftSaved(all, { q, kind, by }).filter((p) => city == null || cityById.get(p.id) === city),
+    [all, q, kind, by, city, cityById],
+  );
+  /* 도시별 묶음. 칩으로 하나를 고르면 그 묶음 하나뿐입니다. */
+  const bunches = useMemo(() => {
+    const out = new Map<string, SavedPlace[]>();
+    for (const p of shown) {
+      const c = cityById.get(p.id) ?? ELSEWHERE;
+      out.set(c, [...(out.get(c) ?? []), p]);
+    }
+    return [...out.entries()].sort((a, b) =>
+      a[0] === ELSEWHERE ? 1 : b[0] === ELSEWHERE ? -1 : b[1].length - a[1].length,
+    );
+  }, [shown, cityById]);
+
+  /* 내 여행 — 담을 곳과 「오사카 여행에 4곳 담을 수 있어요」 안내에 씁니다. */
+  const { data: tripData } = useAsync<{ trips: TripSummary[] }>((signal) => api.get('/api/trips', signal), []);
+  const upcoming = useMemo(
+    () =>
+      (tripData?.trips ?? []).filter((t) => (t.endIso ?? t.startIso ?? '9999') >= todayIso()),
+    [tripData],
+  );
+  /*
+    안내 한 줄 — 다가오는 여행 이름에 도시 이름이 들어 있고 그 도시에 담아 둔
+    곳이 있으면. 누르면 그 곳들을 골라 둡니다.
+  */
+  const hint = useMemo(() => {
+    for (const t of upcoming) {
+      const hit = cities.find(([c]) => c !== ELSEWHERE && t.title.includes(c));
+      if (hit) {
+        return { trip: t, city: hit[0], count: hit[1] };
+      }
+    }
+    return null;
+  }, [upcoming, cities]);
+
+  /*
+    담기 — 모임 여행이면 「가고 싶은 곳」, 혼자 여행이면 날짜(plan-review Q5).
+
+    <p>모임 여행의 일정에 혼자 바로 넣으면, 같이 가는 사람은 자기도 모르게 정해진
+    곳을 봅니다. 가고 싶은 곳에 올리면 모두가 좋다고 해야 일정이 됩니다.
+    혼자 여행에는 물을 사람이 없으니 날짜로 바로 넣는 편이 빠릅니다.
+  */
+  async function aimAt(trip: TripSummary) {
+    setFailed(null);
+    if (trip.groupId) {
+      try {
+        for (const savedId of picked) {
+          await api.post(`/api/trips/${encodeURIComponent(trip.id)}/candidates`, { savedId });
+        }
+        setAiming(false);
+        setPicked(new Set());
+        router.push({ pathname: '/vote/[id]', params: { id: trip.id } });
+      } catch (e) {
+        setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
+      }
+      return;
+    }
+    try {
+      const got = await api.get<TripDetail>(`/api/trip?trip=${encodeURIComponent(trip.id)}`);
+      setAimDays(got.days);
+      setAiming(false);
+      setPouring(true);
+    } catch (e) {
+      setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
+    }
+  }
 
   /**
    * 지금 걸려 있는 것들. 밖에 내놓을 것과 개수를 여기서 한 번에 셉니다.
@@ -383,7 +478,7 @@ export default function Saved() {
               </Body>
             </Press>
             <View style={styles.lead}>
-              <Button label={`${picked.size}곳 일정에 넣기`} onPress={() => setPouring(true)} />
+              <Button label={`${picked.size}곳 여행에 담기`} onPress={() => setAiming(true)} />
             </View>
           </Row>
         ) : undefined
@@ -409,7 +504,47 @@ export default function Saved() {
         사진을 안 올리는 앱이라 화면의 무게를 질 것이 지도밖에 없기도 합니다.
         문토나 무신사가 사진으로 하는 일을 여기서는 지도가 합니다.
       */}
-      {pins.length > 0 ? (
+      {/*
+        도시 칩과 목록 · 지도.
+
+        <p>「도쿄 12 · 오사카 4」 — 담아 둔 곳은 결국 어느 도시 여행에 쓰입니다.
+        지도는 고를 때만 폅니다. 늘 위에 있으면 목록이 한 줄 반만 보입니다.
+      */}
+      {all.length > 0 ? (
+        <>
+          <SegmentedTabs
+            items={[
+              { value: 'list', label: '목록' },
+              { value: 'map', label: '지도' },
+            ]}
+            value={view}
+            onChange={setView}
+          />
+          {cities.length > 1 ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.cityRow}>
+              <Chip label="전체" selected={city === null} onPress={() => setCity(null)} />
+              {cities.map(([c, n]) => (
+                <Chip key={c} label={`${c} ${n}`} selected={city === c} onPress={() => setCity(city === c ? null : c)} />
+              ))}
+            </ScrollView>
+          ) : null}
+          {hint ? (
+            <Press
+              onPress={() => {
+                setCity(hint.city);
+                setPicked(new Set(all.filter((p) => cityById.get(p.id) === hint.city).map((p) => p.id)));
+              }}
+              scale={0.99}
+              style={styles.hint}>
+              <Caption tone="brand" strong>
+                {`「${hint.trip.title}」에 ${hint.city} ${hint.count}곳을 담을 수 있어요 ›`}
+              </Caption>
+            </Press>
+          ) : null}
+        </>
+      ) : null}
+
+      {pins.length > 0 && view === 'map' ? (
         <TripMap
           places={pins}
           activeId={activeId}
@@ -430,7 +565,11 @@ export default function Saved() {
       {failed ? <ErrorNote message={failed} /> : null}
 
       {data && all.length === 0 ? (
-        <Empty message="눈에 띄는 곳을 담아 두었다가 일정 아무 날에나 꺼내 써요. 여행 둘러보기나 장소 찾기에서 별을 누르면 여기 쌓이고, 제목 옆 ＋ 로 바로 찾아 담을 수도 있어요." />
+        <>
+          <Empty message="마음에 드는 곳을 저장해 두면 여행 짤 때 바로 꺼내 쓸 수 있어요. 제목 옆 ＋ 로 바로 찾아 담을 수도 있어요." />
+          {/* 빈 자리에 담을 거리를 바로 둡니다 — 지금 뜨는 곳 다섯과 인기 여행. */}
+          <StarterPicks onKept={reload} />
+        </>
       ) : null}
 
       {/*
@@ -545,9 +684,9 @@ export default function Saved() {
         모양입니다 — 제목 왼쪽, 개수 오른쪽.
       */}
       <View>
-        {shown.length > 0 ? (
+        {view === 'list' && shown.length > 0 && bunches.length === 1 ? (
           <SectionHeader
-            title="담아 둔 곳"
+            title={bunches[0][0] === ELSEWHERE ? '담아 둔 곳' : bunches[0][0]}
             action={<Caption tone="secondary">{shown.length}곳</Caption>}
           />
         ) : null}
@@ -560,12 +699,17 @@ export default function Saved() {
           혼자 1000 픽셀을 쓰고 있어서였습니다.
         */}
         <View style={styles.list}>
+          {(view === 'list' && bunches.length > 1 ? bunches : [[null, shown] as const]).map(([c, rows]) => (
+          <View key={c ?? 'all'}>
+          {c ? (
+            <SectionHeader title={c} tight action={<Caption tone="secondary">{rows.length}곳</Caption>} />
+          ) : null}
           <CardGrid>
-            {shown.map((place, at) => (
+            {rows.map((place, at) => (
               <SavedRow
                 key={place.id}
                 place={place}
-                last={at === shown.length - 1}
+                last={at === rows.length - 1}
                 selected={picked.has(place.id)}
                 lit={activeId === place.id}
                 onToggle={() => {
@@ -582,6 +726,8 @@ export default function Saved() {
               />
             ))}
           </CardGrid>
+          </View>
+          ))}
         </View>
       </View>
 
@@ -700,15 +846,39 @@ export default function Saved() {
         here={null}
       />
 
+      <BottomSheet visible={aiming} title="어느 여행에 담을까요?" onClose={() => setAiming(false)}>
+        <Caption tone="secondary">
+          모임 여행이면 「가고 싶은 곳」에 올라가요 — 모두 좋다고 하면 일정이 돼요. 혼자 여행이면 고른 날에 바로 들어가요.
+        </Caption>
+        {upcoming.length === 0 ? (
+          <Caption tone="muted">다가오는 여행이 없어요. 내 여행에서 먼저 만들어 주세요.</Caption>
+        ) : null}
+        {upcoming.map((t, i) => (
+          <ListRow
+            key={t.id}
+            left={<Mark icon={t.groupId ? 'users' : 'calendar'} />}
+            title={t.title}
+            subtitle={t.groupId ? `${t.groupName ?? '모임'} · 가고 싶은 곳에 올리기` : '날짜 골라 넣기'}
+            last={i === upcoming.length - 1}
+            onPress={() => aimAt(t)}
+          />
+        ))}
+      </BottomSheet>
+
       <DayPicker
+        days={aimDays ?? undefined}
         visible={pouring}
         note={`고른 ${picked.size}곳이 그 날 맨 뒤에 붙어요. 순서는 넣은 뒤 바꿀 수 있어요.`}
         onPour={(dayId) =>
           api.post(`/api/days/${dayId}/places/from-saved`, { savedIds: [...picked] })
         }
-        onCancel={() => setPouring(false)}
+        onCancel={() => {
+          setPouring(false);
+          setAimDays(null);
+        }}
         onDone={(tripId) => {
           setPouring(false);
+          setAimDays(null);
           setPicked(new Set());
           if (tripId) {
             router.push({ pathname: '/trip/[id]', params: { id: tripId } });
@@ -716,6 +886,55 @@ export default function Saved() {
         }}
       />
     </Screen>
+  );
+}
+
+/**
+ * 비었을 때 담을 거리 — 지금 뜨는 곳 다섯(저장 단추와 함께)과 인기 여행 셋.
+ *
+ * <p>빈 화면에 「담아 보세요」만 있으면 어디서 무엇을 담는지를 또 찾아 나서야
+ * 합니다. 여기서 바로 담고, 남이 다녀온 여행으로 넘어갈 수 있게 둡니다.
+ */
+function StarterPicks({ onKept }: { onKept: () => void }) {
+  const router = useRouter();
+  const { data: top } = useAsync<{ places: PopularPlace[] }>((signal) => api.get('/api/popular/places', signal), []);
+  const { data: hot } = useAsync<PostPage>((signal) => api.get('/api/posts?sort=hot', signal), []);
+  const [kept, setKept] = useState<Set<string>>(new Set());
+  async function keep(p: PopularPlace) {
+    if (p.lat == null || p.lng == null || kept.has(p.key)) {
+      return;
+    }
+    try {
+      await api.post('/api/saved', { name: p.name, lat: p.lat, lng: p.lng, placeId: p.placeId, icon: p.icon });
+      setKept((was) => new Set(was).add(p.key));
+      onKept();
+    } catch {
+      /* 못 담았으면 단추가 그대로라 다시 누를 수 있습니다. */
+    }
+  }
+  return (
+    <>
+      {(top?.places.length ?? 0) > 0 ? <SectionHeader title="지금 뜨는 곳" tight /> : null}
+      {top?.places.slice(0, 5).map((p) => (
+        <Row key={p.key} style={styles.starter}>
+          <View style={styles.grow}>
+            <ListRow left={<Mark icon={glyphOf(p.icon)} />} title={p.name} subtitle={labelOf(p.icon) || undefined} />
+          </View>
+          <IconButton name="bookmark" label={`${p.name} 저장`} active={kept.has(p.key)} bare onPress={() => keep(p)} />
+        </Row>
+      ))}
+      {(hot?.posts.length ?? 0) > 0 ? <SectionHeader title="인기 여행" tight /> : null}
+      {hot?.posts.slice(0, 3).map((post, i, rows) => (
+        <ListRow
+          key={post.id}
+          left={<Mark icon="compass" />}
+          title={post.title}
+          subtitle={[post.region, `${post.placeCount}곳`].filter(Boolean).join(' · ')}
+          last={i === rows.length - 1}
+          onPress={() => router.push({ pathname: '/community/[id]', params: { id: post.id } })}
+        />
+      ))}
+    </>
   );
 }
 
@@ -787,6 +1006,18 @@ function Why({
 }
 
 const styles = StyleSheet.create({
+  cityRow: {
+    gap: Spacing.s2,
+  },
+  hint: {
+    paddingVertical: Spacing.s1,
+  },
+  starter: {
+    alignItems: 'center',
+  },
+  grow: {
+    flex: 1,
+  },
   /* 찾는 칸과 거르는 줄. 둘 다 목록을 좁히는 일이라 한 묶음입니다. */
   sift: {
     gap: Spacing.s3,

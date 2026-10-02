@@ -1,13 +1,10 @@
 import { StyleSheet, View } from 'react-native';
 
 import type { SavedPlace } from '@/api/types';
-import { iconOf, labelOf } from '@/constants/place-icons';
+import { glyphOf, labelOf } from '@/constants/place-icons';
 import { Colors, Gutter, Spacing } from '@/constants/theme';
 import { savedAgo } from '@/lib/saved';
 import { Body, Button, Caption, Checkbox, Mark, Press } from '@/ui';
-
-/** 그림을 아직 안 고른 곳. 지도에서도 별로 찍힙니다. */
-const STAR = '⭐';
 
 /**
  * 보석함의 한 줄.
@@ -111,7 +108,9 @@ export function SavedRow({
   */
   const kind = labelOf(place.icon);
   const said = place.note ?? (place.cat === kind ? null : place.cat) ?? savedAgo(place.createdAt);
-  const about = [kind, said].filter(Boolean).join(' · ');
+  /* 어디서 담았나 — 둘러보기 여행기에서 담은 것은 그렇다고 적습니다. 한 달 뒤에
+     「이게 왜 여기 있지」의 절반이 이 한 마디로 풀립니다. */
+  const about = [kind, said, place.fromPost ? '여행기에서 담음' : null].filter(Boolean).join(' · ');
 
   return (
     <View
@@ -138,7 +137,7 @@ export function SavedRow({
         }
         accessibilityState={picking ? { selected: on } : undefined}
         style={styles.body}>
-        <Mark emoji={iconOf(place.icon)} fallback={STAR} active={on} />
+        <Mark icon={glyphOf(place.icon)} active={on} />
         <View style={styles.text}>
           <Body strong numberOfLines={1}>
             {place.name}
