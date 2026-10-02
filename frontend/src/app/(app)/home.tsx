@@ -13,12 +13,13 @@ import type {
   News,
   PopularPlace,
   PostPage,
+  SavedPlace,
   TripSummary,
 } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
 import { markOf } from '@/constants/user-marks';
-import { KEEP } from '@/constants/words';
+import { KEEP, UNKEEP } from '@/constants/words';
 import { PlaceDetailSheet, type Looked } from '@/components/place-detail-sheet';
 import { HomeHero, type HeroPhase } from '@/components/home-hero';
 import { ProfileFace } from '@/components/profile-face';
@@ -124,8 +125,40 @@ export default function Home() {
     [],
   );
 
-  /* 지금 뜨는 곳에서 바로 담은 것. 다시 누르면 또 담기지 않게 표만 해 둡니다. */
-  const [kept, setKept] = useState<Set<string>>(new Set());
+  /**
+   * 내가 보석함에 담아 둔 곳 — 번호(key) → 담긴 줄의 번호(savedId).
+   *
+   * <h3>이 화면만의 기억이었습니다</h3>
+   *
+   * <p>세션 동안만 사는 {@code Set} 하나로 「방금 담았다」만 표시했습니다.
+   * 그래서 어제 담아 둔 곳은 화면을 다시 열면 전부 <b>안 담긴 것처럼</b>
+   * 보였고, 이미 담긴 곳을 다시 눌러도 할 수 있는 일이 「이미 있어요」
+   * 안내뿐이었습니다 — 빼는 길이 아예 없었습니다.
+   *
+   * <p>서버가 진짜를 압니다({@code /api/saved}). 로그인했을 때만 받아 오고,
+   * 비로그인 방문자에게는 묻지 않습니다 — 401 만 돌아올 질문입니다.
+   */
+  const { data: saved, reload: reloadSaved } = useAsync<{ places: SavedPlace[] }>(
+    (signal) => (user ? api.get('/api/saved', signal) : Promise.resolve({ places: [] })),
+    [user?.id],
+  );
+
+  /*
+    PopularPlace.key 와 같은 규칙으로 맞춥니다.
+
+    <p>서버가 「지금 뜨는 곳」을 묶는 열쇠는 구글 번호가 있으면 그것, 없으면
+    이름입니다(PopularRepository). 보석함 줄도 같은 규칙으로 맞춰야 두 쪽이
+    같은 곳을 같은 열쇠로 가리킵니다 — 하나만 바꾸면 담긴 것이 안 담긴
+    것처럼 보입니다.
+  */
+  const savedByKey = useMemo(() => {
+    const out = new Map<string, string>();
+    for (const p of saved?.places ?? []) {
+      out.set(p.placeId || p.name, p.id);
+    }
+    return out;
+  }, [saved]);
+
   /**
    * 담고 나서 할 말. 담았으면 띠가 뜨고, 못 담았으면 왜인지 적습니다.
    *
@@ -146,15 +179,30 @@ export default function Home() {
   const [keepNote, setKeepNote] = useState<string | null>(null);
   const [keepFailed, setKeepFailed] = useState<string | null>(null);
 
-  async function keep(place: PopularPlace) {
+  /**
+   * 담기 · 빼기를 한 단추가 함께 합니다.
+   *
+   * <p>이미 담긴 곳이면 {@code savedByKey} 의 줄 번호로 지웁니다
+   * ({@code DELETE /api/saved/{id}}) — 안 담긴 곳이면 새로 담습니다. 서버를
+   * 다녀온 뒤 {@code reloadSaved} 로 다시 받으므로, 다른 화면(보석함)에서
+   * 지운 것도 여기로 돌아오면 맞게 보입니다.
+   */
+  async function toggleKeep(place: PopularPlace) {
     setKeepNote(null);
     setKeepFailed(null);
     if (!user) {
       router.push('/(auth)/login');
       return;
     }
-    if (kept.has(place.key)) {
-      setKeepNote(`「${place.name}」 는 이미 보석함에 있어요.`);
+    const savedId = savedByKey.get(place.key);
+    if (savedId) {
+      try {
+        await api.delete(`/api/saved/${encodeURIComponent(savedId)}`);
+        await reloadSaved();
+        setKeepNote(`「${place.name}」 를 보석함에서 뺐어요.`);
+      } catch (e) {
+        setKeepFailed(e instanceof ApiError ? e.message : UNEXPECTED);
+      }
       return;
     }
     /* 좌표 없이는 담아도 지도에 안 섭니다. 말없이 넘어가면 눌린 적이 없는
@@ -171,7 +219,7 @@ export default function Home() {
         placeId: place.placeId,
         icon: place.icon,
       });
-      setKept((was) => new Set(was).add(place.key));
+      await reloadSaved();
       setKeepNote(`「${place.name}」 를 보석함에 담았어요.`);
     } catch (e) {
       /* 삼키지 않습니다. 서버가 보낸 말이 그대로 쓸모 있습니다 — 「보석함이
@@ -572,15 +620,17 @@ export default function Home() {
                 </View>
                 <IconButton
                   name="bookmark"
-                  label={`${place.name} ${KEEP}`}
-                  active={kept.has(place.key)}
+                  /* 담겼으면 「빼기」, 안 담겼으면 「담기」 — 눌렀을 때 무슨
+                     일이 일어날지가 이름에 그대로 적힙니다. */
+                  label={`${place.name} ${savedByKey.has(place.key) ? UNKEEP : KEEP}`}
+                  active={savedByKey.has(place.key)}
                   /* {@link IconButton} 의 문서가 적어 둔 그대로입니다 —
                      「bare 와 함께 쓰면 회색에서 검정으로만 바뀌어 아무 말도
                      안 합니다. 코랄로 물들여야 하는 자리는 tone="brand"」.
                      담겼다는 것이 보여야 하는 자리라 그대로 따릅니다. */
-                  tone={kept.has(place.key) ? 'brand' : undefined}
+                  tone={savedByKey.has(place.key) ? 'brand' : undefined}
                   bare
-                  onPress={() => keep(place)}
+                  onPress={() => toggleKeep(place)}
                 />
               </Row>
             );

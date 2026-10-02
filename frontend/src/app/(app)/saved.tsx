@@ -10,7 +10,7 @@ import type { MapPlace } from '@/components/map-types';
 import { PlaceDetailSheet } from '@/components/place-detail-sheet';
 import { PlaceSearch } from '@/components/place-search';
 import { RecommendSheet } from '@/components/recommend-sheet';
-import { WhereNext } from '@/components/curation';
+import { SavedShelf } from '@/components/curation';
 import { DayPicker } from '@/components/day-picker';
 import { SavedRow } from '@/components/saved-row';
 import { SORT_GIVEN, SORT_NAME, SortBar, type SortBy } from '@/components/sort-bar';
@@ -747,17 +747,18 @@ export default function Saved() {
       </View>
 
       {/*
-        다음은 어디로.
+        다음은 어디로 — 장소가 먼저입니다.
 
-        <h3>내 여행과 같은 줄을 세웁니다</h3>
+        <h3>내 여행과 같은 줄, 다른 차례</h3>
 
-        <p>{@link WhereNext} 는 내 여행에 세우려고 뗀 것인데, 담을 거리를
-        구하는 자리가 하나 더 있습니다 — <b>여기</b>입니다. 보석함을 열고
-        「더 담을 것이 없나」 하는 자리와, 내 여행을 열고 「다음은 어디로」
-        하는 자리는 같은 물음입니다.
+        <p>{@link SavedShelf} 는 {@link WhereNext} 와 줄을 그대로 재사용합니다.
+        담을 거리를 구하는 자리가 내 여행 말고 여기도 있다는 것은 같지만,
+        보석함을 연 사람이 찾는 것은 남의 여행기가 아니라 <b>장소</b>입니다.
+        그래서 내 근처를 맨 앞에 두고 지역 · 여행기 순으로 물립니다.
 
-        <p>줄마다 <b>다음 한 걸음</b>이 다릅니다 — 지역은 그 지역 둘러보기로,
-        여행기는 그 글로, 내 근처는 장소 판으로. 그 판에서 바로 담깁니다.
+        <p>줄마다 <b>다음 한 걸음</b>이 다릅니다 — 내 근처는 장소 판으로
+        (그 판에서 바로 담깁니다), 지역은 그 지역 둘러보기로, 여행기는 그
+        글로.
 
         <h3>조건을 안 겁니다</h3>
 
@@ -769,7 +770,7 @@ export default function Saved() {
         조건을 걸고 싶어지면 되찾을 수 있는 것이 그만큼입니다.
       */}
       <Band />
-      <WhereNext />
+      <SavedShelf />
 
       {/*
         담는 판.
@@ -939,28 +940,55 @@ function StarterPicks({ onKept }: { onKept: () => void }) {
   const router = useRouter();
   const { data: top } = useAsync<{ places: PopularPlace[] }>((signal) => api.get('/api/popular/places', signal), []);
   const { data: hot } = useAsync<PostPage>((signal) => api.get('/api/posts?sort=hot', signal), []);
+  /*
+    이 칸은 보석함이 <b>빈 사람</b>에게만 섭니다(이 칸을 부르는 자리의 조건이
+    {@code all.length === 0}). 그래서 「이미 담겼나」를 서버에 물을 일이 없고
+    ({@code kept} 는 늘 비어서 시작하는 것이 맞습니다) — 담자마자 부모가
+    다시 받아 {@code all.length} 가 1 이 되는 순간 이 칸 자체가 사라집니다.
+    담은 것을 빼는 길도 그래서 안 둡니다. 빼려면 이미 이 칸이 없는 자리
+    (보석함 목록)에서 합니다.
+
+    <p>그래도 <b>실패는 숨기지 않습니다.</b> 전에는 못 담아도 단추만
+    그대로였습니다 — 눌렀는데 아무 말이 없으면 눌린 것인지도 알 수 없습니다.
+  */
   const [kept, setKept] = useState<Set<string>>(new Set());
+  const [failed, setFailed] = useState<string | null>(null);
   async function keep(p: PopularPlace) {
-    if (p.lat == null || p.lng == null || kept.has(p.key)) {
+    setFailed(null);
+    if (kept.has(p.key)) {
+      return;
+    }
+    if (p.lat == null || p.lng == null) {
+      setFailed(`「${p.name}」 는 자리를 몰라서 담을 수 없어요.`);
       return;
     }
     try {
       await api.post('/api/saved', { name: p.name, lat: p.lat, lng: p.lng, placeId: p.placeId, icon: p.icon });
       setKept((was) => new Set(was).add(p.key));
       onKept();
-    } catch {
-      /* 못 담았으면 단추가 그대로라 다시 누를 수 있습니다. */
+    } catch (e) {
+      setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
     }
   }
   return (
     <>
       {(top?.places.length ?? 0) > 0 ? <SectionHeader title="지금 뜨는 곳" tight /> : null}
+      {failed ? <ErrorNote message={failed} /> : null}
       {top?.places.slice(0, 5).map((p) => (
         <Row key={p.key} style={styles.starter}>
           <View style={styles.grow}>
             <ListRow left={<Mark icon={glyphOf(p.icon)} />} title={p.name} subtitle={labelOf(p.icon) || undefined} />
           </View>
-          <IconButton name="bookmark" label={`${p.name} ${KEEP}`} active={kept.has(p.key)} bare onPress={() => keep(p)} />
+          <IconButton
+            name="bookmark"
+            label={`${p.name} ${KEEP}`}
+            active={kept.has(p.key)}
+            /* 담겼다는 것이 보여야 하는 자리입니다 — bare 는 회색↔검정만
+               바꾸고 아무 말도 안 합니다({@link IconButton} 의 문서). */
+            tone={kept.has(p.key) ? 'brand' : undefined}
+            bare
+            onPress={() => keep(p)}
+          />
         </Row>
       ))}
       {(hot?.posts.length ?? 0) > 0 ? <SectionHeader title="인기 여행" tight /> : null}

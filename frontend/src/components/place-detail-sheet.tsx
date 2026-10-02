@@ -1,13 +1,14 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Linking, StyleSheet, View } from 'react-native';
 
 import { api } from '@/api/client';
 import type { Comment, OurStars, PlaceInfo, TravelMode } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { CommentPeek } from '@/components/comment-list';
+import type { MapPlace } from '@/components/map-types';
 import { PlacePhoto } from '@/components/place-photo';
-import { SpotMap } from '@/components/spot-map';
-import { labelOf } from '@/constants/place-icons';
+import { TripMap } from '@/components/trip-map';
+import { iconOf, labelOf } from '@/constants/place-icons';
 import { Colors, Gutter, Radius, Spacing, Tap } from '@/constants/theme';
 import { openDirections, openPlace } from '@/lib/directions';
 import { awayFrom } from '@/lib/geo';
@@ -218,6 +219,36 @@ export function PlaceDetailSheet({
   const peek = talk?.recent ?? [];
   const shown = Math.min(peek.length, PEEK);
 
+  /*
+    지도에 꽂을 핀 하나.
+
+    <p>{@link TripMap} 은 여러 곳을 받는 자리라 {@code places} 가 배열입니다.
+    여기는 늘 하나뿐이지만 그 모양에 맞춰 한 칸짜리 배열로 줍니다. 번호
+    ({@code id})가 없는 곳도 있어(좌표만 찍어 둔 곳) 구글 번호나 좌표를
+    엮어 만듭니다 — 판이 열려 있는 동안 같은 곳이면 같은 번호여야 지도가
+    다시 안 굽습니다.
+  */
+  const places = useMemo<MapPlace[]>(() => {
+    if (!place) {
+      return [];
+    }
+    return [
+      {
+        id: place.placeId ?? `${place.lat},${place.lng}`,
+        name: place.name,
+        lat: place.lat,
+        lng: place.lng,
+        dayIndex: 0,
+        order: 1,
+        emoji: iconOf(place.icon),
+        color: Colors.accent,
+        fit: true,
+        radius: null,
+        detail: { time: null, cat: null, cost: null, note: null, sub: null, dayLabel: '' },
+      },
+    ];
+  }, [place]);
+
   if (!place) {
     return null;
   }
@@ -225,61 +256,57 @@ export function PlaceDetailSheet({
   return (
     <BottomSheet visible title={place.name} onClose={onClose}>
       {/*
-        그림 한 장.
+        그림 한 장, 그리고 늘 사는 지도.
 
-        <h3>사진과 지도를 둘 다 깔고 있었습니다</h3>
+        <h3>스냅샷으로는 「어디인지」가 안 보였습니다</h3>
 
-        <p>200짜리 둘이면 판의 첫 400픽셀이 그림입니다. 좁은 폰에서는 판을
-        열었을 때 평점도 영업시간도 안 보이고, 그것을 보려면 그림 두 장을
-        지나쳐 내려가야 했습니다. 게다가 사진이 없는 곳에서는 회색 자리와
-        지도가 겹쳐 아래위로 두 덩어리였습니다.
+        <p>한동안 지도 자리에 서버가 미리 구워 둔 그림 한 장({@code SpotMap})
+        을 썼습니다. 비용은 싸졌지만(여섯 시간 캐시, 구글 호출 0) 그 값을
+        치렀습니다 — 배율이 고정이라 주변에 뭐가 있는지 가늠이 안 되고,
+        손가락으로 밀어 봐도 꿈쩍 않는 그림이라 「여기가 정확히 어디지」를
+        묻는 사람에게 답을 못 줬습니다.
 
-        <p>그래서 한동안 <b>하나만</b> 냈습니다 — 사진이 있으면 사진, 없으면
-        지도. 그 규칙이 둘을 깨뜨렸습니다.
+        <p>그래서 {@link TripMap} 을 그대로 씁니다. 일정 화면에서 쓰는 것과
+        같은 살아 있는 지도입니다 — 밀고 당기고, 전체화면 단추를 누르면
+        이 장소를 중심에 두고 주변을 마음껏 둘러볼 수 있습니다.
 
-        <h3>지도가 떴다가 사진에 밀려났습니다</h3>
+        <h3>일정이 아니라 점 하나입니다</h3>
 
-        <p>사정({@code info})은 늦게 옵니다. 그래서 판을 열면 <b>먼저 지도가
-        뜨고</b>, 사진 이름이 도착하는 순간 그 자리가 사진으로 갈아끼워졌습니다.
-        고르려고 보던 그림이 눈앞에서 다른 것으로 바뀝니다 — 고른 적이 없는
-        바뀜입니다.
+        <p>{@code link={false}} 로 둡니다. 여기는 장소 하나를 보여 주는
+        자리이지 동선이 아닙니다 — 이을 다음 곳이 없습니다. 핀을 누르면
+        {@code onSelect} 가 불리지만 고를 다른 곳이 없으니 아무 일도 안
+        일어납니다.
 
-        <h3>사진은 「어디인지」를 말하지 않습니다</h3>
+        <p>{@code here} 를 그대로 넘깁니다. 받았으면 지도 위에 「내 위치로」
+        단추가 서고, 그 버튼이 바로 「근처에 뭐가 있나」를 스스로 찾아보게
+        해 줍니다 — 거리 숫자 한 줄보다 지도를 밀어 보는 쪽이 빠릅니다.
 
-        <p>사진이 「어떤 곳인지」에 가장 빨리 답하는 것은 맞습니다. 그런데
-        <b>가 본 적 없는 곳</b>에서 먼저 알아야 하는 것은 어디쯤이냐입니다 —
-        지금 뜨는 곳에서 누른 사람은 그 가게가 어느 동네인지조차 모릅니다.
-        사진이 지도를 밀어내면 그 답이 화면에서 사라집니다.
+        <h3>값은 다시 커졌습니다</h3>
 
-        <p>그래서 <b>지도는 늘 세우고</b> 사진이 오면 그 위에 얹습니다. 지도가
-        한 번도 안 빠지므로 갈아끼우는 일이 없고, 사진이 없는 곳은 지금까지와
-        같습니다.
+        <p>Maps JavaScript 는 지도가 뜰 때마다 셉니다({@code StaticMapService}
+        의 캐시가 없는 길로 돌아간 것입니다). 이 판이 자주 열리는 자리라면
+        할당량을 다시 눌러볼 일입니다 — 지금은 「어디인지 모르겠다」는
+        불만이 그 값보다 급했습니다.
 
-        <h3>높이는 사진이 있을 때만 양보합니다</h3>
+        <h3>사진은 그 위에 얹습니다</h3>
 
-        <p>둘을 180씩 두면 판의 첫 360이 그림이고, 평점도 영업시간도 그 아래로
-        밀립니다. 사진이 선 자리에서는 지도를 120으로 낮춥니다 — 어디쯤인지를
-        말하는 데는 그만하면 되고, 자세히 볼 사람은 아래의 「구글 지도」로
-        갑니다.
-
-        <h3>지도는 살아 있지 않습니다</h3>
-
-        <p>상호작용 지도를 띄우고 있었습니다. 그런데 여기 지도는 누를 것도
-        이을 것도 없었습니다 — onSelect 가 빈 함수였고 link 가 꺼져 있었습니다.
-
-        <p>Maps JavaScript 는 지도가 뜰 때마다 셉니다. 혼자 쓰는데도 하루
-        할당량의 20%가 나갔고 그중 상당수가 이 판이었습니다. 지금 쓰는
-        {@link SpotMap} 은 <b>그림</b>이고, 서버가 받아서 여섯 시간 들고
-        있습니다 — 같은 장소를 다시 열면 구글에 아예 안 나갑니다. 늘 세워도
-        되는 까닭이 이것입니다.
+        <p>사진이 「어떤 곳인지」를 가장 빨리 답하는 것은 여전히 맞습니다.
+        지도가 늘 서므로 사진이 오고 가도 지도가 사라지는 일은 없습니다 —
+        사진이 있으면 그 자리를 내주고 지도는 120으로, 없으면 지도가
+        180을 그대로 씁니다.
       */}
       {info?.photoName ? (
         <PlacePhoto name={info.photoName} by={info.photoBy} height={180} big />
       ) : null}
-      <SpotMap
-        lat={place.lat}
-        lng={place.lng}
-        name={place.name}
+      <TripMap
+        places={places}
+        activeId={places[0]?.id ?? null}
+        onSelect={() => {}}
+        link={false}
+        /* 이 판의 here 는 거리를 셈하려고 받은 {lat,lng} 뿐이라 정확도가
+           없습니다. 지도는 그 값으로 원을 그리므로 0을 줍니다 — 점
+           하나만 찍히고, 「내 위치로」 단추는 정확도와 무관하게 섭니다. */
+        here={here ? { ...here, accuracy: 0 } : null}
         height={info?.photoName ? 120 : 180}
       />
 

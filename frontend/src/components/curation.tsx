@@ -117,6 +117,35 @@ export function WhereNext() {
 }
 
 /**
+ * 보석함에 서는 추천 묶음 — 장소가 먼저입니다.
+ *
+ * <h3>왜 {@link WhereNext} 와 순서가 다른가</h3>
+ *
+ * <p>내 여행은 「다음 여행을 어디로 짤까」를 묻는 자리라 지역 · 여행기 ·
+ * 장소 차례가 맞습니다. 보석함은 <b>장소를 모으는</b> 자리입니다 — 열어서
+ * 보고 싶은 것이 남의 여행기가 아니라 담을 만한 곳입니다.
+ *
+ * <p>줄을 그대로 재사용하고 차례만 뒤집습니다. 내 근처를 맨 앞에,
+ * 지역 레일을 그다음에 두고, 하트 많은 여행기는 맨 뒤로 보냅니다 — 보석함을
+ * 연 사람에게도 여전히 쓸모 있지만 이 화면의 주인공은 아닙니다.
+ */
+export function SavedShelf() {
+  const router = useRouter();
+  return (
+    <>
+      <NearbyPlaces />
+      <RegionShelf onRegion={(region) => router.push(`/community?region=${encodeURIComponent(region)}`)} />
+      <ShelfRow
+        title="하트 많은 여행기"
+        path="/api/posts?sort=top&size=6"
+        note="누르면 그 여행기를 보고 내 여행으로 가져올 수 있어요."
+        onOpen={(id) => router.push(`/community/${id}`)}
+      />
+    </>
+  );
+}
+
+/**
  * 많이 다녀온 지역.
  *
  * <h3>왜 글 카드가 아닌가</h3>

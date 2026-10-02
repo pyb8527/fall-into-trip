@@ -22,13 +22,12 @@ import {
   MaxContentWidth,
   Radius,
   Spacing,
-  Tap,
   Type,
   Weight,
 } from '@/constants/theme';
 import type { Comeback } from '@/lib/comeback';
 import { Body, Button, Caption, ListRow, Mark, Press, Rise, Screen } from '@/ui';
-import { LogoMark } from '@/ui/logo';
+import { LogoLockup } from '@/ui/logo';
 
 /**
  * 처음 온 사람이 보는 문.
@@ -386,9 +385,21 @@ export default function Welcome() {
           />
         </>
       }>
-      {/* 이름만 있는 줄입니다. 문에는 뒤로도 설정도 없습니다. */}
+      {/*
+        심볼 · 이름 · 한 줄을 세로로 쌓은 것을 가운데 세웁니다.
+
+        <p>글자만 있는 「fit」 한 줄이 상단 막대에 있었습니다. 그런데 이
+        화면은 로고가 안 보이는 화면이 아닙니다 — 앱을 처음 여는 사람이
+        제일 먼저 마주치는 자리이고, 초대 링크({@code invite/[token]})·
+        공유 링크({@code view/[token]})가 이미 {@link LogoLockup} 으로
+        그 일을 합니다. 시작 화면만 빠져 있었습니다.
+
+        <p>작게 둡니다. 저 둘은 로고가 화면의 거의 전부지만, 여기는 그
+        아래로 보여 줄 것이 많습니다 — 심볼이 카드와 레일 위에서 너무
+        크게 자리를 차지하면 안 됩니다.
+      */}
       <View style={styles.bar}>
-        <LogoMark size={32} />
+        <LogoLockup size={48} />
       </View>
 
       <View style={styles.pitch}>
@@ -714,9 +725,11 @@ const POINTS = [
 ];
 
 const styles = StyleSheet.create({
+  /* LogoLockup 이 제 몫의 세로 공간을 요구합니다 — Tap.bar 는 글자 한
+     줄짜리 막대 높이라 심볼·이름·한 줄 셋을 쌓기엔 모자랍니다. */
   bar: {
-    height: Tap.bar,
-    justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: Spacing.s2,
   },
   /* 이름 줄과 이야기 사이 24. Screen 이 자식 사이를 12 씌우므로 12 만 더합니다. */
   pitch: {
