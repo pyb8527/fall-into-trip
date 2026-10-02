@@ -79,7 +79,8 @@ public class SecurityConfig {
                                    헤더가 실릴 수 없는 길이라 열어 두고, 이 둘이
                                    맞는지는 state(서버 기록 + 쿠키)로 봅니다. */
                                 "/api/auth/kakao/start",
-                                "/api/auth/kakao/callback").permitAll()
+                                "/api/auth/kakao/callback",
+                                "/api/auth/kakao/exchange").permitAll()
                         /* 링크를 받은 사람이 가입 전에도 어떤 모임인지 볼 수 있게 합니다.
                            참여 자체는 로그인해야 합니다. */
                         .requestMatchers(HttpMethod.GET, "/api/group-invites/*/preview").permitAll()

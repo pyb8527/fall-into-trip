@@ -31,6 +31,8 @@ type AuthContextValue = {
   setup: (email: string, name: string, password: string, token: string) => Promise<void>;
   changePassword: (current: string, next: string) => Promise<void>;
   signInWithGoogle: (credential: string) => Promise<void>;
+  /** 앱 껍데기가 카카오에서 받아 온 표를 세션으로 바꿉니다 */
+  signInWithKakaoTicket: (ticket: string, nonce: string) => Promise<void>;
   logout: () => Promise<void>;
   logoutAll: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -147,6 +149,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [accept],
   );
 
+  const signInWithKakaoTicket = useCallback(
+    async (ticket: string, nonce: string) => {
+      accept(await api.anon<TokenResponse>('/api/auth/kakao/exchange', { ticket, nonce }));
+    },
+    [accept],
+  );
+
   const register = useCallback(
     async (email: string, name: string, password: string) => {
       accept(await api.anon<TokenResponse>('/api/auth/register', { email, name, password }));
@@ -199,6 +208,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       googleClientId,
       kakaoEnabled,
       signInWithGoogle,
+      signInWithKakaoTicket,
       login,
       register,
       setup,
@@ -208,7 +218,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       refreshUser,
     }),
     [ready, user, setupNeeded, googleClientId, kakaoEnabled, login, register, setup, changePassword, logout,
-     logoutAll, refreshUser, signInWithGoogle],
+     logoutAll, refreshUser, signInWithGoogle, signInWithKakaoTicket],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -120,14 +120,58 @@ public class AuthController {
      * 동의 화면을 거쳐 아래 콜백으로 돌아옵니다.
      */
     @GetMapping("/kakao/start")
-    public ResponseEntity<Void> kakaoStart() {
+    public ResponseEntity<Void> kakaoStart(@RequestParam(required = false) String app,
+                                           @RequestParam(required = false) String nonce) {
+        /*
+          앱(껍데기)에서 시작한 것.
+
+          <p>앱은 이 주소를 웹뷰가 아니라 앱 위에 띄운 브라우저에서 엽니다.
+          웹뷰 안에서 열면 카카오 주소가 우리 자리가 아니라서 껍데기가 폰
+          브라우저로 내보내고, 로그인이 거기서 끝나 버렸습니다. 끝나면 쿠키
+          대신 일회용 표를 들려 fit://kakao 로 돌려보내고, 앱이 그 표를
+          웹뷰에 건넵니다. 웹뷰가 시작할 때 낸 값(nonce)이 있어야 표를 바꿀
+          수 있습니다.
+        */
+        boolean fromApp = "1".equals(app);
+        if (fromApp && (nonce == null || nonce.length() < 16 || nonce.length() > 128)) {
+            return toApp("error", "로그인을 다시 시작해 주세요.");
+        }
         if (!kakao.enabled()) {
-            return back("/login", "카카오 로그인이 꺼져 있어요.");
+            return fromApp ? toApp("error", "카카오 로그인이 꺼져 있어요.")
+                    : back("/login", "카카오 로그인이 꺼져 있어요.");
         }
         String state = net.weeniebeenie.fit.shared.domain.Ids.secret();
         return ResponseEntity.status(302)
                 .header(HttpHeaders.SET_COOKIE, kakaoCookie(state).toString())
-                .header(HttpHeaders.LOCATION, kakao.authorizeUrl(state, null))
+                .header(HttpHeaders.LOCATION, kakao.authorizeUrl(state, null, fromApp ? nonce : null))
+                .build();
+    }
+
+    /**
+     * 앱이 받아 온 표를 세션으로 바꿉니다. 시작할 때 낸 값이 맞아야 합니다.
+     *
+     * <p>여기서부터는 다른 로그인과 같은 모양입니다 — 웹뷰가 부르므로 세션
+     * 쿠키도 웹뷰에 심깁니다.
+     */
+    @PostMapping("/kakao/exchange")
+    public ResponseEntity<TokenResponse> kakaoExchange(@RequestBody KakaoTicket req,
+                                                       HttpServletRequest http) {
+        String userId = kakao.redeem(req == null ? null : req.ticket(), req == null ? null : req.nonce());
+        User user = users.findById(userId)
+                .filter(u -> !u.isDisabled())
+                .orElseThrow(() -> ApiException.unauthorized("사용할 수 없는 계정이에요."));
+        return withNewSession(user, http);
+    }
+
+    public record KakaoTicket(String ticket, String nonce) {
+    }
+
+    /** 앱으로 돌려보냅니다. 앱 위에 띄운 브라우저가 이 주소를 보고 닫힙니다. */
+    private ResponseEntity<Void> toApp(String key, String value) {
+        return ResponseEntity.status(302)
+                .header(HttpHeaders.SET_COOKIE, kakaoCookie("").toString())
+                .header(HttpHeaders.LOCATION, "fit://kakao?" + key + "="
+                        + java.net.URLEncoder.encode(value, java.nio.charset.StandardCharsets.UTF_8))
                 .build();
     }
 
@@ -171,7 +215,15 @@ public class AuthController {
         /* 동의 화면에서 「취소」를 누르면 code 없이 error 만 옵니다. 그건
            잘못이 아니라 마음을 바꾼 것이라 아무 말 없이 되돌립니다. */
         if (error != null || code == null) {
-            return back(home, null);
+            return waiting.fromApp() ? toApp("cancel", "1") : back(home, null);
+        }
+        if (waiting.fromApp()) {
+            try {
+                User user = social.signIn(kakao.read(code));
+                return toApp("ticket", kakao.ticketFor(user.getId(), waiting));
+            } catch (ApiException e) {
+                return toApp("error", e.getMessage());
+            }
         }
         try {
             var who = kakao.read(code);

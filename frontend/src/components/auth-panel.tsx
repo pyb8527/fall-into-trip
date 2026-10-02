@@ -7,6 +7,7 @@ import { useAuth } from '@/auth/auth-provider';
 import { Colors, Spacing, Type, Weight } from '@/constants/theme';
 import { GoogleButton } from '@/components/google-button';
 import { canSignInWithKakao, KakaoButton } from '@/components/kakao-button';
+import { startKakao } from '@/lib/kakao-signin';
 import { canSignInWithGoogle } from '@/lib/google-signin';
 import { Button, ErrorNote, Field, IconButton, Row, Screen, Title } from '@/ui';
 import { LogoSymbol } from '@/ui/logo';
@@ -58,7 +59,7 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
     next?: string;
     social_error?: string;
   }>();
-  const { login, register, signInWithGoogle } = useAuth();
+  const { login, register, signInWithGoogle, signInWithKakaoTicket } = useAuth();
 
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
@@ -94,6 +95,27 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
       await signInWithGoogle(credential);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : UNEXPECTED);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /**
+   * 카카오로 들어옵니다.
+   *
+   * <p>브라우저에서는 페이지째 옮겨 가서 여기로 안 돌아옵니다. 앱 껍데기
+   * 안에서는 껍데기가 받아 온 표를 바꾸고 여기서 끝납니다.
+   */
+  async function withKakao() {
+    if (busy) {
+      return;
+    }
+    setError(null);
+    setBusy(true);
+    try {
+      await startKakao(signInWithKakaoTicket);
+    } catch (e) {
+      setError(e instanceof Error && e.message ? e.message : UNEXPECTED);
     } finally {
       setBusy(false);
     }
@@ -235,7 +257,7 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
         비밀번호 칸 아래에 둡니다. 위에 두면 이미 비밀번호로 쓰던 사람이
         매번 지나쳐야 합니다.
       */}
-      <GoogleBlock onDone={withGoogle} />
+      <GoogleBlock onDone={withGoogle} onKakao={withKakao} />
 
       {/* 다른 쪽으로 가는 길. 맨 아래입니다 — 찾는 사람만 찾습니다. */}
       <Pressable
@@ -258,7 +280,13 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
  * <b>가름 줄도 안 뜹니다.</b> 아래가 빈 채로 "또는" 만 남으면 무엇이 빠진
  * 것처럼 보입니다.
  */
-function GoogleBlock({ onDone }: { onDone: (credential: string) => void }) {
+function GoogleBlock({
+  onDone,
+  onKakao,
+}: {
+  onDone: (credential: string) => void;
+  onKakao: () => void;
+}) {
   const { googleClientId, kakaoEnabled } = useAuth();
   const google = !!googleClientId && canSignInWithGoogle;
   const kakao = kakaoEnabled && canSignInWithKakao;
@@ -288,7 +316,7 @@ function GoogleBlock({ onDone }: { onDone: (credential: string) => void }) {
         <View style={styles.orLine} />
       </Row>
       {/* 카카오가 위입니다. 이 앱을 쓰는 사람 대부분에게 더 가까운 계정입니다. */}
-      {kakao ? <KakaoButton /> : null}
+      {kakao ? <KakaoButton onPress={onKakao} /> : null}
       {google ? <GoogleButton onCredential={onDone} /> : null}
     </View>
   );

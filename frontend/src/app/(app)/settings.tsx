@@ -6,6 +6,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { api, API_BASE, ApiError, UNEXPECTED } from '@/api/client';
 import { GoogleButton } from '@/components/google-button';
 import { canSignInWithKakao, KakaoButton } from '@/components/kakao-button';
+import { canLinkKakao } from '@/lib/kakao-signin';
 import { canNotify, notifyState, turnOff, turnOn } from '@/lib/notify';
 import { shareLink } from '@/lib/share';
 import { useAuth } from '@/auth/auth-provider';
@@ -566,7 +567,10 @@ function AccountGroup() {
   /* 서버가 구글을 안 켰으면 그 줄 자체가 뜻이 없습니다. */
   const showGoogle = !!googleClientId && providers !== null;
   const kakaoLinked = (providers ?? []).includes('kakao');
-  const showKakao = kakaoEnabled && canSignInWithKakao && providers !== null;
+  /* 잇기는 브라우저에서만. 앱에서는 콜백이 이 화면으로 못 돌아옵니다 —
+     이어 둔 것을 보여 주고 끊는 것은 앱에서도 합니다. */
+  const showKakao =
+    kakaoEnabled && canSignInWithKakao && providers !== null && (canLinkKakao || kakaoLinked);
 
   /*
     카카오 잇기.

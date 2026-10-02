@@ -1,6 +1,5 @@
 import { Platform, StyleSheet, Text } from 'react-native';
 
-import { API_BASE } from '@/api/client';
 import { Radius, Tap, Type } from '@/constants/theme';
 import { Press } from '@/ui';
 
@@ -26,22 +25,15 @@ export function KakaoButton({
   onPress,
 }: {
   label?: string;
-  /** 안 주면 로그인을 시작합니다. 잇기처럼 다른 길이면 따로 줍니다 */
-  onPress?: () => void;
+  /** 누르면 할 일 — 로그인(lib/kakao-signin)이나 잇기 */
+  onPress: () => void;
 }) {
   if (!canSignInWithKakao) {
     return null;
   }
   return (
     <Press
-      onPress={
-        onPress ??
-        (() => {
-          /* fetch 가 아니라 페이지를 옮깁니다. 카카오 동의 화면은 브라우저가
-             직접 가야 하고, 돌아올 때 서버가 심는 쿠키도 그래야 붙습니다. */
-          window.location.assign(`${API_BASE}/api/auth/kakao/start`);
-        })
-      }
+      onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={label}
       style={styles.button}>

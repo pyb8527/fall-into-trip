@@ -4,6 +4,7 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { Share } from 'react-native';
 
+import { kakaoReturn } from '@/shell/kakao';
 import { googleIdToken } from '@/shell/sign-in';
 import { expoPushToken, stopPush } from '@/shell/push';
 import type { Ask } from '@/shell/talk';
@@ -30,6 +31,13 @@ export async function answer(ask: Ask): Promise<unknown> {
     */
     case 'signIn':
       return googleIdToken();
+
+    /*
+      카카오 로그인. 구글과 같은 까닭으로 앱 위에 브라우저를 띄웁니다 —
+      웹뷰에서 열면 카카오 주소가 폰 브라우저로 나가 앱 밖에서 끝납니다.
+    */
+    case 'kakaoSignIn':
+      return kakaoReturn(ask.url);
 
     /*
       알림.

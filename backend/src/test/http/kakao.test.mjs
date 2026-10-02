@@ -60,5 +60,22 @@ r = await fetch(BASE + "/api/auth/register", { method: "POST", headers: { "conte
   body: JSON.stringify({ email: "kakao-1@users.invalid", name: "x", password: "pw-12345678" }) });
 T("400", r.status === 400, r.status);
 
+console.log("\n[8] 앱(껍데기)에서 시작 — 쿠키 대신 nonce, 끝은 fit://kakao");
+const nonce = "n".repeat(32);
+r = await go(`/api/auth/kakao/start?app=1&nonce=${nonce}`);
+const s8 = new URL(r.headers.get("location")).searchParams.get("state");
+T("카카오로 보냄", r.status === 302 && r.headers.get("location").startsWith("https://kauth.kakao.com/"), r.headers.get("location"));
+r = await go(`/api/auth/kakao/callback?error=access_denied&state=${s8}`);
+T("쿠키 없이도 받고, 취소는 앱으로", r.headers.get("location") === "fit://kakao?cancel=1", r.headers.get("location"));
+r = await go("/api/auth/kakao/start?app=1&nonce=short");
+T("값이 짧으면 앱으로 되돌림", (r.headers.get("location") ?? "").startsWith("fit://kakao?error="), r.headers.get("location"));
+r = await go(`/api/auth/kakao/start?app=1&nonce=${nonce}`);
+const s9 = new URL(r.headers.get("location")).searchParams.get("state");
+r = await go(`/api/auth/kakao/callback?code=bogus&state=${s9}`);
+T("틀린 코드는 까닭을 싣고 앱으로", (r.headers.get("location") ?? "").startsWith("fit://kakao?error="), r.headers.get("location"));
+r = await fetch(BASE + "/api/auth/kakao/exchange", { method: "POST", headers: { "content-type": "application/json" },
+  body: JSON.stringify({ ticket: "x", nonce }) });
+T("모르는 표는 400", r.status === 400, r.status);
+
 console.log(`\n결과: ${pass} 통과 / ${fail} 실패`);
 process.exit(fail ? 1 : 0);

@@ -85,12 +85,26 @@ public class KakaoLogin {
                 ? DEFAULT_REDIRECT : redirectSetting.trim();
     }
 
+    /** 앱에 건넬 일회용 표. 받은 사람과, 시작할 때 웹뷰가 낸 값의 해시. */
+    private final Map<String, Ticket> tickets = new ConcurrentHashMap<>();
+
+    /** 표가 살아 있는 시간. 앱으로 돌아와 바로 바꿔 가므로 짧게 둡니다. */
+    private static final Duration TICKET = Duration.ofMinutes(2);
+
     /**
      * 기다리는 한 건.
      *
      * @param userId 잇기면 그 계정. 로그인이면 비어 있습니다
+     * @param nonce  앱(껍데기)에서 시작했으면 그 웹뷰가 낸 값의 해시.
+     *               브라우저면 비어 있습니다
      */
-    public record Pending(String userId, Instant until) {
+    public record Pending(String userId, Instant until, String nonce) {
+        public boolean fromApp() {
+            return nonce != null;
+        }
+    }
+
+    private record Ticket(String userId, String nonce, Instant until) {
     }
 
     public boolean enabled() {
@@ -99,11 +113,22 @@ public class KakaoLogin {
 
     /** 시작합니다. 돌려준 주소로 브라우저를 보냅니다. */
     public String authorizeUrl(String state, String userId) {
+        return authorizeUrl(state, userId, null);
+    }
+
+    /**
+     * 시작합니다.
+     *
+     * @param nonce 앱에서 시작했으면 웹뷰가 만든 값. 끝에 표를 바꿀 때 같은
+     *              값을 내야 합니다 — 쿠키를 대신하는 두 번째 겹입니다
+     */
+    public String authorizeUrl(String state, String userId, String nonce) {
         if (!enabled()) {
             throw ApiException.badRequest("카카오 로그인이 꺼져 있어요.");
         }
         sweep();
-        pending.put(state, new Pending(userId, Instant.now().plus(WAIT)));
+        pending.put(state, new Pending(userId, Instant.now().plus(WAIT),
+                nonce == null ? null : sha256(nonce)));
         return "https://kauth.kakao.com/oauth/authorize?response_type=code"
                 + "&client_id=" + enc(restKey.trim())
                 + "&redirect_uri=" + enc(redirectUri())
@@ -116,14 +141,48 @@ public class KakaoLogin {
      * <p>쿠키 값과 같아야 합니다 — 위 머리말의 두 겹.
      */
     public Pending take(String state, String cookie) {
-        if (state == null || state.isBlank() || cookie == null || !state.equals(cookie)) {
+        if (state == null || state.isBlank()) {
             throw ApiException.badRequest("로그인을 다시 시작해 주세요.");
         }
         Pending got = pending.remove(state);
         if (got == null || got.until().isBefore(Instant.now())) {
             throw ApiException.badRequest("시간이 지났어요. 로그인을 다시 시작해 주세요.");
         }
+        /*
+          앱에서 시작한 것은 쿠키를 안 봅니다.
+
+          <p>시작은 앱 위에 띄운 브라우저에서 했는데, 카카오톡 앱을 거쳐 돌아올
+          때는 다른 브라우저로 올 수 있습니다. 쿠키가 거기에는 없습니다. 대신
+          끝에서 표를 바꿀 때 웹뷰가 시작할 때 낸 값을 다시 내야 합니다 —
+          남이 만든 표를 내 앱에 밀어 넣어도 그 값을 모르니 못 씁니다.
+        */
+        if (!got.fromApp() && (cookie == null || !state.equals(cookie))) {
+            throw ApiException.badRequest("로그인을 다시 시작해 주세요.");
+        }
         return got;
+    }
+
+    /** 앱에 건넬 표를 만듭니다. 한 번 쓰면 사라집니다. */
+    public String ticketFor(String userId, Pending from) {
+        String raw = net.weeniebeenie.fit.shared.domain.Ids.secret();
+        tickets.put(sha256(raw), new Ticket(userId, from.nonce(), Instant.now().plus(TICKET)));
+        return raw;
+    }
+
+    /**
+     * 표를 사람으로 바꿉니다. 시작할 때 낸 값이 맞아야 합니다.
+     *
+     * <p>틀려도 표는 사라집니다. 같은 표로 값을 여러 번 찔러 보지 못하게.
+     */
+    public String redeem(String ticket, String nonce) {
+        if (ticket == null || nonce == null) {
+            throw ApiException.badRequest("로그인을 다시 시작해 주세요.");
+        }
+        Ticket got = tickets.remove(sha256(ticket));
+        if (got == null || got.until().isBefore(Instant.now()) || !got.nonce().equals(sha256(nonce))) {
+            throw ApiException.badRequest("로그인을 다시 시작해 주세요.");
+        }
+        return got.userId();
     }
 
     /** 코드를 토큰으로 바꾸고, 그 토큰으로 누구인지 묻습니다. */
@@ -203,6 +262,16 @@ public class KakaoLogin {
             if (it.next().until().isBefore(now)) {
                 it.remove();
             }
+        }
+        tickets.values().removeIf(t -> t.until().isBefore(now));
+    }
+
+    private static String sha256(String raw) {
+        try {
+            return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(raw.getBytes(StandardCharsets.UTF_8)));
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
         }
     }
 

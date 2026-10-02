@@ -28,6 +28,11 @@
 export type Ask =
   /** 구글 로그인 창을 띄워 주세요. 답: id_token 또는 null */
   | { kind: 'signIn' }
+  /**
+   * 카카오 로그인 창을 앱 위에 띄워 주세요. 서버 시작 주소를 줍니다.
+   * 답: fit://kakao 로 돌아온 주소의 값들(ticket · error · cancel) 또는 null
+   */
+  | { kind: 'kakaoSignIn'; url: string }
   /** 알림을 켜 주세요. 답: 서버에 등록할 열쇠 또는 null */
   | { kind: 'notifyOn' }
   /** 알림을 꺼 주세요. */
