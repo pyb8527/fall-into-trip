@@ -18,6 +18,7 @@ import type {
 } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
+import { markOf } from '@/constants/user-marks';
 import { PlaceDetailSheet, type Looked } from '@/components/place-detail-sheet';
 import { TripMark } from '@/components/trip-mark';
 import { TripThumb } from '@/components/trip-thumb';
@@ -221,11 +222,24 @@ export default function Home() {
             <LogoMark size={22} />
           </Grow>
           {/*
-            오른쪽에 둘입니다.
+            오른쪽에 찾기·소식, 그리고 얼굴.
 
-            <p>셋이었습니다 — 찾기·소식·내 계정. 막대에 그림이 셋 서면
-            어느 것도 안 읽히고, 그중 <b>내 계정은 하루에 한 번도 안
-            누르는 것</b>입니다. 그것은 아래 「내 계정」 줄로 내려보냈습니다.
+            <h3>한 번 내려보냈다가 되돌립니다</h3>
+
+            <p>처음엔 셋이었습니다 — 찾기·소식·설정(⚙). 「막대에 그림이 셋
+            서면 어느 것도 안 읽히고, 설정은 하루에 한 번도 안 누른다」가
+            까닭이어서, 홈 맨 아래 「내 계정」 줄로 내려보냈습니다.
+
+            <p>그 진단은 <b>⚙ 에 대해서는</b> 맞았습니다. 그런데 내려보낸
+            자리가 틀렸습니다 — 홈 맨 아래는 띠 다섯 개를 지나야 닿는
+            자리입니다. 제 계정에 가려고 남의 추천 여행과 인기 장소를 훑어
+            내려가야 했습니다. 넓은 화면에서는 왼쪽 기둥 아래에 프로필 줄이
+            서 있어서, <b>폰에서만</b> 그렇게 멀었습니다.
+
+            <p>얼굴로 되돌립니다. ⚙ 는 다른 두 그림과 같은 선 그림이라 셋이
+            섞였지만, 얼굴은 동그란 면에 든 이모지라 <b>그림이 아니라
+            사람</b>으로 읽힙니다 — 셋이 서도 묻히지 않습니다. 「나」로 가는
+            자리가 「나」 처럼 생긴 것은 어디서나 그렇습니다.
           */}
           <Row gap={Spacing.s1}>
             {/* 찾기가 화면마다 흩어져 있었습니다 — 장소는 여행 안에서,
@@ -244,6 +258,25 @@ export default function Home() {
               bare
               onPress={() => router.push('/(app)/news')}
             />
+            {/*
+              내 계정으로 가는 자리.
+
+              <p>표식을 골라 둔 사람은 그 이모지가, 안 고른 사람은 로고가
+              섭니다. 이름의 첫 글자를 쓰지 않습니다 — 「박」 이 든 동그라미는
+              남의 얼굴과 구별이 안 되고, 이 앱에는 이미 표식을 고르는
+              자리가 있습니다(내 계정 → 내 표식).
+            */}
+            <Press
+              onPress={() => router.push('/(app)/settings')}
+              accessibilityLabel="내 계정"
+              hitSlop={Tap.compactSlop}
+              style={styles.face}>
+              {user?.mark ? (
+                <Text style={styles.faceEmoji}>{markOf(user.mark)}</Text>
+              ) : (
+                <LogoMark size={16} />
+              )}
+            </Press>
           </Row>
         </Split>
       }>
@@ -518,23 +551,18 @@ export default function Home() {
       ) : null}
 
       {/*
-        내 계정과 운영은 맨 아래입니다.
+        운영은 맨 아래입니다.
 
-        <p>여행을 짜는 것들과 같은 자리에 두면 같은 무게로 읽힙니다. 둘 다
-        쓸 일이 있을 때 찾아 내려오는 것이고, 특히 운영은 운영자에게만
-        보입니다.
+        <p>여행을 짜는 것들과 같은 자리에 두면 같은 무게로 읽힙니다. 쓸 일이
+        있을 때 찾아 내려오는 것이고, 운영자에게만 보입니다.
+
+        <p>「내 계정」 줄도 여기 있었습니다. 띠 다섯 개를 지나야 닿는
+        자리라 <b>막대 오른쪽 얼굴</b>로 올렸습니다 — 제 계정에 가려고 남의
+        추천 여행을 훑어 내려갈 일이 아닙니다.
       */}
-      <View>
-        <Band />
-        <ListRow
-          left={<Icon name="settings" size={24} tone="secondary" />}
-          title="내 계정"
-          subtitle={user?.name ?? undefined}
-          right={<Icon name="chevron-right" size={20} tone="muted" />}
-          last={user?.role !== 'ADMIN'}
-          onPress={() => router.push('/(app)/settings')}
-        />
-        {user?.role === 'ADMIN' ? (
+      {user?.role === 'ADMIN' ? (
+        <View>
+          <Band />
           <ListRow
             left={<Icon name="users" size={24} tone="secondary" />}
             title="운영 관리"
@@ -543,8 +571,8 @@ export default function Home() {
             last
             onPress={() => router.push('/admin')}
           />
-        ) : null}
-      </View>
+        </View>
+      ) : null}
 
       <PlaceDetailSheet place={looking} onClose={() => setLooking(null)} />
     </Screen>
@@ -803,6 +831,27 @@ const styles = StyleSheet.create({
      그래야 첫 카드가 왼쪽 20 선에 맞고 마지막 카드가 끝까지 흘러갑니다. */
   bleed: {
     marginHorizontal: -Gutter,
+  },
+  /*
+    막대 오른쪽의 얼굴.
+
+    <p>32 입니다. 옆의 그림 단추들이 24 인데, 동그란 면에 든 것은 같은
+    크기로 두면 더 작아 보입니다 — 면의 가장자리가 그림의 여백을 먹습니다.
+
+    <p>누르는 넓이는 {@code hitSlop} 이 44 로 채웁니다.
+  */
+  face: {
+    width: 32,
+    height: 32,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.fill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  faceEmoji: {
+    fontSize: 17,
+    /* 이모지는 글꼴이 제 높이를 갖고 있어, 줄 높이를 두면 아래로 처집니다. */
+    lineHeight: undefined,
   },
   strip: {
     paddingHorizontal: Gutter,
