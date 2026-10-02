@@ -5,7 +5,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/auth/auth-provider';
 import {
   Colors,
-  Elevation,
   Radius,
   Spacing,
   TabDock,
@@ -95,19 +94,38 @@ export function TabBar({
           모르는 채로 틈이 벌어지는 것보다 낫습니다.
         */
         {
+          /*
+            안전영역은 <b>띠 안쪽</b>에 둡니다.
+
+            <p>겉껍데기에 {@code paddingBottom} 으로 두고 있었습니다. 띠가
+            떠 있는 알약이던 때는 그것이 맞았습니다 — 알약은 안전영역 위에
+            앉고, 그 아래로 내용이 비쳐 보이는 것이 제 모습이었습니다.
+
+            <p>띠를 바닥에 붙이고 나니 그 여백이 <b>흰 면 밖</b>에 남았습니다.
+            띠 아래 한 자락(아이폰은 34픽셀)이 투명한 채로 남아서, 굴러 올라온
+            내용이 그 틈으로 보였습니다 — 띠가 바닥에 붙은 것이 아니라 바닥에서
+            조금 떠 있는 것처럼 됐습니다.
+
+            <p>여백을 안쪽으로 옮깁니다. 흰 면이 화면 맨 아래까지 닿고, 갈래
+            이름들은 그 안에서 안전영역 위에 앉습니다.
+          */
           height: TabDock + Math.max(insets.bottom, Spacing.sm),
-          paddingBottom: Math.max(insets.bottom, Spacing.sm),
         },
       ]}>
-      {onBack ? (
-        /* 띠와 같은 재질입니다. 하나만 꽉 막힌 흰 동그라미면 둘이 다른
-           층에 있는 것처럼 보입니다. */
-        <Press onPress={onBack} accessibilityLabel="나가기" style={styles.back}>
-          <Icon name="chevron-left" size={24} />
-        </Press>
-      ) : null}
+      {/*
+        나가는 화살표는 여기 없습니다.
 
-      <View style={styles.bar}>
+        <p>띠 왼쪽에 동그란 화살표가 하나 더 서 있었습니다. 여행 안의 네
+        화면(일정·가고 싶은 곳·가계부·요약)이 모두 위 막대에 <b>뒤로</b>를
+        이미 가지고 있는데(app/_layout.tsx 의 stackHeader), 그 아래
+        띠에도 같은 일을 하는 단추가 또 있었습니다 — 나가는 길이 한 화면에
+        둘이면 어느 것이 맞는지 한 번 생각하게 됩니다.
+
+        <p>넓은 화면의 기둥에는 그대로 있습니다. 거기서는 「← 내 여행」이
+        기둥 위쪽에 서서 <b>지금 어느 여행 안인지</b>를 같이 말합니다 —
+        막대의 뒤로와 하는 말이 다릅니다.
+      */}
+      <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, Spacing.sm) }]}>
         {items.map((item) => (
           <Press
             key={item.key}
@@ -466,19 +484,26 @@ const styles = StyleSheet.create({
   /*
     띠가 앉는 자리.
 
-    <h3>바탕색을 깔았다가 걷었습니다</h3>
+    <h3>떠 있는 알약을 세 번 고쳤습니다</h3>
 
-    <p>일정 화면은 지도가 바탕이라 떠 있는 띠 뒤로 지도가 그대로 보였습니다.
-    지도에 얹힌 조각처럼 보여서, 띠가 앉는 자리에 회색 바탕을 깔았습니다.
+    <p>처음에는 회색 바탕을 깔고 그 위에 알약을 띄웠습니다. 일정 화면이
+    지도를 바탕으로 쓰는데, 반투명 알약 뒤로 지도가 그대로 보여 지도에 얹힌
+    조각처럼 보였기 때문입니다. 그런데 그것은 <b>화면 아래 한 자락을 통째로
+    회색으로 막는</b> 일이라, 어느 화면에서든 내용이 그 선에서 끊겼습니다 —
+    알약 하나를 살리려고 82픽셀을 버린 셈입니다.
 
-    <p>그런데 그것은 <b>화면 아래 한 자락을 통째로 회색으로 막는</b> 일이라,
-    어느 화면에서든 내용이 그 선에서 끊겼습니다. 띄운 알약 하나를 살리려고
-    82픽셀을 버린 셈입니다.
+    <p>그래서 바탕색만 걷고 알약은 그대로 뒀습니다. 반투명한 흰 판에 머리카락
+    한 올 테두리와 그림자로, 알약 스스로 떠 있게 했습니다.
 
-    <p>자리는 그대로 두고 색만 걷습니다. 위에 있던 내용이 띠 뒤로 그대로
-    이어지고, 띠는 그 위에 떠 있습니다. 지도 위에서도 떨어져 보이게 하는 일은
-    바탕색이 아니라 <b>알약 스스로</b>가 맡습니다 — 반투명한 흰 판, 머리카락
-    한 올 테두리, 그리고 그림자.
+    <p>이제 알약을 걷었습니다. 알약의 전제는 <b>「회색 바닥에 흰 판을 얹어
+    층을 만든다」</b>였는데, 개편에서 바닥이 흰색이 됐습니다. 흰 바닥 위에
+    반투명한 흰 알약은 비치는 것도 흐리는 것도 아무 말을 안 하고, 그림자만
+    남아 화면 아래가 들떠 보였습니다. 알약 양옆으로는 본문이 비집고 나왔습니다.
+
+    <p>지금은 <b>바닥에 붙은 흰 띠</b>입니다. 위에 1px 선 하나로 「여기서부터
+    띠」를 말하고, 그림자는 안 씁니다 — 떠 있을 이유가 없습니다. 흰 면은
+    화면 맨 아래까지(안전영역 포함) 닿습니다. 그 여백을 겉껍데기에 두었더니
+    띠 아래 한 자락이 투명하게 남아 내용이 비쳐 보였습니다.
 
     <p>자리를 없애지는 않습니다. 높이가 0 이 되면 판(DragSheet)이 믿고 있는
     TabDock 과 어긋나고, 굴러가는 화면의 마지막 줄이 띠 뒤로 들어가 아무리
@@ -513,7 +538,14 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    /*
+      띠가 겉껍데기를 꽉 채웁니다.
+
+      <p>{@code 'flex-end'} 였습니다. 알약이 겉껍데기 바닥에 앉고 그 위는
+      비워 두는 것이 제 모습이었기 때문인데, 바닥에 붙는 띠에 그것을 두면
+      <b>띠가 제 내용만큼만 높아지고</b> 나머지가 투명하게 남습니다.
+    */
+    alignItems: 'stretch',
     /* 바닥에 붙습니다. 좌우로 12 띄워 알약을 떠 있게 두던 여백을
        걷습니다 — 그 여백이 있으면 띠 양옆으로 본문이 비집고 나옵니다. */
     gap: 0,
@@ -544,17 +576,25 @@ const styles = StyleSheet.create({
   bar: {
     flex: 1,
     flexDirection: 'row',
-    alignItems: 'center',
+    /*
+      칸들은 <b>안전영역 위</b>에서 가운데입니다.
+
+      <p>{@code 'center'} 로 두면 안전영역까지 더한 높이의 가운데에 앉아서,
+      아이폰에서 갈래 이름이 17픽셀쯤 아래로 처집니다. 위쪽을 기준으로 두고
+      칸이 제 높이(TabDock)를 가지게 합니다.
+    */
+    alignItems: 'flex-start',
     backgroundColor: Colors.surface,
     borderTopWidth: 1,
     borderTopColor: Colors.divider,
   },
   tab: {
     flex: 1,
+    /* 띠 몸통 높이를 그대로 가집니다. 안전영역은 겉의 바가 들고 있습니다. */
+    height: TabDock,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 2,
-    paddingVertical: Spacing.s1,
   },
   /*
     갈래 이름.
@@ -709,19 +749,4 @@ const styles = StyleSheet.create({
      읽힙니다. */
   /* 띠와 같은 재질입니다. 하나만 꽉 막힌 흰 동그라미면 둘이 다른 층에
      있는 것처럼 보입니다. */
-  back: {
-    width: Tap.min,
-    height: Tap.min,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: Radius.full,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: Colors.border,
-    backgroundColor: 'rgba(255, 255, 255, 0.86)',
-    ...Elevation.float,
-    ...Platform.select({
-      web: { backdropFilter: 'saturate(180%) blur(18px)' } as object,
-      default: {},
-    }),
-  },
 });
