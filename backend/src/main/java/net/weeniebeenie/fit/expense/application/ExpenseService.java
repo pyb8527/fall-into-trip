@@ -448,19 +448,33 @@ public class ExpenseService {
         if (tripIds.isEmpty()) {
             return Map.of();
         }
+        /* 적어 둔 환율. 여행마다 묻지 않고 한 번에 받습니다. */
+        Map<String, BigDecimal> noted = new java.util.HashMap<>();
+        for (TripRate r : rates.findAllByTripIdIn(tripIds)) {
+            noted.put(r.getTripId() + "|" + r.getCurrency(), r.getRate());
+        }
+
         Map<String, List<Sum>> out = new LinkedHashMap<>();
         for (ExpenseRepository.TripSpend row : expenses.sumByTrip(tripIds)) {
             out.computeIfAbsent(row.getTripId(), k -> new ArrayList<>())
                     .add(new Sum(row.getCurrency(),
                             Currencies.decimals(row.getCurrency()),
                             row.getTotal(),
-                            row.getItems()));
+                            row.getItems(),
+                            Exchange.toKrw(row.getTotal(), row.getCurrency(),
+                                    noted.get(row.getTripId() + "|" + row.getCurrency()))));
         }
         return out;
     }
 
-    /** 한 여행에서 한 통화로 쓴 것. */
-    public record Sum(String currency, int decimals, long total, long items) {
+    /**
+     * 한 여행에서 한 통화로 쓴 것.
+     *
+     * @param krw 그 여행에 적어 둔 환율로 바꾼 원화. 환율을 안 적었으면 비어
+     *            있습니다 — 내 여행 화면이 「원화로 합칠 수 있는 여행만」 합치고
+     *            나머지는 통화별로 따로 적습니다
+     */
+    public record Sum(String currency, int decimals, long total, long items, Long krw) {
     }
 
     /* ----------------------------------------------------------- 환율 */
