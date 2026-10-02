@@ -153,7 +153,7 @@ export function Press({
   scale?: number;
   style?: StyleProp<ViewStyle>;
   accessibilityLabel?: string;
-  accessibilityRole?: 'button' | 'tab' | 'link';
+  accessibilityRole?: 'button' | 'tab' | 'link' | 'radio';
   accessibilityState?: { selected?: boolean; disabled?: boolean; busy?: boolean };
   hitSlop?: number;
   /**
@@ -1964,6 +1964,69 @@ export function Badge({
  * 눌러 본 뒤에야 무엇이 있는지 알지만, 띠로 두면 고를 수 있는 것이 처음부터
  * 다 보입니다.
  */
+/**
+ * 별 다섯.
+ *
+ * <h3>읽는 것과 주는 것이 한 부품입니다</h3>
+ *
+ * <p>{@code onChange} 를 주면 누를 수 있고, 안 주면 보여 주기만 합니다.
+ * 둘을 따로 만들면 별 크기와 사이가 어긋나는데, 같은 화면에 「우리 4.6」과
+ * 「나도 남기기」가 나란히 서므로 그 어긋남이 바로 보입니다.
+ *
+ * <h3>반쪽 별은 안 그립니다</h3>
+ *
+ * <p>평균이 4.6 이면 별 넷과 반이 맞지만, 반쪽 별을 그리려면 별 하나를
+ * 두 겹으로 겹쳐 잘라야 합니다. 대신 <b>가까운 쪽으로 채우고 숫자를 옆에
+ * 적습니다</b> — 「★★★★★ 4.6」 입니다. 숫자가 이미 정확하므로 그림이
+ * 반까지 맞출 이유가 없습니다.
+ *
+ * @param value   채울 개수. 평균이면 소수여도 됩니다
+ * @param onChange 주면 누를 수 있습니다. 누른 별 개수가 옵니다
+ * @param size    별 하나의 크기. 목록에서는 14, 남기는 자리에서는 32
+ */
+export function Stars({
+  value,
+  onChange,
+  size = 16,
+  label,
+}: {
+  value: number;
+  onChange?: (next: number) => void;
+  size?: number;
+  /** 누를 수 있을 때 읽어 주는 기기에 붙는 이름. 「맛」·「별점」 같은 것 */
+  label?: string;
+}) {
+  const filled = Math.round(value);
+
+  return (
+    <View style={styles.stars}>
+      {[1, 2, 3, 4, 5].map((n) =>
+        onChange ? (
+          <Press
+            key={n}
+            onPress={() => onChange(n)}
+            accessibilityRole="radio"
+            accessibilityState={{ selected: n <= filled }}
+            accessibilityLabel={`${label ?? '별점'} ${n}점`}
+            /* 별 하나가 32 라도 누르는 자리는 44 를 채웁니다. */
+            hitSlop={Math.max(0, (Tap.min - size) / 2)}
+            scale={0.96}>
+            <Icon name="star" size={size} solid={n <= filled} tone={n <= filled ? 'hot' : 'off'} />
+          </Press>
+        ) : (
+          <Icon
+            key={n}
+            name="star"
+            size={size}
+            solid={n <= filled}
+            tone={n <= filled ? 'hot' : 'off'}
+          />
+        ),
+      )}
+    </View>
+  );
+}
+
 /**
  * 못 누르는 꼬리표.
  *
@@ -4129,6 +4192,12 @@ const styles = StyleSheet.create({
   chipLabel: {
     ...Type.label,
     fontWeight: Weight.medium,
+  },
+
+  stars: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
   },
 
   /* 못 누르는 꼬리표. 칩(키 34, 알약, 테두리)과 생김새를 가릅니다. */

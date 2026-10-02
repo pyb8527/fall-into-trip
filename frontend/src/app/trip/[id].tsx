@@ -15,20 +15,7 @@ import {
 } from 'react-native';
 
 import { api, ApiError, UNEXPECTED } from '@/api/client';
-import type { Day,
-  Person,
-  Gap,
-  GapOption,
-  LivePin,
-  LiveWhere,
-  Money,
-  Place,
-  PlaceInfo,
-  Spend,
-  TravelMode,
-  Trip,
-  TripDetail,
-} from '@/api/types';
+import type { Day, Gap, GapOption, LivePin, LiveWhere, Money, OurStars, Person, Place, PlaceInfo, Spend, TravelMode, Trip, TripDetail } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
 import { PeopleSheet } from '@/components/people-sheet';
@@ -833,6 +820,8 @@ export default function TripScreen() {
     나갑니다. 번호가 있는 것만 모아 한 번에 셉니다.
   */
   const [tipCounts, setTipCounts] = useState<Record<string, number>>({});
+  /* 장소마다 우리 별점. 팁 수와 같은 길로 한 번에 옵니다. */
+  const [tipStars, setTipStars] = useState<Record<string, OurStars>>({});
   const dayPlaceIds = useMemo(
     () =>
       days
@@ -846,11 +835,18 @@ export default function TripScreen() {
   const countTips = useCallback(() => {
     if (dayPlaceIds.length === 0) {
       setTipCounts({});
+      setTipStars({});
       return;
     }
     api
-      .post<{ counts: Record<string, number> }>('/api/tips/counts', { placeIds: dayPlaceIds })
-      .then((res) => setTipCounts(res.counts))
+      .post<{ counts: Record<string, number>; stars?: Record<string, OurStars> }>(
+        '/api/tips/counts',
+        { placeIds: dayPlaceIds },
+      )
+      .then((res) => {
+        setTipCounts(res.counts);
+        setTipStars(res.stars ?? {});
+      })
       .catch(() => {
         /* 팁은 곁다리라 못 세어도 일정은 보여야 합니다. */
       });
@@ -1591,6 +1587,7 @@ export default function TripScreen() {
           <p>구글 번호가 없는 곳에는 안 냅니다 — 한 줄은 그 번호에 달리는
           것이라 달 데가 없습니다.
         */
+        ours={looking?.place.placeId ? (tipStars[looking.place.placeId] ?? null) : null}
         talk={
           looking?.place.placeId
             ? {

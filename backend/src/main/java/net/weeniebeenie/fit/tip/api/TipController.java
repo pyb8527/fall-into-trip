@@ -40,7 +40,21 @@ public class TipController {
         } catch (RuntimeException ignored) {
             /* 세기만 못 했습니다. 볼 것은 이미 손에 있습니다. */
         }
-        return Map.of("tips", cards);
+        /*
+          우리 평점을 같이 냅니다.
+
+          <p>판 하나가 둘을 함께 그립니다 — 머리에 「★ 4.6 · 우리 11명」,
+          아래에 한 줄들. 길을 둘로 나누면 판이 두 번 묻고, 그 둘이 서로
+          다른 순간의 값일 수 있습니다.
+
+          <p>아직 아무도 별을 안 줬으면 비워 보냅니다. 0 을 보내면 화면이
+          별 0개를 그럴듯하게 그립니다.
+        */
+        var stars = tips.starsOf(List.of(placeId)).get(placeId);
+        Map<String, Object> out = new java.util.LinkedHashMap<>();
+        out.put("tips", cards);
+        out.put("stars", stars);
+        return out;
     }
 
     /** 여러 장소의 팁 수를 한 번에. 목록에서 "팁 3" 을 띄우는 데 씁니다. */

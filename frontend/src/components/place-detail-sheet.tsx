@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Linking, StyleSheet, View } from 'react-native';
 
 import { api } from '@/api/client';
-import type { PlaceInfo, TravelMode } from '@/api/types';
+import type { OurStars, PlaceInfo, TravelMode } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { PlacePhoto } from '@/components/place-photo';
 import { SpotMap } from '@/components/spot-map';
@@ -73,6 +73,7 @@ export function PlaceDetailSheet({
   here,
   about,
   talk,
+  ours,
   actions,
   mode,
   onClose,
@@ -99,6 +100,16 @@ export function PlaceDetailSheet({
    * <p>없으면 안 냅니다. 좌표만 찍어 둔 곳에는 달 데가 없습니다.
    */
   talk?: { noun: string; count: number; onOpen: () => void } | null;
+  /**
+   * 우리 별점.
+   *
+   * <p>구글 평점 옆에 섭니다. <b>다르면 그것이 정보입니다</b> — 구글 4.2 에
+   * 우리 4.6 이면 「우리 같은 사람들은 더 좋게 봤다」는 말이고, 그 반대면
+   * 「소문보다 별로」입니다. 같은 자리에 두지 않으면 그 비교가 안 생깁니다.
+   *
+   * <p>아직 아무도 안 줬으면 없습니다.
+   */
+  ours?: OurStars | null;
   /** 이 곳을 어디에 담을지. 부르는 자리가 정합니다. */
   actions?: React.ReactNode;
   /**
@@ -184,6 +195,20 @@ export function PlaceDetailSheet({
             {info.ratingCount ? (
               <Caption tone="secondary">{` (${info.ratingCount.toLocaleString()})`}</Caption>
             ) : null}
+          </Body>
+        ) : null}
+        {/*
+          우리 평점.
+
+          <p>구글 것 바로 뒤입니다. 몇 명이 줬는지를 늘 함께 적습니다 —
+          한 사람이 준 5.0 과 열한 명이 준 4.6 은 같은 숫자가 아닌데,
+          평균만 띄우면 앞쪽이 더 좋아 보입니다.
+        */}
+        {ours ? (
+          <Body small strong>
+            <Caption tone="brand">★ </Caption>
+            {ours.average.toFixed(1)}
+            <Caption tone="secondary">{` (우리 ${ours.count})`}</Caption>
           </Body>
         ) : null}
         {place.icon ? <Badge label={labelOf(place.icon)} tone="muted" /> : null}

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { api, ApiError, UNEXPECTED } from '@/api/client';
-import type { Tip } from '@/api/types';
+import type { OurStars, Tip } from '@/api/types';
 import { useAuth } from '@/auth/auth-provider';
 import { Colors, Gutter, Spacing } from '@/constants/theme';
 import {
@@ -17,6 +17,8 @@ import {
   Field,
   IconButton,
   Loading,
+  Row,
+  Stars,
   Split,
 } from '@/ui';
 
@@ -48,15 +50,22 @@ export function TipSheet({
 }) {
   const { user } = useAuth();
   const [tips, setTips] = useState<Tip[] | null>(null);
+  /* 내가 줄 별. 0 은 아직 안 고른 것입니다 — 서버에는 1~5 만 보냅니다. */
+  const [mine, setMine] = useState(0);
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
   const [reporting, setReporting] = useState<Tip | null>(null);
+  /* 이 장소의 우리 평균. 아직 아무도 안 줬으면 없습니다. */
+  const [ours, setOurs] = useState<OurStars | null>(null);
 
   async function load() {
     try {
-      const res = await api.get<{ tips: Tip[] }>(`/api/places/${encodeURIComponent(placeId)}/tips`);
+      const res = await api.get<{ tips: Tip[]; stars?: OurStars | null }>(
+        `/api/places/${encodeURIComponent(placeId)}/tips`,
+      );
       setTips(res.tips);
+      setOurs(res.stars ?? null);
     } catch (e) {
       setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
     }
@@ -67,6 +76,8 @@ export function TipSheet({
       setText('');
       setFailed(null);
       setTips(null);
+      setOurs(null);
+      setMine(0);
       load();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -101,6 +112,25 @@ export function TipSheet({
         시각을 함께 보세요.
       </Caption>
 
+      {/*
+        우리 평점.
+
+        <p>구글 평점은 장소 상세 위쪽에 이미 섰습니다. 여기 것은 <b>우리
+        쪽</b>이라, 둘을 나란히 두면 다를 때 그것이 정보가 됩니다.
+
+        <p>몇 명이 줬는지를 늘 함께 적습니다. 한 사람이 준 5.0 과 열한 명이
+        준 4.6 은 같은 숫자가 아닌데, 평균만 띄우면 앞쪽이 더 좋아 보입니다.
+      */}
+      {ours ? (
+        <Row gap={Spacing.s2}>
+          <Stars value={ours.average} size={16} />
+          <Body small strong>
+            {ours.average.toFixed(1)}
+          </Body>
+          <Caption tone="secondary">우리 {ours.count}명</Caption>
+        </Row>
+      ) : null}
+
       {failed ? <ErrorNote message={failed} /> : null}
       {tips === null ? <Loading /> : null}
       {tips && tips.length === 0 ? (
@@ -116,7 +146,10 @@ export function TipSheet({
       */}
       {tips?.map((tip, i) => (
         <View key={tip.id} style={[styles.tip, i > 0 ? styles.tipEdge : null]}>
-          <Body small>{tip.text}</Body>
+          {tip.stars ? <Stars value={tip.stars} size={14} /> : null}
+          {/* 별만 주고 글은 안 남긴 사람이 있습니다. 빈 줄을 세우지
+              않습니다. */}
+          {tip.text ? <Body small>{tip.text}</Body> : null}
           <Split>
             <Caption tone="secondary">
               {tip.authorName} · {sinceOf(tip.createdAt)}
@@ -147,24 +180,42 @@ export function TipSheet({
       {user ? (
         <>
           <Band />
+
+          {/*
+            별 다섯이 먼저입니다.
+
+            <p>적을 말은 없어도 「좋았다」는 있습니다. 글칸을 먼저 두면
+            적을 말이 없는 사람은 아무것도 안 남기고 닫습니다 — 별 다섯은
+            한 번 누르면 끝이라 문턱이 가장 낮습니다.
+          */}
+          <Caption tone="secondary">여기 어땠어요?</Caption>
+          <Stars value={mine} onChange={setMine} size={32} label="별점" />
+
           <Field
             label="한 줄 남기기"
             value={text}
             onChangeText={setText}
             placeholder="지금 대기 40분, 2번 출구로 나와야 함"
             hint="200자까지. 같은 곳에는 하루 세 번까지 남길 수 있어요."
+            limit={200}
             returnKeyType="done"
           />
           <Button
             label="남기기"
             busy={busy}
-            disabled={!text.trim()}
+            /* 둘 중 하나만 있어도 남깁니다(G-11). 별만 준 사람도 있고
+               할 말만 있는 사람도 있습니다. */
+            disabled={!text.trim() && mine === 0}
             onPress={() =>
               run(() =>
-                api.post(`/api/places/${encodeURIComponent(placeId)}/tips`, { text: text.trim() }),
+                api.post(`/api/places/${encodeURIComponent(placeId)}/tips`, {
+                  text: text.trim(),
+                  stars: mine === 0 ? null : mine,
+                }),
               ).then((done) => {
                 if (done) {
                   setText('');
+                  setMine(0);
                 }
               })
             }
