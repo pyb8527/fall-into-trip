@@ -80,7 +80,7 @@ r = await call("GET", `/api/trip?trip=${mineTrip}`, { token: taker });
 T("이틀만 왔다", r.data.days.length === 2, r.data.days.length);
 names = r.data.days.flatMap((d) => d.places.map((p) => p.name));
 T("고른 날들의 곳만", names.join(",") === "첫날곳,셋째날곳", names);
-T("번호는 다시 첫날부터", r.data.days.map((d) => d.label).join(",") === "Day 1,Day 2",
+T("번호는 다시 첫날부터", r.data.days.map((d) => d.label).join(",") === "1일차,2일차",
   r.data.days.map((d) => d.label));
 
 r = await call("POST", `/api/posts/${whole}/copy`, { token: taker, body: { startIso: "2026-08-01" } });

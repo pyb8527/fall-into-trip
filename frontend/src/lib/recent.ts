@@ -49,6 +49,13 @@ export function remember(word: string): string[] {
   return next;
 }
 
+/** 하나만 지웁니다. 잘못 친 말 하나 때문에 전부 지우게 하지 않습니다. */
+export function forget(word: string): string[] {
+  const next = recentSearches().filter((w) => w !== word);
+  write(next);
+  return next;
+}
+
 export function forgetAll(): string[] {
   write([]);
   return [];

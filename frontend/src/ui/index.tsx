@@ -1255,7 +1255,11 @@ export function SearchField({
             onSubmitEditing={onSearch}
             style={styles.input}
           />
-          {value.length > 0 ? (
+          {/* 묻는 동안에는 지우기 자리에 도는 표시를 둡니다. 「찾기」 단추가
+              없어진 뒤로 여기가 「묻는 중」을 말하는 유일한 자리입니다. */}
+          {busy ? (
+            <ActivityIndicator size="small" color={Colors.textMuted} />
+          ) : value.length > 0 ? (
             <IconButton
               name="x"
               label={`${label} 지우기`}
@@ -1264,18 +1268,14 @@ export function SearchField({
             />
           ) : null}
         </View>
-        {/* 눌러야 묻는 칸만 단추를 가집니다. 칸 안이 아니라 옆에 두는
-            까닭은, 이것이 「적은 것을 가지고 하는 일」이라 칸과 같은 무게로
-            서야 하기 때문입니다. */}
-        {onSearch ? (
-          <Button
-            label="찾기"
-            size="m"
-            disabled={!value.trim() || busy}
-            busy={busy}
-            onPress={onSearch}
-          />
-        ) : null}
+        {/*
+          「찾기」 단추를 뗐습니다.
+
+          <p>칸 옆에 바이올렛 단추가 늘 서 있어서, 찾기 화면의 첫 주 동작이
+          「단추를 누르는 것」처럼 보였습니다. 묻는 것은 자판의 검색 키(엔터)가
+          합니다 — 모바일 자판은 이 칸에서 검색 키를 띄웁니다(returnKeyType).
+          단추가 자리를 비우면 칸이 한 줄을 다 씁니다.
+        */}
       </Row>
       {hint ? <Text style={styles.hint}>{hint}</Text> : null}
     </View>

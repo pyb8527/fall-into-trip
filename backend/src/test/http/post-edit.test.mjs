@@ -37,15 +37,15 @@ for (let i = 0; i < 3; i++) {
   }
 }
 
-console.log("\n[2] 3일차만 올리면 보는 사람에게는 Day 1");
+console.log("\n[2] 3일차만 올리면 보는 사람에게는 1일차");
 r = await call("POST", `/api/trips/${tripId}/publish`, {
   token: author, body: { title: "셋째 날만", days: [dayIds[2]] },
 });
 const lone = r.data.postId;
 T("올라감", r.status === 200 && !!lone, r.data);
 r = await call("GET", `/api/posts/${lone}`);
-T("Day 1 로 보인다", r.data.itinerary.days[0].label === "Day 1", r.data.itinerary.days[0].label);
-T("색도 첫째 날 색", r.data.itinerary.days[0].color === "#3182f6", r.data.itinerary.days[0].color);
+T("1일차로 보인다", r.data.itinerary.days[0].label === "1일차", r.data.itinerary.days[0].label);
+T("색도 첫째 날 색", r.data.itinerary.days[0].color === "#3b82f6", r.data.itinerary.days[0].color);
 T("곳은 3일차 것", r.data.itinerary.days[0].places[0].name === "3일차앞",
   r.data.itinerary.days[0].places.map((p) => p.name));
 
@@ -58,8 +58,8 @@ r = await call("POST", `/api/trips/${tripId}/publish`, { token: author, body: { 
 const whole = r.data.postId;
 r = await call("POST", `/api/posts/${whole}/copy`, { token: taker, body: { startIso: "2026-07-01", days: [2] } });
 r = await call("GET", `/api/trip?trip=${r.data.tripId}`, { token: taker });
-T("가져온 것은 Day 1", r.data.days[0].label === "Day 1", r.data.days[0].label);
-T("가져온 것의 색도 첫째", r.data.days[0].color === "#3182f6", r.data.days[0].color);
+T("가져온 것은 1일차", r.data.days[0].label === "1일차", r.data.days[0].label);
+T("가져온 것의 색도 첫째", r.data.days[0].color === "#3b82f6", r.data.days[0].color);
 
 console.log("\n[4] 겉을 고친다");
 r = await call("PATCH", `/api/posts/${whole}`, {
@@ -131,9 +131,9 @@ T("날이 둘로", r.data.dayCount === 2, r.data);
 r = await call("GET", `/api/posts/${whole}`);
 T("첫날이 옛 2일차", r.data.itinerary.days[0].places[0].name === "2일차앞",
   r.data.itinerary.days[0].places.map((p) => p.name));
-T("번호를 다시 셌다", r.data.itinerary.days.map((d) => d.label).join(",") === "Day 1,Day 2",
+T("번호를 다시 셌다", r.data.itinerary.days.map((d) => d.label).join(",") === "1일차,2일차",
   r.data.itinerary.days.map((d) => d.label));
-T("색도 다시 셌다", r.data.itinerary.days[0].color === "#3182f6", r.data.itinerary.days[0].color);
+T("색도 다시 셌다", r.data.itinerary.days[0].color === "#3b82f6", r.data.itinerary.days[0].color);
 
 r = await call("GET", `/api/posts/${whole}/comments`);
 texts = r.data.comments.map((c) => `${c.text}@${c.dayIndex}:${c.placeIndex}`);

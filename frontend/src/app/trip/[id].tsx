@@ -2501,11 +2501,16 @@ function DayCard({
           ) : null}
           {/* 셋은 있어야 순서를 바꿀 여지가 생깁니다. 둘이면 갈 데가 하나뿐입니다. */}
           {canEdit && day.places.length > 2 ? (
-            <IconButton
-              name="shuffle"
-              label={`${day.date || day.label} 동선 정리`}
+            /* 그림만 있던 단추에 글자를 답니다. ⤨ 하나로는 「섞기」로 읽혀서,
+               누르면 일정이 뒤섞이는 줄 알고 안 눌렀습니다. 이 단추가 하는 일은
+               가까운 차례로 다시 세워 <b>제안</b>하는 것이고, 받을지는 사람이
+               정합니다(RouteTidy). */
+            <Button
+              label="동선 최적화"
+              icon="shuffle"
+              variant="ghost"
+              compact
               disabled={tidying}
-              bare
               onPress={() => {
                 setFolded(false);
                 askTidy();

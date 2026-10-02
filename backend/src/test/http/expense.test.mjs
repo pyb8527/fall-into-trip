@@ -356,11 +356,11 @@ T("한 건도 없는 여행도 나온다", !!emptyRow, r.data.trips.map((t) => t
 T("합계가 비어 있다", emptyRow?.sums.length === 0 && emptyRow?.items === 0, emptyRow);
 
 /* 여행 표식이 함께 실려 와야 목록에서 색과 그림을 그릴 수 있습니다. */
-r = await call("PATCH", `/api/trips/${emptyTrip}`, { token: A, body: { theme: "#3182f6", emoji: "X" } });
+r = await call("PATCH", `/api/trips/${emptyTrip}`, { token: A, body: { theme: "#3b82f6", emoji: "X" } });
 T("표식을 고친다", r.status === 200, r.data);
 r = await call("GET", "/api/expenses/summary", { token: A });
 const marked = r.data.trips.find((t) => t.id === emptyTrip);
-T("표식이 실려 온다", marked?.theme === "#3182f6" && marked?.emoji === "X", marked);
+T("표식이 실려 온다", marked?.theme === "#3b82f6" && marked?.emoji === "X", marked);
 r = await call("PATCH", `/api/trips/${emptyTrip}`, { token: A, body: { theme: "#123456" } });
 T("우리 팔레트가 아닌 색은 거절", r.status === 400, r.data);
 

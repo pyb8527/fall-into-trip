@@ -10,9 +10,9 @@ import type { Found } from '@/components/map-types';
 import { OurPhoto } from '@/components/our-photo';
 import { PlaceDetailSheet } from '@/components/place-detail-sheet';
 import { glyphOf, labelOf } from '@/constants/place-icons';
-import { Colors, Gutter, Palette, Spacing, Tap, Type, Weight } from '@/constants/theme';
+import { Colors, Gutter, Palette, Radius, Spacing, Tap, Type, Weight } from '@/constants/theme';
 import { formatNights } from '@/lib/countdown';
-import { forgetAll, recentSearches, remember } from '@/lib/recent';
+import { forget, forgetAll, recentSearches, remember } from '@/lib/recent';
 import {
   Band,
   Body,
@@ -335,8 +335,21 @@ export default function Search() {
                 }
               />
               <Row gap={Spacing.s2} style={styles.wrap}>
+                {/* 말마다 ✕. 「모두 지우기」만 있으면 잘못 친 말 하나를 빼려고
+                    나머지까지 다 잃습니다. */}
                 {recent.map((word) => (
-                  <Chip key={word} label={word} selected={false} onPress={() => ask(word)} />
+                  <View key={word} style={styles.recent}>
+                    <Press onPress={() => ask(word)} scale={0.96} style={styles.recentWord}>
+                      <Body small>{word}</Body>
+                    </Press>
+                    <IconButton
+                      name="x"
+                      label={`최근 검색 ${word} 지우기`}
+                      tone="muted"
+                      bare
+                      onPress={() => setRecent(forget(word))}
+                    />
+                  </View>
                 ))}
               </Row>
             </View>
@@ -446,6 +459,21 @@ function MoreLink({
 }
 
 const styles = StyleSheet.create({
+  /* 최근 검색 한 말. 칩과 같은 알약이고, 오른쪽에 ✕ 가 붙습니다. */
+  recent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: Tap.chip,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingLeft: Spacing.s3 + 2,
+    paddingRight: Spacing.s1,
+  },
+  recentWord: {
+    justifyContent: 'center',
+    height: '100%',
+  },
   filters: {
     flexWrap: 'wrap',
   },

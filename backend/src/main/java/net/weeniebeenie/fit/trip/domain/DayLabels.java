@@ -113,7 +113,13 @@ public final class DayLabels {
         return COLORS[Math.floorMod(index, COLORS.length)];
     }
 
+    /**
+     * 날의 기본 이름 — 「1일차」.
+     *
+     * <p>「Day 1」이었습니다. 화면이 전부 한국어인데 날 머리만 영어라 거기서만
+     * 다른 앱처럼 읽혔고, 일정을 짜며 세는 말도 「며칠째」입니다(V49).
+     */
     public static String labelOf(int index) {
-        return "Day " + (index + 1);
+        return (index + 1) + "일차";
     }
 }
