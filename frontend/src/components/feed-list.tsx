@@ -7,7 +7,8 @@ import type { FeedPost, FeedSlice } from '@/api/types';
 import { FeedCard } from '@/components/feed-card';
 import { FeedForm } from '@/components/feed-form';
 import { Spacing } from '@/constants/theme';
-import { Button, Caption, Chip, Empty, ErrorNote, Loading, Row } from '@/ui';
+import { Button, Caption, Chip, Empty, ErrorNote, Loading, Press, Row, SegmentedTabs, Split } from '@/ui';
+import { OurPhoto } from '@/components/our-photo';
 
 /**
  * 피드 한 벌.
@@ -24,9 +25,15 @@ export function FeedList({
   /** 모임 피드면 그 모임. 안 주면 내 피드입니다. */
   groupId,
   groupName,
+  compact = false,
 }: {
   groupId?: string | null;
   groupName?: string | null;
+  /**
+   * 마이페이지처럼 위에 이미 할 것이 많은 자리. 올리기 단추를 판 폭 회색
+   * 상자 대신 오른쪽 작은 단추로 줄이고, 목록 · 사진 보기를 고를 수 있게 합니다.
+   */
+  compact?: boolean;
 }) {
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [more, setMore] = useState(false);
@@ -36,6 +43,8 @@ export function FeedList({
   const [error, setError] = useState<string | null>(null);
 
   const [writing, setWriting] = useState(false);
+  /* 사진만 격자로 보기. 내 피드는 「무엇을 찍었나」를 훑는 자리이기도 합니다. */
+  const [grid, setGrid] = useState(false);
   const [editing, setEditing] = useState<FeedPost | null>(null);
 
   const where = groupId ? `group=${encodeURIComponent(groupId)}` : 'mine=true';
@@ -81,11 +90,25 @@ export function FeedList({
       {/* 채운 단추로 두지 않습니다. 이 띠가 서는 자리(모임 상세)에는 이미
           머리에 채운 단추가 하나 있고, 한 화면에 가득 찬 브랜드색은 하나여야
           어느 것이 주된 일인지 보입니다. */}
-      <Button
-        label={groupName ? `${groupName}에 올리기` : '피드에 올리기'}
-        variant="secondary"
-        onPress={() => setWriting(true)}
-      />
+      {compact ? (
+        <Split align="center">
+          <SegmentedTabs
+            items={[
+              { value: 'list', label: '목록' },
+              { value: 'grid', label: '사진' },
+            ]}
+            value={grid ? 'grid' : 'list'}
+            onChange={(v) => setGrid(v === 'grid')}
+          />
+          <Button label="올리기" icon="plus" variant="ghost" compact onPress={() => setWriting(true)} />
+        </Split>
+      ) : (
+        <Button
+          label={groupName ? `${groupName}에 올리기` : '피드에 올리기'}
+          variant="secondary"
+          onPress={() => setWriting(true)}
+        />
+      )}
 
       {(seen.length > 0 || tag) ? (
         <Row gap={Spacing.s2} style={styles.wrap}>
@@ -118,9 +141,21 @@ export function FeedList({
         />
       ) : null}
 
-      {posts.map((p) => (
-        <FeedCard key={p.id} post={p} onChanged={refresh} onEdit={setEditing} />
-      ))}
+      {grid ? (
+        /* 사진 격자 — 세 칸. 누르면 그 글의 고치기 판이 아니라 글이 있는
+           목록으로 돌아갑니다(한 장만 크게 보는 자리는 글 카드가 이미 합니다). */
+        <View style={styles.grid}>
+          {posts.flatMap((p) =>
+            p.photoIds.map((id) => (
+              <Press key={`${p.id}-${id}`} onPress={() => setGrid(false)} scale={0.97} style={styles.cell}>
+                <OurPhoto id={id} height={110} />
+              </Press>
+            )),
+          )}
+        </View>
+      ) : (
+        posts.map((p) => <FeedCard key={p.id} post={p} onChanged={refresh} onEdit={setEditing} />)
+      )}
 
       {more ? (
         <Button
@@ -162,6 +197,15 @@ export function FeedList({
 }
 
 const styles = StyleSheet.create({
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 2,
+  },
+  /* 세 칸에서 사이 2 를 뺀 몫. */
+  cell: {
+    width: '32.6%',
+  },
   /* 글 카드 사이. s2(8) 였습니다 — 카드 넷이 거의 붙어 서서 한 덩어리로
      읽혔습니다. 한 편과 다음 편 사이는 카드 안쪽 여백보다 넓어야 합니다. */
   body: {

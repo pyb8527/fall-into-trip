@@ -35,6 +35,7 @@ export function TripCalendar({
   showGroup = false,
   polls = [],
   onPoll,
+  onPick,
 }: {
   trips: TripSummary[];
   onOpen: (trip: TripSummary) => void;
@@ -49,6 +50,8 @@ export function TripCalendar({
   polls?: OpenDate[];
   /** 후보 줄을 누르면 그 여행의 「언제 갈까」 판을 엽니다 */
   onPoll?: (tripId: string) => void;
+  /** 날을 눌렀을 때(풀면 null). 마이페이지가 그날 장소와 쓴 돈을 아래에 그립니다 */
+  onPick?: (iso: string | null) => void;
 }) {
   /* 보고 있는 달. 오늘이 든 달에서 시작합니다. */
   const [at, setAt] = useState(() => {
@@ -140,6 +143,7 @@ export function TripCalendar({
 
   function move(by: number) {
     setPicked(null);
+    onPick?.(null);
     setAt((was) => {
       const m = was.month + by;
       return { year: was.year + Math.floor(m / 12), month: ((m % 12) + 12) % 12 };
@@ -182,7 +186,11 @@ export function TripCalendar({
           return (
             <Press
               key={iso}
-              onPress={() => setPicked(picked === iso ? null : iso)}
+              onPress={() => {
+                const next = picked === iso ? null : iso;
+                setPicked(next);
+                onPick?.(next);
+              }}
               accessibilityLabel={`${at.month + 1}월 ${d}일${on.length > 0 ? ` 여행 ${on.length}` : ''}`}
               accessibilityState={{ selected: picked === iso }}
               scale={1}

@@ -80,6 +80,10 @@ public class User {
     @Column(name = "cal_token_hash", length = 64)
     private String calTokenHash;
 
+    /** 한 줄 소개. 비어 있으면 마이페이지가 그 자리를 안 그립니다. */
+    @Column(length = 80)
+    private String bio;
+
     @Builder
     public User(String email, String name, String passwordHash, Role role) {
         this.id = Ids.next();

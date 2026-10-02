@@ -69,13 +69,65 @@ public class ProfileService {
                 user.getId(),
                 user.getName(),
                 user.getMark(),
+                user.getBio(),
                 user.getCreatedAt(),
                 mine,
+                companionsOf(target),
                 new Counts(
                         trips.countByOwnerId(target),
                         posts.countByAuthorId(target),
                         tips.countByUserIdAndHiddenFalseAndStarsIsNotNull(target),
                         members.countByIdUserId(target)));
+    }
+
+    /**
+     * 이름과 한 줄 소개를 고칩니다. 늘 제 것만입니다.
+     *
+     * <p>{@code null} 인 칸은 그대로 둡니다. 소개를 지우는 것은 빈 글("")입니다.
+     */
+    @Transactional
+    public Profile edit(AuthPrincipal me, String name, String bio) {
+        User user = users.findById(me.id())
+                .orElseThrow(() -> ApiException.unauthorized("로그인이 필요해요."));
+        if (name != null) {
+            String clean = name.trim();
+            if (clean.isEmpty()) {
+                throw ApiException.badRequest("이름이 비어 있어요.");
+            }
+            if (clean.length() > 80) {
+                throw ApiException.badRequest("이름이 너무 길어요.");
+            }
+            user.setName(clean);
+        }
+        if (bio != null) {
+            String clean = bio.strip();
+            if (clean.length() > 80) {
+                throw ApiException.badRequest("한 줄 소개는 80자까지예요.");
+            }
+            user.setBio(clean.isEmpty() ? null : clean);
+        }
+        return of(me, me.id());
+    }
+
+    /**
+     * 함께한 사람 — 이 사람과 같은 모임에 든 사람 수(자기 빼고, 겹치면 한 번).
+     *
+     * <p>「2026년 9월부터」 대신 서는 기록입니다. 가입한 달은 그 사람에 대해
+     * 아무것도 말하지 않지만, 몇 사람과 다녀 왔나는 이 앱에서의 그 사람입니다.
+     */
+    private long companionsOf(String userId) {
+        Set<String> groups = new HashSet<>();
+        for (GroupMember m : members.findAllByIdUserId(userId)) {
+            groups.add(m.getId().getGroupId());
+        }
+        Set<String> people = new HashSet<>();
+        for (String g : groups) {
+            for (GroupMember m : members.findAllByIdGroupId(g)) {
+                people.add(m.getId().getUserId());
+            }
+        }
+        people.remove(userId);
+        return people.size();
     }
 
     /**
@@ -104,8 +156,8 @@ public class ProfileService {
      * @param mark 골라 둔 표식. 안 골랐으면 비어 있고, 화면이 로고를 세웁니다
      * @param mine 내 것인지. 「내 계정」 줄을 붙일지를 이걸로 정합니다
      */
-    public record Profile(String id, String name, String mark, Instant since,
-                          boolean mine, Counts counts) {
+    public record Profile(String id, String name, String mark, String bio, Instant since,
+                          boolean mine, long companions, Counts counts) {
     }
 
     /**

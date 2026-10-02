@@ -1,34 +1,53 @@
+import Constants from 'expo-constants';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { api } from '@/api/client';
-import type { Profile, TripSummary } from '@/api/types';
+import { api, ApiError, UNEXPECTED } from '@/api/client';
+import type { PostPage, Profile, Spend, TripDetail, TripSummary } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
 import { FeedList } from '@/components/feed-list';
+import { TipSheet } from '@/components/tip-sheet';
 import { TripCalendar } from '@/components/trip-calendar';
+import { TripThumb } from '@/components/trip-thumb';
+import { glyphOf } from '@/constants/place-icons';
+import { formatNights, formatSpan, todayIso } from '@/lib/countdown';
+import { money } from '@/lib/money';
 import { Colors, Radius, Spacing, Type } from '@/constants/theme';
 import { markOf } from '@/constants/user-marks';
 import {
   Band,
   Body,
+  BottomSheet,
+  Button,
   Caption,
   ErrorNote,
+  Field,
   Grow,
   Icon,
   ListRow,
   Loading,
+  Mark,
+  Press,
   Row,
   Screen,
   SectionHeader,
+  Split,
   Tabs,
   Title,
 } from '@/ui';
 import { LogoSymbol } from '@/ui/logo';
 
 /** 어느 묶음을 보고 있나. */
-type Lane = 'feed' | 'calendar' | 'reviews';
+/*
+  여행기 · 피드 · 리뷰 · 달력.
+
+  <p>내 피드 · 달력 · 리뷰였습니다. 「무엇을 다녀왔나」가 어디에도 없어서,
+  여행을 다섯 번 다녀온 사람의 마이페이지도 피드가 비면 빈 화면이었습니다.
+  내놓은 여행기와 다녀온 여행을 맨 앞 칸에 둡니다.
+*/
+type Lane = 'trips' | 'feed' | 'reviews' | 'calendar';
 
 /**
  * 마이페이지 (G-10).
@@ -61,7 +80,10 @@ export default function Me() {
     [whose],
   );
 
-  const [lane, setLane] = useState<Lane>('feed');
+  const [lane, setLane] = useState<Lane>('trips');
+  const [editing, setEditing] = useState(false);
+  /* 달력에서 누른 날. 그날 장소와 쓴 돈을 달력 아래에 그립니다. */
+  const [picked, setPicked] = useState<string | null>(null);
   const me = profile.data;
 
   /*
@@ -105,8 +127,23 @@ export default function Me() {
             </View>
             <Grow gap={Spacing.s1}>
               <Title>{me.name}</Title>
-              <Caption tone="secondary">{sinceOf(me.since)}부터</Caption>
+              {/* 한 줄 소개. 내 것인데 비어 있으면 적을 자리라고 알립니다. */}
+              {me.bio ? (
+                <Body small tone="secondary">
+                  {me.bio}
+                </Body>
+              ) : me.mine ? (
+                <Caption tone="muted">한 줄 소개를 적어 보세요</Caption>
+              ) : null}
+              {/* 가입한 달 대신 기록. 가입한 달은 그 사람에 대해 아무것도 말하지
+                  않습니다. */}
+              <Caption tone="secondary">
+                {`여행 ${me.counts.trips}번 · 함께한 사람 ${me.companions ?? 0}명`}
+              </Caption>
             </Grow>
+            {me.mine ? (
+              <Button label="프로필 편집" variant="secondary" compact onPress={() => setEditing(true)} />
+            ) : null}
           </Row>
 
           {/*
@@ -117,25 +154,34 @@ export default function Me() {
             늘어놓습니다.
           */}
           <Row style={styles.counts}>
-            <Tally n={me.counts.trips} what="여행" />
-            <Tally n={me.counts.posts} what="글" />
-            <Tally n={me.counts.reviews} what="리뷰" />
-            <Tally n={me.counts.groups} what="모임" />
+            <Tally n={me.counts.trips} what="여행" onPress={() => setLane('trips')} />
+            <Tally n={me.counts.posts} what="글" onPress={() => setLane('feed')} />
+            <Tally n={me.counts.reviews} what="리뷰" onPress={() => setLane('reviews')} />
+            <Tally
+              n={me.counts.groups}
+              what="모임"
+              onPress={me.mine ? () => router.push('/(app)/groups') : undefined}
+            />
           </Row>
+
+          {me.mine ? <Footprint /> : null}
 
           <Band />
 
           <Tabs
             items={[
-              { value: 'feed', label: me.mine ? '내 피드' : '피드' },
+              { value: 'trips' as Lane, label: '여행기' },
+              { value: 'feed' as Lane, label: '피드' },
+              { value: 'reviews' as Lane, label: '리뷰' },
               ...(me.mine ? [{ value: 'calendar' as Lane, label: '달력' }] : []),
-              { value: 'reviews', label: '리뷰' },
             ]}
             value={lane}
             onChange={setLane}
           />
 
-          {lane === 'calendar' ? (
+          {lane === 'trips' ? (
+            <Journals mine={me.mine} trips={trips.data?.trips ?? []} />
+          ) : lane === 'calendar' ? (
             /*
               나는 언제 어디 가지.
 
@@ -143,11 +189,15 @@ export default function Me() {
               모임 이름을 줄에 붙입니다 — 모임 캘린더와 달리 여기서는
               어느 모임 것인지가 안 보이면 「이게 뭐였지」가 됩니다.
             */
-            <TripCalendar
-              trips={trips.data?.trips ?? []}
-              showGroup
-              onOpen={(t) => router.push({ pathname: '/trip/[id]', params: { id: t.id } })}
-            />
+            <>
+              <TripCalendar
+                trips={trips.data?.trips ?? []}
+                showGroup
+                onOpen={(t) => router.push({ pathname: '/trip/[id]', params: { id: t.id } })}
+                onPick={setPicked}
+              />
+              {picked ? <DayDetail iso={picked} trips={trips.data?.trips ?? []} /> : null}
+            </>
           ) : lane === 'feed' ? (
             /*
               내 것일 때만 FeedList 를 씁니다.
@@ -158,7 +208,7 @@ export default function Me() {
               보이려면 어느 모임을 통해 보이는지부터 정해야 합니다.
             */
             me.mine ? (
-              <FeedList />
+              <FeedList compact />
             ) : (
               <Caption tone="secondary">
                 남의 피드는 아직 못 봐요. 같은 모임의 피드에서 볼 수 있어요.
@@ -169,6 +219,13 @@ export default function Me() {
           )}
 
           {/* 내 것에만 붙습니다. 남의 계정 설정을 열 수는 없습니다. */}
+          {/*
+            설정 묶음.
+
+            <p>「내 계정」 한 줄뿐이었습니다. 알림 · 기기 안에서 처리하기 · 저장이
+            어디 있는지는 내 계정 안을 열어 봐야 알았습니다. 자주 찾는 것을
+            여기 줄로 늘어놓습니다 — 들어가면 같은 설정 화면입니다.
+          */}
           {me.mine ? (
             <>
               <Band />
@@ -177,10 +234,45 @@ export default function Me() {
                 title="내 계정"
                 subtitle={user?.email ?? undefined}
                 right={<Icon name="chevron-right" size={20} tone="muted" />}
-                last
                 onPress={() => router.push('/(app)/settings')}
               />
+              <ListRow
+                left={<Icon name="bell" size={24} tone="secondary" />}
+                title="알림 · 기기 안에서 처리하기"
+                right={<Icon name="chevron-right" size={20} tone="muted" />}
+                onPress={() => router.push('/(app)/settings')}
+              />
+              <ListRow
+                left={<Icon name="bookmark" size={24} tone="secondary" />}
+                title="저장"
+                right={<Icon name="chevron-right" size={20} tone="muted" />}
+                last={user?.role !== 'ADMIN'}
+                onPress={() => router.push('/(app)/saved')}
+              />
+              {user?.role === 'ADMIN' ? (
+                <ListRow
+                  left={<Icon name="users" size={24} tone="secondary" />}
+                  title="운영 관리"
+                  subtitle="계정 관리 · 감사 로그"
+                  right={<Icon name="chevron-right" size={20} tone="muted" />}
+                  last
+                  onPress={() => router.push('/admin')}
+                />
+              ) : null}
+              <Caption tone="muted">FIT {Constants.expoConfig?.version ?? ''}</Caption>
             </>
+          ) : null}
+
+          {me.mine ? (
+            <ProfileSheet
+              visible={editing}
+              profile={me}
+              onClose={() => setEditing(false)}
+              onSaved={() => {
+                setEditing(false);
+                profile.reload();
+              }}
+            />
           ) : null}
         </>
       ) : null}
@@ -190,36 +282,299 @@ export default function Me() {
 
 
 /** 숫자 하나. */
-function Tally({ n, what }: { n: number; what: string }) {
-  return (
-    <View style={styles.tally}>
+/**
+ * 숫자 하나. 누르면 그 목록으로 갑니다.
+ *
+ * <p>누를 수 있다는 것을 옅은 회색 면으로 말합니다. 맨 숫자만 있으면 그냥
+ * 적힌 값으로 읽혀서 아무도 안 눌렀습니다.
+ */
+function Tally({ n, what, onPress }: { n: number; what: string; onPress?: () => void }) {
+  const body = (
+    <>
       <Text style={styles.tallyNum}>{n}</Text>
       <Caption tone="secondary">{what}</Caption>
-    </View>
+    </>
+  );
+  return onPress ? (
+    <Press onPress={onPress} scale={0.96} accessibilityLabel={`${what} ${n}`} style={[styles.tally, styles.tallyOn]}>
+      {body}
+    </Press>
+  ) : (
+    <View style={styles.tally}>{body}</View>
+  );
+}
+
+type Reviews = {
+  reviews: { placeId: string; name?: string | null; stars?: number | null; text?: string | null; at: string }[];
+  unreviewed: { placeId: string; name: string; icon?: string | null }[];
+};
+
+/**
+ * 남긴 리뷰들 — 장소 이름 · 별 · 한 줄.
+ *
+ * <p>이름은 서버가 내 일정의 장소에서 같은 구글 번호로 이어 붙여 줍니다.
+ * 구글에 묻지 않습니다(MyRecordService). 일정에도 보석함에도 없는 곳이면
+ * 「이름 모르는 곳」입니다.
+ *
+ * <p>아래에 <b>다녀온 곳 중 아직 안 남긴 곳</b>. 누르면 그 자리에서 별을
+ * 남깁니다 — 빈 탭을 채우는 길이 그대로 리뷰를 늘리는 길입니다.
+ */
+function MyReviews({ whose, count }: { whose: string | null; count: number }) {
+  const { data, reload } = useAsync<Reviews>(
+    (signal) => (whose ? Promise.resolve({ reviews: [], unreviewed: [] }) : api.get('/api/me/reviews', signal)),
+    [whose],
+  );
+  const [tipFor, setTipFor] = useState<{ placeId: string; name: string } | null>(null);
+  if (whose) {
+    return <Caption tone="secondary">남이 남긴 리뷰는 장소에서 볼 수 있어요.</Caption>;
+  }
+  const reviews = data?.reviews ?? [];
+  const rest = data?.unreviewed ?? [];
+  return (
+    <>
+      <SectionHeader title="내가 남긴 것" tight note={`별점을 준 것 ${count}개`} />
+      {reviews.length === 0 ? (
+        <Caption tone="secondary">장소 상세에서 남긴 별점과 한 줄이 여기 모여요.</Caption>
+      ) : null}
+      {reviews.map((rv, i) => (
+        <View key={`${rv.placeId}-${i}`} style={styles.review}>
+          <Split>
+            <Body strong numberOfLines={1}>
+              {rv.name ?? '이름 모르는 곳'}
+            </Body>
+            {rv.stars ? <Caption tone="brand">{'★'.repeat(rv.stars)}</Caption> : null}
+          </Split>
+          {rv.text ? <Body small tone="secondary">{rv.text}</Body> : null}
+        </View>
+      ))}
+      <TipReach />
+
+      {rest.length > 0 ? (
+        <>
+          <SectionHeader title="다녀온 곳 중 아직 안 남긴 곳" tight />
+          {rest.map((v, i) => (
+            <ListRow
+              key={v.placeId}
+              left={<Mark icon={glyphOf(v.icon)} />}
+              title={v.name}
+              right={<Caption tone="brand" strong>별점 남기기</Caption>}
+              last={i === rest.length - 1}
+              onPress={() => setTipFor({ placeId: v.placeId, name: v.name })}
+            />
+          ))}
+        </>
+      ) : null}
+
+      {tipFor ? (
+        <TipSheet
+          visible
+          placeId={tipFor.placeId}
+          placeName={tipFor.name}
+          onClose={() => {
+            setTipFor(null);
+            reload();
+          }}
+          onChanged={reload}
+        />
+      ) : null}
+    </>
   );
 }
 
 /**
- * 남긴 리뷰들.
+ * 다녀온 곳 — 끝난 여행에서 일정에 넣었던 곳.
  *
- * <p>장소 이름을 여기서 알 수 없습니다. 리뷰는 <b>구글 장소 번호</b>에
- * 달려 있고(그래야 남의 일정에서도 쌓입니다), 그 번호를 이름으로 바꾸려면
- * 구글에 한 번 더 물어야 합니다 — 리뷰 열한 개면 열한 번입니다.
+ * <p>도장(다녀옴 표시)은 뺐습니다. 그래서 세는 것은 <b>일정에 넣었던 곳</b>이고,
+ * 안 간 곳도 섞입니다. 그 말을 카드에 그대로 적습니다(plan-review Q10).
+ * 도시 · 나라 이름은 좌표만으로는 안 나와서 안 셉니다.
  *
- * <p>그래서 이름은 서버가 같이 보내 줄 때까지 번호를 안 보여 주고 별과 글만
- * 둡니다. 「어디였지」를 묻게 되는 자리라, 다음 묶음에서 장소 이름을 함께
- * 내려받게 고칩니다.
+ * <p>지도는 누를 때만 폅니다. 마이페이지를 열 때마다 지도를 받으면 그 값이
+ * 열 때마다 듭니다.
  */
-function MyReviews({ whose, count }: { whose: string | null; count: number }) {
-  if (whose) {
-    return <Caption tone="secondary">남이 남긴 리뷰는 장소에서 볼 수 있어요.</Caption>;
+function Footprint() {
+  const router = useRouter();
+  const { data } = useAsync<{ places: number; trips: number }>(
+    (signal) => api.get('/api/me/visited', signal),
+    [],
+  );
+  if (!data || data.trips === 0) {
+    return null;
   }
   return (
+    <Press onPress={() => router.push('/(app)/trips')} scale={0.99} style={styles.footprint}>
+      <Mark icon="map-pin" />
+      <Grow gap={2}>
+        <Body strong>{`다녀온 여행 ${data.trips}번 · 일정에 넣었던 곳 ${data.places}곳`}</Body>
+        <Caption tone="muted">일정에 넣고 안 간 곳도 함께 세요.</Caption>
+      </Grow>
+      <Icon name="chevron-right" size={18} tone="muted" />
+    </Press>
+  );
+}
+
+/**
+ * 여행기 칸 — 내놓은 여행기와 다녀온 여행.
+ *
+ * <p>내놓은 것은 둘러보기에서 남이 보는 것이고, 다녀온 것은 나만 보는
+ * 영수증입니다. 둘을 한 칸에 둡니다 — 「내가 어디를 다녀왔나」의 두 얼굴입니다.
+ */
+function Journals({ mine, trips }: { mine: boolean; trips: TripSummary[] }) {
+  const router = useRouter();
+  const posted = useAsync<PostPage>(
+    (signal) => (mine ? api.get('/api/posts/mine', signal) : Promise.resolve(null as unknown as PostPage)),
+    [mine],
+  );
+  if (!mine) {
+    return <Caption tone="secondary">이 사람이 내놓은 여행기는 둘러보기에서 볼 수 있어요.</Caption>;
+  }
+  const today = todayIso();
+  const done = trips
+    .filter((t) => t.endIso != null && t.endIso < today)
+    .sort((a, b) => (b.endIso ?? '').localeCompare(a.endIso ?? ''));
+  const posts = posted.data?.posts ?? [];
+  return (
     <>
-      <SectionHeader title="내가 남긴 것" tight note={`별점을 준 것 ${count}개`} />
-      <Caption tone="secondary">장소 상세에서 남긴 별점과 한 줄이 여기 모여요.</Caption>
-      <TipReach />
+      {posts.length > 0 ? <SectionHeader title="내놓은 여행기" tight /> : null}
+      {posts.map((p, i) => (
+        <Press
+          key={p.id}
+          onPress={() => router.push({ pathname: '/community/[id]', params: { id: p.id } })}
+          scale={0.99}
+          style={styles.journal}>
+          <TripThumb postId={p.id} coverPhotoId={p.coverPhotoId} height={64} label={p.title} />
+          <Grow gap={2}>
+            <Body strong numberOfLines={1}>
+              {p.title}
+            </Body>
+            <Caption tone="muted">
+              {[p.region, formatNights(p.dayCount), `${p.placeCount}곳`].filter(Boolean).join(' · ')}
+            </Caption>
+          </Grow>
+        </Press>
+      ))}
+      <SectionHeader title="다녀온 여행" tight={posts.length === 0} />
+      {done.length === 0 ? (
+        <Caption tone="secondary">다녀온 여행이 생기면 여기 영수증으로 모여요.</Caption>
+      ) : null}
+      {done.map((t, i) => (
+        <ListRow
+          key={t.id}
+          left={<Mark icon="book-open" />}
+          title={t.title}
+          subtitle={`${formatSpan(t.startIso, t.endIso)} · ${t.placeCount}곳`}
+          last={i === done.length - 1}
+          onPress={() => router.push({ pathname: '/card/[id]', params: { id: t.id } })}
+        />
+      ))}
     </>
+  );
+}
+
+/**
+ * 달력에서 누른 날 — 그날 일정 장소와 쓴 돈.
+ *
+ * <p>그날 걸치는 여행만 한 번 더 받습니다. 달력을 그리려고 모든 여행의 장소를
+ * 미리 받지 않습니다.
+ */
+function DayDetail({ iso, trips }: { iso: string; trips: TripSummary[] }) {
+  const trip = trips.find((t) => t.startIso != null && t.startIso <= iso && (t.endIso ?? t.startIso) >= iso) ?? null;
+  const detail = useAsync<TripDetail | null>(
+    (signal) => (trip ? api.get(`/api/trip?trip=${encodeURIComponent(trip.id)}`, signal) : Promise.resolve(null)),
+    [trip?.id],
+  );
+  const spent = useAsync<{ expenses: Spend[] }>(
+    (signal) =>
+      trip ? api.get(`/api/trips/${encodeURIComponent(trip.id)}/expenses`, signal) : Promise.resolve({ expenses: [] }),
+    [trip?.id],
+  );
+  if (!trip) {
+    return null;
+  }
+  const day = detail.data?.days.find((d) => d.iso === iso) ?? null;
+  const sums = new Map<string, { sum: number; decimals: number }>();
+  for (const e of spent.data?.expenses ?? []) {
+    if (day && e.dayId === day.id) {
+      const was = sums.get(e.currency) ?? { sum: 0, decimals: e.decimals };
+      sums.set(e.currency, { sum: was.sum + e.amount, decimals: e.decimals });
+    }
+  }
+  return (
+    <View style={styles.dayDetail}>
+      <Caption tone="secondary">{`${trip.title}${day ? ` · ${day.label}` : ''}`}</Caption>
+      {day && day.places.length > 0 ? (
+        day.places.map((pl) => (
+          <Body key={pl.id} small>
+            {pl.time ? `${pl.time}  ` : ''}
+            {pl.name}
+          </Body>
+        ))
+      ) : (
+        <Caption tone="muted">이날 넣어 둔 곳이 없어요.</Caption>
+      )}
+      {sums.size > 0 ? (
+        <Caption tone="secondary">
+          쓴 돈 {[...sums.entries()].map(([c, t]) => money(t.sum, c, t.decimals)).join(' · ')}
+        </Caption>
+      ) : null}
+    </View>
+  );
+}
+
+/** 이름과 한 줄 소개 고치기. 얼굴(표식)은 내 계정 화면에서 고릅니다. */
+function ProfileSheet({
+  visible,
+  profile,
+  onClose,
+  onSaved,
+}: {
+  visible: boolean;
+  profile: Profile;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const router = useRouter();
+  const [name, setName] = useState(profile.name);
+  const [bio, setBio] = useState(profile.bio ?? '');
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
+
+  async function save() {
+    setBusy(true);
+    setFailed(null);
+    try {
+      await api.patch('/api/me/profile', { name, bio });
+      onSaved();
+    } catch (e) {
+      setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <BottomSheet
+      visible={visible}
+      title="프로필 편집"
+      onClose={onClose}
+      footer={<Button label="저장" busy={busy} onPress={save} />}>
+      <Field label="이름" value={name} onChangeText={setName} maxLength={80} />
+      <Field
+        label="한 줄 소개"
+        value={bio}
+        onChangeText={setBio}
+        placeholder="먹으러 다니는 여행러"
+        limit={80}
+      />
+      {failed ? <ErrorNote message={failed} /> : null}
+      <Button
+        label="지도에 쓰는 얼굴 고르기"
+        variant="ghost"
+        onPress={() => {
+          onClose();
+          router.push('/(app)/settings');
+        }}
+      />
+    </BottomSheet>
   );
 }
 
@@ -251,12 +606,40 @@ function TipReach() {
   );
 }
 
-function sinceOf(iso: string) {
-  const at = new Date(iso);
-  return `${at.getFullYear()}년 ${at.getMonth() + 1}월`;
-}
 
 const styles = StyleSheet.create({
+  /* 누를 수 있는 숫자. 옅은 회색 면이 「눌린다」를 말합니다. */
+  tallyOn: {
+    backgroundColor: Colors.fill,
+    borderRadius: Radius.r2,
+    paddingVertical: Spacing.s2,
+  },
+  footprint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.s3,
+    padding: Spacing.s3,
+    borderRadius: 12,
+    backgroundColor: Colors.accentSoft,
+  },
+  review: {
+    gap: 2,
+    paddingVertical: Spacing.s2,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.divider,
+  },
+  journal: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.s3,
+    paddingVertical: Spacing.s2,
+  },
+  dayDetail: {
+    gap: Spacing.s1,
+    padding: Spacing.s3,
+    borderRadius: 12,
+    backgroundColor: Colors.fill,
+  },
   who: {
     minHeight: 88,
     alignItems: 'center',

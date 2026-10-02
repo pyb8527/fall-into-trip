@@ -873,9 +873,13 @@ export type Profile = {
   name: string;
   /** 골라 둔 표식. 안 골랐으면 없고, 화면이 로고를 세웁니다 */
   mark?: string | null;
+  /** 한 줄 소개. 안 적었으면 없습니다 */
+  bio?: string | null;
   /** 가입한 때 */
   since: string;
   mine: boolean;
+  /** 같은 모임에 든 사람 수(자기 빼고, 겹치면 한 번) */
+  companions?: number;
   counts: {
     /** 내가 만든 여행. 남이 만든 모임 여행은 안 셉니다 */
     trips: number;

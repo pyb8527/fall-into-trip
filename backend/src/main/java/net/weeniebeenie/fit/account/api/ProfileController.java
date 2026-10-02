@@ -5,6 +5,8 @@ import net.weeniebeenie.fit.account.application.ProfileService;
 import net.weeniebeenie.fit.account.infrastructure.security.AuthPrincipal;
 import net.weeniebeenie.fit.account.infrastructure.security.CurrentUser;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -25,6 +27,15 @@ public class ProfileController {
     @GetMapping("/api/me/profile")
     public ProfileService.Profile mine(@CurrentUser AuthPrincipal me) {
         return profiles.of(me, null);
+    }
+
+    /** 이름과 한 줄 소개. 늘 제 것만 고칩니다. */
+    @PatchMapping("/api/me/profile")
+    public ProfileService.Profile edit(@CurrentUser AuthPrincipal me, @RequestBody EditBody body) {
+        return profiles.edit(me, body == null ? null : body.name(), body == null ? null : body.bio());
+    }
+
+    public record EditBody(String name, String bio) {
     }
 
     @GetMapping("/api/users/{userId}/profile")
