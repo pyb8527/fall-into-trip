@@ -778,6 +778,30 @@ export type Tip = {
 };
 
 /**
+ * 마이페이지가 받는 것 — 이 사람이 어떤 여행을 해 왔나.
+ *
+ * <p>내 것과 남의 것이 같은 꼴입니다. {@code mine} 으로만 갈립니다 —
+ * 내 것에만 「내 계정」 줄이 붙습니다.
+ */
+export type Profile = {
+  id: string;
+  name: string;
+  /** 골라 둔 표식. 안 골랐으면 없고, 화면이 로고를 세웁니다 */
+  mark?: string | null;
+  /** 가입한 때 */
+  since: string;
+  mine: boolean;
+  counts: {
+    /** 내가 만든 여행. 남이 만든 모임 여행은 안 셉니다 */
+    trips: number;
+    posts: number;
+    /** 별점을 준 것만. 한 줄만 남긴 것은 리뷰로 안 셉니다 */
+    reviews: number;
+    groups: number;
+  };
+};
+
+/**
  * 한 장소의 우리 별점.
  *
  * <p>구글 평점과 나란히 섭니다. 다르면 그것이 정보입니다 — 구글 4.2 에

@@ -81,7 +81,14 @@ export default function AppLayout() {
           라고 적혀 있었습니다. */}
       <Stack.Screen name="search" options={stackHeader('검색', { up: '/(app)/home' })} />
       <Stack.Screen name="news" options={stackHeader('알림', { up: '/(app)/home' })} />
-      <Stack.Screen name="settings" options={stackHeader('내 계정', { up: '/(app)/home' })} />
+      {/*
+        마이페이지.
+
+        <p>제 상단바를 직접 세웁니다(큰 제목 + 뒤로) — 다른 갈래 루트들과
+        같은 꼴입니다. 그래서 여기서는 막대를 걷습니다.
+      */}
+      <Stack.Screen name="me" options={{ headerShown: false }} />
+      <Stack.Screen name="settings" options={stackHeader('내 계정', { up: '/(app)/me' })} />
     </Stack>
   );
 }

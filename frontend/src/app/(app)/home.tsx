@@ -259,7 +259,7 @@ export default function Home() {
               onPress={() => router.push('/(app)/news')}
             />
             {/*
-              내 계정으로 가는 자리.
+              마이페이지로 가는 자리.
 
               <p>표식을 골라 둔 사람은 그 이모지가, 안 고른 사람은 로고가
               섭니다. 이름의 첫 글자를 쓰지 않습니다 — 「박」 이 든 동그라미는
@@ -267,7 +267,7 @@ export default function Home() {
               자리가 있습니다(내 계정 → 내 표식).
             */}
             <Press
-              onPress={() => router.push('/(app)/settings')}
+              onPress={() => router.push('/(app)/me')}
               accessibilityLabel="내 계정"
               hitSlop={Tap.compactSlop}
               style={styles.face}>
