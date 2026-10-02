@@ -24,6 +24,7 @@ import { PlaceForm } from '@/components/place-form';
 import { SavedPicker } from '@/components/saved-picker';
 import { PublishForm } from '@/components/publish-form';
 import { TipSheet } from '@/components/tip-sheet';
+import { TripAlbum } from '@/components/trip-album';
 import { TripMap, type MapPlace } from '@/components/trip-map';
 import { iconOf, labelOf } from '@/constants/place-icons';
 import { faceOf } from '@/constants/user-marks';
@@ -1520,6 +1521,23 @@ export default function TripScreen() {
             </View>
           ) : null,
         )}
+
+        {/*
+          이 여행의 사진.
+
+          <p>피드에 올린 사진을 여행으로 모아 봅니다. 날짜 묶음 아래, 지도
+          패널 안 맨 끝입니다 — 「다녀와서 보는 것」이라 짜는 자리보다
+          뒤입니다.
+
+          <p>한 장도 없으면 칸 자체가 안 섭니다. 「아직 없어요」를 띄우면
+          올리라는 재촉으로 읽힙니다.
+        */}
+        <TripAlbum
+          tripId={id}
+          onOpen={(post) =>
+            router.push({ pathname: '/community/[id]', params: { id: post.id } })
+          }
+        />
 
       </MapAside>
 

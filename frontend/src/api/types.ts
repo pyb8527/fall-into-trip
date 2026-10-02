@@ -941,7 +941,12 @@ export type NewsItem = {
     | 'candidate.add'
     | 'candidate.vote'
     | 'post.like'
-    | 'post.comment';
+    | 'post.comment'
+    /* 모임에 걸리는 것 셋. 피드와 모임이 생긴 뒤 비어 있던 자리입니다 —
+       글이 올라와도 들어가서 보지 않으면 몰랐습니다. */
+    | 'feed.post'
+    | 'feed.comment'
+    | 'group.join';
   /**
    * 한 일을 한 사람. 지워진 계정이면 "누군가" 입니다.
    *

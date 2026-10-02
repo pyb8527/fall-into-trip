@@ -74,6 +74,7 @@ public class NewsService {
 
     private final NewsFeed feed;
     private final TripAccessPolicy access;
+    private final net.weeniebeenie.fit.group.domain.GroupMemberRepository members;
     private final UserRepository users;
 
     /**
@@ -115,6 +116,10 @@ public class NewsService {
         Instant seenAt = users.findById(me.id()).map(User::getNewsSeenAt).orElse(null);
 
         List<String> tripIds = access.tripIdsOf(me.id());
+        /* 내가 든 모임들. 모임에 걸리는 소식 셋이 이것을 씁니다. */
+        List<String> groupIds = members.findAllByIdUserId(me.id()).stream()
+                .map(m -> m.getId().getGroupId())
+                .toList();
 
         List<Item> rows = new ArrayList<>();
         for (PlaceRow r : feed.places(tripIds, me.id(), since, LIMIT)) {
@@ -147,6 +152,39 @@ public class NewsService {
                     one ? quoted(r.postTitle()) + " 를 추천했어요."
                         : quoted(r.postTitle()) + " 를 " + r.people() + "명이 추천했어요."));
         }
+        /*
+          모임에 올라온 피드 글.
+
+          <p>2단계에서 피드를 만들 때 비워 둔 자리입니다. 글이 올라와도
+          들어가서 보지 않으면 몰랐습니다.
+        */
+        for (GroupRow r : feed.feedPosts(groupIds, me.id(), since, LIMIT)) {
+            boolean one = r.people() == 1;
+            rows.add(inGroup(r.at(), "feed.post", one ? r.actorId() : null,
+                    r.groupId(), r.groupName(),
+                    one ? "피드에 글을 올렸어요."
+                        : "피드에 글 " + r.people() + "개가 올라왔어요."));
+        }
+
+        /* 내 피드 글에 달린 댓글. 모임 이름이 없습니다 — 그룹 없이 올린
+           글에도 댓글이 달립니다. */
+        for (GroupRow r : feed.feedComments(me.id(), since, LIMIT)) {
+            boolean one = r.people() == 1;
+            rows.add(inGroup(r.at(), "feed.comment", one ? r.actorId() : null,
+                    null, null,
+                    one ? "내 피드 글에 댓글을 남겼어요."
+                        : "내 피드 글에 " + r.people() + "명이 댓글을 남겼어요."));
+        }
+
+        /* 모임에 들어온 사람. */
+        for (GroupRow r : feed.joins(groupIds, me.id(), since, LIMIT)) {
+            boolean one = r.people() == 1;
+            rows.add(inGroup(r.at(), "group.join", one ? r.actorId() : null,
+                    r.groupId(), r.groupName(),
+                    one ? "모임에 들어왔어요."
+                        : r.people() + "명이 모임에 들어왔어요."));
+        }
+
         for (PostAggRow r : feed.comments(me.id(), since, LIMIT)) {
             boolean one = r.people() == 1;
             rows.add(inPost(r.at(), "post.comment", one ? r.actorId() : null,
@@ -197,6 +235,25 @@ public class NewsService {
                                String tripId, String tripTitle, String text) {
         return new Item(at, kind, actorId, tripId, tripTitle, null, null,
                 text, "/trip/" + tripId, false);
+    }
+
+    /**
+     * 모임에 걸리는 한 줄.
+     *
+     * <h3>모임 이름은 「어디에서」 자리에 담습니다</h3>
+     *
+     * <p>화면이 {@code tripTitle ?? postTitle} 을 그 자리에 적습니다
+     * ({@code news.tsx}). 모임 이름을 담을 칸이 따로 없는데, 칸을 하나 더
+     * 두면 <b>모든 소식이 쓰지 않는 칸을 하나씩</b> 들고 다닙니다 — 여행
+     * 이름을 적는 칸을 그대로 씁니다.
+     *
+     * <p>모임 번호는 안 담습니다. 담으면 화면이 그 번호로 <b>여행</b>을
+     * 열려고 합니다. 어디로 갈지는 {@code url} 이 들고 있습니다.
+     */
+    private static Item inGroup(Instant at, String kind, String actorId,
+                                String groupId, String groupName, String text) {
+        return new Item(at, kind, actorId, null, groupName, null, null,
+                text, groupId == null ? "/(app)/news" : "/group/" + groupId, false);
     }
 
     private static Item inPost(Instant at, String kind, String actorId,

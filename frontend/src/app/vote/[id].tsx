@@ -83,9 +83,44 @@ export default function Vote() {
   const agreed = useMemo(() => all.filter((c) => c.agreed), [all]);
   /* 보기를 걸러도 아래 단추는 <b>정해진 전부</b>를 넣습니다. 거르는 것은
      보는 방식이고, 넣는 것은 실제로 일어나는 일입니다. */
-  const shown = all.filter((c) =>
-    view === 'all' ? true : view === 'agreed' ? c.agreed : !c.agreed,
-  );
+  /*
+    줄 세우는 순서 (verdict 3번).
+
+    <h3>정하는 규칙은 안 바꿉니다</h3>
+
+    <p>조사한 앱들은 <b>득표순에 마감</b>을 붙입니다 — 마감까지 답이 없으면
+    많이 받은 것으로 정해집니다. 이 앱은 그렇게 안 합니다. 「합의는 전원
+    동의」이고, 표 안 던진 사람은 <b>미정</b>입니다({@code CandidateService}).
+    마감으로 밀어붙이면 안 간다고 한 사람을 끌고 가는 셈입니다.
+
+    <p>받은 것은 <b>순서만</b>입니다. 결정 규칙도, 마감도, 기본값도 안
+    받습니다. 순서는 아무 말도 강요하지 않으면서 「지금 어디까지 왔나」를
+    보여 줍니다.
+
+    <p>차례는 셋입니다.
+    <ol>
+      <li>합의된 것 — 이미 모두 좋다고 한 것</li>
+      <li>반대가 없는 것 — 아직 덜 모였지만 막는 사람은 없는 것</li>
+      <li>나머지 — 반대가 있는 것. 좋아요가 많은 쪽을 위로</li>
+    </ol>
+
+    <p>「누가 아직 안 답했나」는 여전히 안 보여 줍니다. 그것은 눈치입니다.
+  */
+  const shown = useMemo(() => {
+    const picked = all.filter((c) =>
+      view === 'all' ? true : view === 'agreed' ? c.agreed : !c.agreed,
+    );
+    const rank = (c: Candidate) => (c.agreed ? 0 : c.no === 0 ? 1 : 2);
+    return [...picked].sort((a, b) => {
+      const byRank = rank(a) - rank(b);
+      if (byRank !== 0) {
+        return byRank;
+      }
+      /* 같은 자리에서는 좋아요가 많은 쪽이 위입니다. 그것도 같으면 들어온
+         차례 그대로 둡니다 — 흔들면 볼 때마다 순서가 바뀝니다. */
+      return b.yes - a.yes;
+    });
+  }, [all, view]);
 
   async function vote(candidate: Candidate, yes: boolean | null) {
     setFailed(null);

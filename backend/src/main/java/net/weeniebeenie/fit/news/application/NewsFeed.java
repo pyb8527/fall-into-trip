@@ -138,6 +138,103 @@ public class NewsFeed {
     }
 
     /**
+     * 내 모임에 올라온 피드 글. <b>모임마다 한 줄로 접습니다.</b>
+     *
+     * <h3>2단계에서 비워 둔 자리입니다</h3>
+     *
+     * <p>피드를 만들 때 소식은 안 붙였습니다. 그래서 모임에 글이 올라와도
+     * 들어가서 보지 않으면 몰랐습니다 — 피드가 「다니면서 남기는 자리」인데,
+     * 남긴 것이 아무에게도 안 알려졌습니다.
+     *
+     * <p>글마다 한 줄로 올리지 않습니다. 사진 여덟 장을 세 번에 나눠 올린
+     * 사람이 있으면 목록이 그것만으로 찹니다 — 추천·댓글과 같은 판단입니다.
+     *
+     * <p>내 글은 뺍니다. 내가 올린 것이 내 소식함에 뜨면 「내가 없는 동안
+     * 무엇이 바뀌었나」가 아닙니다.
+     */
+    public List<GroupRow> feedPosts(List<String> groupIds, String me, Instant since, int limit) {
+        if (groupIds.isEmpty()) {
+            return List.of();
+        }
+        return em.createQuery("""
+                       SELECT new %sGroupRow(
+                              g.id, g.name, min(p.id), count(p),
+                              max(p.createdAt), min(p.authorId))
+                       FROM Post p, Group g
+                       WHERE p.groupId = g.id
+                         AND p.groupId IN :groupIds
+                         AND p.hidden = false
+                         AND p.createdAt > :since
+                         AND p.authorId <> :me
+                       GROUP BY g.id, g.name
+                       ORDER BY max(p.createdAt) DESC
+                       """.formatted(ROW), GroupRow.class)
+                .setParameter("groupIds", groupIds)
+                .setParameter("me", me)
+                .setParameter("since", since)
+                .setMaxResults(limit)
+                .getResultList();
+    }
+
+    /**
+     * 내 피드 글에 달린 댓글. <b>글마다 한 줄로 접습니다.</b>
+     *
+     * <p>둘러보기 글의 댓글({@link #comments})과 같은 표를 쓰지만 가리키는
+     * 글이 다릅니다 — {@code PostComment.kind} 가 그 둘을 가릅니다(V39).
+     * 한 질의로 묶으면 어느 쪽 글인지 모른 채 번호만 들고 나오게 되고,
+     * 눌렀을 때 엉뚱한 화면으로 갑니다.
+     */
+    public List<GroupRow> feedComments(String me, Instant since, int limit) {
+        return em.createQuery("""
+                       SELECT new %sGroupRow(
+                              p.id, p.id, p.id, count(c),
+                              max(c.createdAt), min(c.userId))
+                       FROM PostComment c, Post p
+                       WHERE c.postId = p.id
+                         AND c.kind = net.weeniebeenie.fit.community.domain.CommentKind.FEED
+                         AND p.authorId = :me AND p.hidden = false
+                         AND c.hidden = false
+                         AND c.createdAt > :since
+                         AND c.userId <> :me
+                       GROUP BY p.id
+                       ORDER BY max(c.createdAt) DESC
+                       """.formatted(ROW), GroupRow.class)
+                .setParameter("me", me)
+                .setParameter("since", since)
+                .setMaxResults(limit)
+                .getResultList();
+    }
+
+    /**
+     * 내 모임에 들어온 사람. <b>모임마다 한 줄로 접습니다.</b>
+     *
+     * <p>초대 링크를 뿌리면 여럿이 한꺼번에 들어옵니다. 한 사람씩 올리면
+     * 그날 소식함이 「○○ 님이 들어왔어요」로만 찹니다.
+     */
+    public List<GroupRow> joins(List<String> groupIds, String me, Instant since, int limit) {
+        if (groupIds.isEmpty()) {
+            return List.of();
+        }
+        return em.createQuery("""
+                       SELECT new %sGroupRow(
+                              g.id, g.name, null, count(m),
+                              max(m.joinedAt), min(m.id.userId))
+                       FROM GroupMember m, Group g
+                       WHERE m.id.groupId = g.id
+                         AND m.id.groupId IN :groupIds
+                         AND m.joinedAt > :since
+                         AND m.id.userId <> :me
+                       GROUP BY g.id, g.name
+                       ORDER BY max(m.joinedAt) DESC
+                       """.formatted(ROW), GroupRow.class)
+                .setParameter("groupIds", groupIds)
+                .setParameter("me", me)
+                .setParameter("since", since)
+                .setMaxResults(limit)
+                .getResultList();
+    }
+
+    /**
      * 내 글에 붙은 추천. <b>글마다 한 줄로 접습니다.</b>
      *
      * <p>내려간 글은 뺍니다. 운영자가 감춘 글의 소식이 글쓴이에게만 남아

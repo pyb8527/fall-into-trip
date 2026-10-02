@@ -315,6 +315,10 @@ function iconOf(kind: NewsItem['kind']): IconName {
       return 'check';
     case 'post.like':
       return 'star';
+    case 'feed.post':
+      return 'image';
+    case 'group.join':
+      return 'users';
     default:
       return 'message-square';
   }
