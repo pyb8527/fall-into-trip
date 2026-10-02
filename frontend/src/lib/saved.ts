@@ -21,6 +21,14 @@ export type Sift = {
   /** 갈래 이름. null 이면 전부 */
   kind: string | null;
   by: SortBy;
+  /**
+   * 가까운순의 기준 — 지금 내 자리.
+   *
+   * <p>없으면 가까운순은 아무 일도 안 합니다({@code sortPlaces}). 그래서
+   * <b>안 주는 자리에서는 그 칩을 아예 안 내야 합니다</b> — 누를 수 있는데
+   * 눌러도 순서가 안 바뀌면 고장으로 읽힙니다.
+   */
+  from?: { lat: number; lng: number } | null;
 };
 
 /**
@@ -42,7 +50,7 @@ export function kindsIn(all: SavedPlace[]) {
  * 이 아니라 화면에 적히는 말("면")로 찾습니다. 쓰는 사람이 보는 것은 그쪽
  * 이고, 영어 이름은 어디에도 안 적혀 있습니다.
  */
-export function siftSaved(all: SavedPlace[], { q, kind, by }: Sift): SavedPlace[] {
+export function siftSaved(all: SavedPlace[], { q, kind, by, from }: Sift): SavedPlace[] {
   const byKind = kind === null ? all : all.filter((p) => p.icon === kind);
   const needle = q.trim().toLowerCase();
   const found = !needle
@@ -52,7 +60,7 @@ export function siftSaved(all: SavedPlace[], { q, kind, by }: Sift): SavedPlace[
           .filter(Boolean)
           .some((field) => String(field).toLowerCase().includes(needle)),
       );
-  return sortPlaces(found, by);
+  return sortPlaces(found, by, from);
 }
 
 /**

@@ -4,7 +4,7 @@ import type { SavedPlace } from '@/api/types';
 import { glyphOf, labelOf } from '@/constants/place-icons';
 import { Colors, Gutter, Spacing } from '@/constants/theme';
 import { savedAgo } from '@/lib/saved';
-import { Body, Button, Caption, Checkbox, Mark, Press } from '@/ui';
+import { Body, Caption, Checkbox, IconButton, Mark, Press } from '@/ui';
 
 /**
  * 보석함의 한 줄.
@@ -27,13 +27,24 @@ import { Body, Button, Caption, Checkbox, Mark, Press } from '@/ui';
  *
  * <h3>판을 벗고 한 줄이 되었습니다</h3>
  *
- * <p>줄마다 흰 판을 두르고, 그 안을 다시 위아래로 갈라 아래쪽에 「자세히」를
- * 두었습니다. 그러면 한 곳이 <b>두 줄 높이</b>를 먹어서 스무 곳을 담아 둔
- * 사람은 화면에 네 곳만 보였습니다. 게다가 바닥이 흰색이 된 뒤로 그 판은
- * 보이지도 않으면서 글자를 안으로 밀어 넣는 일만 했습니다.
+ * <p>줄마다 흰 판을 두르고, 그 안을 다시 위아래로 갈라 아래쪽에 들여다보는
+ * 단추를 두었습니다. 그러면 한 곳이 <b>두 줄 높이</b>를 먹어서 스무 곳을
+ * 담아 둔 사람은 화면에 네 곳만 보였습니다. 게다가 바닥이 흰색이 된 뒤로 그
+ * 판은 보이지도 않으면서 글자를 안으로 밀어 넣는 일만 했습니다.
  *
- * <p>한 줄로 폅니다. 그림·이름·설명이 왼쪽에서 읽히고, 「자세히」는 같은
- * 줄 오른쪽 끝에 작은 단추로 섭니다.
+ * <p>한 줄로 폅니다. 그림·이름·설명이 왼쪽에서 읽히고, 들여다보는 길은 같은
+ * 줄 오른쪽 끝에 ⓘ 하나로 섭니다.
+ *
+ * <h3>「자세히」가 ⓘ 가 되었습니다</h3>
+ *
+ * <p>네 글자 단추였습니다. 줄마다 오른쪽 끝에서 폭을 먹으니 그만큼 이름이
+ * 먼저 잘렸습니다 — 줄에서 가장 중요한 것이 이름인데 가장 덜 중요한 것에
+ * 자리를 내준 꼴입니다. 「자세히」라는 말도 <b>무엇이 열리는지가 아니라
+ * 정도만</b> 말합니다.
+ *
+ * <p>ⓘ 하나로 줄입니다. 글자는 읽어 주는 기기에만 답니다. 보이는 그림은
+ * 작아졌지만 짚는 넓이는 그대로입니다 — {@link IconButton} 이
+ * {@code Tap.min} 을 채웁니다.
  *
  * <h3>고르는 네모는 줄 앞입니다</h3>
  *
@@ -49,7 +60,7 @@ import { Body, Button, Caption, Checkbox, Mark, Press } from '@/ui';
  * 웹에서는 큰 것 안의 작은 것이 함께 눌려, 그림을 바꾸려다 고르기까지
  * 됐습니다.
  *
- * <p>이제 줄을 누르면 <b>지도가 그리로 가고</b>, 「자세히」를 누르면
+ * <p>이제 줄을 누르면 <b>지도가 그리로 가고</b>, ⓘ 를 누르면
  * <b>들여다보고</b>, 네모를 누르면 <b>고릅니다</b>. 길찾기·빼기·그림
  * 바꾸기는 들여다보는 판 안으로 들어갔습니다 — 거기서는 무엇을 하는 것인지
  * 이름이 붙어 있습니다.
@@ -82,7 +93,7 @@ export function SavedRow({
    * 자리에서는 보낼 데가 없습니다.
    */
   onPress?: () => void;
-  /** 들여다보기. 주면 줄 끝에 작은 단추가 붙습니다. */
+  /** 들여다보기. 주면 줄 끝에 ⓘ 가 붙습니다. */
   onLook?: () => void;
   /** 지도에서 켜 둔 것. 목록의 그 줄도 함께 켜집니다. */
   lit?: boolean;
@@ -148,9 +159,11 @@ export function SavedRow({
         </View>
       </Press>
 
-      {/* 들여다보는 길. 줄 끝에 작은 단추로 섭니다 — 줄을 두 겹으로 쪼개지
-          않습니다. */}
-      {onLook ? <Button label="자세히" variant="ghost" compact onPress={onLook} /> : null}
+      {/* 들여다보는 길. 줄 끝에 ⓘ 하나로 섭니다 — 글자 단추는 줄마다 폭을
+          먹고, 줄을 두 겹으로 쪼개는 것은 더 먹습니다. */}
+      {onLook ? (
+        <IconButton name="info" label={`${place.name} 자세히 보기`} onPress={onLook} />
+      ) : null}
     </View>
   );
 }

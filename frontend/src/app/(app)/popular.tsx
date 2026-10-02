@@ -23,7 +23,7 @@ import {
   Tabs,
   Title,
 } from '@/ui';
-import { NavLeft } from '@/ui/nav';
+import { NavLeft, ScreenTop } from '@/ui/nav';
 
 type Tab = 'places' | 'regions';
 
@@ -121,13 +121,20 @@ export default function Popular() {
   return (
     <Screen
       safeTop
+      /* 줄 높이는 {@link ScreenTop} 이 한 자리에서 정합니다 — 홈에서 눌러
+         들어오는 화면 넷(알림함·검색·가계부·여기)이 같은 높이로 서야 오갈
+         때 윗줄이 들썩이지 않습니다. */
       header={
-        <Row gap={Spacing.s2}>
-          <NavLeft navigation={navigation} up="/(app)/home" />
-          <Grow>
-            <Title>지금 뜨는 여행지</Title>
-          </Grow>
-        </Row>
+        <ScreenTop
+          left={
+            <Row gap={Spacing.s2}>
+              <NavLeft navigation={navigation} up="/(app)/home" />
+              <Grow>
+                <Title>지금 뜨는 여행지</Title>
+              </Grow>
+            </Row>
+          }
+        />
       }>
       {/* 큰 제목이 본문 위에 서므로 상단바는 걷습니다. 둘 다 두면 같은 말이
           한 화면에 두 번 적힙니다. */}

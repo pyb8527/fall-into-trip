@@ -67,7 +67,7 @@ export default function AppLayout() {
         options={stackHeader('내 여행', { up: '/(app)/home', rail: wide })}
       />
       <Stack.Screen name="groups" options={stackHeader('모임', { up: '/(app)/home', rail: wide })} />
-      <Stack.Screen name="saved" options={stackHeader('저장', { up: '/(app)/home', rail: wide })} />
+      <Stack.Screen name="saved" options={stackHeader('보석함', { up: '/(app)/home', rail: wide })} />
       {/* 제목을 화면 안에 두므로 막대를 감춥니다 — 홈과 같은 방식입니다. */}
       <Stack.Screen name="money" options={{ headerShown: false }} />
       {/* 「여럿이 간 곳」 이었습니다. 무엇이 있는지는 말해 주는데 왜
@@ -80,7 +80,10 @@ export default function AppLayout() {
       {/* 적어 두지 않으면 머리글에 길 이름이 그대로 뜹니다 — 「search」
           라고 적혀 있었습니다. */}
       <Stack.Screen name="search" options={stackHeader('검색', { up: '/(app)/home' })} />
-      <Stack.Screen name="news" options={stackHeader('알림', { up: '/(app)/home' })} />
+      {/* 「알림」이었습니다. 홈의 들어오는 자리가 「모임 소식」이라 한 곳을
+          두 이름으로 부르고 있었고, 둘 다 여기가 <b>개인</b> 알림함이라는
+          것을 말하지 않았습니다. 「알림함」으로 맞춥니다. */}
+      <Stack.Screen name="news" options={stackHeader('알림함', { up: '/(app)/home' })} />
       {/*
         마이페이지.
 

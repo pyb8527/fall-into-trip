@@ -141,6 +141,27 @@ public class StaticMapService {
      * @param days 날짜별 점들. 빈 날은 그냥 건너뜁니다
      */
     public byte[] renderDays(List<List<Point>> days, int width, int height) {
+        return renderDays(days, 0, width, height);
+    }
+
+    /**
+     * 같은 그림을, 첫째 날의 색을 골라서.
+     *
+     * <h3>왜 색을 고르게 해야 하는가</h3>
+     *
+     * <p>하루만 그리는 자리가 생겼습니다(달력에서 날을 누를 때). 그 하루는
+     * 제 여행의 <b>셋째 날</b>인데, 넘겨받은 목록에서는 첫 번째라 늘 첫째 날
+     * 색으로 그려졌습니다. 그러면 같은 날이 달력에서는 파랑, 여행 전체
+     * 그림에서는 초록이 되어 <b>다른 날로 읽힙니다.</b>
+     *
+     * <p>그래서 「몇 번째 색부터 셀 것인가」를 부르는 쪽이 말합니다. 색을
+     * 그대로 넘기게 두지 않았습니다 — 색은 {@link DayLabels#COLORS} 여덟
+     * 가운데 하나여야 하고, 그 규칙이 두 군데로 갈라지면 한쪽이 팔레트 밖
+     * 색을 보냅니다.
+     *
+     * @param colorFrom 첫째 날에 쓸 색의 차례. 0 이면 지금까지와 같습니다
+     */
+    public byte[] renderDays(List<List<Point>> days, int colorFrom, int width, int height) {
         if (!enabled()) {
             throw ApiException.badRequest("지도 그림이 꺼져 있어요.");
         }
@@ -149,7 +170,7 @@ public class StaticMapService {
             throw ApiException.badRequest("그릴 곳이 없어요.");
         }
 
-        String id = cacheKey(thinned, width, height);
+        String id = cacheKey(thinned, colorFrom, width, height);
         Cached hit = cache.get(id);
         if (hit != null && hit.until().isAfter(Instant.now())) {
             return hit.png();
@@ -158,7 +179,8 @@ public class StaticMapService {
         List<String> paths = new ArrayList<>();
         List<String> markers = new ArrayList<>();
         for (int i = 0; i < thinned.size(); i++) {
-            String color = "0x" + DayLabels.COLORS[i % DayLabels.COLORS.length].substring(1);
+            String color = "0x" + DayLabels
+                    .COLORS[(colorFrom + i) % DayLabels.COLORS.length].substring(1);
             /* 선을 굵게 둡니다. 썸네일은 가로 600 이라 4 로는 도로와 굵기가
                비슷해져, 조용한 바탕에서도 어느 것이 동선인지 한눈에 안 옵니다. */
             StringBuilder path = new StringBuilder("color:" + color + "|weight:5");
@@ -331,8 +353,15 @@ public class StaticMapService {
         return out;
     }
 
-    private static String cacheKey(List<List<Point>> days, int width, int height) {
-        StringBuilder id = new StringBuilder(width + "x" + height);
+    /*
+      그림 하나를 가리키는 열쇠.
+
+      <p>{@code colorFrom} 도 넣습니다. 같은 곳들을 같은 크기로 그려도 색이
+      다르면 다른 그림입니다 — 안 넣으면 사흘째 동선을 먼저 그린 사람 뒤에
+      온 첫날 동선이 사흘째 색으로 나옵니다.
+    */
+    private static String cacheKey(List<List<Point>> days, int colorFrom, int width, int height) {
+        StringBuilder id = new StringBuilder(width + "x" + height + "@" + colorFrom);
         for (List<Point> day : days) {
             /* 날 사이를 갈라 둡니다. 안 그러면 [[a],[b]] 와 [[a,b]] 가 같은
                열쇠가 되어, 색이 다른 두 그림 중 먼저 그린 것이 돌아옵니다. */

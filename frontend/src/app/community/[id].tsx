@@ -780,12 +780,27 @@ export default function Post() {
           일부이고, 같은 일을 하는 자리가 화면마다 다를 이유가 없습니다.
 
           <p>댓글을 안 받는 글에는 안 냅니다.
+
+          <h3>개수만 주던 것을 고쳤습니다</h3>
+
+          <p>「댓글 3개 보기」 단추 하나였습니다. 그러면 판은 구글이 아는 것만
+          적힌 자리이고, 남이 여기서 뭐라고 했는지는 한 번 더 눌러야 압니다 —
+          읽을 것이 있는지 모르는 채로는 대개 안 누릅니다.
+
+          <p>그 자리를 가리키는 것을 <b>자르지 않고</b> 넘깁니다. 최근 몇을
+          펼치고 더 있는지를 가리는 것은 판이 하는 일이고, 여기서 다섯만 잘라
+          보내면 판은 전부를 본 것인지 아닌지를 알 수가 없습니다 — 셋을 다
+          펼쳐 놓고 「더 보기」라고 말하게 됩니다.
         */
         talk={
           looking && data.feedback
             ? {
                 noun: '댓글',
                 count: perPlace.get(`${looking.at.dayIndex}:${looking.at.placeIndex}`) ?? 0,
+                recent: (talk.comments ?? []).filter(
+                  (c) =>
+                    c.dayIndex === looking.at.dayIndex && c.placeIndex === looking.at.placeIndex,
+                ),
                 onOpen: () => {
                   const at = looking.at;
                   setLooking(null);

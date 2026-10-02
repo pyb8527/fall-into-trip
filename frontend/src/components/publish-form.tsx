@@ -7,7 +7,7 @@ import { useAsync } from '@/api/use-async';
 import { OurPhoto } from '@/components/our-photo';
 import { PostFields, type PostShape } from '@/components/post-fields';
 import { Colors, Radius, Spacing } from '@/constants/theme';
-import { BottomSheet, Button, Caption, Checkbox, Chip, ErrorNote, Grow, Press, Row } from '@/ui';
+import { BottomSheet, Button, Caption, Checkbox, Chip, ErrorNote, Grow, Press, Row, Split } from '@/ui';
 
 /**
  * 내 일정을 게시판에 올립니다.
@@ -17,8 +17,13 @@ import { BottomSheet, Button, Caption, Checkbox, Chip, ErrorNote, Grow, Press, R
  * 내리고 다시 올려야 합니다. 화면에 그렇게 적어 둡니다 — 안 적으면 고쳤는데
  * 왜 글이 그대로냐는 말이 나옵니다.
  */
-/** 고른 사진을 늘어놓는 네모의 한 변. */
-const THUMB = 64;
+/**
+ * 사진 격자의 한 줄 높이.
+ *
+ * <p>칸 넓이는 {@code styles.shot} 이 백분율로 정합니다 — 넓이를 픽셀로
+ * 박아 두면 네 칸을 세운 뒤 오른쪽에 쓰다 남은 자리가 생깁니다.
+ */
+const THUMB = 76;
 
 export function PublishForm({
   visible,
@@ -43,6 +48,17 @@ export function PublishForm({
   const [shape, setShape] = useState<PostShape>({
     title: tripTitle,
     summary: '',
+    /*
+      지역은 비워 둡니다.
+
+      <p>여행 이름과 장소 이름을 <b>글자로 훑어</b> 미리 골라 주고 있었습니다.
+      「도쿄 라멘 투어」는 도쿄가 되지만 「엄마랑 셋이」는 아무것도 안 되고,
+      「도쿄에서 산 물건들」도 도쿄 모음에 섰습니다. 제목은 지역에 대한 사실이
+      아닙니다.
+
+      <p>비워 둔 채로 올리면 서버가 첫날 첫 장소의 <b>좌표로</b> 꼽습니다. 아래
+      칸에서 고르면 고른 것이 이깁니다.
+    */
     region: null,
     tags: [],
     feedback: false,
@@ -53,22 +69,9 @@ export function PublishForm({
   });
   /* 더 고를 것들을 펼쳤는지. 처음에는 접혀 있습니다. */
   const [more, setMore] = useState(false);
-  /*
-    「어디로 다녀오셨나요?」를 미리 골라 둡니다.
-
-    <p>여행 이름이나 장소 이름에 지역 이름이 들어 있으면 그것입니다 —
-    「오사카 3박 4일」을 내놓는 사람에게 오사카를 또 고르게 하지 않습니다.
-    못 알아내면 비워 둡니다. 틀린 지역으로 올라가면 엉뚱한 목록에 섞입니다.
-  */
-  const { data: regionList } = useAsync<{ regions: string[] }>(
-    (signal) => (visible ? api.get('/api/posts/regions', signal) : Promise.resolve({ regions: [] })),
-    [visible],
-  );
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
 
-  /* 고를 수 있는 지역은 서버가 정합니다. 여기 따로 적어 두면 언젠가 어긋나고,
-     어긋나면 고른 값이 저장은 되는데 목록에서 아무것도 안 걸립니다. */
   /*
     어느 날을 올릴지.
 
@@ -153,18 +156,6 @@ export function PublishForm({
     setPickedShots([]);
     setMore(false);
   }, [visible, tripTitle]);
-
-  useEffect(() => {
-    if (!visible || !trip || !regionList || shape.region) {
-      return;
-    }
-    const text = [tripTitle, ...trip.days.flatMap((d) => d.places.map((p) => p.name))].join(' ');
-    const hit = regionList.regions.find((r) => text.includes(r));
-    if (hit) {
-      setShape((was) => (was.region ? was : { ...was, region: hit }));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, trip, regionList]);
 
   async function submit() {
     if (busy) {
@@ -320,32 +311,69 @@ export function PublishForm({
               <Caption tone="secondary">
                 장소에 챙겨 둔 사진을 같이 실을까요? 고른 것만 공개돼요.
               </Caption>
-              {withShots.map(({ day, place, shots }) => (
-                <View key={place.id} style={styles.spot}>
-                  <Caption tone="muted" numberOfLines={1}>
-                    {day.date || day.label} · {place.name}
-                  </Caption>
-                  <Row gap={Spacing.s2} style={styles.wrap}>
-                    {shots.map((id) => {
-                      const on = pickedShots.includes(id);
-                      return (
-                        <Press
-                          key={id}
-                          onPress={() =>
-                            setPickedShots((was) =>
-                              was.includes(id) ? was.filter((x) => x !== id) : [...was, id],
-                            )
-                          }
-                          accessibilityLabel={`${place.name} 사진 같이 싣기`}
-                          accessibilityState={{ selected: on }}
-                          style={[styles.shot, on ? styles.shotOn : null]}>
-                          <OurPhoto id={id} width={THUMB} height={THUMB} />
-                        </Press>
-                      );
-                    })}
-                  </Row>
-                </View>
-              ))}
+              {withShots.map(({ day, place, shots }) => {
+                /* 이 장소 것이 다 골라져 있으면 끄는 쪽을 냅니다. 같은 자리에
+                   켜기와 끄기를 나란히 두면 둘 중 무엇이 지금인지 안 보입니다. */
+                const allOn = shots.every((id) => pickedShots.includes(id));
+                return (
+                  <View key={place.id} style={styles.spot}>
+                    <Split>
+                      <Grow>
+                        <Caption tone="muted" numberOfLines={1}>
+                          {day.date || day.label} · {place.name}
+                        </Caption>
+                      </Grow>
+                      {/*
+                        장소마다 하나씩.
+
+                        <p>판 전체를 한 번에 켜는 것은 안 둡니다 — 여기 쌓인
+                        것에는 예매 화면과 메뉴판이 섞여 있어서, 「전부」 가
+                        판 전체를 뜻하면 한 번 눌러 그것까지 공개됩니다.
+                        장소 하나는 눈으로 확인할 수 있는 크기입니다.
+                      */}
+                      <Press
+                        onPress={() =>
+                          setPickedShots((was) =>
+                            allOn
+                              ? was.filter((x) => !shots.includes(x))
+                              : [...was, ...shots.filter((id) => !was.includes(id))],
+                          )
+                        }
+                        scale={0.96}
+                        hitSlop={8}
+                        accessibilityLabel={`${place.name} 사진 ${allOn ? '전부 끄기' : '전부 고르기'}`}>
+                        <Caption tone="accent">{allOn ? '전부 끄기' : '전부'}</Caption>
+                      </Press>
+                    </Split>
+                    {/*
+                      사진은 격자로 깔립니다.
+
+                      <p>장소마다 한 줄에 썸네일 하나였습니다. 장소가 스물이면
+                      스무 줄이 되어, 고르려면 판을 한참 굴려야 했습니다. 네
+                      칸으로 깔면 같은 사진이 다섯 줄 남짓에 들어옵니다.
+                    */}
+                    <View style={styles.shots}>
+                      {shots.map((id) => {
+                        const on = pickedShots.includes(id);
+                        return (
+                          <Press
+                            key={id}
+                            onPress={() =>
+                              setPickedShots((was) =>
+                                was.includes(id) ? was.filter((x) => x !== id) : [...was, id],
+                              )
+                            }
+                            accessibilityLabel={`${place.name} 사진 같이 싣기`}
+                            accessibilityState={{ selected: on }}
+                            style={[styles.shot, on ? styles.shotOn : null]}>
+                            <OurPhoto id={id} height={THUMB} />
+                          </Press>
+                        );
+                      })}
+                    </View>
+                  </View>
+                );
+              })}
             </>
           ) : null}
         </>
@@ -374,8 +402,17 @@ const styles = StyleSheet.create({
   spot: {
     gap: Spacing.s1,
   },
+  /* 네 칸 격자. 사진 피드 격자와 같은 길입니다(components/feed-list) — 폭을
+     재지 않고 백분율로 나눕니다. */
+  shots: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.s1,
+  },
   /* 고른 사진은 테두리가 말합니다. 체크를 얹으면 작은 그림이 가립니다. */
   shot: {
+    /* 네 칸에서 사이 간격을 뺀 몫. */
+    width: '23.5%',
     borderRadius: Radius.r2,
     overflow: 'hidden',
     borderWidth: 2,

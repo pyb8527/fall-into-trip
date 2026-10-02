@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { api, ApiError, UNEXPECTED } from '@/api/client';
-import type { FeedPost } from '@/api/types';
+import type { FeedAudience, FeedPost } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
 import { PhotoStrip } from '@/components/photo-strip';
@@ -41,20 +41,53 @@ import {
  *
  * <p>목록에서 글마다 댓글이 펼쳐져 있으면 세 편만 지나도 화면이 댓글로
  * 찹니다. 몇 개인지만 보여 주고, 누르면 열립니다 — 그때 불러옵니다.
+ *
+ * <p>글 하나만 서는 화면은 예외입니다({@code commentsOpen}).
+ *
+ * <h3>공개 범위는 제 글에만 적습니다</h3>
+ *
+ * <p>올린 사람이 <b>한눈에</b> 알아야 하는 값입니다. 모임 피드와 내 피드가 한
+ * 벌의 카드로 섞여 서므로, 적어 두지 않으면 지금 보는 글이 모임 사람에게도
+ * 보이는 것인지 나만 보는 것인지를 고치는 판을 열어야 압니다.
+ *
+ * <p>남의 글에는 안 적습니다. 보고 있다는 것이 이미 「볼 수 있다」는 답이고,
+ * 그 위에 「이 사람은 모임 사람에게만 열어 두었다」를 얹으면 읽는 사람이 할
+ * 일이 없는 말이 글마다 한 줄씩 붙습니다.
  */
 export function FeedCard({
   post,
   onChanged,
   onEdit,
+  commentsOpen = false,
+  onGone,
 }: {
   post: FeedPost;
   onChanged: () => void;
   /** 고치기를 누르면. 안 주면 고치기 단추를 안 냅니다. */
   onEdit?: (post: FeedPost) => void;
+  /**
+   * 댓글을 펼친 채로 시작할지.
+   *
+   * <p>목록에서는 접혀 있어야 합니다(위 설명). 그런데 이 글 하나만 서는
+   * 화면({@code app/feed/[id]})에서는 접을 이유가 없습니다 — 거기서 읽을
+   * 것은 이 글과 이 글에 달린 말이 전부고, 들어온 사람은 그것을 보러 온
+   * 것입니다. 한 번 더 누르게 할 일이 아닙니다.
+   */
+  commentsOpen?: boolean;
+  /**
+   * 이 글이 지워졌으면.
+   *
+   * <p>안 주면 {@code onChanged} 가 대신 불립니다 — 목록에서는 다시 읽으면
+   * 이 카드가 그 자리에서 빠지므로 그것으로 충분합니다. 글 하나만 서는
+   * 화면은 다시 읽을 것이 없어서(서버가 없다고 답합니다) 지운 직후에
+   * 「글을 찾을 수 없어요」가 뜹니다. 지운 사람에게 그건 오류가 아니라
+   * 제가 한 일이라, 그 화면은 돌려보내는 쪽을 고릅니다.
+   */
+  onGone?: () => void;
 }) {
   const router = useRouter();
   const { user } = useAuth();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(commentsOpen);
   const [dropping, setDropping] = useState(false);
   /* 이 글 다루기 판. 고치기와 지우기를 그림 둘로 세워 두었는데, 지우기가
      빨간 X 라 글마다 빨강이 하나씩 떠 있었습니다. ⋯ 하나로 접습니다. */
@@ -67,7 +100,7 @@ export function FeedCard({
     setFailed(null);
     try {
       await api.delete(`/api/feed/${encodeURIComponent(post.id)}`);
-      onChanged();
+      (onGone ?? onChanged)();
     } catch (e) {
       setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
     } finally {
@@ -93,7 +126,12 @@ export function FeedCard({
             <Body strong numberOfLines={1}>
               {post.authorName}
             </Body>
-            <Caption tone="muted">{ago(post.createdAt)}</Caption>
+            {/* 시간 옆에 붙입니다. 줄을 따로 두면 카드마다 한 줄이 늘어나
+                목록이 그만큼 짧아집니다. */}
+            <Row gap={Spacing.s2}>
+              <Caption tone="muted">{ago(post.createdAt)}</Caption>
+              {post.mine ? <Seen audience={post.audience} /> : null}
+            </Row>
           </View>
         </Press>
         {/* 지우기는 글쓴이와 모임 주인이 합니다. 주인인지는 서버만 아는데,
@@ -199,6 +237,33 @@ export function FeedCard({
   );
 }
 
+/**
+ * 누가 볼 수 있는지, 그림 하나와 한 마디로.
+ *
+ * <p>그림만 두지 않습니다. 눈 그림과 사람 그림을 가려 읽으라고 하면 처음 보는
+ * 사람은 못 읽고, 작은 회색 그림이라 더 그렇습니다. 말만 두지도 않습니다 —
+ * 시간 옆에 글자만 더 붙으면 날짜의 일부로 읽힙니다.
+ *
+ * <p>「내 모임 사람만」을 「내 모임」으로 줄입니다. 이 자리는 알림이 아니라
+ * 표라서, 줄여 적어도 뜻이 안 흐려지고 긴 글자는 이름 줄을 밀어냅니다.
+ */
+function Seen({ audience }: { audience: FeedAudience }) {
+  const shown = SEEN[audience];
+  return (
+    <Row gap={Spacing.s1}>
+      <Icon name={shown.icon} size={12} tone="muted" />
+      <Caption tone="muted">{shown.label}</Caption>
+    </Row>
+  );
+}
+
+/** 값은 서버의 {@code feed/domain/Audience} 와 같아야 합니다. */
+const SEEN: Record<FeedAudience, { icon: 'eye' | 'users' | 'eye-off'; label: string }> = {
+  EVERYONE: { icon: 'eye', label: '모두' },
+  MATES: { icon: 'users', label: '내 모임' },
+  ONLY_ME: { icon: 'eye-off', label: '나만' },
+};
+
 /** 댓글 한 토막. 펼쳤을 때만 불러옵니다. */
 type Comment = {
   id: string;
@@ -258,7 +323,7 @@ function Talk({ postId, onChanged }: { postId: string; onChanged: () => void }) 
     <View style={styles.comments}>
       <Divider />
 
-      {loading && !data ? <Caption tone="muted">가져오는 중…</Caption> : null}
+      {loading && !data ? <Caption tone="muted">가져오고 있어요</Caption> : null}
       {error ? <ErrorNote message={error} onRetry={reload} /> : null}
       {failed ? <ErrorNote message={failed} /> : null}
 

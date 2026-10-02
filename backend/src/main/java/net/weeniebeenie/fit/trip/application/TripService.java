@@ -30,6 +30,8 @@ public class TripService {
     private final TripRepository trips;
     private final DayRepository days;
     private final PlaceRepository places;
+    /* 목록에 세울 첫 사진만 여기서 읽습니다 — 붙이고 떼는 일은 PhotoService 몫입니다. */
+    private final PlacePhotoRepository placePhotos;
     private final TripAccessPolicy access;
     private final TripGoingRepository going;
     private final net.weeniebeenie.fit.account.domain.UserRepository users;
@@ -61,6 +63,8 @@ public class TripService {
             groupBook.findAllById(groupIds).forEach(g -> groupNames.put(g.getId(), g.getName()));
         }
 
+        Map<String, String> shots = firstPhotosOf(visible.stream().map(Trip::getId).toList());
+
         return visible.stream().map(trip -> {
             List<Day> dayList = days.findAllByTripIdOrderBySortAsc(trip.getId());
             return new TripSummary(
@@ -71,8 +75,50 @@ public class TripService {
                     dayList.size(),
                     (int) places.countOfTrip(trip.getId()),
                     trip.getGroupId(),
-                    trip.getGroupId() == null ? null : groupNames.get(trip.getGroupId()));
+                    trip.getGroupId() == null ? null : groupNames.get(trip.getGroupId()),
+                    shots.get(trip.getId()));
         }).toList();
+    }
+
+    /**
+     * 여행마다 목록에 세울 사진 한 장.
+     *
+     * <h3>어느 사진인가 — 장소에 챙겨 둔 것입니다</h3>
+     *
+     * <p>고를 수 있던 자리가 둘이었습니다.
+     *
+     * <ul>
+     *   <li><b>피드</b>({@code feed.Post} 의 {@code tripId}) — 여행 앨범이 쓰는
+     *       그것입니다. 사진은 그쪽이 더 「여행 사진」답지만, 그 사진은
+     *       <b>사람의 것</b>이고 누가 볼 수 있는지는 올린 모임에 달려 있습니다
+     *       ({@code FeedService.canRead}). 여행 목록에 그것을 세우면 같은 여행이
+     *       사람마다 다른 그림으로 보이거나, 안 보여야 할 것이 보입니다.
+     *   <li><b>장소에 챙겨 둔 사진</b>({@link net.weeniebeenie.fit.trip.domain.PlacePhoto})
+     *       — 이것입니다. 「여행의 것입니다. 사람마다 따로 달지 않습니다」가 그
+     *       표의 약속이라, 여행을 볼 수 있는 사람은 이미 그 사진을 다 봅니다.
+     *       볼 권한을 따로 셀 것이 없습니다.
+     * </ul>
+     *
+     * <p>메뉴판이나 예매 화면이 걸릴 수 있다는 것은 압니다 — 거기 쌓이는 것이
+     * 반은 그런 것입니다. 그래도 둡니다. 내가 내 여행에 넣어 둔 사진이고
+     * (남에게 나가는 자리가 아닙니다), 아니면 그 자리는 구글 Static Maps 로
+     * 그린 선 한 장입니다. 선보다 못한 사진은 드물고, 선은 호출 한 번입니다.
+     *
+     * <p>한 장도 없는 여행은 지도가 그 자리를 맡습니다 — 없는 번호를 지어내지
+     * 않습니다.
+     *
+     * @param tripIds 볼 수 있다고 이미 가려낸 여행들
+     * @return 여행 번호 → 사진 번호. 사진이 없는 여행은 아예 안 들어 있습니다
+     */
+    private Map<String, String> firstPhotosOf(List<String> tripIds) {
+        if (tripIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, String> out = new java.util.HashMap<>();
+        for (Object[] row : placePhotos.firstPhotoOfTrips(tripIds)) {
+            out.put((String) row[0], (String) row[1]);
+        }
+        return out;
     }
 
     /**
@@ -468,11 +514,14 @@ public class TripService {
     /**
      * @param groupId   모임 여행이면 그 모임. 혼자 여행이면 비어 있습니다.
      * @param groupName 모임 이름. 화면이 「모임」 칸을 모임별로 묶는 데 씁니다.
+     * @param firstPhotoId 목록에 세울 첫 사진. 한 장도 없으면 비어 있습니다
+     *                     ({@link #firstPhotosOf}).
      */
     public record TripSummary(String id, String title, String ownerId,
                               String theme, String emoji,
                               LocalDate startIso, LocalDate endIso,
                               int dayCount, int placeCount,
-                              String groupId, String groupName) {
+                              String groupId, String groupName,
+                              String firstPhotoId) {
     }
 }

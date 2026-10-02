@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { Linking, StyleSheet, View } from 'react-native';
 
 import { api } from '@/api/client';
-import type { OurStars, PlaceInfo, TravelMode } from '@/api/types';
+import type { Comment, OurStars, PlaceInfo, TravelMode } from '@/api/types';
 import { useAsync } from '@/api/use-async';
+import { CommentPeek } from '@/components/comment-list';
 import { PlacePhoto } from '@/components/place-photo';
 import { SpotMap } from '@/components/spot-map';
 import { labelOf } from '@/constants/place-icons';
@@ -21,8 +22,18 @@ import {
   Loading,
   Press,
   Row,
+  Split,
+  Subtitle,
 } from '@/ui';
 import type { IconName } from '@/ui';
+
+/**
+ * 판에 바로 펼치는 줄 수.
+ *
+ * <p>받은 것입니다 — 「장소 상세에 최근 댓글 다섯」. 더 늘리면 판을 열었을 때
+ * 평점과 영업시간이 댓글에 밀려 위로 올라갑니다.
+ */
+const PEEK = 5;
 
 /**
  * 장소 하나를 들여다보는 판.
@@ -52,11 +63,20 @@ import type { IconName } from '@/ui';
  * 그 답의 일부입니다 — 평점 다음에 오는 것이 사람 말입니다. 두 화면이 같은
  * 자리에서 같은 모양으로 냅니다.
  *
+ * <p>개수만 받아 단추를 내던 것을 고쳤습니다. 받은 것이 있으면 <b>최근
+ * 다섯</b>을 바로 펼치고, 더 있으면 단추가 「더 보기」가 됩니다 — 읽을 것이
+ * 있는 자리가 되어야 사람들이 그 단추를 누릅니다.
+ *
  * <h3>넣는 단추는 밖에서 받습니다</h3>
  *
- * <p>부르는 자리마다 갈 곳이 다릅니다 — 보석함에서 열면 "담기" 하나, 추천
- * 에서 열면 일정·투표장·보석함 셋. 이 판은 그것을 정하지 않고 받아서
- * 늘어놓기만 합니다.
+ * <p>부르는 자리마다 갈 곳이 다릅니다 — 보석함에서 열면 「빼기」와 「일정에
+ * 넣기」, 추천에서 열면 일정·투표장·보석함 셋, 찾기에서 열면 「여기로
+ * 고르기」. 이 판은 그것을 정하지 않고 {@code actions} 로 받아서 늘어놓기만
+ * 합니다.
+ *
+ * <p>다만 <b>담기</b>는 갈 곳을 고르는 일이 아니라 한 번 누르면 끝나는
+ * 일입니다. 그래서 글자 단추 자리가 아니라 구글 지도 옆 그림 자리를 따로
+ * 둡니다({@code scrap}) — 어느 자리에서 열었든 담는 일은 같은 그림입니다.
  *
  * <h3>우리가 아는 것도 밖에서 받습니다</h3>
  *
@@ -74,6 +94,7 @@ export function PlaceDetailSheet({
   about,
   talk,
   ours,
+  scrap,
   actions,
   mode,
   onClose,
@@ -94,12 +115,33 @@ export function PlaceDetailSheet({
    *
    * <p>부르는 자리마다 무엇이 달리는지가 다릅니다 — 내 여행에서는 구글이
    * 모르는 「한 줄」이고, 남의 일정에서는 그 장소에 대한 「댓글」입니다.
-   * 세는 것과 여는 것은 저쪽이 하고, 이 판은 부르는 이름과 개수만 받아
+   * 세는 것과 여는 것은 저쪽이 하고, 이 판은 부르는 이름과 개수를 받아
    * 같은 모양으로 냅니다.
    *
    * <p>없으면 안 냅니다. 좌표만 찍어 둔 곳에는 달 데가 없습니다.
    */
-  talk?: { noun: string; count: number; onOpen: () => void } | null;
+  talk?: {
+    noun: string;
+    count: number;
+    onOpen: () => void;
+    /**
+     * 판에 바로 펼쳐 둘 것.
+     *
+     * <h3>단추 하나만 있었습니다</h3>
+     *
+     * <p>개수만 받아서 「댓글 3개 보기」 단추를 냈습니다. 그러면 이 판은
+     * <b>구글이 아는 것만 적힌 자리</b>이고, 남이 여기서 뭐라고 했는지는 한 번
+     * 더 눌러야 압니다 — 거기에 읽을 것이 있는지 모르는 채로는 대개 안
+     * 누릅니다. 읽을 것이 있는 자리가 되면 담는 단추가 설 자리도 생깁니다.
+     *
+     * <p>개수와 함께 받습니다. 판은 받은 것 중 {@code PEEK} 개만 펼치고,
+     * 개수가 그보다 많으면 단추가 「더 보기」가 됩니다.
+     *
+     * <p>댓글만입니다. 「한 줄」은 별점이 함께 붙는 다른 모양이라 그 판이
+     * 따로 있습니다 — 안 주면 단추만 서던 전과 같습니다.
+     */
+    recent?: Comment[] | null;
+  } | null;
   /**
    * 우리 별점.
    *
@@ -110,6 +152,28 @@ export function PlaceDetailSheet({
    * <p>아직 아무도 안 줬으면 없습니다.
    */
   ours?: OurStars | null;
+  /**
+   * 보석함에 담기 — 지금 넣지 않고 담아만 두는 것.
+   *
+   * <h3>글자 단추에서 그림 하나로</h3>
+   *
+   * <p>「보석함에 담기」가 판 아래 {@code actions} 에 글자 단추로 섰습니다.
+   * 그런데 이것은 <b>갈 곳을 고르는 일</b>(일정에·투표장에)과 다릅니다 —
+   * 누르면 그걸로 끝나고, 목록 줄에서는 이미 같은 일을 책갈피 그림 하나로
+   * 하고 있었습니다. 같은 일이 자리마다 다른 모양이면 같은 일로 안 읽힙니다.
+   *
+   * <p>그래서 구글 지도 옆, {@link Way} 들과 한 줄에 섭니다. 그 줄은 이제
+   * <b>이 곳을 두고 바로 하는 한 번짜리 동작</b>들의 줄입니다. 담는 것만
+   * 앱 안에 남는 일이라, 담긴 뒤에는 그림이 채워지고 색이 붙습니다.
+   *
+   * <p>안 주면 안 섭니다 — 보석함에서 열었으면 이미 담겨 있는 곳이라 담을
+   * 데가 없고, 그 자리의 「빼기」는 아래 {@code actions} 에 그대로 있습니다.
+   */
+  scrap?: {
+    /** 이미 담겨 있는지. 담긴 것은 그림이 채워지고 다시 안 눌립니다 */
+    kept: boolean;
+    onPress: () => void;
+  } | null;
   /** 이 곳을 어디에 담을지. 부르는 자리가 정합니다. */
   actions?: React.ReactNode;
   /**
@@ -147,6 +211,12 @@ export function PlaceDetailSheet({
      같아야 합니다 — 어긋나면 빈 상자가 다시 생깁니다. */
   const hasHours = info != null && !info.permanentlyClosed
     && (info.onDay != null || info.hours.length > 0);
+
+  /* 판에 펼칠 것이 몇 줄인지. 받은 것이 다섯보다 적을 수 있으므로 개수와
+     견주는 것은 「다섯」이 아니라 <b>실제로 펼치는 수</b>입니다 — 그걸 안
+     보면 셋을 다 펼쳐 놓고 「더 보기」라고 말하게 됩니다. */
+  const peek = talk?.recent ?? [];
+  const shown = Math.min(peek.length, PEEK);
 
   if (!place) {
     return null;
@@ -217,7 +287,7 @@ export function PlaceDetailSheet({
 
       {about}
 
-      {loading && place.placeId ? <Loading label="사정을 보는 중" /> : null}
+      {loading && place.placeId ? <Loading label="정보를 가져오고 있어요" /> : null}
 
       {/* 아예 문 닫은 가게를 넣게 두면 안 됩니다. 가장 먼저 말합니다. */}
       {info?.permanentlyClosed ? (
@@ -261,15 +331,25 @@ export function PlaceDetailSheet({
       ) : null}
 
       {/*
-        나가는 길들.
+        한 번 누르면 끝나는 것들.
 
         <h3>글자 단추 넷에서 그림 줄 하나로</h3>
 
         <p>「전화번호」 · 「홈페이지」 · 「구글 지도에서 보기」 · 「길찾기」가
         저마다 글자 단추였습니다. 넷을 늘어놓으면 두 줄이 되고, 그 아래
-        「담기」 까지 있으니 판 끝이 단추밭이었습니다. 무엇보다 이 넷은 다
-        <b>앱 밖으로 나가는</b> 같은 종류인데, 아래의 「담기」 와 같은 모양
-        이라 어느 것이 이 앱에서 하는 일인지 안 갈렸습니다.
+        「담기」 까지 있으니 판 끝이 단추밭이었습니다.
+
+        <h3>담는 것도 이 줄입니다</h3>
+
+        <p>한동안 이 줄을 <b>앱 밖으로 나가는 길</b>들만의 줄로 두고, 담는
+        것은 아래 글자 단추로 가렸습니다. 그런데 사람이 가리는 것은 「안이냐
+        밖이냐」가 아니라 <b>한 번 눌러 끝나는 일이냐, 갈 곳을 고르는
+        일이냐</b> 였습니다 — 담는 것은 앞쪽이고, 목록 줄에서는 이미 책갈피
+        그림 하나로 하던 일입니다.
+
+        <p>아래 글자 단추 자리에는 갈 곳을 고르는 것(일정에·투표장에)만
+        남습니다. 담긴 뒤에 그림이 채워지는 것으로 이 하나만 <b>앱 안에
+        남는 일</b>이라고 말합니다.
       */}
       <Row gap={Spacing.s2} style={styles.ways}>
         <Way
@@ -293,6 +373,15 @@ export function PlaceDetailSheet({
         ) : null}
         {/* 사진·후기·메뉴·거리뷰는 저쪽에 있습니다. 우리가 옮겨 오지 않습니다. */}
         <Way icon="map-pin" label="구글 지도" onPress={() => openPlace(place, info?.mapUrl)} />
+        {scrap ? (
+          <Way
+            icon="bookmark"
+            label={scrap.kept ? '담겼어요' : '보석함'}
+            says={scrap.kept ? '보석함에 담겼어요' : '보석함에 담기'}
+            on={scrap.kept}
+            onPress={scrap.onPress}
+          />
+        ) : null}
       </Row>
 
       {/* 사람 말은 사실 다음입니다. 여기까지가 "여기가 어떤 데지" 에 대한
@@ -300,9 +389,36 @@ export function PlaceDetailSheet({
       {talk ? (
         <>
           <Band />
+          {shown > 0 ? (
+            <>
+              {/* 머리를 답니다. 단추만 있던 자리에 갑자기 사람 이름과 날짜가
+                  나오면 위의 영업시간에 딸린 것으로 읽힙니다. 글 상세의 댓글
+                  구역과 같은 모양입니다 — 같은 것이 같아 보여야 합니다. */}
+              <Split align="baseline">
+                <Subtitle>{talk.noun}</Subtitle>
+                <Caption tone="secondary">{talk.count}</Caption>
+              </Split>
+              <CommentPeek comments={peek} max={PEEK} />
+            </>
+          ) : null}
           <Button
-            label={talk.count > 0 ? `${talk.noun} ${talk.count}개 보기` : `${talk.noun} 남기기`}
-            variant={talk.count > 0 ? 'secondary' : 'ghost'}
+            /*
+              펼친 것이 있으면 단추는 「더 보기」입니다.
+
+              <p>개수를 그대로 적던 「댓글 3개 보기」는 셋이 이미 눈앞에
+              펼쳐져 있을 때 거짓말이 됩니다. 다 펼쳤으면 남은 일은 <b>남기는
+              것</b>뿐이라 그렇게 적습니다.
+            */
+            label={
+              shown === 0
+                ? talk.count > 0
+                  ? `${talk.noun} ${talk.count}개 보기`
+                  : `${talk.noun} 남기기`
+                : talk.count > shown
+                  ? `${talk.noun} 더 보기`
+                  : `${talk.noun} 남기기`
+            }
+            variant={talk.count > shown ? 'secondary' : 'ghost'}
             compact
             onPress={talk.onOpen}
           />
@@ -322,29 +438,47 @@ export function PlaceDetailSheet({
 }
 
 /**
- * 앱 밖으로 나가는 길 하나.
+ * 한 번 누르면 끝나는 일 하나.
  *
  * <p>회색 동그라미에 그림 하나와 아래 이름. 글자 단추로 두면 넷이 두 줄을
- * 먹는데, 이 모양이면 한 줄에 넷이 고르게 섭니다.
+ * 먹는데, 이 모양이면 한 줄에 고르게 섭니다.
  *
  * <p>이름을 그림 아래 적습니다 — 그림만 두면 전화인지 문자인지, 지도인지
- * 길찾기인지가 짐작입니다.
+ * 길찾기인지가 짐작입니다. 이름은 한 줄로 자릅니다. 둘러 가며 다섯까지 서는
+ * 줄이라, 긴 이름 하나가 접히면 <b>그 칸만 키가 커져</b> 줄이 들쭉날쭉합니다.
+ *
+ * @param says 읽어 주는 기기에 들려줄 말. 보이는 이름이 너무 짧을 때만
+ * @param on   이미 끝난 일인지. 그림이 채워지고 색이 붙고, 다시 안 눌립니다
  */
 function Way({
   icon,
   label,
+  says,
+  on,
   onPress,
 }: {
   icon: IconName;
   label: string;
+  says?: string;
+  on?: boolean;
   onPress: () => void;
 }) {
   return (
-    <Press onPress={onPress} scale={0.96} accessibilityLabel={label} style={styles.way}>
-      <View style={styles.wayRing}>
-        <Icon name={icon} size={20} tone="secondary" />
+    <Press
+      onPress={onPress}
+      /* 이미 담긴 것을 또 누르게 두지 않습니다. 서버가 같은 곳을 두 번 담지
+         않으니 눌러도 아무 일이 안 일어나는데, 그러면 안 담긴 것처럼 보입니다. */
+      disabled={on}
+      scale={0.96}
+      accessibilityLabel={says ?? label}
+      accessibilityState={{ disabled: on }}
+      style={styles.way}>
+      <View style={[styles.wayRing, on ? styles.wayRingOn : null]}>
+        <Icon name={icon} size={20} tone={on ? 'brand' : 'secondary'} solid={on} />
       </View>
-      <Caption tone="secondary">{label}</Caption>
+      <Caption tone={on ? 'brand' : 'secondary'} numberOfLines={1}>
+        {label}
+      </Caption>
     </Press>
   );
 }
@@ -466,5 +600,11 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.fill,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  /* 이미 담긴 것. 회색 원에 채운 책갈피만 두면 꺼진 것처럼 보이는데, 이것은
+     꺼진 것이 아니라 <b>해 둔 것</b>입니다 — 옅은 바이올렛 면이 그 말을
+     합니다. 가득 찬 브랜드색은 판에 하나뿐이라 여기는 옅은 쪽입니다. */
+  wayRingOn: {
+    backgroundColor: Colors.accentSoft,
   },
 });

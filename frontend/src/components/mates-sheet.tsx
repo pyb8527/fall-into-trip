@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { api, API_BASE, ApiError, UNEXPECTED } from '@/api/client';
-import type { InviteRow, Mate, NewInvite } from '@/api/types';
+import type { InviteRow, Mate, Maybe, NewInvite } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
 import { Colors, Gutter, Radius, Spacing, Tap } from '@/constants/theme';
@@ -288,7 +288,13 @@ function Inner({
  * 부르는 링크 만들기와 만들어 둔 것들.
  *
  * <p>토큰은 만들 때 딱 한 번 옵니다. 서버에는 해시만 남아서 목록으로는 다시
- * 못 봅니다. 그래서 만든 직후 화면에 띄워 두고, 잃어버리면 새로 만듭니다.
+ * 못 봅니다. 그래서 만든 직후 화면에 띄웁니다.
+ *
+ * <p><b>잃어버렸을 때 쓰는 길은 줄마다 있는 「다시 만들기」입니다.</b> 토큰을
+ * 되돌려 주게 서버를 고치는 길도 있지만, 모임에 들어오는 열쇠를 아무 때나
+ * 다시 꺼낼 수 있게 두는 쪽은 얻는 것보다 잃는 것이 큽니다. 실제로 번거로웠던
+ * 것은 토큰을 못 보는 것보다 <b>못 쓰게 하고 폼을 다시 채워 만드는 두 번
+ * 누르기</b>였고, 그건 단추 하나로 풀립니다.
  */
 function InviteSection({ groupId }: { groupId: string }) {
   const { data, error, loading, reload } = useAsync<{ invites: InviteRow[] }>(
@@ -316,18 +322,30 @@ function InviteSection({ groupId }: { groupId: string }) {
   const site = API_BASE || (typeof window === 'undefined' ? '' : window.location.origin);
   const link = made ? `${site}/invite/${made.token}` : '';
 
+  /**
+   * 링크 하나 만들기.
+   *
+   * <p>만든 링크가 뜨는 자리는 한 곳입니다 — 위 폼이 만들든 아래 줄의 「다시
+   * 만들기」가 만들든 같은 칸에 뜹니다. 방금 만든 링크가 화면 두 군데에 뜨면
+   * 어느 것이 새것인지 사람이 가려야 합니다.
+   *
+   * <p>실패는 여기서 안 받고 던집니다. 글자를 띄울 곳이 부르는 자리마다
+   * 다릅니다 — 폼 아래냐 그 줄 아래냐.
+   */
+  async function make(spec: { days: number; maxUses: number }) {
+    /* 지난번 보내기 결과("링크를 복사했어요")는 새 링크와 상관이 없습니다. */
+    setNotice(null);
+    const res = await api.post<{ invite: NewInvite }>(`/api/groups/${groupId}/invites`, spec);
+    setMade(res.invite);
+    reload();
+  }
+
   async function create() {
     setFailed(null);
-    setNotice(null);
     setBusy(true);
     try {
-      const res = await api.post<{ invite: NewInvite }>(`/api/groups/${groupId}/invites`, {
-        /* 0 은 기한을 두지 말라는 뜻입니다. */
-        days: dated ? days : 0,
-        maxUses: uses,
-      });
-      setMade(res.invite);
-      reload();
+      /* 0 은 기한을 두지 말라는 뜻입니다. */
+      await make({ days: dated ? days : 0, maxUses: uses });
     } catch (e) {
       setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
     } finally {
@@ -406,7 +424,7 @@ function InviteSection({ groupId }: { groupId: string }) {
           <Band />
           <Caption tone="secondary">만들어 둔 링크</Caption>
           {data.invites.map((i) => (
-            <InviteRowView key={i.id} invite={i} onChanged={reload} />
+            <InviteRowView key={i.id} invite={i} onChanged={reload} onRemake={make} />
           ))}
         </>
       ) : null}
@@ -414,15 +432,35 @@ function InviteSection({ groupId }: { groupId: string }) {
   );
 }
 
-function InviteRowView({ invite, onChanged }: { invite: InviteRow; onChanged: () => void }) {
+function InviteRowView({
+  invite,
+  onChanged,
+  onRemake,
+}: {
+  invite: InviteRow;
+  onChanged: () => void;
+  /** 같은 조건으로 링크를 새로 만드는 일. {@link InviteSection} 이 맡습니다. */
+  onRemake: (spec: { days: number; maxUses: number }) => Promise<void>;
+}) {
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
   const [asking, setAsking] = useState(false);
+  const [remaking, setRemaking] = useState(false);
 
   /* 서버는 비어 있는 값을 아예 빼고 보냅니다(non_null). null 인지 없는지를
      가르지 않아야 "기한 없음" 이 제대로 읽힙니다. */
   const expired = invite.expiresAt != null && new Date(invite.expiresAt).getTime() < Date.now();
   const spent = invite.usedCount >= invite.maxUses;
+
+  /**
+   * 새로 만들 때 물려받는 조건.
+   *
+   * <p><b>폼에 지금 적혀 있는 값이 아니라 이 줄의 값</b>을 씁니다. 폼은 아까
+   * 다른 링크를 만들려고 건드려 둔 것일 수 있어서, 그걸 쓰면 기한이 말없이
+   * 바뀝니다. 묻는 창에 이 숫자를 그대로 적어 두어 바뀌는 것이 없음을
+   * 보여 줍니다.
+   */
+  const next = { days: daysLeftOf(invite.expiresAt), maxUses: invite.maxUses };
 
   async function revoke() {
     setFailed(null);
@@ -432,6 +470,36 @@ function InviteRowView({ invite, onChanged }: { invite: InviteRow; onChanged: ()
       onChanged();
     } catch (e) {
       setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /**
+   * 못 쓰게 하고, 바로 같은 조건으로 새로 만들기.
+   *
+   * <p>순서는 <b>닫고 나서 만들기</b>입니다. 거꾸로 하면 만드는 것은 됐는데
+   * 닫는 것이 안 된 사이에 쓸 수 있는 링크가 둘 남습니다 — 묻는 창에서 "지금
+   * 링크는 못 쓰게 돼요" 라고 해 둔 말이 거짓이 됩니다. 이 순서면 안 되는
+   * 경우에 링크가 하나도 없이 남는데, 그것은 위 「링크 만들기」로 바로 풉니다.
+   */
+  async function remake() {
+    setFailed(null);
+    setBusy(true);
+    try {
+      await api.delete(`/api/group-invites/${invite.id}`);
+    } catch (e) {
+      setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
+      setBusy(false);
+      return;
+    }
+    try {
+      await onRemake(next);
+    } catch {
+      /* 목록을 다시 받습니다 — 이미 닫은 링크가 「쓸 수 있음」으로 남아 있으면
+         거짓입니다. */
+      setFailed('이 링크는 못 쓰게 했어요. 그런데 새 링크를 만들지 못했어요 — 위 「링크 만들기」로 만들어 주세요.');
+      onChanged();
     } finally {
       setBusy(false);
     }
@@ -460,6 +528,18 @@ function InviteRowView({ invite, onChanged }: { invite: InviteRow; onChanged: ()
           {!invite.usable && expired ? <Badge label="기한 지남" tone="muted" /> : null}
           {!invite.usable && !expired && spent ? <Badge label="다 씀" tone="muted" /> : null}
           {!invite.usable && !expired && !spent ? <Badge label="닫음" tone="muted" /> : null}
+          {/* 잃어버린 링크를 되살리는 자리. 닫고 새로 만드는 두 걸음을 한 번에
+              합니다. 그냥 닫기만 하는 길도 그대로 둡니다 — 갈아 끼울 것 없이
+              닫고 싶을 때가 있습니다(링크가 새어 나간 날). */}
+          {invite.usable ? (
+            <Button
+              label="다시 만들기"
+              variant="ghost"
+              compact
+              disabled={busy}
+              onPress={() => setRemaking(true)}
+            />
+          ) : null}
           {invite.usable ? (
             <IconButton
               name="x"
@@ -487,8 +567,48 @@ function InviteRowView({ invite, onChanged }: { invite: InviteRow; onChanged: ()
           revoke();
         }}
       />
+
+      {/*
+        갈아 끼우기를 묻는 창.
+
+        <p>묻는 말에 <b>새 링크의 조건을 숫자로</b> 적습니다. "같은 조건" 이라고만
+        하면 무엇이 같은지를 사람이 믿고 넘겨야 하고, 기한이 말없이 바뀌는 쪽이
+        한 번 더 묻는 것보다 나쁩니다.
+
+        <p>빨간 단추는 아닙니다. 끝나고 남는 것은 쓸 수 있는 링크 하나라 지우는
+        일이 아닙니다 — 없어지는 쪽은 묻는 말이 적어 둡니다.
+      */}
+      <ConfirmDialog
+        visible={remaking}
+        title="새 링크로 갈아 끼울까요?"
+        message={`지금 링크는 못 쓰게 되고, 같은 조건(${
+          next.days === 0 ? '기한 없음' : `${next.days}일 동안`
+        } · ${next.maxUses}명까지)으로 새 링크가 나와요. 몇 명 들어왔는지는 0부터 다시 세요. 이미 들어온 사람은 그대로 남고, 링크를 받아 두고 아직 안 들어온 사람은 못 들어와요 — 새 링크를 보내 주세요. 새 링크도 만든 직후 한 번만 보여요.`}
+        confirmLabel="다시 만들기"
+        busy={busy}
+        onCancel={() => setRemaking(false)}
+        onConfirm={() => {
+          setRemaking(false);
+          remake();
+        }}
+      />
     </View>
   );
+}
+
+/**
+ * 남은 기한을 날 수로.
+ *
+ * <p>서버에 보내는 것은 「며칠 동안」이고 줄이 쥐고 있는 것은 「언제까지」라
+ * 되돌려 세야 합니다. 올림입니다 — 반나절 남은 링크를 0일로 보내면 그 0 이
+ * 「기한을 두지 말라」는 뜻이 되어 기한 없는 링크가 나옵니다.
+ */
+function daysLeftOf(expiresAt: Maybe<string>): number {
+  if (expiresAt == null) {
+    return 0;
+  }
+  const left = Math.ceil((new Date(expiresAt).getTime() - Date.now()) / 86400000);
+  return Math.min(MAX_DAYS, Math.max(1, left));
 }
 
 const styles = StyleSheet.create({

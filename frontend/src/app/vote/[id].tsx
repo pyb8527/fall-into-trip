@@ -366,27 +366,23 @@ export default function Vote() {
         <b>내 마음에는 든</b> 곳일 수 있는데, 지금은 내려가면 그대로 사라집니다 —
         다시 찾으려면 이름을 기억해 뒀다가 검색해야 합니다.
 
-        <p>찾기 화면과 같은 자리, 같은 말입니다.
+        <p>찾기 화면과 같은 자리, 같은 모양입니다.
+
+        <h3>글자 한 줄에서 그림으로</h3>
+
+        <p>「보석함에 줍기」라는 글자 한 줄이 판 맨 아래에 섰습니다. 담는 일은
+        누르면 그걸로 끝나는 것이라 판이 구글 지도 옆에 그림 자리를 가지고
+        있고, 목록에서도 같은 책갈피로 하는 일입니다 — 같은 일을 자리마다
+        다른 모양으로 두면 같은 일로 안 읽힙니다.
+
+        <p>담은 뒤에 판을 안 닫습니다. 전에는 닫고 나서 담았는데, 그러면 담긴
+        것을 <b>볼 수가 없었습니다</b> — 이제 책갈피가 채워지는 것으로 받았다는
+        말을 합니다.
       */}
       <PlaceDetailSheet
         place={looking}
         onClose={() => setLooking(null)}
-        actions={
-          looking && !kept.has(looking.name) ? (
-            <Press
-              onPress={() => {
-                const target = looking;
-                setLooking(null);
-                keep(target);
-              }}
-              accessibilityLabel={`${looking.name} 보석함에 줍기`}
-              scale={0.98}>
-              <Caption tone="brand" strong>
-                보석함에 줍기
-              </Caption>
-            </Press>
-          ) : null
-        }
+        scrap={looking ? { kept: kept.has(looking.name), onPress: () => keep(looking) } : null}
       />
 
       <AddSheet

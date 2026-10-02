@@ -1,6 +1,7 @@
 package net.weeniebeenie.fit.community.api;
 
 import lombok.RequiredArgsConstructor;
+import net.weeniebeenie.fit.community.application.Near;
 import net.weeniebeenie.fit.community.application.PostService;
 import net.weeniebeenie.fit.community.domain.PopularRepository;
 import net.weeniebeenie.fit.trip.domain.PlaceKind;
@@ -28,6 +29,17 @@ import java.util.Map;
  *
  * <p>이미 공개된 글을 세는 것이라 새로 드러나는 것이 없습니다. 둘러보기가
  * 그렇듯 가입하기 전에 볼 수 있어야 가입할 이유가 생깁니다.
+ *
+ * <h3>자리를 주면 「지금 내 근처」가 됩니다</h3>
+ *
+ * <p>같은 목록을 내 좌표로 다시 세운 것입니다({@code near}). 화면을 하나 더
+ * 만들지 않았습니다 — 세는 법도 감춘 글을 빼는 규칙도 같고, 다른 것은
+ * <b>무엇을 앞에 세우는가</b> 하나뿐입니다.
+ *
+ * <p>좌표는 주소에 실려 옵니다. 접근 기록에 남는 값이라 꺼림칙한 자리인데,
+ * 그림 주소({@code /api/maps/spot})가 이미 같은 일을 하고 있어 여기만 본문
+ * 으로 받는 것은 뜻이 없습니다. 대신 로그인과 묶이지 않습니다 — 누가 거기
+ * 있었는지는 안 남습니다.
  */
 @RestController
 @RequiredArgsConstructor
@@ -62,14 +74,21 @@ public class PopularController {
      * @param region 지역으로 거를 때. 같은 규칙입니다. 갈래만으로 거르면
      *               "카페" 를 눌렀을 때 도쿄와 제주가 한 목록에 섞여 나오는데,
      *               정작 보는 사람은 대개 갈 곳을 하나 정해 두고 봅니다
+     * @param near   지금 내 자리("37.5665,126.9780"). 주면 <b>가까운 순</b>
+     *               으로 세우고 {@code Near.RADIUS_M} 안쪽만 냅니다. 못 읽는
+     *               값은 안 준 것으로 봅니다 — 갈래·지역과 같은 규칙입니다
      */
     @GetMapping("/api/popular/places")
     public Map<String, Object> places(@RequestParam(required = false) String kind,
-                                      @RequestParam(required = false) String region) {
+                                      @RequestParam(required = false) String region,
+                                      @RequestParam(required = false) String near) {
         String clean = PlaceKind.clean(kind);
         String where = known(region);
+        Near at = Near.parse(near);
         List<Map<String, Object>> out = new ArrayList<>();
-        for (Object[] r : popular.places(clean, where, LIMIT)) {
+        for (Object[] r : popular.places(clean, where,
+                at.lat(), at.lng(), at.south(), at.north(), at.west(), at.east(),
+                Near.RADIUS_M, LIMIT)) {
             Map<String, Object> one = new java.util.LinkedHashMap<>();
             one.put("key", r[0]);
             one.put("name", r[1]);
@@ -79,12 +98,29 @@ public class PopularController {
             one.put("placeId", r[5]);
             one.put("posts", num(r[6]));
             one.put("likes", num(r[7]));
+            /* 미터 단위 정수입니다. 추천 판이 이미 그 이름과 단위로 받고
+               있어서({@code RecommendService.Card.distanceM}) 화면이 거리를
+               적는 함수를 그대로 씁니다 — 한쪽만 소수로 내면 같은 말을 두
+               가지로 적게 됩니다. */
+            one.put("distanceM", r[8] == null ? null : Math.round(((Number) r[8]).doubleValue()));
             out.add(one);
         }
-        return Map.of(
-                "places", out,
-                "kind", clean == null ? "" : clean,
-                "region", where == null ? "" : where);
+        Map<String, Object> body = new java.util.LinkedHashMap<>();
+        body.put("places", out);
+        body.put("kind", clean == null ? "" : clean);
+        body.put("region", where == null ? "" : where);
+        /*
+          자리를 <b>실제로 썼는지</b>를 함께 내려 줍니다.
+
+          <p>화면이 보낸 값이 못 읽히면 목록은 인기순으로 내려가는데, 그때
+          화면이 제목을 「지금 내 근처」로 적어 두면 가깝지도 않은 목록에
+          그 제목이 붙습니다. 보낸 쪽이 아니라 <b>센 쪽</b>이 말해야 합니다.
+        */
+        body.put("near", at.given());
+        /* 「30km 안쪽에는 없어요」를 화면이 적을 수 있게 거리도 함께 냅니다.
+           두 곳에 적어 두면 서버만 고쳤을 때 화면이 옛 숫자를 말합니다. */
+        body.put("radiusM", Near.RADIUS_M);
+        return body;
     }
 
     /**

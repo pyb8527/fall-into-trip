@@ -19,7 +19,7 @@ import {
   Screen,
   Title,
 } from '@/ui';
-import { NavLeft } from '@/ui/nav';
+import { NavLeft, ScreenTop } from '@/ui/nav';
 
 /** 한 여행에서 한 통화로 쓴 것. */
 type Sum = { currency: string; decimals: number; total: number; items: number };
@@ -88,17 +88,27 @@ export default function MoneyList() {
         제목 줄 — 돌아갈 단추와 큰 제목.
 
         <p>제목을 막대 제목 크기로 적고, 돌아가는 단추도 이 화면이 직접
-        그리고 있었습니다. 그래서 알림·설정·지금 뜨는 여행지와 <b>같은 깊이의
-        화면인데 제목 크기와 돌아가는 길이 저마다 달랐습니다.</b>
+        그리고 있었습니다. 그래서 알림함·설정·지금 뜨는 여행지와 <b>같은
+        깊이의 화면인데 제목 크기와 돌아가는 길이 저마다 달랐습니다.</b>
         네 화면이 같은 줄을 씁니다 — 공용 단추 묶음(NavLeft) + 큰 제목.
+
+        <p>줄 높이는 {@link ScreenTop} 이 정합니다. 여기는 단추가 있어
+        마침 44 였지만, 그것은 <b>안에 든 것이 그만했을 뿐</b>이라 단추를
+        걷는 날 조용히 32 로 내려앉습니다. 이 화면은 갈래 띠로 오는 화면
+        옆에 서는 것이 아니라 그 안에서 열리는 것이라, 높이가 어긋나면
+        돌아올 때 화면이 한 번 들썩입니다.
       */
       header={
-        <Row gap={Spacing.s2}>
-          <NavLeft navigation={navigation} up="/(app)/trips" />
-          <Grow>
-            <Title>가계부</Title>
-          </Grow>
-        </Row>
+        <ScreenTop
+          left={
+            <Row gap={Spacing.s2}>
+              <NavLeft navigation={navigation} up="/(app)/trips" />
+              <Grow>
+                <Title>가계부</Title>
+              </Grow>
+            </Row>
+          }
+        />
       }>
       {loading && !data ? <Loading /> : null}
       {error ? <ErrorNote message={error} onRetry={reload} /> : null}

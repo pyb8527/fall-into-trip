@@ -6,7 +6,7 @@ import { api, ApiError, UNEXPECTED } from '@/api/client';
 import type { Folder, Going, TripSummary } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
-import { TripMark } from '@/components/trip-mark';
+import { TripSlot } from '@/components/trip-slot';
 import { FolderSheet } from '@/components/folder-sheet';
 import { TripForm } from '@/components/trip-form';
 import { CountdownBadge } from '@/components/countdown-badge';
@@ -26,20 +26,19 @@ import {
   Empty,
   ErrorNote,
   Field,
-  Grow,
   Icon,
   IconButton,
   ListRow,
-  Loading,
   Press,
   Row,
   Screen,
   SearchField,
   SectionHeader,
   SegmentedTabs,
+  Skeleton,
   Split,
-  Title,
 } from '@/ui';
+import { ScreenTop } from '@/ui/nav';
 import { AppTabs } from '@/ui/tab-bar';
 
 /**
@@ -170,18 +169,6 @@ export default function Trips() {
     골라내는 것이라, 확인을 누르게 할 이유가 없습니다.
   */
   const [q, setQ] = useState('');
-  /*
-    찾는 칸을 접어 둡니다.
-
-    <p>안내 한 줄과 찾기 칸을 흰 카드에 담아 목록 위에 늘 세워 두었습니다.
-    그런데 찾는 일은 <b>가끔 한 번</b>이고, 이 화면을 여는 대부분의 경우는
-    목록을 보러 오는 것입니다 — 늘 서 있는 칸이 여행 한 줄을 영영 아래로
-    밀고 있었습니다.
-
-    <p>막대 오른쪽의 돋보기가 칸을 엽니다. 닫으면 친 말도 함께 지웁니다 —
-    접힌 칸에 글이 남아 있으면 목록이 왜 짧아졌는지 알 수 없습니다.
-  */
-  const [searching, setSearching] = useState(false);
 
   const everything = useMemo(() => data?.trips ?? [], [data]);
 
@@ -243,42 +230,47 @@ export default function Trips() {
       safeTop
       tabs={<AppTabs />}
       /*
-        갈래 화면은 큰 제목으로 섭니다.
+        맨 윗줄은 찾는 칸입니다.
 
-        <p>여기만 상단바에 작은 제목을 달고 있었습니다. 「모임」과 「저장」은
-        큰 제목인데 「내 여행」만 막대라, 아래 갈래 띠로 옮겨 다니면 <b>화면이
-        갈아 끼워진 것처럼</b> 보였습니다 — 제목의 크기와 자리가 화면마다
-        달랐기 때문입니다.
+        <h3>이름을 걷고 그 자리를 썼습니다</h3>
 
-        <p>돋보기는 그 제목 오른쪽에 섭니다. 몇 개 안 될 때는 안 답니다 —
-        다섯 줄을 눈으로 훑는 것이 치는 것보다 빠릅니다.
+        <p>「내 여행」이라고 큰 제목으로 적고 있었습니다. 그런데 지금 어디인지는
+        <b>아래 갈래 띠가 이미 말합니다</b> — 「내 여행」 칸이 채워져 있는 채로
+        위에 같은 말이 한 번 더 적혀 있었습니다. 걷습니다.
+
+        <p>그 자리에 찾는 칸을 세웁니다. 돋보기로 접어 두고 있었습니다 —
+        「찾는 일은 가끔 한 번」이 그때의 까닭이었는데, 접고 펴는 몸짓이
+        있으면 펼 때마다 목록이 한 줄 아래로 밀렸고 <b>돋보기가 생기는 순간
+        (여행이 다섯째가 될 때) 윗줄이 32 에서 44 로 자랐습니다.</b> 칸을
+        그냥 세우면 둘 다 없어집니다.
+
+        <p>여행이 몇 개 안 되면 칸은 안 냅니다 — 다섯 줄을 눈으로 훑는 것이
+        치는 것보다 빠릅니다. 다만 <b>줄은 그대로 섭니다.</b> 줄째 걷으면
+        이 화면만 첫 줄이 위로 올라붙고, 다섯째 여행이 생기는 날 화면이
+        한 번 들썩입니다 — 35번이 말하는 것이 바로 그것입니다.
       */
       header={
-        <Split>
-          <Grow>
-            <Title>내 여행</Title>
-          </Grow>
-          {all.length > 4 ? (
-            <IconButton
-              name={searching ? 'x' : 'search'}
-              label={searching ? '찾기 닫기' : '여행 찾기'}
-              bare
-              onPress={() => {
-                setSearching((was) => !was);
-                setQ('');
-              }}
-            />
-          ) : null}
-        </Split>
+        <ScreenTop
+          left={
+            all.length > 4 ? (
+              <SearchField
+                label="여행 찾기"
+                value={q}
+                onChangeText={setQ}
+                placeholder="오사카, 제주"
+              />
+            ) : null
+          }
+        />
       }
       /* 주 동작은 아래에 붙입니다. 한 손으로 쥐었을 때 엄지가 닿는 자리입니다. */
       footer={<Button label="새 여행 만들기" onPress={() => setCreating(true)} />}>
       {/*
-        큰 제목이 본문 위에 서므로 상단바는 걷습니다.
+        상단바는 걷습니다.
 
         <p>갈래 띠로 오는 화면입니다. 뒤로 갈 데가 없으니 상단바가 할 일이
-        없는데, 작은 제목 하나를 위해 56픽셀을 먹고 있었습니다 — 게다가
-        아래 큰 제목과 같은 말을 두 번 적는 셈이었습니다.
+        없는데, 작은 제목 하나를 위해 56픽셀을 먹고 있었습니다 — 그 제목은
+        아래 띠가 이미 하고 있는 말입니다.
       */}
       <Stack.Screen options={{ headerShown: false }} />
 
@@ -287,16 +279,26 @@ export default function Trips() {
         <Caption tone="secondary">어느 여행의 가계부를 볼까요?</Caption>
       ) : null}
 
-      {searching ? (
-        <SearchField
-          label="여행 찾기"
-          value={q}
-          onChangeText={setQ}
-          placeholder="오사카, 제주"
-        />
-      ) : null}
+      {/*
+        처음 받는 동안 — 줄이 올 자리를 미리 세웁니다.
 
-      {loading && !data ? <Loading /> : null}
+        <p>{@link Loading} 이 섰습니다. 가운데에서 점 셋이 돌다가 목록이 닿는
+        순간 줄들이 한꺼번에 들어서서, 화면이 한 번 들썩였습니다 — 목록이
+        어디서 시작하는지가 <b>받고 나서야</b> 정해졌습니다.
+
+        <p>{@link Skeleton} 의 회색 칸은 두 줄짜리 {@link ListRow} 와 높이가
+        같고(72), 앞의 네모도 {@link TripSlot} 과 같은 48 입니다. 그래서 줄이
+        닿아도 자리가 안 움직입니다.
+
+        <p>셋입니다. 여행은 대개 몇 개뿐이라 넷 다섯을 세우면 실제보다 긴
+        목록을 약속하는 셈이고, 하나만 세우면 「거의 다 왔다」로 읽힙니다.
+
+        <p><b>다시 받을 때는 안 섭니다.</b> {@link useAsync} 는 새로 받는 동안
+        먼저 받아 둔 것을 들고 있어서, 화면으로 돌아왔을 때 목록은 비지 않고
+        그대로 보입니다. 거기에 이것을 또 세우면 있는 줄들을 일부러 걷는
+        일이 됩니다.
+      */}
+      {loading && !data ? <Skeleton /> : null}
       {error ? <ErrorNote message={error} onRetry={reload} /> : null}
 
       {/*
@@ -751,7 +753,23 @@ function TripRow({
   return (
     <ListRow
       last={last}
-      left={<TripMark theme={trip.theme} emoji={trip.emoji} />}
+      /*
+        앞 칸은 사진이 있으면 사진, 없으면 표식입니다({@link TripSlot}).
+
+        <p>겹치는 쪽 — 사진을 깔고 표식을 배지로 얹는 것 — 은 48 에서 안
+        됩니다. 더 센 까닭은 셈이 어긋나는 쪽입니다: 배지가 뜻을 갖는 것은
+        <b>색이나 이모지를 정한 여행</b>인데 새 구글 호출을 치르는 것은
+        <b>사진이 없는 여행</b>이고, 그 두 묶음은 서로 상관이 없습니다 —
+        아무것도 안 정한 여행은 배지로 얻는 것이 없으면서 값만 냅니다.
+
+        <p>가르면 호출이 하나도 안 늡니다. 서버가 목록에 이미 실어 보낸
+        번호만 쓰고, 없으면 여태 그대로 표식입니다. 자세한 것과
+        {@link TripThumb} 을 안 쓰는 까닭은 {@link TripSlot} 에 적어 두었습니다.
+
+        <p>칸은 48 그대로이고 줄 높이도 72 그대로입니다 — 사진을 담겠다고
+        칸을 넓히면 이 줄을 쓰는 두 화면이 같이 자랍니다.
+      */
+      left={<TripSlot theme={trip.theme} emoji={trip.emoji} firstPhotoId={trip.firstPhotoId} />}
       title={trip.title}
       subtitle={`${formatSpan(trip.startIso, trip.endIso)} · ${formatNights(trip.dayCount)} · 장소 ${trip.placeCount}곳`}
       /* 안 줄어드는 자리입니다. 줄어들 수 있게 두면 제목이 아니라 이쪽이

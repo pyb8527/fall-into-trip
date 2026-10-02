@@ -73,6 +73,14 @@ export type TripSummary = {
   groupId: Maybe<string>;
   /** 모임 이름. 모임 칸에서 여행을 모임별로 묶는 데 씁니다. */
   groupName: Maybe<string>;
+  /**
+   * 목록에 세울 첫 사진. 한 장도 없으면 비어 있습니다.
+   *
+   * <p>장소마다 챙겨 둔 사진 가운데 일정 차례로 가장 앞의 것입니다. 비어
+   * 있을 때만 동선 그림을 그립니다 — 그 그림이 구글 호출 한 번이라
+   * ({@link TripThumb}), 사진이 있으면 안 그리는 편이 맞습니다.
+   */
+  firstPhotoId: Maybe<string>;
 };
 
 export type Trip = {
@@ -325,6 +333,8 @@ export type FeedPost = {
   authorMark: Maybe<string>;
   /** 모임 글이면 그 모임. 내 피드면 비어 있습니다. */
   groupId: Maybe<string>;
+  /** 누가 볼 수 있는지. */
+  audience: FeedAudience;
   /** 어느 여행 이야기인지. 지워진 여행이면 비어 있습니다. */
   tripId: Maybe<string>;
   tripTitle: Maybe<string>;
@@ -337,6 +347,24 @@ export type FeedPost = {
   createdAt: string;
   updatedAt: string;
 };
+
+/**
+ * 피드 글을 누가 볼 수 있는지.
+ *
+ * <p>여행기의 {@link Visibility} 와 <b>따로</b> 둡니다. 그쪽의 「주소 아는
+ * 사람만」(LINK)은 피드에 뜻이 없고 — 피드에는 남이 뒤지는 목록이 애초에 없어서
+ * "목록에서는 빠지고 주소로는 열린다" 가 할 일이 없습니다 — 거꾸로 「내 모임
+ * 사람만」은 여행기에 없습니다. 값은 서버의 {@code feed/domain/Audience} 와
+ * 같아야 합니다.
+ *
+ * <ul>
+ *   <li>{@code EVERYONE} 모두
+ *   <li>{@code MATES} 내 모임 사람만 — 모임에 올린 글이면 그 모임 사람,
+ *       내 피드에 쓴 글이면 나와 모임을 함께 쓰는 사람입니다
+ *   <li>{@code ONLY_ME} 나만
+ * </ul>
+ */
+export type FeedAudience = 'EVERYONE' | 'MATES' | 'ONLY_ME';
 
 /** 피드 한 번에 오는 것. @param more 더 있는지 */
 export type FeedSlice = {
@@ -530,8 +558,19 @@ export type PostCard = {
   /** 내가 추천했는지. 로그인 안 했으면 항상 false 입니다. */
   liked: boolean;
   createdAt: string;
-  /** 표지 사진. 없으면 동선 그림이 그 자리를 맡습니다. */
+  /** 표지 사진. 없으면 첫 사진, 그것도 없으면 동선 그림입니다. */
   coverPhotoId: string | null;
+  /**
+   * 표지를 안 골랐을 때 대신 세울 이 글의 첫 사진.
+   *
+   * <p>글에 실린 사진을 읽는 차례대로 훑은 첫 장입니다({@code PostService}).
+   * 사진이 한 장도 없으면 비어 있고, 그때만 동선 그림을 그립니다.
+   *
+   * <p><b>있어도 되고 없어도 되는 칸입니다.</b> 목록({@code /api/posts})은
+   * 싣지만 글 하나를 읽는 주소는 안 싣습니다 — 거기서는 일정 사본에 사진이
+   * 그대로 들어 있어서 첫 장만 따로 받을 이유가 없습니다.
+   */
+  firstPhotoId?: Maybe<string>;
   /** 「내 여행으로 가져오기」 한 사람 수. 같은 사람은 한 번 */
   copyCount?: number;
   /** 모임 여행에서 나온 여행기인지 */

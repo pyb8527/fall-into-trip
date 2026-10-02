@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { api, ApiError, UNEXPECTED } from '@/api/client';
-import type { FeedPost, TripSummary } from '@/api/types';
+import type { FeedAudience, FeedPost, TripSummary } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { OurPhoto } from '@/components/our-photo';
 import { Spacing } from '@/constants/theme';
@@ -23,8 +23,19 @@ import {
  *
  * <h3>사진만 올려도, 글만 써도 됩니다</h3>
  *
- * <p>둘 다 비면 못 올립니다. 그 밖에는 아무것도 안 받습니다 — 제목도 지역도
- * 공개 범위도 없습니다. 올리는 데 드는 품이 사진 고르기 하나여야 합니다.
+ * <p>둘 다 비면 못 올립니다. 제목도 지역도 안 받습니다 — 올리는 데 드는 품이
+ * 사진 고르기 하나여야 합니다.
+ *
+ * <h3>공개 범위는 받습니다 — 다만 안 골라도 됩니다</h3>
+ *
+ * <p>전에는 <b>올린 자리가 곧 공개 범위</b>였습니다. 모임에 올리면 그 모임
+ * 사람이 보고 내 피드에 쓰면 나만 봤는데, 그 사이에 있고 싶은 글이 있습니다 —
+ * 모임 사람에게만 보여 주고 싶은 사진, 아무에게도 안 보여 줄 메모, 누구에게나
+ * 보여 주고 싶은 한 장.
+ *
+ * <p>칸을 하나 더 두는 값은 치릅니다. 그래서 <b>미리 골라 둡니다</b> — 모임에
+ * 올리면 그 모임 사람, 내 피드에 쓰면 나만입니다. 안 건드리고 올리면 전과
+ * 똑같이 동작하고, 서버도 같은 값을 기본으로 씁니다.
  *
  * <h3>태그는 적는 대로</h3>
  *
@@ -53,6 +64,49 @@ const THUMB = 88;
 const MAX_TEXT = 2000;
 const MAX_TAGS = 5;
 
+/**
+ * 고를 수 있는 공개 범위.
+ *
+ * <p>값은 서버의 {@code feed/domain/Audience} 와 같아야 합니다. 차례는 <b>넓은
+ * 것부터</b>입니다 — 여행기 쪽({@code post-fields.tsx})과 같은 차례라 두 판을
+ * 번갈아 쓰는 사람이 같은 자리에서 같은 것을 찾습니다.
+ *
+ * <p>「내 모임 사람만」의 설명이 둘입니다. 모임에 올리는 글에서는 <b>그 모임</b>
+ * 이고, 내 피드에 쓰는 글에서는 <b>나와 모임을 함께 쓰는 사람</b>이라 묻는
+ * 것이 다릅니다. 한 문장으로 뭉치면 둘 다 아닌 말이 됩니다.
+ */
+const SEEN: { value: FeedAudience; label: string; hint: string; inGroupHint?: string }[] = [
+  {
+    value: 'EVERYONE',
+    label: '모두',
+    hint: '앱을 쓰는 누구나 볼 수 있어요. 모임 밖 사람도요.',
+  },
+  {
+    value: 'MATES',
+    label: '내 모임 사람만',
+    hint: '나와 모임을 함께 쓰는 사람만 볼 수 있어요.',
+    inGroupHint: '이 모임 사람만 볼 수 있어요.',
+  },
+  {
+    value: 'ONLY_ME',
+    label: '나만',
+    hint: '나만 볼 수 있어요. 혼자 간직할 때.',
+  },
+];
+
+/**
+ * 안 고른 글의 공개 범위.
+ *
+ * <p>서버의 {@code Post.audienceFor} 와 같은 규칙입니다. 공개 범위가 없던
+ * 때의 동작이라, 미리 골라 두어도 아무도 모르게 넓어지는 일이 없습니다.
+ *
+ * <p>「모두」를 기본으로 두지 않습니다. 모르고 넓게 열리는 쪽이 모르고 좁게
+ * 닫히는 쪽보다 되돌리기 어렵습니다 — 이미 남이 본 것은 못 거둡니다.
+ */
+function defaultAudience(groupId?: string | null): FeedAudience {
+  return groupId ? 'MATES' : 'ONLY_ME';
+}
+
 export function FeedForm({
   visible,
   /** 모임에 올리면 그 모임. 안 주면 내 피드입니다. */
@@ -77,6 +131,7 @@ export function FeedForm({
   const [tags, setTags] = useState<string[]>([]);
   const [tagDraft, setTagDraft] = useState('');
   const [tripId, setTripId] = useState<string | null>(null);
+  const [audience, setAudience] = useState<FeedAudience>(defaultAudience(groupId));
   const [busy, setBusy] = useState(false);
   const [picking, setPicking] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -106,10 +161,13 @@ export function FeedForm({
     setTags(post?.tags ?? []);
     setTagDraft('');
     setTripId(post?.tripId ?? null);
+    /* 고치는 중이면 지금 값을, 새로 쓰면 올린 자리가 정한 값을. 고치는
+       판에서 기본값으로 되돌리면 좁혀 두었던 글이 조용히 넓어집니다. */
+    setAudience(post?.audience ?? defaultAudience(groupId));
     setError(null);
     setNotice(null);
     setBusy(false);
-  }, [visible, post]);
+  }, [visible, post, groupId]);
 
   async function addPhotos() {
     const room = MAX_PHOTOS - photoIds.length;
@@ -170,7 +228,7 @@ export function FeedForm({
     setError(null);
     setBusy(true);
     try {
-      const body = { text: text.trim(), tags, photoIds, tripId: tripId ?? '' };
+      const body = { text: text.trim(), tags, photoIds, tripId: tripId ?? '', audience };
       if (editing) {
         await api.patch(`/api/feed/${encodeURIComponent(post.id)}`, body);
       } else {
@@ -197,8 +255,12 @@ export function FeedForm({
           <View key={id} style={styles.shot}>
             <OurPhoto id={id} width={THUMB} height={THUMB} />
             <View style={styles.pull}>
-              /* 사진 위에 얹히는 단추라 바탕 없이 둡니다 — 회색 네모를 두르면
-                 그 네모가 사진의 일부처럼 보입니다. */
+              {/* 사진 위에 얹히는 단추라 바탕 없이 둡니다 — 회색 네모를 두르면
+                  그 네모가 사진의 일부처럼 보입니다.
+
+                  중괄호 없이 적혀 있었습니다. 그러면 주석이 아니라 <b>글자</b>라서
+                  React Native 가 「Text strings must be rendered within a Text
+                  component」로 멈춥니다 — 사진을 한 장 고르는 순간 판이 터졌습니다. */}
               <IconButton
                 name="x"
                 label="이 사진 빼기"
@@ -269,9 +331,38 @@ export function FeedForm({
         </>
       ) : null}
 
+      {/*
+        누가 볼지.
+
+        <p>맨 아래입니다 — 무엇을 올릴지 다 정한 다음에 정하는 것이고, 무엇보다
+        <b>올리기 직전에 한 번 더 보게</b> 하고 싶은 값입니다. 여행기 쪽
+        ({@code post-fields.tsx})도 같은 자리입니다.
+      */}
+      <Caption strong tone="secondary">누가 볼 수 있나요?</Caption>
+      <Row gap={Spacing.s2} style={styles.wrap}>
+        {SEEN.map((s) => (
+          <Chip
+            key={s.value}
+            label={s.label}
+            selected={audience === s.value}
+            onPress={() => setAudience(s.value)}
+          />
+        ))}
+      </Row>
+      <Caption tone="muted">{hintOf(audience, groupId)}</Caption>
+
       {error ? <ErrorNote message={error} /> : null}
     </BottomSheet>
   );
+}
+
+/** 고른 갈래의 한 줄 설명. 모임에 올리는 글이면 「내 모임」이 그 모임입니다. */
+function hintOf(audience: FeedAudience, groupId?: string | null) {
+  const found = SEEN.find((s) => s.value === audience);
+  if (!found) {
+    return '';
+  }
+  return groupId && found.inGroupHint ? found.inGroupHint : found.hint;
 }
 
 const styles = StyleSheet.create({

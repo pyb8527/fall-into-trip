@@ -11,7 +11,7 @@ import {
 import { api, query } from '@/api/client';
 import type { PostCard, PostPage } from '@/api/types';
 import { useAsync } from '@/api/use-async';
-import { PostMap } from '@/components/post-map';
+import { TripThumb } from '@/components/trip-thumb';
 import {
   Colors,
   Gutter,
@@ -83,8 +83,9 @@ import { LogoMark } from '@/ui/logo';
  * <p>가로로 눕히면서 하나를 더 받습니다. 옆으로 미는 줄은 <b>끝이 보이면
  * 밀 생각을 안 하므로</b>, 네 번째가 반쯤 걸쳐 있어야 손이 갑니다.
  *
- * <p>한 장이 곧 구글 호출 한 번이라는 것도 셈에 넣습니다. 로그인 안 한
- * 사람이 가장 자주 여는 화면이라 늘릴 자리가 아닙니다.
+ * <p>값도 셈에 넣습니다. 사진이 한 장도 없는 글은 동선 그림을 그리는데
+ * 그것이 구글 호출 한 번입니다({@link TripThumb}). 로그인 안 한 사람이 가장
+ * 자주 여는 화면이라 늘릴 자리가 아닙니다.
  */
 const SHOW = 4;
 
@@ -193,8 +194,13 @@ export default function Welcome() {
  * <p>누르면 그 글로 곧장 갑니다. 문을 한 번 더 거치게 하면 구경하러 온
  * 사람이 문 앞에서 한 번 더 결심해야 합니다.
  *
- * <p>지도를 4:3 으로 눕힙니다. 폰에서 세로로 긴 그림은 한 장이 화면을
+ * <p>그림을 4:3 으로 눕힙니다. 폰에서 세로로 긴 그림은 한 장이 화면을
  * 다 먹어 "더 있다" 를 못 보여 줍니다.
+ *
+ * <p>한동안 <b>동선 그림만</b> 걸었습니다. 글쓴이가 고른 표지가 응답에 실려
+ * 오는데도 안 봤고, 그래서 사진이 넘치는 글도 문 앞에서는 선 한 장이었습니다.
+ * {@link TripThumb} 에 맡기면 표지 · 첫 사진 · 동선 그림 세 칸이 한곳에
+ * 있습니다 — <b>네 장 가운데 사진이 있는 만큼 구글 호출이 사라집니다.</b>
  */
 function Peek({
   post,
@@ -205,12 +211,20 @@ function Peek({
   width: number;
   onOpen: () => void;
 }) {
+  const tall = Math.round((width * 3) / 4);
   return (
     <Pressable onPress={onOpen} accessibilityRole="button" style={{ width }}>
-      {/* 지도가 안 받아지면 PostMap 이 아무것도 안 그립니다. 바탕을 깔아
-          두어야 그때도 카드 모양이 남습니다. */}
-      <View style={[styles.media, { height: Math.round((width * 3) / 4) }]}>
-        <PostMap postId={post.id} title={post.title} height={Math.round((width * 3) / 4)} />
+      {/* 사진도 지도도 못 받아 오는 판이 있습니다. 바탕을 깔아 두어야 그때도
+          카드 모양이 남습니다. */}
+      <View style={[styles.media, { height: tall }]}>
+        <TripThumb
+          postId={post.id}
+          coverPhotoId={post.coverPhotoId}
+          firstPhotoId={post.firstPhotoId}
+          height={tall}
+          label={post.title}
+          style={styles.flat}
+        />
       </View>
       <Text style={styles.cardTitle} numberOfLines={2}>
         {post.title}
@@ -261,6 +275,12 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.fill,
     overflow: 'hidden',
     marginBottom: Spacing.s2,
+  },
+  /* 이 틀이 이미 모서리를 쥐고 있으니 안쪽 그림은 제 모서리와 테두리를
+     내놓습니다. 두 겹을 두르면 안쪽 둥근 선 밖으로 바탕색이 비칩니다. */
+  flat: {
+    borderRadius: 0,
+    borderWidth: 0,
   },
   cardTitle: {
     ...Type.headline,

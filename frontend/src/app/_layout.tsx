@@ -154,6 +154,17 @@ export default function RootLayout() {
             {/* 모임 이름은 화면이 받아 온 뒤에 스스로 답니다. 여기 적는
                 것은 아직 못 받았을 때 잠깐 보일 이름입니다. */}
             <Stack.Screen name="group/[id]" options={stackHeader('모임', { up: '/(app)/groups' })} />
+            {/*
+              피드 글 하나.
+
+              <p>위층을 안 적습니다. 다른 화면들은 위층이 하나인데 — 일정의
+              위는 내 여행이고 모임의 위는 모임 목록입니다 — 피드 글은 들어오는
+              길이 셋입니다(마이페이지의 피드 칸, 모임의 피드, 여행 상세의
+              앨범). 그중 하나를 위층이라고 적으면 나머지 둘로 들어온 사람이
+              엉뚱한 데로 올라갑니다. 안 적으면 돌아갈 데가 없을 때만 처음으로
+              갑니다.
+            */}
+            <Stack.Screen name="feed/[id]" options={stackHeader('피드 글')} />
             <Stack.Screen name="community" options={{ headerShown: false }} />
             <Stack.Screen name="admin" options={{ headerShown: false }} />
           </Stack>

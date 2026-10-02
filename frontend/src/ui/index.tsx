@@ -2237,6 +2237,11 @@ export function SegmentedTabs<T extends string>({
             onPress={() => onChange(item.value)}
             accessibilityRole="tab"
             accessibilityState={{ selected }}
+            /* 칸은 띠의 안쪽 여백만큼 작습니다. 그 여백은 알약이 테두리에 안
+               붙게 두는 자리인데, 손가락에게는 <b>띠인데 안 눌리는 테</b>였
+               습니다 — 끝을 누르면 아무 일도 안 일어납니다. 보이는 띠 전체가
+               눌리게 채웁니다. */
+            hitSlop={Tap.compactSlop}
             style={styles.segmentItem}>
             <Text style={[styles.segmentLabel, selected && styles.segmentLabelOn]}>
               {item.label}
@@ -3349,13 +3354,148 @@ export function Pager({
   );
 }
 
-export function Loading({ label = '가져오는 중' }: { label?: string }) {
+/**
+ * 기다리는 중.
+ *
+ * <h3>기기가 그려 주는 바퀴였습니다</h3>
+ *
+ * <p>{@link ActivityIndicator} 하나와 글자 한 줄이었습니다. 그 바퀴는
+ * 안드로이드·iOS·웹에서 생김새가 다 다르고 어느 것도 이 앱이 그린 것이
+ * 아닙니다. 서른여덟 자리가 이것을 부르므로, <b>기다리는 동안 보이는 화면은
+ * 어디나 남의 것</b>이었습니다.
+ *
+ * <p>점 셋이 차례로 숨을 쉽니다. 글자와 같은 결의 도형이라 어느 쪽도 튀지
+ * 않고, {@link Skeleton} 의 회색 칸과 숨 박자가 같습니다 — 기다리는 것은 이
+ * 앱에서 한 가지 몸짓입니다.
+ *
+ * <p>색은 회색입니다. 바이올렛으로 두면 「기다리는 중」이 화면에서 가장 눈에
+ * 띄는 것이 되는데, 기다리는 것은 알리기만 하면 됩니다.
+ *
+ * <p><b>목록이 올 자리에는 안 씁니다.</b> 바퀴든 점이든 그것이 도는 동안
+ * 목록은 백지이고, 데이터가 닿는 순간 줄들이 한꺼번에 들어서면서 화면이
+ * 튑니다. 그 자리는 {@link Skeleton} 입니다.
+ *
+ * @param label 무엇을 가져오는 중인지. 자리마다 적습니다
+ */
+export function Loading({ label = '가져오고 있어요' }: { label?: string }) {
+  const calm = useCalm();
+
   return (
     <View style={styles.center}>
-      {/* 스피너는 회색입니다. 바이올렛으로 두면 「기다리는 중」이 화면에서
-          가장 눈에 띄는 것이 되는데, 기다리는 것은 알리기만 하면 됩니다. */}
-      <ActivityIndicator color={Colors.textDisabled} />
+      <View style={styles.waitDots}>
+        {WAIT_DOTS.map((order) => (
+          <WaitDot key={order} order={order} calm={calm} />
+        ))}
+      </View>
       <Caption>{label}</Caption>
+    </View>
+  );
+}
+
+/** 기다리는 점 셋. 넷을 넘으면 「기다리는 중」이 아니라 무늬로 보입니다. */
+const WAIT_DOTS = [0, 1, 2];
+
+/** 숨 한 번의 길이. 점과 스켈레톤 칸이 같은 값을 봅니다. */
+const BREATH = 400;
+
+/** 점 사이의 시차. 셋이 차례로 밝아지는 간격입니다. */
+const BREATH_STEP = 160;
+
+/**
+ * 밝아졌다 흐려지는 것.
+ *
+ * <p>차례를 늦춘 만큼 뒤에서 되돌려 <b>한 바퀴 길이를 셋이 똑같이</b>
+ * 가집니다. 안 맞추면 바퀴를 돌 때마다 시차가 쌓여, 셋이 한꺼번에 깜빡이는
+ * 순간이 생깁니다.
+ *
+ * <p>움직임을 줄이겠다고 해 둔 사람에게는 켜 둔 채로 멈춥니다. 기다리는
+ * 중이라는 말은 옆의 글자가 이미 하고 있습니다.
+ *
+ * @param from 가장 흐려졌을 때의 투명도. 0 까지 내리면 점이 사라져 자리가 빕니다
+ * @param order 몇 번째인지. 앞에서부터 조금씩 늦게 밝아집니다
+ */
+function useBreath({ from, order = 0, calm }: { from: number; order?: number; calm: boolean }) {
+  const value = useRef(new Animated.Value(calm ? 1 : from)).current;
+
+  useEffect(() => {
+    if (calm) {
+      value.setValue(1);
+      return;
+    }
+    const wait = order * BREATH_STEP;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(value, {
+          toValue: 1,
+          duration: BREATH,
+          delay: wait,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(value, {
+          toValue: from,
+          duration: BREATH,
+          /* 늦게 시작한 만큼 일찍 끝냅니다 — 위의 <b>한 바퀴 길이</b> 이야기
+             입니다. {@link Animated.delay} 는 안 씁니다. 그것이 만드는 애니
+             메이션은 네이티브 드라이버를 안 쓰므로, 한 묶음 안에서 드라이버가
+             섞입니다. */
+          delay: BREATH_STEP * 2 - wait,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [value, from, order, calm]);
+
+  return value;
+}
+
+function WaitDot({ order, calm }: { order: number; calm: boolean }) {
+  const breath = useBreath({ from: 0.25, order, calm });
+
+  return <Animated.View style={[styles.waitDot, { opacity: breath }]} />;
+}
+
+/**
+ * 올 것의 자리.
+ *
+ * <h3>다시 받아 오는 동안 목록이 사라졌습니다</h3>
+ *
+ * <p>목록 화면이 {@link Loading} 을 세우고 있었습니다. 그러면 있던 줄들이
+ * 전부 걷히고 가운데에 점 셋만 남았다가, 데이터가 닿는 순간 줄들이 한꺼번에
+ * 들어섭니다 — 탭을 옮겨 다니는 것이 <b>부자연스럽다</b>고 한 것의 절반이
+ * 이것입니다.
+ *
+ * <p>올 것과 비슷한 크기의 회색 칸을 미리 세워 둡니다. 자리가 이미 잡혀
+ * 있으면 데이터가 닿아도 화면이 안 움직이고, 몇 개쯤 오는지도 먼저 보입니다.
+ *
+ * <p>칸은 숨을 쉽니다. 가만히 있는 회색 네모는 <b>다 그려진 화면</b>으로
+ * 읽혀서, 기다리는 중인지 원래 그런 화면인지 안 갈립니다.
+ *
+ * @param rows 몇 줄을 세울지. 그 자리에 대개 몇 개가 오는지로 정합니다
+ * @param thumb 줄 앞에 그림이 서는 목록인지. 글자만 오는 목록이면 끕니다
+ */
+export function Skeleton({ rows = 3, thumb = true }: { rows?: number; thumb?: boolean }) {
+  const calm = useCalm();
+  /* 칸들이 한 숨으로 함께 쉽니다. 줄마다 시차를 두면 목록이 아래로 흐르는
+     것처럼 보여서, 가만히 기다리는 자리가 제 혼자 움직이는 화면이 됩니다. */
+  const breath = useBreath({ from: 0.5, calm });
+
+  return (
+    /* 읽어 주는 기기에 회색 칸은 아무 말도 아닙니다. 무엇을 하는 중인지 한 번
+       말하고, 안의 칸들은 읽을 글자가 없으니 저절로 넘어갑니다. */
+    <View accessibilityRole="progressbar" accessibilityLabel="가져오고 있어요">
+      {Array.from({ length: rows }, (_, i) => (
+        <View key={i} style={styles.bone}>
+          {thumb ? <Animated.View style={[styles.boneThumb, { opacity: breath }]} /> : null}
+          <View style={styles.boneText}>
+            <Animated.View style={[styles.boneLine, { opacity: breath }]} />
+            <Animated.View style={[styles.boneLine, styles.boneLineTail, { opacity: breath }]} />
+          </View>
+        </View>
+      ))}
     </View>
   );
 }
@@ -4381,8 +4521,31 @@ const styles = StyleSheet.create({
        「위에 떠 있는 것」과 반대 방향으로 읽힙니다. */
     ...Elevation.card,
   },
-  /* 칸 높이 40 − 안쪽 여백. 44 였는데, 계획서가 세그먼트를 40 으로 두는
-     까닭은 이것이 화면 맨 위에 늘 서 있는 것이라서입니다. */
+  /*
+    칸 높이 40 − 안쪽 여백.
+
+    <p>44 였는데, 계획서가 세그먼트를 40 으로 두는 까닭은 이것이 화면 맨 위에
+    늘 서 있는 것이라서입니다. 그 자리에서는 4픽셀이 상단을 그만큼 낮춰 줍니다.
+
+    <h3>그래서 32픽셀만 눌렸습니다</h3>
+
+    <p>보이는 띠는 40 인데 <b>누르는 것은 이 칸</b>이고, 칸은 띠의 안쪽 여백
+    둘을 뺀 32 였습니다. 띠의 위아래 테를 누르면 아무 일도 안 일어났습니다 —
+    마이페이지에서 「토글이 너무 짧다」고 한 것이 이 자리입니다. 그 화면에서는
+    이것이 맨 위가 아니라 프로필과 갈래 탭 아래 중간에 서 있어, 4픽셀을 아껴
+    봐야 아무것도 안 벌어 줍니다.
+  */
+  /*
+    보이는 높이는 그대로 두고 {@code hitSlop} 으로 채웁니다.
+
+    <p>{@link Tap.segment} 를 44 로 올리면 <b>앱의 모든 세그먼트</b>가 그만큼
+    키가 큽니다 — 한 화면의 불만보다 큰 변경입니다.
+
+    <p>채우는 끝은 <b>띠의 바깥선</b>입니다. {@code hitSlop} 은 부모 밖으로는
+    안 나가므로(리액트 네이티브가 그렇게 못 박아 두었습니다), 여기서 더 늘려
+    44 를 만들 수는 없습니다. 눌리는 높이 40 은 손가락이 겨냥하는 <b>보이는
+    것과 같은</b> 크기이고, 44 가 필요하면 그때 고치는 것은 토큰입니다.
+  */
   segmentItem: {
     flex: 1,
     height: Tap.segment - SEGMENT_PAD * 2,
@@ -4881,6 +5044,60 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: Spacing.huge,
     gap: Spacing.sm,
+  },
+  /* 기다리는 점 셋. 글자 위에 서므로 한 덩어리로 모읍니다 — 사이를 8 로
+     벌리면 점 셋이 아니라 따로 선 점 세 개로 보입니다. */
+  waitDots: {
+    flexDirection: 'row',
+    gap: Spacing.s1,
+  },
+  waitDot: {
+    width: 8,
+    height: 8,
+    borderRadius: Radius.full,
+    /* 옛 바퀴와 같은 회색입니다. */
+    backgroundColor: Colors.textDisabled,
+  },
+  /*
+    올 줄 하나.
+
+    <p>{@link ListRow} 의 <b>부제가 붙은 줄</b>과 같은 키·같은 여백입니다.
+    어긋나면 칸이 걷히고 줄이 들어설 때 그 차이만큼 목록이 들썩여, 자리를
+    미리 비워 둔 뜻이 없어집니다.
+  */
+  bone: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.s3,
+    paddingVertical: Spacing.s3,
+    minHeight: 72,
+  },
+  /*
+    회색 칸의 색.
+
+    <p>{@code Colors.fillPressed} 와 같은 값인데 그 이름으로 안 부릅니다 —
+    여기는 눌린 면이 아닙니다. 토큰 설명이 gray100 을 <b>스켈레톤의 색</b>
+    으로 적어 두었고, 부품 안에서는 단계를 직접 집어도 됩니다.
+  */
+  boneThumb: {
+    width: 48,
+    height: 48,
+    borderRadius: Radius.r2,
+    backgroundColor: Palette.gray[100],
+  },
+  boneText: {
+    flex: 1,
+    gap: Spacing.s2,
+  },
+  boneLine: {
+    height: 14,
+    borderRadius: Radius.r1,
+    backgroundColor: Palette.gray[100],
+  },
+  /* 둘째 줄은 짧고 얇습니다. 둘이 같은 길이면 글이 아니라 표처럼 보입니다. */
+  boneLineTail: {
+    height: 12,
+    width: '48%',
   },
   /* 옅은 붉은 상자였습니다. 색을 걷으니 흰 바탕에 흰 상자가 되어
      아무 표시도 아니게 됐습니다. 상자 대신 왼쪽에 선 한 줄을 세웁니다 —

@@ -50,37 +50,98 @@ public interface PopularRepository extends JpaRepository<TripPost, String> {
      * <p>한 글에서 같은 곳을 두 번 넣었어도 한 번으로 셉니다. 사흘 내내 같은
      * 카페에 갔다고 그 카페가 세 배 인기 있는 것은 아닙니다.
      *
-     * @param kind 갈래로 거를 때의 이름("ramen"). 비우면 전부.
-     * @return [묶음 열쇠, 이름, 갈래, 위도, 경도, 구글 번호, 글 수, 추천 합]
+     * <h3>내 자리를 주면 가까운 순입니다</h3>
+     *
+     * <p>「지금 내 근처」입니다. 거리를 여기서 셉니다 — 열 줄을 받아 화면에서
+     * 다시 세우면 <b>그 열 줄 안에 없는 옆 가게</b>는 아무리 세워도 안 나옵니다.
+     *
+     * <p>두 단으로 거릅니다. 먼저 {@code Near} 가 준 네모로 쳐서 지구 반대편
+     * 장소에 삼각함수가 안 돌게 하고, 남은 것에만 하버사인을 돌려 원으로 다시
+     * 거릅니다. 네모는 원을 감싸는 쪽으로만 틀리므로({@code Near.MARGIN})
+     * 안에 있는 것이 네모 때문에 빠지는 일은 없습니다.
+     *
+     * <p>거리는 <b>묶은 뒤의 좌표</b>(avg)로 셉니다. 내려 주는 좌표와 같은
+     * 값이어야 하기 때문입니다 — 다른 값으로 재면 지도의 핀과 「여기서 1.2km」
+     * 가 서로 다른 곳을 가리킵니다.
+     *
+     * <p>네모가 좌표 없는 장소를 떨어냅니다. 그래서 자리를 준 호출에서는
+     * {@code away} 가 늘 값이 있고, {@code away IS NULL} 은 <b>자리를 안
+     * 줬다</b>는 뜻만 가집니다 — 아래 {@code WHERE} 가 그것에 기댑니다.
+     *
+     * <h3>{@code cast} 를 왜 쓰는가</h3>
+     *
+     * <p>자리를 안 주면 숫자 자리에 null 이 들어갑니다. 그런데 null 에는
+     * <b>타입이 없어서</b> 포스트그레스가 {@code :lat IS NULL} 의 {@code :lat}
+     * 이 무엇인지 알 수 없다고 합니다. 글자 조건({@code :kind})은 드라이버가
+     * varchar 로 보내 주지만 숫자는 그렇지 않습니다. 그래서 쓰는 자리마다
+     * 타입을 적어 둡니다.
+     *
+     * <p>이름을 한 번만 적으려고 {@code WITH me AS (...)} 로 묶어 보았는데,
+     * 그러면 그것을 안쪽과 바깥쪽 두 단에 각각 끌어다 붙이고 {@code GROUP BY}
+     * 도 넓혀야 합니다 — 고칠 자리는 그대로 하나인데 틀릴 자리만 늘어서
+     * 되돌렸습니다.
+     *
+     * @param kind   갈래로 거를 때의 이름("ramen"). 비우면 전부.
+     * @param lat    지금 내 자리. null 이면 인기순 그대로입니다
+     * @param south  네모의 네 끝({@code Near}). 자리가 없으면 다 null 입니다
+     * @param radius 「근처」라고 부를 거리(미터). {@code Near.RADIUS_M}
+     * @return [묶음 열쇠, 이름, 갈래, 위도, 경도, 구글 번호, 글 수, 추천 합,
+     *         거리(미터, 자리를 안 줬으면 null)]
      */
     @Query(value = """
-           SELECT key, max(name) AS name, max(icon) AS icon,
-                  avg(lat) AS lat, avg(lng) AS lng, max(place_id) AS place_id,
-                  count(*) AS posts, coalesce(sum(likes), 0) AS likes
+           SELECT agg.key, agg.name, agg.icon, agg.lat, agg.lng, agg.place_id,
+                  agg.posts, agg.likes, agg.away
            FROM (
-               SELECT DISTINCT ON (p.id, coalesce(nullif(pl->>'placeId', ''), pl->>'name'))
-                      p.id AS post_id,
-                      coalesce(nullif(pl->>'placeId', ''), pl->>'name') AS key,
-                      pl->>'name'    AS name,
-                      pl->>'icon'    AS icon,
-                      (pl->>'lat')::double precision AS lat,
-                      (pl->>'lng')::double precision AS lng,
-                      nullif(pl->>'placeId', '')     AS place_id,
-                      p.like_count   AS likes
-               FROM trip_posts p,
-                    jsonb_array_elements(p.snapshot -> 'days') AS d,
-                    jsonb_array_elements(d -> 'places') AS pl
-               WHERE p.hidden = false AND p.visibility = 'LISTED'
-                 AND pl->>'name' IS NOT NULL
-                 AND (:kind IS NULL OR pl->>'icon' = :kind)
-                 AND (:region IS NULL OR p.region = :region)
-           ) one
-           GROUP BY key
-           ORDER BY posts DESC, likes DESC, name ASC
+               SELECT key, max(name) AS name, max(icon) AS icon,
+                      avg(lat) AS lat, avg(lng) AS lng, max(place_id) AS place_id,
+                      count(*) AS posts, coalesce(sum(likes), 0) AS likes,
+                      CASE WHEN cast(:lat as double precision) IS NULL THEN NULL ELSE
+                           6371000 * 2 * asin(sqrt(
+                               power(sin(radians(avg(lat) - cast(:lat as double precision)) / 2), 2)
+                             + cos(radians(cast(:lat as double precision))) * cos(radians(avg(lat)))
+                               * power(sin(radians(avg(lng) - cast(:lng as double precision)) / 2), 2)))
+                      END AS away
+               FROM (
+                   SELECT DISTINCT ON (p.id, coalesce(nullif(pl->>'placeId', ''), pl->>'name'))
+                          p.id AS post_id,
+                          coalesce(nullif(pl->>'placeId', ''), pl->>'name') AS key,
+                          pl->>'name'    AS name,
+                          pl->>'icon'    AS icon,
+                          (pl->>'lat')::double precision AS lat,
+                          (pl->>'lng')::double precision AS lng,
+                          nullif(pl->>'placeId', '')     AS place_id,
+                          p.like_count   AS likes
+                   FROM trip_posts p,
+                        jsonb_array_elements(p.snapshot -> 'days') AS d,
+                        jsonb_array_elements(d -> 'places') AS pl
+                   WHERE p.hidden = false AND p.visibility = 'LISTED'
+                     AND pl->>'name' IS NOT NULL
+                     AND (:kind IS NULL OR pl->>'icon' = :kind)
+                     AND (:region IS NULL OR p.region = :region)
+                     AND (cast(:south as double precision) IS NULL
+                          OR ((pl->>'lat')::double precision
+                                  BETWEEN cast(:south as double precision)
+                                      AND cast(:north as double precision)
+                              AND (pl->>'lng')::double precision
+                                  BETWEEN cast(:west as double precision)
+                                      AND cast(:east as double precision)))
+               ) one
+               GROUP BY key
+           ) agg
+           WHERE agg.away IS NULL OR agg.away <= :radius
+           ORDER BY agg.away ASC NULLS LAST,
+                    agg.posts DESC, agg.likes DESC, agg.name ASC
            LIMIT :limit
            """, nativeQuery = true)
     List<Object[]> places(@Param("kind") String kind,
                           @Param("region") String region,
+                          @Param("lat") Double lat,
+                          @Param("lng") Double lng,
+                          @Param("south") Double south,
+                          @Param("north") Double north,
+                          @Param("west") Double west,
+                          @Param("east") Double east,
+                          @Param("radius") int radius,
                           @Param("limit") int limit);
 
     /**

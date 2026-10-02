@@ -848,7 +848,7 @@ export function TripMap({
         {routesPending && !full ? (
           <View style={styles.pending} pointerEvents="none">
             <ActivityIndicator size="small" color={Colors.textSecondary} />
-            <Caption tone="secondary">길 찾는 중</Caption>
+            <Caption tone="secondary">길을 찾고 있어요</Caption>
           </View>
         ) : null}
         {full ? null : dayRail}

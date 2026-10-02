@@ -5,6 +5,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { api, ApiError, UNEXPECTED } from '@/api/client';
 import type { Group, Mate, OpenDate, Trip, TripSummary } from '@/api/types';
 import { useAsync } from '@/api/use-async';
+import { CountdownBadge } from '@/components/countdown-badge';
 import { DatePollSheet } from '@/components/date-poll-sheet';
 import { TripCalendar } from '@/components/trip-calendar';
 import { useAuth } from '@/auth/auth-provider';
@@ -12,8 +13,10 @@ import { FeedList } from '@/components/feed-list';
 import { GroupForm } from '@/components/group-form';
 import { MatesSheet } from '@/components/mates-sheet';
 import { TripForm } from '@/components/trip-form';
+import { TripSlot } from '@/components/trip-slot';
 import { Colors, Gutter, Radius, Spacing, Tap } from '@/constants/theme';
 import { faceOf } from '@/constants/user-marks';
+import { formatNights, formatSpan, todayIso } from '@/lib/countdown';
 import {
   Band,
   Body,
@@ -80,16 +83,24 @@ const LANES: { value: Lane; label: string }[] = [
   { value: 'feed', label: '피드' },
 ];
 
+/*
+  모임 상세가 돌려주는 것.
+
+  <p>응답에는 {@code trips} 도 있습니다 — 번호와 이름만 든 목록입니다. 전에는
+  여행 칸이 그것으로 줄을 그렸는데 날짜도 장소 수도 없어서 백지에 글자
+  하나였고, 지금은 {@code /api/trips} 쪽을 봅니다. 여행이 있는지 없는지는
+  {@code group.tripCount} 가 같은 응답에서 답해 주므로 <b>여기서는 안 받습니다
+  </b> — 쓰지 않는 것을 적어 두면 다음 사람이 그것을 쓸 자리를 찾습니다.
+*/
 type Detail = {
   group: Group;
   members: Mate[];
-  /** 모임의 여행들. 목록에 쓸 것만 옵니다. */
-  trips: { id: string; title: string }[];
 };
 
 export default function GroupScreen() {
-  /* invite — 모임 목록의 「초대 링크 만들기」나 새로 만든 직후. 사람들 판을
-     바로 엽니다 — 다음에 할 일이 사람을 부르는 것입니다. */
+  /* invite — 모임 목록에서 이 모임을 골라 「초대 링크 만들기」를 눌렀거나,
+     모임을 새로 만든 직후. 사람들 판을 바로 엽니다 — 다음에 할 일이 사람을
+     부르는 것입니다. */
   const { id, invite } = useLocalSearchParams<{ id: string; invite?: string }>();
   const router = useRouter();
   const { user } = useAuth();
@@ -107,11 +118,22 @@ export default function GroupScreen() {
     <h3>왜 모임 응답을 안 쓰는가</h3>
 
     <p>모임 상세가 돌려주는 여행에는 <b>번호와 이름만</b> 있습니다. 달력은
-    날짜가 있어야 그립니다.
+    날짜가 있어야 그리고, 여행 목록도 날짜·며칠·장소 수가 있어야 줄이
+    내 여행 목록과 같은 꼴로 섭니다.
 
-    <p>모임 응답에 날짜를 더하는 길도 있지만, {@code /api/trips} 가 이미
-    여행마다 날짜·모임 번호를 돌려줍니다. 그것을 모임으로 거르면 서버를
-    안 고치고 끝납니다 — 달력 칸 하나 때문에 길을 바꾸지 않습니다.
+    <p>모임 응답에 그것들을 더하는 길도 있지만, {@code /api/trips} 가 이미
+    여행마다 날짜·장소 수·모임 번호를 돌려줍니다. 그것을 모임으로 거르면
+    서버를 안 고치고 끝납니다 — 화면 하나 때문에 길을 바꾸지 않습니다.
+
+    <p>거르는 것이 빠뜨리는 것은 없습니다. {@code /api/trips} 는 내가 든
+    모임의 여행을 전부 싣고(TripAccessPolicy), 모임 상세는 그 모임 것만
+    고르므로 <b>같은 것을 두 길로 세는 셈</b>입니다. 쪽 나눔도 없습니다.
+
+    <h3>두 번째 요청이라는 것</h3>
+
+    <p>그래서 여행은 모임보다 늦게 옵니다. 그 틈에 「아직 짠 여행이 없어요」를
+    띄우면 여행이 있는 모임에 없다고 말하는 것이 되므로, 있는지 없는지는
+    {@code group.tripCount} 에게 묻습니다 — 첫 응답에 이미 들어 있습니다.
   */
   const all = useAsync<{ trips: TripSummary[] }>(
     (signal) => api.get('/api/trips', signal),
@@ -240,7 +262,7 @@ export default function GroupScreen() {
             />
           ) : lane === 'trips' ? (
             <>
-              {data.trips.length === 0 ? (
+              {group.tripCount === 0 ? (
                 <Empty
                   icon="map-pin"
                   message="아직 짠 여행이 없어요."
@@ -249,15 +271,73 @@ export default function GroupScreen() {
                      보이면 둘 다 주 동작으로 안 읽힙니다. */
                   note="위 「여행 만들기」로 첫 줄을 그어 보세요."
                 />
-              ) : null}
-              {data.trips.map((t, i) => (
-                <ListRow
-                  key={t.id}
-                  title={t.title}
-                  last={i === data.trips.length - 1}
-                  onPress={() => router.push({ pathname: '/trip/[id]', params: { id: t.id } })}
-                />
-              ))}
+              ) : all.error ? (
+                <ErrorNote message={all.error} onRetry={all.reload} />
+              ) : ours.length === 0 ? (
+                /* 모임은 왔고 여행은 아직입니다. 여행이 있다는 것은 이미
+                   아니까(위 {@code tripCount}) 비었다고 말하지 않고 기다리는
+                   것을 보입니다. */
+                <Loading label="여행을 가져오고 있어요" />
+              ) : (
+                /*
+                  내 여행 목록과 같은 줄입니다 — 앞 칸 · 이름 · 날짜 · 며칠 ·
+                  장소 수 · D-day.
+
+                  <p>전에는 이름 하나만 넘겼습니다. 같은 여행이 내 여행에서는
+                  색 표식과 날짜를 갖고 모임에서는 글자 한 줄이라, 화면을
+                  옮기면 다른 것으로 보였습니다. 부품은 {@link TripSlot} 과
+                  {@link CountdownBadge} — 내 여행 줄이 쓰는 그것들입니다.
+                  <b>두 화면이 같은 칸을 세우는 것이 이 줄의 요점입니다.</b>
+
+                  <h3>첫 사진 번호가 왔고, 칸이 바뀌었습니다</h3>
+
+                  <p>여기 적혀 있던 것: 「{@code TripSummary} 에 사진 번호가
+                  없어서 {@link TripThumb} 를 쓰면 줄마다 구글 지도를 한 번씩
+                  부르게 된다. 서버가 첫 사진 번호를 실어 보내면 그때 이 자리도
+                  바뀐다.」 번호는 왔고({@code firstPhotoId}) 칸은 바뀌었는데,
+                  <b>{@link TripThumb} 로 바뀐 것이 아닙니다</b> — 그 예측은
+                  틀렸으므로 여기 남겨 두지 않습니다.
+
+                  <p>그 부품은 표지 → 첫 사진 → <b>동선 그림</b> 으로 떨어지는
+                  것이 제 일이고, 마지막 칸이 바로 그 구글 호출입니다. 사진이
+                  없는 여행에서는 번호가 와도 그 칸까지 떨어집니다 — 피하려던
+                  값이 그대로 남습니다. 그래서 사진이 있으면 사진, 없으면 표식
+                  으로 가릅니다({@link TripSlot}). 쓰는 것은 목록에 이미 실려
+                  온 번호뿐이라 호출이 하나도 안 늡니다.
+
+                  <p>사진을 깔고 표식을 배지로 얹는 쪽은 안 됩니다. 48 에서
+                  배지가 작아지는 것보다, <b>셈이 어긋나는 쪽</b>이 더 센
+                  까닭입니다 — 배지가 뜻을 갖는 것은 색이나 이모지를 정한
+                  여행이고 새 호출을 치르는 것은 사진이 없는 여행이라, 그 두
+                  묶음은 서로 상관이 없습니다. 자세한 것은 {@link TripSlot} 에
+                  적어 두었습니다.
+
+                  <p>모임 이름표는 안 답니다 — 여기 있는 것이 전부 이 모임
+                  것입니다. 내 여행이 모임이 둘 이상일 때만 그 이름표를 내는
+                  것과 같은 셈입니다.
+                */
+                upcomingFirst(ours).map((t, i, rows) => (
+                  <ListRow
+                    key={t.id}
+                    left={<TripSlot theme={t.theme} emoji={t.emoji} firstPhotoId={t.firstPhotoId} />}
+                    title={t.title}
+                    subtitle={[
+                      formatSpan(t.startIso, t.endIso),
+                      /* 날짜를 안 정한 여행에 「당일」을 붙이면 하루짜리라는
+                         뜻이 됩니다. 날짜가 없으면 며칠인지도 없습니다. */
+                      t.dayCount > 0 ? formatNights(t.dayCount) : null,
+                      `장소 ${t.placeCount}곳`,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
+                    right={<CountdownBadge startIso={t.startIso} endIso={t.endIso} />}
+                    /* 마지막 줄에는 아래 선을 안 긋습니다. 목록이 끝났는데
+                       선이 하나 더 있으면 아래에 뭔가 더 있는 줄 압니다. */
+                    last={i === rows.length - 1}
+                    onPress={() => router.push({ pathname: '/trip/[id]', params: { id: t.id } })}
+                  />
+                ))
+              )}
             </>
           ) : (
             <FeedList groupId={group.id} groupName={group.name} />
@@ -335,6 +415,45 @@ export default function GroupScreen() {
       ) : null}
     </Screen>
   );
+}
+
+/**
+ * 다가오는 것부터.
+ *
+ * <p>모임을 다시 여는 이유가 「다음에 언제 가지」입니다. 서버가 주는 순서는
+ * <b>만든 때</b>라, 그대로 깔면 작년에 다녀온 것이 다음 주 여행 위에 섭니다.
+ *
+ * <p>셋으로 가릅니다 — 아직 안 끝난 것, 날짜를 안 정한 것, 다녀온 것. 날짜
+ * 없는 것을 다가오는 것에 섞으면 언제인지 모르는 여행이 맨 위를 차지하고,
+ * 다녀온 것 뒤로 보내면 지금 짜고 있는 여행이 작년 것보다 아래로 내려갑니다.
+ * 그래서 가운데입니다.
+ *
+ * <p>내 여행 목록은 같은 순서를 <b>머리글 넷</b>으로 가릅니다
+ * ({@code (app)/trips.tsx} 의 {@code byWhen}). 여기서는 안 가릅니다 — 모임
+ * 하나의 여행은 대개 몇 개여서, 줄 하나마다 머리글이 하나 붙으면 목록이
+ * 아니라 목차로 읽힙니다.
+ */
+function upcomingFirst(trips: TripSummary[]): TripSummary[] {
+  const today = todayIso();
+  /** 아직 안 끝난 것 0, 날짜 미정 1, 다녀온 것 2. */
+  const rank = (t: TripSummary) => {
+    if (!t.startIso) {
+      return 1;
+    }
+    return (t.endIso ?? t.startIso) < today ? 2 : 0;
+  };
+  /* 받은 것을 그대로 뒤집지 않습니다 — 달력도 같은 배열을 봅니다. */
+  return [...trips].sort((a, b) => {
+    const ra = rank(a);
+    const rb = rank(b);
+    if (ra !== rb) {
+      return ra - rb;
+    }
+    /* 다녀온 것은 최근 것부터, 나머지는 가까운 날짜부터입니다. */
+    return ra === 2
+      ? (b.endIso ?? '').localeCompare(a.endIso ?? '')
+      : (a.startIso ?? '').localeCompare(b.startIso ?? '');
+  });
 }
 
 const styles = StyleSheet.create({

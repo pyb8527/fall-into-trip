@@ -14,7 +14,7 @@ import {
   type SortBy,
 } from '@/components/sort-bar';
 import { Body, Button, Caption, Divider, Field, IconButton, Loading, Row } from '@/ui';
-import { KEEP, KEPT } from '@/constants/words';
+import { KEEP } from '@/constants/words';
 
 /**
  * 이름으로 장소 찾기.
@@ -34,7 +34,7 @@ export function PlaceSearch({ onPick, here }: PlaceSearchProps) {
      그것 하나가 아닙니다. */
   const [by, setBy] = useState<SortBy>('given');
   const [results, setResults] = useState<Found[] | null>(null);
-  /* 담은 것을 기억해 별을 채웁니다. 서버는 같은 곳을 두 번 담지 않지만,
+  /* 담은 것을 기억해 책갈피를 채웁니다. 서버는 같은 곳을 두 번 담지 않지만,
      화면이 그것을 모르면 눌러도 아무 일도 안 일어난 것처럼 보입니다. */
   const [kept, setKept] = useState<Set<string>>(new Set());
 
@@ -51,8 +51,8 @@ export function PlaceSearch({ onPick, here }: PlaceSearchProps) {
       });
       setKept((prev) => new Set(prev).add(found.name));
     } catch {
-      /* 담기는 곁다리라 실패해도 검색을 막지 않습니다. 별이 안 켜지는 것으로
-         알 수 있습니다. */
+      /* 담기는 곁다리라 실패해도 검색을 막지 않습니다. 책갈피가 안 켜지는
+         것으로 알 수 있습니다. */
     }
   }
   const [busy, setBusy] = useState(false);
@@ -82,6 +82,25 @@ export function PlaceSearch({ onPick, here }: PlaceSearchProps) {
     <View style={styles.wrap}>
       {/* 찾기 단추를 칸 아래에 따로 두었더니 둘이 한 벌로 안 읽히고 세로로만
           길어졌습니다. 칸 안 오른쪽 끝에 돋보기로 붙입니다. */}
+      {/*
+        지역을 함께 쓰라고 먼저 말합니다.
+
+        <p>상호명만 넣으면 잘 안 나옵니다. 구글이 덜 주는 것이 아니라
+        <b>지역을 안 주면 못 좁히는 것</b>입니다 — 「이치란」은 세계에 수십
+        군데이고, 그중 어디를 찾는지는 말해 주지 않으면 알 수 없습니다.
+
+        <p>찾은 뒤에 「찾지 못했어요」로 알리면 늦습니다. 그때는 이미 한 번
+        헛걸음한 것이고, 무엇을 고쳐 적어야 하는지도 말해 주지 않습니다.
+        그래서 <b>칸 아래 힌트</b>입니다 — 적기 전에 읽는 자리입니다.
+
+        <p>여기 있던 「이름을 넣고 찾아 주세요. 고르면 지도에 자리가 잡혀요」를
+        걷습니다. 앞쪽은 라벨과 자리 표시 글자가 이미 하는 말이고, 뒤쪽은
+        고른 다음 이야기라 찾기 전에 쓸 데가 없습니다. 힌트 줄은 하나입니다 —
+        둘을 쌓으면 둘 다 안 읽힙니다.
+
+        <p>예를 답니다. 「지역을 함께」라는 말만으로는 「오사카부 주오구」처럼
+        적어야 하나 싶은데, 보기 하나를 보면 그만큼만 적으면 되는 것을 압니다.
+      */}
       <Field
         label="장소 찾기"
         value={query}
@@ -90,7 +109,7 @@ export function PlaceSearch({ onPick, here }: PlaceSearchProps) {
         autoCorrect={false}
         returnKeyType="search"
         onSubmitEditing={search}
-        hint="이름을 넣고 찾아 주세요. 고르면 지도에 자리가 잡혀요."
+        hint="지역과 상호명을 함께 쓰면 더 잘 찾아요. 예) 오사카 이치란"
         action={{
           icon: 'search',
           label: '장소 찾기',
@@ -99,7 +118,9 @@ export function PlaceSearch({ onPick, here }: PlaceSearchProps) {
         }}
       />
 
-      {busy ? <Loading label="찾는 중" /> : null}
+      {/* 기다리는 말은 앱 어디서나 해요체입니다. 「찾는 중」은 우리끼리 쓰는
+          말투고, 읽는 사람에게 하는 말이 아닙니다. */}
+      {busy ? <Loading label="찾고 있어요" /> : null}
       {error ? <Caption tone="danger">{error}</Caption> : null}
 
       {results && results.length === 0 ? <Caption>찾지 못했어요.</Caption> : null}
@@ -108,27 +129,29 @@ export function PlaceSearch({ onPick, here }: PlaceSearchProps) {
         place={looking}
         here={here}
         onClose={() => setLooking(null)}
+        /*
+          담는 것은 구글 지도 옆 그림입니다.
+
+          <p>「여기로 고르기」와 나란한 글자 단추였습니다. 그러면 둘이 같은
+          무게로 보이는데, 이 화면에서 하려던 일은 <b>고르는 것</b>이고 담아
+          두는 것은 「지금은 아니고 나중에」 입니다. 아래 결과 줄마다 이미
+          같은 일을 책갈피 그림으로 하고 있으니, 판 안에서도 같은 그림입니다.
+        */
+        scrap={
+          looking ? { kept: kept.has(looking.name), onPress: () => keep(looking) } : null
+        }
         actions={
           looking ? (
-            <Row gap={Spacing.sm}>
-              <Button
-                label="여기로 고르기"
-                compact
-                onPress={() => {
-                  onPick(looking);
-                  setLooking(null);
-                  setResults(null);
-                  setQuery('');
-                }}
-              />
-              <Button
-                label={kept.has(looking.name) ? KEPT : KEEP}
-                variant="secondary"
-                compact
-                disabled={kept.has(looking.name)}
-                onPress={() => keep(looking)}
-              />
-            </Row>
+            <Button
+              label="여기로 고르기"
+              compact
+              onPress={() => {
+                onPick(looking);
+                setLooking(null);
+                setResults(null);
+                setQuery('');
+              }}
+            />
           ) : null
         }
       />

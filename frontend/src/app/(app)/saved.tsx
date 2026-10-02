@@ -1,6 +1,6 @@
 import { Stack, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { api, ApiError, UNEXPECTED } from '@/api/client';
 import type { PopularPlace, PostPage, SavedPlace, TripDetail, TripSummary } from '@/api/types';
@@ -17,7 +17,6 @@ import { TripMap } from '@/components/trip-map';
 import { glyphOf, labelOf } from '@/constants/place-icons';
 import { Colors, Spacing, Tap } from '@/constants/theme';
 import { kindsIn, savedAgo, siftSaved } from '@/lib/saved';
-import { cityOf, ELSEWHERE } from '@/lib/cities';
 import { todayIso } from '@/lib/countdown';
 import {
   Band,
@@ -31,10 +30,8 @@ import {
   ErrorNote,
   Field,
   FilterChip,
-  Grow,
   IconButton,
   ListRow,
-  Loading,
   Mark,
   Press,
   Row,
@@ -42,14 +39,24 @@ import {
   SearchField,
   SectionHeader,
   SegmentedTabs,
+  Skeleton,
   Snack,
-  Split,
   Title,
   useUndo,
 } from '@/ui';
 import { CardGrid } from '@/ui/grid';
+import { ScreenTop } from '@/ui/nav';
 import { AppTabs } from '@/ui/tab-bar';
 import { KEEP, UNKEEP } from '@/constants/words';
+
+/**
+ * 갈래를 안 고른 곳들의 묶음 이름.
+ *
+ * <p>이름이 있는 묶음이 먼저 서고 이것은 늘 끝입니다. 「그 밖」이라고 적지
+ * 않습니다 — 갈래가 없는 것은 어딘가에서 벗어난 것이 아니라 아직 안 고른
+ * 것이고, 줄을 눌러 고르면 제 묶음으로 갑니다.
+ */
+const NO_KIND = '갈래 없음';
 
 /**
  * 보석함.
@@ -128,8 +135,6 @@ export default function Saved() {
   const [lookingId, setLookingId] = useState<string | null>(null);
   const { undo, show: showUndo, hide: hideUndo } = useUndo();
   const [taggingId, setTaggingId] = useState<string | null>(null);
-  /* 도시 묶음 하나만 볼 때. 비우면 전부입니다. */
-  const [city, setCity] = useState<string | null>(null);
   /* 목록 · 지도. 지도가 늘 위에 있어서 목록이 한 줄 반만 보였습니다. */
   const [view, setView] = useState<'list' | 'map'>('list');
   /* 담을 여행을 고르는 판. */
@@ -143,39 +148,31 @@ export default function Saved() {
 
   const all = useMemo(() => data?.places ?? [], [data]);
   const kinds = useMemo(() => kindsIn(all), [all]);
-  /* 장소마다 도시. 좌표에서 가장 가까운 큰 도시입니다(lib/cities). */
-  const cityById = useMemo(
-    () => new Map(all.map((p) => [p.id, cityOf(p.lat, p.lng) ?? ELSEWHERE])),
-    [all],
-  );
-  /* 도시 칩 — 많이 담은 도시부터. 「그 밖」은 늘 끝입니다. */
-  const cities = useMemo(() => {
-    const n = new Map<string, number>();
-    for (const c of cityById.values()) {
-      n.set(c, (n.get(c) ?? 0) + 1);
-    }
-    return [...n.entries()].sort((a, b) =>
-      a[0] === ELSEWHERE ? 1 : b[0] === ELSEWHERE ? -1 : b[1] - a[1],
-    );
-  }, [cityById]);
-  const shown = useMemo(
-    () =>
-      siftSaved(all, { q, kind, by }).filter((p) => city == null || cityById.get(p.id) === city),
-    [all, q, kind, by, city, cityById],
-  );
-  /* 도시별 묶음. 칩으로 하나를 고르면 그 묶음 하나뿐입니다. */
+  const shown = useMemo(() => siftSaved(all, { q, kind, by }), [all, q, kind, by]);
+  /*
+    갈래별 묶음 — 많이 담은 갈래부터. 「갈래 없음」은 늘 끝입니다.
+
+    <p>도시로 묶었습니다. 담을 때 도시를 받지 않으므로 좌표에서 가장 가까운 큰
+    도시를 <b>되짚어</b> 묶었는데, 적어 둔 목록에 없는 도시(대전)의 곳이 60km
+    떨어진 전주로 묶였습니다 — 묶음이 사실이 아니라 추측이었고, 틀렸을 때 쓰는
+    사람이 바로잡을 길도 없었습니다. 도시를 더 적어 넣어도 되짚는 일은 그대로
+    추측입니다.
+
+    <p>갈래는 담을 때 사람이 손으로 고른 것입니다({@link glyphOf} 가 그리는
+    그 값). 되짚을 것이 없으니 틀릴 일이 없습니다.
+  */
   const bunches = useMemo(() => {
     const out = new Map<string, SavedPlace[]>();
     for (const p of shown) {
-      const c = cityById.get(p.id) ?? ELSEWHERE;
-      out.set(c, [...(out.get(c) ?? []), p]);
+      const k = labelOf(p.icon) || NO_KIND;
+      out.set(k, [...(out.get(k) ?? []), p]);
     }
     return [...out.entries()].sort((a, b) =>
-      a[0] === ELSEWHERE ? 1 : b[0] === ELSEWHERE ? -1 : b[1].length - a[1].length,
+      a[0] === NO_KIND ? 1 : b[0] === NO_KIND ? -1 : b[1].length - a[1].length,
     );
-  }, [shown, cityById]);
+  }, [shown]);
 
-  /* 내 여행 — 담을 곳과 「오사카 여행에 4곳 담을 수 있어요」 안내에 씁니다. */
+  /* 내 여행 — 고른 곳을 어디에 담을지 고르는 판이 씁니다. */
   const { data: tripData } = useAsync<{ trips: TripSummary[] }>((signal) => api.get('/api/trips', signal), []);
   const upcoming = useMemo(
     () =>
@@ -183,18 +180,16 @@ export default function Saved() {
     [tripData],
   );
   /*
-    안내 한 줄 — 다가오는 여행 이름에 도시 이름이 들어 있고 그 도시에 담아 둔
-    곳이 있으면. 누르면 그 곳들을 골라 둡니다.
+    「오사카 여행에 4곳 담을 수 있어요」 안내가 여기 있었습니다. 걷었습니다.
+
+    <p>다가오는 여행의 <b>제목에 도시 이름이 들어 있는지</b>로 맞췄습니다.
+    「도쿄 라멘 투어」는 맞지만 「엄마랑 셋이」는 아무것도 안 맞고, 「도쿄에서
+    산 물건들」은 도쿄 여행이 아닌데도 맞습니다 — 도시 묶음과 같은 추측이라
+    함께 걷습니다.
+
+    <p>되살리려면 여행이 <b>지역을 값으로 들고</b> 있어야 합니다. 제목을 글자로
+    훑는 길로는 다시 안 세웁니다.
   */
-  const hint = useMemo(() => {
-    for (const t of upcoming) {
-      const hit = cities.find(([c]) => c !== ELSEWHERE && t.title.includes(c));
-      if (hit) {
-        return { trip: t, city: hit[0], count: hit[1] };
-      }
-    }
-    return null;
-  }, [upcoming, cities]);
 
   /*
     담기 — 모임 여행이면 「가고 싶은 곳」, 혼자 여행이면 날짜(plan-review Q5).
@@ -428,23 +423,49 @@ export default function Saved() {
       safeTop
       tabs={<AppTabs />}
       snack={<Snack undo={undo} onHide={hideUndo} />}
+      /*
+        맨 윗줄 — 찾는 칸과 담는 단추.
+
+        <h3>이름을 걷고 그 자리를 썼습니다</h3>
+
+        <p>「저장」이라고 큰 제목으로 적고 있었습니다. 그런데 지금 어디인지는
+        <b>아래 갈래 띠가 이미 말합니다</b> — 「보석함」 칸이 채워져 있는 채로
+        위에 같은 말이 한 번 더 적혀 있었습니다.
+
+        <p>그 자리에 찾는 칸을 올립니다. 목록 중간에 서 있던 것인데, 거기
+        있으면 지도와 띠를 지나야 닿고 목록을 한 줄 아래로 밀었습니다. 담아
+        둔 곳이 몇 개 안 될 때는 안 냅니다 — 찾을 것이 없습니다.
+
+        <p>고르는 동안에는 줄이 「몇 곳 골랐는지」와 「그만두기」만 말합니다.
+        그것은 화면 이름이 아니라 <b>지금 무슨 일을 하는 중인지</b>라서
+        제목으로 남습니다. 담기 단추는 이때 할 일이 아닙니다.
+
+        <p>세 꼴 모두 줄 높이는 같습니다 — {@link ScreenTop} 이 44 로
+        못박습니다. 전에는 제목만 선 꼴이 32, 단추가 선 꼴이 44, 고르는
+        중인 꼴이 36 이라 같은 화면이 세 높이를 오갔습니다.
+      */
       header={
         picked.size > 0 ? (
-          /* 고르는 동안에는 머리가 「몇 곳 골랐는지」 와 「그만두기」 만
-             말합니다. 담기 단추는 이때 할 일이 아닙니다. */
-          <Split>
-            <Grow>
-              <Title>{picked.size}곳 선택됨</Title>
-            </Grow>
-            <Button label="취소" variant="ghost" compact onPress={() => setPicked(new Set())} />
-          </Split>
+          <ScreenTop
+            left={<Title>{picked.size}곳 선택됨</Title>}
+            right={
+              <Button label="취소" variant="ghost" compact onPress={() => setPicked(new Set())} />
+            }
+          />
         ) : (
-          <Split>
-            <Grow>
-              <Title>저장</Title>
-            </Grow>
-            <IconButton name="plus" label={KEEP} bare onPress={() => setKeeping(true)} />
-          </Split>
+          <ScreenTop
+            left={
+              all.length > 4 ? (
+                <SearchField
+                  label="보석함에서 찾기"
+                  value={q}
+                  onChangeText={setQ}
+                  placeholder="국밥, 온천, 도톤보리"
+                />
+              ) : null
+            }
+            right={<IconButton name="plus" label={KEEP} bare onPress={() => setKeeping(true)} />}
+          />
         )
       }
       footer={
@@ -484,11 +505,11 @@ export default function Saved() {
         ) : undefined
       }>
       {/*
-        큰 제목이 본문 위에 서므로 상단바는 걷습니다.
+        상단바는 걷습니다.
 
         <p>갈래 띠로 오는 화면입니다. 뒤로 갈 데가 없으니 상단바가 할 일이
         없는데, 작은 제목 하나를 위해 56픽셀을 먹고 있었습니다 — 게다가
-        고르는 동안에는 제목 자리가 「3곳 선택됨」 으로 바뀌어야 하는데
+        고르는 동안에는 그 자리가 「3곳 선택됨」 으로 바뀌어야 하는데
         상단바에 둔 제목은 그 말을 할 수 없었습니다.
       */}
       <Stack.Screen options={{ headerShown: false }} />
@@ -505,43 +526,23 @@ export default function Saved() {
         문토나 무신사가 사진으로 하는 일을 여기서는 지도가 합니다.
       */}
       {/*
-        도시 칩과 목록 · 지도.
+        목록 · 지도.
 
-        <p>「도쿄 12 · 오사카 4」 — 담아 둔 곳은 결국 어느 도시 여행에 쓰입니다.
-        지도는 고를 때만 폅니다. 늘 위에 있으면 목록이 한 줄 반만 보입니다.
+        <p>지도는 고를 때만 폅니다. 늘 위에 있으면 목록이 한 줄 반만 보입니다.
+
+        <p>여기 「도쿄 12 · 오사카 4」 도시 칩이 함께 서 있었습니다. 묶는 값이
+        좌표에서 되짚은 추측이라 걷었습니다 — 묶는 일은 아래 목록이 갈래로
+        합니다. 거르는 일도 이미 갈래로 합니다(필터 판).
       */}
       {all.length > 0 ? (
-        <>
-          <SegmentedTabs
-            items={[
-              { value: 'list', label: '목록' },
-              { value: 'map', label: '지도' },
-            ]}
-            value={view}
-            onChange={setView}
-          />
-          {cities.length > 1 ? (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.cityRow}>
-              <Chip label="전체" selected={city === null} onPress={() => setCity(null)} />
-              {cities.map(([c, n]) => (
-                <Chip key={c} label={`${c} ${n}`} selected={city === c} onPress={() => setCity(city === c ? null : c)} />
-              ))}
-            </ScrollView>
-          ) : null}
-          {hint ? (
-            <Press
-              onPress={() => {
-                setCity(hint.city);
-                setPicked(new Set(all.filter((p) => cityById.get(p.id) === hint.city).map((p) => p.id)));
-              }}
-              scale={0.99}
-              style={styles.hint}>
-              <Caption tone="brand" strong>
-                {`「${hint.trip.title}」에 ${hint.city} ${hint.count}곳을 담을 수 있어요 ›`}
-              </Caption>
-            </Press>
-          ) : null}
-        </>
+        <SegmentedTabs
+          items={[
+            { value: 'list', label: '목록' },
+            { value: 'map', label: '지도' },
+          ]}
+          value={view}
+          onChange={setView}
+        />
       ) : null}
 
       {pins.length > 0 && view === 'map' ? (
@@ -560,13 +561,28 @@ export default function Saved() {
         />
       ) : null}
 
-      {loading && !data ? <Loading /> : null}
+      {/*
+        처음 받는 동안 — 줄이 올 자리를 미리 세웁니다.
+
+        <p>{@link Loading} 이 섰습니다. 그런데 이 화면은 위에 지도가 서는
+        자리라, 점 셋이 지도 아래에서 돌다가 줄들이 한꺼번에 들어섰습니다 —
+        목록이 올 만큼 화면이 아래로 밀렸습니다.
+
+        <p>{@link Skeleton} 의 칸은 {@link SavedRow} 와 높이가 같습니다(72,
+        앞의 표식 자리까지). 담아 둔 곳은 여행보다 쉽게 쌓여서 넷을
+        세웁니다 — 셋이면 폰 한 화면이 다 안 찹니다.
+
+        <p>다시 받을 때는 안 섭니다. {@link useAsync} 가 새로 받는 동안
+        먼저 받아 둔 것을 들고 있어서, 보석함으로 돌아와도 줄들은 그대로
+        보입니다.
+      */}
+      {loading && !data ? <Skeleton rows={4} /> : null}
       {error ? <ErrorNote message={error} onRetry={reload} /> : null}
       {failed ? <ErrorNote message={failed} /> : null}
 
       {data && all.length === 0 ? (
         <>
-          <Empty message="마음에 드는 곳을 저장해 두면 여행 짤 때 바로 꺼내 쓸 수 있어요. 제목 옆 ＋ 로 바로 찾아 담을 수도 있어요." />
+          <Empty message="마음에 드는 곳을 담아 두면 여행 짤 때 바로 꺼내 쓸 수 있어요. 맨 위 ＋ 로 바로 찾아 담을 수도 있어요." />
           {/* 빈 자리에 담을 거리를 바로 둡니다 — 지금 뜨는 곳 다섯과 인기 여행. */}
           <StarterPicks onKept={reload} />
         </>
@@ -582,10 +598,10 @@ export default function Saved() {
       {pins.length > 0 ? <Band /> : null}
 
       {/*
-        찾기와 거르기는 한 묶음입니다.
+        거르기.
 
-        <p>둘을 화면의 직접 자식으로 두면 사이에 기본 간격이 끼어 따로따로
-        떠 보입니다. 둘 다 <b>목록을 좁히는 일</b>이라 붙어 있어야 합니다.
+        <p>찾는 칸이 이 묶음에 함께 있었습니다. 맨 윗줄로 올렸습니다 — 화면
+        이름을 걷고 난 자리가 바로 그런 것을 놓는 자리입니다.
 
         <p>갈래와 정렬은 판 안으로 보냈습니다. 갈래 칩이 여덟이면 좁은 폰에서
         두 줄이고 그 아래 정렬이 또 한 줄입니다. 담아 둔 것을 보러 왔는데
@@ -594,16 +610,6 @@ export default function Saved() {
       */}
       {all.length > 2 || kinds.length > 1 ? (
         <View style={styles.sift}>
-          {/* 몇 개 안 될 때는 찾을 것이 없습니다. 칸만 자리를 차지합니다. */}
-          {all.length > 4 ? (
-            <SearchField
-              label="저장한 곳에서 찾기"
-              value={q}
-              onChangeText={setQ}
-              placeholder="국밥, 온천, 도톤보리"
-            />
-          ) : null}
-
           <Row gap={Spacing.s2} style={styles.applied}>
             <Button
               label={applied.length > 0 ? `필터 ${applied.length}` : '필터'}
@@ -684,9 +690,17 @@ export default function Saved() {
         모양입니다 — 제목 왼쪽, 개수 오른쪽.
       */}
       <View>
+        {/*
+          묶음이 하나면 머리도 하나입니다.
+
+          <p>갈래 하나만 거르고 있을 때가 그렇습니다. 그때 머리에까지 그 갈래
+          이름을 적으면 <b>같은 말이 두 군데</b> 섭니다 — 바로 위 거르기 칩이
+          이미 「면」이라고 말하고 있습니다. 그런 때 머리는 「담아 둔 곳」과
+          개수만 맡습니다.
+        */}
         {view === 'list' && shown.length > 0 && bunches.length === 1 ? (
           <SectionHeader
-            title={bunches[0][0] === ELSEWHERE ? '담아 둔 곳' : bunches[0][0]}
+            title={kind === null && bunches[0][0] !== NO_KIND ? bunches[0][0] : '담아 둔 곳'}
             action={<Caption tone="secondary">{shown.length}곳</Caption>}
           />
         ) : null}
@@ -699,10 +713,10 @@ export default function Saved() {
           혼자 1000 픽셀을 쓰고 있어서였습니다.
         */}
         <View style={styles.list}>
-          {(view === 'list' && bunches.length > 1 ? bunches : [[null, shown] as const]).map(([c, rows]) => (
-          <View key={c ?? 'all'}>
-          {c ? (
-            <SectionHeader title={c} tight action={<Caption tone="secondary">{rows.length}곳</Caption>} />
+          {(view === 'list' && bunches.length > 1 ? bunches : [[null, shown] as const]).map(([bunch, rows]) => (
+          <View key={bunch ?? 'all'}>
+          {bunch ? (
+            <SectionHeader title={bunch} tight action={<Caption tone="secondary">{rows.length}곳</Caption>} />
           ) : null}
           <CardGrid>
             {rows.map((place, at) => (
@@ -890,7 +904,7 @@ export default function Saved() {
 }
 
 /**
- * 비었을 때 담을 거리 — 지금 뜨는 곳 다섯(저장 단추와 함께)과 인기 여행 셋.
+ * 비었을 때 담을 거리 — 지금 뜨는 곳 다섯(담는 단추와 함께)과 인기 여행 셋.
  *
  * <p>빈 화면에 「담아 보세요」만 있으면 어디서 무엇을 담는지를 또 찾아 나서야
  * 합니다. 여기서 바로 담고, 남이 다녀온 여행으로 넘어갈 수 있게 둡니다.
@@ -920,7 +934,7 @@ function StarterPicks({ onKept }: { onKept: () => void }) {
           <View style={styles.grow}>
             <ListRow left={<Mark icon={glyphOf(p.icon)} />} title={p.name} subtitle={labelOf(p.icon) || undefined} />
           </View>
-          <IconButton name="bookmark" label={`${p.name} 저장`} active={kept.has(p.key)} bare onPress={() => keep(p)} />
+          <IconButton name="bookmark" label={`${p.name} ${KEEP}`} active={kept.has(p.key)} bare onPress={() => keep(p)} />
         </Row>
       ))}
       {(hot?.posts.length ?? 0) > 0 ? <SectionHeader title="인기 여행" tight /> : null}
@@ -1006,12 +1020,6 @@ function Why({
 }
 
 const styles = StyleSheet.create({
-  cityRow: {
-    gap: Spacing.s2,
-  },
-  hint: {
-    paddingVertical: Spacing.s1,
-  },
   starter: {
     alignItems: 'center',
   },

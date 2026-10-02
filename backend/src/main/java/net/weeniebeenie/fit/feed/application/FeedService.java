@@ -7,6 +7,7 @@ import net.weeniebeenie.fit.account.domain.UserRepository;
 import net.weeniebeenie.fit.account.infrastructure.security.AuthPrincipal;
 import net.weeniebeenie.fit.community.domain.CommentKind;
 import net.weeniebeenie.fit.community.domain.PostCommentRepository;
+import net.weeniebeenie.fit.feed.domain.Audience;
 import net.weeniebeenie.fit.feed.domain.Post;
 import net.weeniebeenie.fit.feed.domain.PostPhoto;
 import net.weeniebeenie.fit.feed.domain.PostPhotoRepository;
@@ -26,13 +27,19 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.function.Predicate;
 
 /**
  * 사진과 글을 나누는 자리.
@@ -45,9 +52,9 @@ import java.util.Objects;
  *
  * <h3>올리는 데 드는 품이 사진 고르기 하나여야 합니다</h3>
  *
- * <p>제목도 지역도 공개 범위도 안 받습니다. 그것들은 여행기(TripPost)가
- * 가집니다 — 그쪽은 남에게 내놓는 글이고 이쪽은 아는 사람들끼리 보는
- * 것입니다. <b>사진만 올려도, 글만 써도 됩니다.</b> 둘 다 비면 못 올립니다.
+ * <p>제목도 지역도 안 받습니다. 그것들은 여행기(TripPost)가 가집니다 — 그쪽은
+ * 남에게 내놓는 글이고 이쪽은 아는 사람들끼리 보는 것입니다. <b>사진만 올려도,
+ * 글만 써도 됩니다.</b> 둘 다 비면 못 올립니다.
  *
  * <h3>좋아요는 안 둡니다</h3>
  *
@@ -56,13 +63,35 @@ import java.util.Objects;
  *
  * <h3>볼 수 있는가</h3>
  *
+ * <p>글이 들고 있는 {@link Audience} 가 정합니다. 전에는 올린 자리가 정했는데
+ * (모임에 올리면 그 모임 사람, 내 피드면 글쓴이만), 그러면 범위를 바꾸는 길이
+ * 글을 지우고 다시 쓰는 것뿐이었습니다. 안 고른 글에는 그 옛 규칙이 그대로
+ * 기본값으로 들어갑니다({@code Post.audienceFor}).
+ *
  * <pre>
- *   group_id 가 있으면 → 그 그룹의 멤버만
- *   group_id 가 없으면 → 글쓴이만
+ *   글쓴이                  → 늘 봅니다
+ *   EVERYONE               → 번호를 아는 사람이면
+ *   MATES, 모임에 올린 글   → 그 모임 사람
+ *   MATES, 내 피드에 쓴 글  → 나와 모임을 함께 쓰는 사람
+ *   ONLY_ME                → 글쓴이만
  * </pre>
  *
+ * <p>셈하는 곳은 {@link #visible} 한 곳입니다. 묻는 일(모임에 들었나, 모임을
+ * 함께 쓰나)은 {@link Viewer} 가 <b>목록 한 번에 한 번만</b> 합니다.
+ *
  * <p>못 보면 <b>404</b> 입니다. 403 으로 답하면 "있긴 있는데 못 본다" 가 되어,
- * id 를 바꿔 가며 어떤 글이 존재하는지 알아낼 수 있습니다.
+ * id 를 바꿔 가며 어떤 글이 존재하는지 알아낼 수 있습니다. 여행기 쪽과 같은
+ * 약속입니다({@code PostService.read}).
+ *
+ * <h3>달력에 적는 수</h3>
+ *
+ * <p>{@link #daysOfMine} 과 {@link #mineOn} 은 <b>글쓴이 제 글만</b> 셈하고
+ * 내놓습니다. 그래서 둘은 {@link Audience} 를 안 봅니다 — 글쓴이는 무엇을
+ * 골랐든 제 글을 보기 때문입니다({@link #visible} 의 첫 줄). <b>남의 글이
+ * 섞이는 자리에 그대로 쓰면 「나만」으로 닫아 둔 글이 새어 나갑니다</b>:
+ * 그때는 {@link Viewer} 를 거쳐야 합니다.
+ *
+ * <p>날짜를 어느 시계로 가르는지는 {@link #calendarZone} 한 곳에 있습니다.
  */
 @Service
 @RequiredArgsConstructor
@@ -86,6 +115,19 @@ public class FeedService {
     /** 한 번에 내려 주는 글 수. */
     private static final int PAGE = 20;
 
+    /**
+     * 달력이 한 번에 물을 수 있는 날 수.
+     *
+     * <p>한 해 조금 넘게 둡니다 — 달력은 한 달씩 묻고, 연 단위로 보여 주는
+     * 화면이 생겨도 한 번으로 됩니다.
+     *
+     * <p>끝을 아예 안 두는 길도 있었습니다. 한 사람의 글이
+     * {@link #MAX_PER_USER} 로 묶여 있어 범위를 넓혀도 터지지는 않습니다.
+     * 그런데 그러면 <b>그 한도를 올리는 날</b> 여기가 같이 늘어나는데, 올리는
+     * 사람은 이 자리를 안 봅니다.
+     */
+    private static final int MAX_CALENDAR_DAYS = 400;
+
     private final PostRepository posts;
     private final PostPhotoRepository postPhotos;
     private final PostCommentRepository comments;
@@ -108,37 +150,48 @@ public class FeedService {
     @Transactional(readOnly = true)
     public Slice ofGroup(AuthPrincipal me, String groupId, String tag, int page) {
         groups.requireMember(groupId, me.id());
-        return sliceOf(posts.ofGroup(groupId, tagOrAll(tag), pageOf(page)), me);
+        return sliceOf(posts.ofGroup(groupId, tagOrAll(tag), me.id(), pageOf(page)),
+                new Viewer(me.id()));
     }
 
     /**
-     * 남의 피드 — <b>나와 함께 속한 모임</b>에 올린 글만.
+     * 남의 피드 — <b>나와 함께 속한 모임</b>에 올린 글과, 그 사람이 제 피드에
+     * 열어 둔 글.
      *
      * <p>그 사람이 다른 모임에 올린 글은 그 모임 사람의 것이라 안 냅니다.
-     * 그룹 없이 올린 글도 안 냅니다 — 올린 사람만 보는 자리입니다. 함께
-     * 속한 모임이 없으면(프로필이 404 인 사이) 빈 목록입니다.
+     * 함께 속한 모임이 없으면(프로필이 404 인 사이) 빈 목록입니다 — 거기서
+     * 돌아서는 것이 중요합니다. {@code ofAuthorIn} 은 「모임을 함께 쓰는
+     * 사이」를 빈 집합이 아닌 것으로 갈음하므로, 빈 집합으로 부르면 그 사람이
+     * 제 피드에 「내 모임 사람만」으로 쓴 글이 남에게 갑니다.
+     *
+     * <p>모임 없이 올린 글도 이제 섞입니다. 전에는 올린 사람만 보는 자리라
+     * 통째로 빠졌는데, 지금은 그 글도 {@link Audience} 를 가집니다 — 열어 둔
+     * 글을 안 보여 주면 고른 값이 아무 일도 안 합니다.
      */
     @Transactional(readOnly = true)
     public Slice ofAuthor(AuthPrincipal me, String authorId, String tag, int page) {
         if (authorId.equals(me.id())) {
             return mine(me, tag, page);
         }
-        java.util.Set<String> mineGroups = new java.util.HashSet<>();
+        Set<String> mineGroups = new HashSet<>();
         members.findAllByIdUserId(me.id()).forEach(m -> mineGroups.add(m.getId().getGroupId()));
-        java.util.List<String> shared = members.findAllByIdUserId(authorId).stream()
+        List<String> shared = members.findAllByIdUserId(authorId).stream()
                 .map(m -> m.getId().getGroupId())
                 .filter(mineGroups::contains)
                 .toList();
         if (shared.isEmpty()) {
-            return new Slice(java.util.List.of(), false);
+            return new Slice(List.of(), false);
         }
-        return sliceOf(posts.ofAuthorIn(authorId, shared, tagOrAll(tag), pageOf(page)), me);
+        /* 내가 든 모임을 방금 다 셌으므로 들고 들어갑니다 — 울타리를 보는
+           쪽에서 같은 것을 또 묻지 않습니다. */
+        Viewer viewer = new Viewer(me.id(), mineGroups);
+        return sliceOf(posts.ofAuthorIn(authorId, shared, tagOrAll(tag), pageOf(page)), viewer);
     }
 
     /** 내가 올린 것 전부. 그룹에 올린 것도 함께 옵니다. */
     @Transactional(readOnly = true)
     public Slice mine(AuthPrincipal me, String tag, int page) {
-        return sliceOf(posts.ofAuthor(me.id(), tagOrAll(tag), pageOf(page)), me);
+        return sliceOf(posts.ofAuthor(me.id(), tagOrAll(tag), pageOf(page)), new Viewer(me.id()));
     }
 
     /**
@@ -151,23 +204,145 @@ public class FeedService {
     @Transactional(readOnly = true)
     public List<Card> ofTrip(AuthPrincipal me, String tripId) {
         access.requireCanRead(tripId, me.id());
+        /*
+          울타리를 가장 많이 묻는 자리입니다. 한 여행에 여러 사람이 글을 붙이고
+          그 가운데 모임 없이 올린 것도 섞이므로, 글마다 묻게 두면 왕복이 글
+          수만큼 생깁니다. {@link Viewer} 하나로 묻고 나머지는 셈입니다.
+        */
+        Viewer viewer = new Viewer(me.id());
         List<Post> found = posts.findAllByTripIdAndHiddenFalseOrderByCreatedAtDesc(tripId).stream()
-                .filter(p -> canRead(p, me.id()))
+                .filter(viewer::canRead)
                 .toList();
-        return cardsOf(found, me);
+        return cardsOf(found, viewer);
     }
 
     @Transactional(readOnly = true)
     public Card read(AuthPrincipal me, String postId) {
-        Post post = mine(postId, me.id());
-        return cardsOf(List.of(post), me).get(0);
+        Viewer viewer = new Viewer(me.id());
+        return cardsOf(List.of(mine(postId, viewer)), viewer).get(0);
+    }
+
+    /* ---------------------------------------------------------------- 달력 */
+
+    /**
+     * 날마다 내가 올린 글이 몇 편인가 — 달력 칸에 적는 수.
+     *
+     * <h3>한 달에 한 번입니다</h3>
+     *
+     * <p>칸마다 묻게 두면 달을 넘길 때마다 서른 번입니다 — 아직 아무 날도
+     * 누르지 않은 화면에서. 묶어 센 것을 한 번에 받습니다
+     * ({@link PostRepository#countMineByDay}).
+     *
+     * <p>0 인 날은 안 옵니다. 서른 칸을 다 채워 내려 주면 글 두 편 올린 달에
+     * 0 이 스물여덟 개 가는데, 화면에서 「없으면 안 적는다」는 어차피 같은
+     * 셈입니다.
+     *
+     * <h3>남의 글이 아닙니다</h3>
+     *
+     * <p>세는 것은 <b>부른 사람이 올린 글</b>입니다. 그래서 {@link Audience} 를
+     * 안 봅니다 — 「나만」으로 닫아 둔 글도 제 달력에는 셉니다. 남의 달력을
+     * 그리는 길이 생기면 이것을 그대로 쓸 수 없습니다({@link Viewer} 를 거쳐야
+     * 합니다).
+     *
+     * @param from 첫 날. 이 날이 듭니다
+     * @param to   끝 날. <b>이 날도 듭니다</b> — 달력이 1일과 말일을 넘깁니다
+     */
+    @Transactional(readOnly = true)
+    public Map<LocalDate, Integer> daysOfMine(AuthPrincipal me, LocalDate from, LocalDate to) {
+        if (from.isAfter(to)) {
+            throw ApiException.badRequest("날짜 범위가 거꾸로예요.");
+        }
+        long span = ChronoUnit.DAYS.between(from, to) + 1;
+        if (span > MAX_CALENDAR_DAYS) {
+            throw ApiException.badRequest("한 번에 " + MAX_CALENDAR_DAYS + "일까지 볼 수 있어요.");
+        }
+
+        ZoneId zone = calendarZone();
+        /* 질의가 날짜 순으로 내주므로 그 차례를 지킵니다. 화면은 날짜로 찾아
+           쓰지만, 사람이 눈으로 볼 응답이기도 합니다. */
+        Map<LocalDate, Integer> out = new LinkedHashMap<>();
+        for (Object[] row : posts.countMineByDay(me.id(),
+                midnight(from, zone), midnight(to.plusDays(1), zone), zone.getId())) {
+            out.put(LocalDate.parse((String) row[0]), ((Number) row[1]).intValue());
+        }
+        return out;
+    }
+
+    /**
+     * 그 하루에 내가 올린 글 — 달력에서 날을 눌렀을 때 아래에 서는 것.
+     *
+     * <p>목록이 쓰는 꼴({@link Card})을 그대로 돌려줍니다. 달력용 모양을 따로
+     * 만들지 않습니다 — 그러면 같은 글이 두 꼴을 갖고, 꼬리표 하나를 고칠
+     * 때마다 두 군데를 고치게 됩니다.
+     *
+     * <p>{@link Viewer} 를 거칩니다. 질의가 이미 제 글만 내주고 감춰진 것을
+     * 뺐으니 거를 것이 없는데도 그러는 까닭은, <b>지키는 자리가
+     * {@link #visible} 하나</b>여야 하기 때문입니다 — 질의가 하나 늘 때 조건을
+     * 빼먹으면 조용히 새어 나갑니다. 제 글은 첫 줄에서 통과하므로 모임을 한
+     * 번도 안 묻습니다.
+     *
+     * <p>세는 쪽({@link #daysOfMine})과 <b>같은 시계로 하루를 가릅니다</b>.
+     * 다르면 2 가 적힌 칸을 눌러 글 하나만 나옵니다.
+     */
+    @Transactional(readOnly = true)
+    public List<Card> mineOn(AuthPrincipal me, LocalDate on) {
+        ZoneId zone = calendarZone();
+        Viewer viewer = new Viewer(me.id());
+        List<Post> found = posts
+                .ofAuthorBetween(me.id(), midnight(on, zone), midnight(on.plusDays(1), zone))
+                .stream()
+                .filter(viewer::canRead)
+                .toList();
+        return cardsOf(found, viewer);
+    }
+
+    /**
+     * 달력 칸이 보는 시계.
+     *
+     * <p>{@code createdAt} 은 {@link Instant} 고 달력 칸은 <b>그 지역의
+     * 날짜</b>입니다. UTC 로 묶으면 한국에서 오전 8시에 올린 글이 전날 칸에
+     * 들어갑니다 — 그 순간이 UTC 로는 전날 23시입니다. 어제 아무것도 안 올린
+     * 사람이 어제 칸에 1 을 보고, 방금 올린 글은 오늘 칸에 없습니다.
+     *
+     * <h3>서버가 보는 시계입니다</h3>
+     *
+     * <p>저장소의 다른 자리도 같은 기준입니다 — {@code GoogleQuota.endOf} 의
+     * 자정, {@code PostService} 가 피드 글을 여행 날짜에 맞추는 자리. 여기만
+     * 다르면 같은 글이 달력과 여행기에서 다른 날에 놓입니다.
+     *
+     * <p>보는 사람의 시계를 받는 길도 있었습니다. 그러려면 화면이 제 시간대를
+     * 실어 보내야 하고, 그러면 <b>같은 글의 날짜가 기기마다 달라집니다</b> —
+     * 한 사람이 폰과 웹에서 다른 칸을 봅니다. 여행 날짜가 시간대 없는
+     * {@code LocalDate} 인 것과도 어긋납니다.
+     */
+    private static ZoneId calendarZone() {
+        return ZoneId.systemDefault();
+    }
+
+    /**
+     * 그 지역 날짜의 자정.
+     *
+     * <p>범위의 두 끝을 <b>같은 규칙</b>으로 만들려고 둡니다. 한쪽을 UTC
+     * 자정으로 두면 한국에서 1일 오전 8시에 올린 글(UTC 로는 전날 23시)이
+     * 10월을 물었을 때 안 걸립니다 — 칸은 비어 있고 글은 어디에도 없습니다.
+     */
+    static Instant midnight(LocalDate day, ZoneId zone) {
+        return day.atStartOfDay(zone).toInstant();
     }
 
     /* -------------------------------------------------------------- 올리기 */
 
+    /**
+     * 올립니다.
+     *
+     * @param audience 누가 볼지. 안 보내면 올린 자리가 정합니다
+     *                 ({@code Post.audienceFor}) — 공개 범위가 없던 때의
+     *                 동작이라 안 고른 사람에게 달라지는 것이 없습니다
+     */
     @Transactional
     public Post write(AuthPrincipal me, String groupId, String tripId,
-                      String text, List<String> tags, List<String> photoIds) {
+                      String text, List<String> tags, List<String> photoIds,
+                      Audience audience) {
         String inGroup = blankToNull(groupId);
         if (inGroup != null) {
             groups.requireMember(inGroup, me.id());
@@ -191,11 +366,13 @@ public class FeedService {
                 .tripId(tripOf(me, tripId, inGroup))
                 .text(clean)
                 .tags(cleanTags(tags))
+                .audience(audience)
                 .build());
         attach(post.getId(), pics);
 
         audit.log(me.id(), "feed.write", post.getId(),
-                Map.of("group", String.valueOf(inGroup), "photos", pics.size()));
+                Map.of("group", String.valueOf(inGroup), "photos", pics.size(),
+                        "audience", post.getAudience().name()));
         return post;
     }
 
@@ -208,10 +385,15 @@ public class FeedService {
      *
      * <p><b>보낸 것만 바뀝니다.</b> {@code null} 인 칸은 손대지 않습니다.
      * 비우는 것은 빈 글입니다 — 가계부·보석함과 같은 약속입니다.
+     *
+     * <p>공개 범위도 고칩니다. 올린 뒤에 좁히는 일이 넓히는 일보다 잦습니다 —
+     * 모임 사람에게 보여 준 사진을 나중에 혼자 간직하려고 글을 지우게 할 이유가
+     * 없습니다.
      */
     @Transactional
     public Post edit(AuthPrincipal me, String postId, String text,
-                     List<String> tags, List<String> photoIds, String tripId) {
+                     List<String> tags, List<String> photoIds, String tripId,
+                     Audience audience) {
         Post post = mine(postId, me.id());
         if (!post.getAuthorId().equals(me.id())) {
             throw ApiException.forbidden("내가 쓴 글만 고칠 수 있어요.");
@@ -229,6 +411,9 @@ public class FeedService {
         }
         if (tripId != null) {
             post.setTripId(tripOf(me, tripId, post.getGroupId()));
+        }
+        if (audience != null) {
+            post.setAudience(audience);
         }
         if (photoIds != null) {
             List<String> pics = minePhotos(me, photoIds);
@@ -277,22 +462,128 @@ public class FeedService {
 
     /** 볼 수 있는 글인지 보고, 맞으면 돌려줍니다. 아니면 404. */
     public Post mine(String postId, String userId) {
+        return mine(postId, new Viewer(userId));
+    }
+
+    private Post mine(String postId, Viewer viewer) {
         Post post = posts.findById(postId)
                 .orElseThrow(() -> ApiException.notFound("글을 찾을 수 없어요."));
-        if (!canRead(post, userId)) {
+        if (!viewer.canRead(post)) {
+            /*
+              없다고 답합니다 — "볼 수 없어요" 는 <b>있다는 말</b>입니다. 번호를
+              하나씩 넣어 보면 어느 것이 있는 글인지 가려낼 수 있고, 그러면
+              「나만」으로 닫아 둔 글이 몇 편인지가 새어 나갑니다. 여행기 쪽과
+              같은 약속입니다({@code PostService.read}).
+            */
             throw ApiException.notFound("글을 찾을 수 없어요.");
         }
         return post;
     }
 
-    private boolean canRead(Post post, String userId) {
-        if (userId == null || post.isHidden()) {
+    /**
+     * 이 글을 볼 수 있는지 — <b>묻지 않고 셈만 합니다.</b>
+     *
+     * <h3>왜 묻는 일을 바깥에 두나</h3>
+     *
+     * <p>이 셈은 목록의 글마다 불립니다. 안에서 저장소를 부르면 스무 편짜리
+     * 목록 한 번에 스무 번 왕복합니다 — 사진과 댓글 수를 한 번에 받아 오는
+     * {@link #cardsOf} 와 같은 이유로, 울타리도 한 번만 물어야 합니다. 묻는
+     * 일은 {@link Viewer} 가 한 번만 해 두고 그 답을 여기 넘깁니다.
+     *
+     * <p>{@link Set} 둘이 아니라 {@link Predicate} 둘을 받습니다. 그래야 그
+     * 답이 <b>필요한 글이 하나라도 있을 때까지</b> 안 묻습니다 — 「나만」인 글만
+     * 거르면 되는 목록이 대부분이고, 거기서는 한 번도 안 묻습니다.
+     *
+     * @param inGroup 보는 사람이 그 모임에 들어 있는지
+     * @param isMate  보는 사람이 그 사람과 모임을 함께 쓰는지
+     */
+    static boolean visible(Post post, String viewerId,
+                           Predicate<String> inGroup, Predicate<String> isMate) {
+        if (viewerId == null || post.isHidden()) {
             return false;
         }
-        if (post.getGroupId() == null) {
-            return post.getAuthorId().equals(userId);
+        /* 글쓴이는 무엇을 골랐든 제 글을 봅니다. 여기서 먼저 빠지므로 아래
+           갈래들은 전부 "남이 볼 수 있나" 만 답합니다. */
+        if (post.getAuthorId().equals(viewerId)) {
+            return true;
         }
-        return groups.isMember(post.getGroupId(), userId);
+        return switch (post.getAudience()) {
+            case ONLY_ME -> false;
+            case EVERYONE -> true;
+            /* 모임에 올린 글은 그 모임, 내 피드에 쓴 글은 모임을 함께 쓰는
+               사이. 모임 글을 「함께 쓰는 사이」로 넓히지 않습니다 — A 모임에
+               올린 글이 B 모임 사람에게 보입니다. */
+            case MATES -> post.getGroupId() == null
+                    ? isMate.test(post.getAuthorId())
+                    : inGroup.test(post.getGroupId());
+        };
+    }
+
+    /**
+     * 보는 사람 하나 — <b>목록 내내 한 벌</b>입니다.
+     *
+     * <p>{@link #visible} 이 묻는 두 가지를 들고 있습니다. 둘 다 <b>처음
+     * 물을 때</b> 한 번만 세고 그 뒤로는 셈한 것을 돌려줍니다.
+     *
+     * <pre>
+     *   myGroups  내가 든 모임                 질의 1번
+     *   myMates   나와 모임을 함께 쓰는 사람들   질의 (내 모임 수)번
+     * </pre>
+     *
+     * <p>둘 다 <b>글 수와 글쓴이 수에 안 달립니다.</b> 사람을 하나씩 물으면
+     * 글쓴이가 열이면 열 번이 되므로, 내 모임마다 사람을 한 번 걷어 한 집합으로
+     * 둡니다. 모임 수는 사람마다 몇 개입니다.
+     *
+     * <p>{@code myMates} 는 모임 없이 올린 남의 글이 섞일 때만 셉니다 — 여행
+     * 앨범({@link #ofTrip})과 남의 피드 정도입니다. 모임 피드와 내 피드에서는
+     * 안 셉니다.
+     */
+    private final class Viewer {
+
+        private final String id;
+        private Set<String> myGroups;
+        private Set<String> myMates;
+
+        Viewer(String id) {
+            this(id, null);
+        }
+
+        /**
+         * @param myGroups 보는 사람이 든 모임을 <b>이미 다 센 것</b>이 있으면.
+         *                 일부만 넘기면 안 됩니다 — 이것을 전부로 믿습니다
+         */
+        Viewer(String id, Set<String> myGroups) {
+            this.id = id;
+            this.myGroups = myGroups;
+        }
+
+        boolean canRead(Post post) {
+            return visible(post, id, this::inGroup, this::isMate);
+        }
+
+        private boolean inGroup(String groupId) {
+            return myGroups().contains(groupId);
+        }
+
+        private boolean isMate(String userId) {
+            if (myMates == null) {
+                myMates = new HashSet<>();
+                for (String groupId : myGroups()) {
+                    members.findAllByIdGroupId(groupId)
+                            .forEach(m -> myMates.add(m.getId().getUserId()));
+                }
+            }
+            return myMates.contains(userId);
+        }
+
+        private Set<String> myGroups() {
+            if (myGroups == null) {
+                myGroups = new HashSet<>();
+                members.findAllByIdUserId(id)
+                        .forEach(m -> myGroups.add(m.getId().getGroupId()));
+            }
+            return myGroups;
+        }
     }
 
     /* ---------------------------------------------------------------- 속살 */
@@ -303,7 +594,7 @@ public class FeedService {
      * <p>사진·댓글 수·글쓴이 이름·여행 이름을 <b>한 번에</b> 받아 짝지읍니다.
      * 글마다 묻게 두면 스무 편짜리 목록 한 번에 여든 번 왕복합니다.
      */
-    private List<Card> cardsOf(List<Post> found, AuthPrincipal me) {
+    private List<Card> cardsOf(List<Post> found, Viewer viewer) {
         if (found.isEmpty()) {
             return List.of();
         }
@@ -336,21 +627,31 @@ public class FeedService {
                     u == null ? "알 수 없음" : u.getName(),
                     u == null ? null : u.getMark(),
                     p.getGroupId(),
+                    p.getAudience(),
                     p.getTripId(),
                     p.getTripId() == null ? null : where.get(p.getTripId()),
                     p.getText(),
                     List.of(p.getTags()),
                     pics.getOrDefault(p.getId(), List.of()),
                     talk.getOrDefault(p.getId(), 0L).intValue(),
-                    p.getAuthorId().equals(me.id()),
+                    p.getAuthorId().equals(viewer.id),
                     p.getCreatedAt(),
                     p.getUpdatedAt()));
         }
         return out;
     }
 
-    private Slice sliceOf(Page<Post> page, AuthPrincipal me) {
-        return new Slice(cardsOf(page.getContent(), me), page.hasNext());
+    /**
+     * 한 쪽을 화면이 쓰는 꼴로.
+     *
+     * <p>울타리를 <b>여기서 한 번 더</b> 봅니다. 목록 질의들도 「나만」인 글을
+     * 거르지만(쪽 수가 맞아야 하므로), 그 조건이 질의마다 적혀 있어서 질의가
+     * 하나 늘 때 빼먹으면 조용히 새어 나갑니다. 지키는 자리는
+     * {@link #visible} 하나여야 합니다.
+     */
+    private Slice sliceOf(Page<Post> page, Viewer viewer) {
+        List<Post> seen = page.getContent().stream().filter(viewer::canRead).toList();
+        return new Slice(cardsOf(seen, viewer), page.hasNext());
     }
 
     private static Pageable pageOf(int page) {
@@ -454,11 +755,14 @@ public class FeedService {
      * 피드 글 한 편, 화면이 쓰는 꼴로.
      *
      * @param groupId   모임 글이면 그 모임. 내 피드면 비어 있습니다
+     * @param audience  누가 볼 수 있는지. 남의 글에도 실어 보냅니다 — 글을
+     *                  고치는 판이 지금 값을 집어 두어야 하고, 제 글이면
+     *                  카드가 한눈에 보여 줍니다
      * @param tripTitle 어느 여행 이야기인지. 지워진 여행이면 비어 있습니다
      * @param mine      내가 쓴 것인지. 고치기·지우기 단추가 여기에 걸립니다
      */
     public record Card(String id, String authorId, String authorName, String authorMark,
-                       String groupId, String tripId, String tripTitle,
+                       String groupId, Audience audience, String tripId, String tripTitle,
                        String text, List<String> tags, List<String> photoIds,
                        int commentCount, boolean mine,
                        Instant createdAt, Instant updatedAt) {

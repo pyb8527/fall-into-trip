@@ -90,18 +90,23 @@ public final class TripDtos {
 
     /**
      * @param folderId 이 사람이 넣어 둔 폴더. 안 넣었으면 비어 있습니다.
+     * @param firstPhotoId 목록에서 이 여행을 가리킬 첫 사진. 한 장도 없으면
+     *                     비어 있고, 그때는 화면이 동선 그림을 그립니다 —
+     *                     그 그림이 구글 호출 한 번이라 사진이 있으면 안 그리는
+     *                     편이 맞습니다({@code trip-thumb.tsx}).
      */
     public record TripSummaryView(String id, String title, String ownerId, String folderId,
                                   String theme, String emoji,
                                   LocalDate startIso, LocalDate endIso,
                                   int dayCount, int placeCount,
-                                  String groupId, String groupName) {
+                                  String groupId, String groupName,
+                                  String firstPhotoId) {
 
         public static TripSummaryView of(TripService.TripSummary s, String folderId) {
             return new TripSummaryView(s.id(), s.title(), s.ownerId(), folderId,
                     s.theme(), s.emoji(),
                     s.startIso(), s.endIso(), s.dayCount(), s.placeCount(),
-                    s.groupId(), s.groupName());
+                    s.groupId(), s.groupName(), s.firstPhotoId());
         }
     }
 

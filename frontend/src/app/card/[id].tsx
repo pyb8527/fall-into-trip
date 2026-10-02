@@ -2,7 +2,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { PathTitle } from '@/ui/nav';
 import { LogoInline } from '@/ui/logo';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, View, ActivityIndicator } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { api, API_BASE } from '@/api/client';
 import type { Books, Person, TripDetail } from '@/api/types';
@@ -520,10 +520,13 @@ function Replay({ trip }: { trip: TripDetail }) {
       ) : null}
 
       <View>
+        {/* 바퀴와 글자를 손으로 그리고 있었습니다. 기다리는 모양은 앱에 하나
+            뿐이어야 하는데, 여기만 기기가 그려 주는 바퀴였습니다 —
+            {@link Loading} 이 점 셋으로 바뀐 뒤로는 같은 자리에서 다른 것이
+            보였을 자리입니다. 문구도 같은 결로 맞춥니다. */}
         {!mapReady ? (
           <View style={styles.replayVeil}>
-            <ActivityIndicator color={Colors.textMuted} />
-            <Caption tone="secondary">지도를 불러오는 중이에요</Caption>
+            <Loading label="지도를 가져오고 있어요" />
           </View>
         ) : null}
         <TripMap
@@ -587,7 +590,8 @@ function Replay({ trip }: { trip: TripDetail }) {
 }
 
 const styles = StyleSheet.create({
-  /* 지도가 뜨기 전 덮개. 지도와 같은 자리를 차지해 뜰 때 자리가 안 튑니다. */
+  /* 지도가 뜨기 전 덮개. 지도와 같은 자리를 차지해 뜰 때 자리가 안 튑니다.
+     안의 간격은 {@link Loading} 이 제 안에 가지고 있어 여기서 안 둡니다. */
   replayVeil: {
     position: 'absolute',
     top: 0,
@@ -597,7 +601,6 @@ const styles = StyleSheet.create({
     height: 300,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: Spacing.s2,
     backgroundColor: Colors.fill,
     borderRadius: Radius.r3,
   },

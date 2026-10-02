@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { useAuth } from '@/auth/auth-provider';
-import { Colors, Spacing, Type, Weight } from '@/constants/theme';
+import { Colors, Spacing, Tap, Type, Weight } from '@/constants/theme';
 import { IconButton, Row } from '@/ui';
 import { SidebarWidth } from '@/ui/layout';
 
@@ -118,6 +118,62 @@ export function NavLeft({
     </Row>
   );
 }
+
+/**
+ * 화면이 스스로 세우는 맨 윗줄.
+ *
+ * <h3>돋보기가 있는 화면만 높이가 달랐습니다</h3>
+ *
+ * <p>줄 높이를 화면마다 <b>그 안에 든 것</b>이 정하고 있었습니다. 큰 제목
+ * 하나면 글줄 높이 32 고, 오른쪽에 그림 단추가 서면 {@link Tap.min} 44 입니다.
+ * 그래서 「내 여행」은 여행이 넷을 넘는 순간 — 그때 돋보기가 생깁니다 — 윗줄이
+ * 12 자랐고, 「모임」은 모임이 하나도 없을 때만 12 낮았습니다. 같은 갈래
+ * 띠로 오가는데 윗줄이 화면마다, 심지어 같은 화면에서도 위아래로 뛰었습니다.
+ *
+ * <p>높이를 여기 한 자리에서 못박습니다. 44 입니다 — 지금 가장 높은 꼴(그림
+ * 단추가 선 줄)이고, {@code SearchField} 의 칸도 같은 44 라 <b>돋보기가 있든
+ * 없든, 검색칸이 섰든 안 섰든</b> 줄은 같은 높이입니다.
+ *
+ * <p>한 번 세운 화면은 <b>안에 둘 것이 없는 날에도</b> 그대로 세웁니다.
+ * 「내 여행」의 찾는 칸은 여행이 넷 아래면 안 나오는데, 그때 줄째 걷으면 이
+ * 화면만 첫 줄이 위로 올라붙고 다섯째 여행이 생기는 날 화면이 한 번
+ * 들썩입니다. 애초에 윗줄이 아예 없는 화면(설정·내 페이지)은 {@code Screen}
+ * 에 {@code header} 를 안 넘깁니다 — 그것은 높이가 어긋나는 것과 다릅니다.
+ *
+ * @param left  이 화면이 그 자리에서 실제로 필요한 것 — 검색칸, 고르는 칸,
+ *              또는 홈의 로고. 남는 자리를 다 먹습니다
+ * @param right 줄 끝에 붙는 동작. 제 크기만 씁니다
+ */
+export function ScreenTop({
+  left,
+  right,
+}: {
+  left?: React.ReactNode;
+  right?: React.ReactNode;
+}) {
+  return (
+    <View style={topStyles.row}>
+      <View style={topStyles.lead}>{left}</View>
+      {right}
+    </View>
+  );
+}
+
+const topStyles = StyleSheet.create({
+  /* 높이는 못박습니다. minHeight 로 두면 안에 든 것이 다시 높이를 정하게
+     되어, 고치려던 들쭉날쭉함이 그대로 돌아옵니다. */
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.s2,
+    height: Tap.min,
+  },
+  /* 왼쪽이 늘어납니다. 검색칸이 한 줄을 다 쓰고 오른쪽 단추는 제 크기만
+     쓰게 하려면 늘어나는 쪽이 왼쪽이어야 합니다. */
+  lead: {
+    flex: 1,
+  },
+});
 
 /**
  * 어디에서 들어온 화면인지를 제목 위에 적습니다.

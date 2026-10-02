@@ -7,7 +7,7 @@ import type { FeedPost, FeedSlice } from '@/api/types';
 import { FeedCard } from '@/components/feed-card';
 import { FeedForm } from '@/components/feed-form';
 import { Spacing } from '@/constants/theme';
-import { Button, Caption, Chip, Empty, ErrorNote, Loading, Press, Row, SegmentedTabs, Split } from '@/ui';
+import { Button, Caption, Chip, Empty, ErrorNote, Press, Row, SegmentedTabs, Skeleton, Split } from '@/ui';
 import { OurPhoto } from '@/components/our-photo';
 
 /**
@@ -46,6 +46,16 @@ export function FeedList({
   const [page, setPage] = useState(0);
   const [tag, setTag] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  /**
+   * 지금 받는 중인 쪽이 <b>이어 붙이는</b> 것인지.
+   *
+   * <p>{@code loading} 하나로는 두 가지가 구별되지 않습니다 — 「더 보기」로
+   * 다음 쪽을 받는 중인 것과, 태그를 바꿔 목록을 갈아 끼우는 중인 것. 둘은
+   * 화면에 보여 줄 것이 반대입니다. 이어 붙이는 동안 있던 글을 흐리게 하면
+   * 읽던 글이 흐려지고, 갈아 끼우는 동안 단추만 돌고 있으면 바뀐 조건이
+   * 먹혔는지 알 수 없습니다.
+   */
+  const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [writing, setWriting] = useState(false);
@@ -68,6 +78,7 @@ export function FeedList({
   const load = useCallback(
     async (at: number, onto: boolean) => {
       setLoading(true);
+      setAdding(onto);
       setError(null);
       try {
         const q = tag ? `&tag=${encodeURIComponent(tag)}` : '';
@@ -137,9 +148,28 @@ export function FeedList({
       ) : null}
 
       {error ? <ErrorNote message={error} onRetry={refresh} /> : null}
-      {loading && posts.length === 0 ? <Loading /> : null}
 
-      {!loading && posts.length === 0 ? (
+      {/*
+        처음 받는 동안 — 글이 올 자리를 미리 세웁니다.
+
+        <p>{@link Loading} 이 섰습니다. 마이페이지의 「피드」 칸은 띠를 옮길
+        때마다 이 부품이 새로 서는 자리라, 칸을 누를 때마다 점 셋이 한 번 돌고
+        나서야 글이 들어섰습니다 — 13번이 「부자연스럽다」고 한 것이 이 자리에서
+        가장 세게 보입니다.
+
+        <p>둘입니다. {@link Skeleton} 의 칸은 {@link FeedCard} 의 <b>머리줄</b>
+        (얼굴과 이름과 시각)만큼이라, 그 아래 사진 띠(320)까지 자리를 잡아 주지는
+        못합니다. 그래도 가운데에서 도는 것보다는 위에서 자라는 쪽이 낫습니다 —
+        사진 높이까지 비워 두려면 카드 꼴의 칸이 따로 있어야 하고 그것은
+        {@link Skeleton} 쪽에서 낼 일입니다. 다섯을 세워 메우지는 않습니다.
+        안 올 글을 약속하는 것이 비는 것보다 나쁩니다.
+      */}
+      {loading && posts.length === 0 ? <Skeleton rows={2} /> : null}
+
+      {/* 못 받아 왔을 때는 안 답니다. 위에 「다시 시도」가 떠 있는 채로
+          「아직 올린 글이 없어요」가 같이 적히면, 못 받은 것이 없는 것으로
+          읽힙니다 — 글이 있는 사람에게 없다고 말하는 것입니다. */}
+      {!loading && !error && posts.length === 0 ? (
         <Empty
           message={
             tag
@@ -151,27 +181,58 @@ export function FeedList({
         />
       ) : null}
 
-      {grid ? (
-        /* 사진 격자 — 세 칸. 누르면 그 글의 고치기 판이 아니라 글이 있는
-           목록으로 돌아갑니다(한 장만 크게 보는 자리는 글 카드가 이미 합니다). */
-        <View style={styles.grid}>
-          {posts.flatMap((p) =>
-            p.photoIds.map((id) => (
-              <Press key={`${p.id}-${id}`} onPress={() => setGrid(false)} scale={0.97} style={styles.cell}>
-                <OurPhoto id={id} height={110} />
-              </Press>
-            )),
+      {/*
+        태그를 바꾸는 동안 — 있던 글을 흐리게 둡니다.
+
+        <p>여기서는 {@link Skeleton} 을 쓸 수가 없습니다. 태그를 바꾸면 다시
+        받지만 {@code setPosts} 는 <b>닿았을 때만</b> 불리므로, 받는 동안
+        화면에는 바뀌기 전 글들이 그대로 서 있습니다. 그 자리에 회색 칸을
+        세우려면 있는 글을 일부러 걷어야 하고, 그러면 목록이 한 번 비는
+        것으로 돌아갑니다.
+
+        <p>대신 흐리게 둡니다. 「이건 아직 바뀌기 전 것」이라는 말을 자리를
+        옮기지 않고 할 수 있는 유일한 방법입니다 — 글 위에 바퀴를 얹는 것도
+        생각했는데, 그러면 가려진 글이 무엇인지 보려고 바퀴가 사라질 때까지
+        기다리게 됩니다.
+
+        <p>0.5 는 {@link Skeleton} 의 칸이 가장 흐려졌을 때와 같은 값입니다.
+        기다리는 것은 이 앱에서 한 가지 몸짓입니다.
+
+        <p>이어 붙이는 중({@code adding})에는 안 흐려집니다 — 읽고 있던 글이
+        흐려질 일이 없어야 합니다.
+
+        <p><b>감싸는 칸은 간격을 다시 가집니다.</b> 그냥 감싸면 카드들이
+        {@code body} 의 gap 밖으로 나가 서로 붙어 섭니다. 글이 없으면 칸도 안
+        냅니다 — 높이가 0 이어도 {@code body} 의 gap 은 빈 칸 앞뒤로 한 번씩
+        들어가서, 빈 자리 아래가 까닭 없이 벌어집니다.
+      */}
+      {posts.length > 0 ? (
+        <View style={[styles.list, loading && !adding ? styles.stale : null]}>
+          {grid ? (
+            /* 사진 격자 — 세 칸. 누르면 그 글의 고치기 판이 아니라 글이 있는
+               목록으로 돌아갑니다(한 장만 크게 보는 자리는 글 카드가 이미 합니다). */
+            <View style={styles.grid}>
+              {posts.flatMap((p) =>
+                p.photoIds.map((id) => (
+                  <Press key={`${p.id}-${id}`} onPress={() => setGrid(false)} scale={0.97} style={styles.cell}>
+                    <OurPhoto id={id} height={110} />
+                  </Press>
+                )),
+              )}
+            </View>
+          ) : (
+            posts.map((p) => <FeedCard key={p.id} post={p} onChanged={refresh} onEdit={setEditing} />)
           )}
         </View>
-      ) : (
-        posts.map((p) => <FeedCard key={p.id} post={p} onChanged={refresh} onEdit={setEditing} />)
-      )}
+      ) : null}
 
       {more ? (
         <Button
           label="더 보기"
           variant="secondary"
-          busy={loading}
+          /* 이어 붙이는 중에만 돕니다. {@code loading} 을 그대로 넘기면 태그를
+             바꿀 때도 이 단추가 돌아서, 다음 쪽을 받는 중인 것처럼 보였습니다. */
+          busy={loading && adding}
           onPress={() => load(page + 1, true)}
         />
       ) : null}
@@ -220,6 +281,17 @@ const styles = StyleSheet.create({
      읽혔습니다. 한 편과 다음 편 사이는 카드 안쪽 여백보다 넓어야 합니다. */
   body: {
     gap: Spacing.s5,
+  },
+  /* 글들을 담는 칸. {@code body} 가 가진 것과 같은 간격을 다시 가집니다 —
+     감싸는 칸이 하나 끼면 카드들은 그 안에서 서므로, 여기에 적지 않으면
+     카드 넷이 붙어 한 덩어리로 읽힙니다. */
+  list: {
+    gap: Spacing.s5,
+  },
+  /* 바뀌기 전 목록. 흐린 정도는 {@link Skeleton} 의 칸이 가장 흐려졌을 때와
+     같습니다. */
+  stale: {
+    opacity: 0.5,
   },
   wrap: {
     flexWrap: 'wrap',

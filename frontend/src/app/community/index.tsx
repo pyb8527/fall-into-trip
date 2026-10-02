@@ -3,16 +3,15 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { api, query } from '@/api/client';
-import type { PopularPlace, PostCard, PostDays, PostPage, PostSort, TripSummary } from '@/api/types';
+import type { PopularPlace, PostCard, PostDays, PostPage, PostSort } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
-import { OurPhoto } from '@/components/our-photo';
-import { PostMap } from '@/components/post-map';
+import { Curation } from '@/components/curation';
 import { SignUpGate } from '@/components/signup-gate';
+import { TripThumb } from '@/components/trip-thumb';
 import { glyphOf, labelOf } from '@/constants/place-icons';
 import { Colors, Elevation, Gutter, Radius, Spacing, Tap } from '@/constants/theme';
 import type { Comeback } from '@/lib/comeback';
-import { todayIso } from '@/lib/countdown';
 import {
   Band,
   Body,
@@ -26,20 +25,19 @@ import {
   ErrorNote,
   FilterChip,
   Grow,
-  IconButton,
   ListRow,
-  Loading,
   Mark,
   Pager,
   Press,
   Row,
   Screen,
   SearchField,
+  Skeleton,
   Split,
   Tabs,
-  Title,
 } from '@/ui';
 import { CardGrid } from '@/ui/grid';
+import { ScreenTop } from '@/ui/nav';
 import { AppTabs } from '@/ui/tab-bar';
 
 /**
@@ -48,18 +46,26 @@ import { AppTabs } from '@/ui/tab-bar';
  * <p>로그인 없이도 열립니다. 추천을 누르거나 가져가려 할 때만 로그인을
  * 요구합니다.
  *
- * <h3>제목이 상단바에서 본문으로 내려왔습니다</h3>
+ * <h3>제목을 아예 안 적습니다</h3>
  *
- * <p>갈래 띠로 오는 화면입니다. 그런 화면의 제목은 상단바 가운데 작게
- * 적혀 있을 이유가 없습니다 — 뒤로 갈 데가 없으니 상단바가 할 일도 없고,
- * 작은 글씨 하나를 위해 56픽셀을 먹습니다. 제목을 본문 맨 위로 내려
- * 크게 적고, 상단바는 걷습니다.
+ * <p>두 번 옮겼습니다. 처음에는 상단바 가운데 작게 있었고 — 갈래 띠로 오는
+ * 화면이라 뒤로 갈 데가 없는데 작은 글씨 하나가 56픽셀을 먹었습니다 — 그래서
+ * 본문 맨 위로 내려 크게 적고 상단바를 걷었습니다.
  *
- * <h3>찾기 칸은 눌러야 나옵니다</h3>
+ * <p>그런데 <b>지금 어디인지는 아래 갈래 띠가 이미 말합니다.</b> 「둘러보기」
+ * 칸이 채워져 있는 채로 위에 같은 말이 한 번 더 크게 적혀 있었던 셈입니다.
+ * 이름을 걷고, 그 줄을 찾는 칸에 줍니다.
  *
- * <p>늘 펼쳐 두었더니 화면을 열 때마다 <b>목록보다 찾기 칸이 먼저</b>
- * 보였습니다. 구경하러 들어온 사람이 열에 아홉인데, 그 아홉이 매번 52픽셀을
- * 지나쳐 내려가야 했습니다. 찾으러 온 사람은 돋보기를 한 번 누르면 됩니다.
+ * <h3>찾기 칸은 그 자리에 그냥 섭니다</h3>
+ *
+ * <p>한동안 돋보기로 접어 두었습니다 — 늘 펼쳐 두면 화면을 열 때마다
+ * <b>목록보다 찾기 칸이 먼저</b> 보이고, 구경하러 들어온 아홉이 매번 52픽셀을
+ * 지나쳐 내려가야 했기 때문입니다. 이제 이름이 걷힌 자리가 비어 있으니 그
+ * 걱정이 없습니다. 칸은 윗줄 안이고, 목록은 한 줄도 안 밀립니다.
+ *
+ * <p>내 글·좋아요 띠에서는 칸을 안 냅니다. 다만 <b>줄은 그대로 섭니다</b> —
+ * {@link ScreenTop} 이 높이를 44 로 못박습니다. 전에는 그 두 띠에서 돋보기가
+ * 사라져 윗줄이 32 로 내려앉아, 띠를 옮길 때마다 목록이 12씩 뛰었습니다.
  */
 /**
  * 어느 글을 볼지.
@@ -128,8 +134,6 @@ export default function Community() {
   /* 글자를 칠 때마다 부르면 요청이 쏟아집니다. 확인 버튼으로만 보냅니다. */
   const [typed, setTyped] = useState('');
   const [q, setQ] = useState('');
-  /** 찾기 칸을 펼쳐 두었는지. */
-  const [seeking, setSeeking] = useState(false);
   /*
     어디를 보고 있는지.
 
@@ -259,24 +263,40 @@ export default function Community() {
     <Screen
       safeTop
       tabs={<AppTabs />}
+      /*
+        맨 윗줄은 찾는 칸입니다.
+
+        <h3>이름을 걷고 그 자리를 썼습니다</h3>
+
+        <p>「둘러보기」라고 큰 제목으로 적고 있었습니다. 그런데 지금 어디인지는
+        <b>아래 갈래 띠가 이미 말합니다</b> — 「둘러보기」 칸이 채워져 있는
+        채로 위에 같은 말이 한 번 더 적혀 있었습니다.
+
+        <p>찾는 칸을 돋보기로 접어 두었습니다 — 「구경하러 들어온 사람이 열에
+        아홉」이 그때의 까닭이었는데, 이름이 걷힌 자리가 비어 있으니 칸을
+        거기 그냥 세웁니다. 목록은 한 줄도 안 밀립니다.
+
+        <p>내 글·좋아요에는 안 냅니다 — 몇 줄 안 되는 내 것이고, 서버에 묻는
+        찾기가 아닙니다. 다만 <b>줄은 그대로 섭니다</b>({@link ScreenTop} 이
+        44 로 못박습니다). 전에는 그 두 띠에서 돋보기가 사라져 윗줄이 32 로
+        내려앉았습니다 — 띠를 옮길 때마다 목록이 12 씩 위아래로 뛰었습니다.
+      */
       header={
-        <Split>
-          <Grow>
-            <Title>둘러보기</Title>
-          </Grow>
-          {PRIVATE.includes(view) ? null : (
-            <IconButton
-              name="search"
-              label="글 찾기"
-              bare
-              active={seeking}
-              onPress={() => setSeeking((on) => !on)}
-            />
-          )}
-        </Split>
+        <ScreenTop
+          left={
+            PRIVATE.includes(view) ? null : (
+              <SearchField
+                label="찾기"
+                value={typed}
+                onChangeText={setTyped}
+                placeholder="도쿄, 온천, 아이와 함께"
+                onSearch={() => refilter(() => setQ(typed.trim()))}
+              />
+            )
+          }
+        />
       }>
-      {/* 큰 제목이 본문 위에 서므로 상단바는 걷습니다. 둘 다 두면 같은 말이
-          한 화면에 두 번 적힙니다. */}
+      {/* 윗줄과 갈래 띠가 「여기가 어디인지」를 말하므로 상단바는 걷습니다. */}
       <Stack.Screen options={{ headerShown: false }} />
 
       <Tabs
@@ -292,22 +312,12 @@ export default function Community() {
         조건은 판 안에 둡니다.
 
         전에는 지역 아홉 개와 기간 넷이 늘 펼쳐져 있었습니다. 칩 열셋이면
-        좁은 폰에서 석 줄이고, 그 위에 찾기 칸과 띠까지 있으니 <b>정작 보러
-        온 목록이 늘 화면 밖에서 시작했습니다.</b>
+        좁은 폰에서 석 줄이고, 그 위에 띠까지 있으니 <b>정작 보러 온 목록이
+        늘 화면 밖에서 시작했습니다.</b>
 
         고를 수 있는 것은 판 안으로 넣고, 밖에는 <b>지금 걸려 있는 것</b>만
         남깁니다. 대개 하나나 둘이고, 아무것도 안 걸렸으면 한 줄도 안 먹습니다.
       */}
-      {PRIVATE.includes(view) || !(seeking || q !== '') ? null : (
-        <SearchField
-          label="찾기"
-          value={typed}
-          onChangeText={setTyped}
-          placeholder="도쿄, 온천, 아이와 함께"
-          onSearch={() => refilter(() => setQ(typed.trim()))}
-        />
-      )}
-
       {PRIVATE.includes(view) ? null : (
         <>
           {/*
@@ -555,7 +565,22 @@ export default function Community() {
         </Row>
       </BottomSheet>
 
-      {loading && !data ? <Loading /> : null}
+      {/*
+        처음 받는 동안 — 글이 올 자리를 미리 세웁니다.
+
+        <p>{@link Loading} 이 섰습니다. 윗줄과 띠 바로 아래라, 점 셋이 돌다가
+        카드들이 들어서면서 화면이 한 번 들썩였습니다.
+
+        <p>셋입니다. {@link Skeleton} 의 칸은 글 카드의 <b>글 쪽</b>만큼이라
+        위의 사진(180)까지 자리를 잡아 주지는 못합니다 — 카드 꼴의 칸은
+        {@link Skeleton} 쪽에서 낼 일입니다. 열 장을 세워 메우지는 않습니다.
+        안 올 글을 약속하는 것이 비는 것보다 나쁩니다.
+
+        <p><b>띠를 옮길 때는 안 섭니다.</b> {@link useAsync} 는 새로 받는 동안
+        먼저 받아 둔 쪽을 들고 있어서, 띠를 옮겨도 목록은 비지 않습니다 —
+        여기서 할 일은 아래의 흐리게 두기입니다.
+      */}
+      {loading && !data ? <Skeleton rows={3} /> : null}
       {error ? <ErrorNote message={error} onRetry={reload} /> : null}
 
       {data && data.posts.length === 0 ? (
@@ -621,6 +646,9 @@ export default function Community() {
           <PostRow
             key={post.id}
             post={post}
+            /* 쪽을 넘길 때도 흐려집니다. 쪽 넘기기는 이어 붙이는 것이 아니라
+               목록을 갈아 끼우는 것이라, 띠를 옮기는 것과 같은 자리입니다. */
+            stale={loading}
             onOpen={() => router.push(`/community/${post.id}`)}
             onLike={() => toggleLike(post)}
             onTag={(t) => refilter(() => setTag(t))}
@@ -641,94 +669,6 @@ export default function Community() {
 
       <SignUpGate intent={gate} onClose={() => setGate(null)} />
     </Screen>
-  );
-}
-
-/**
- * 큐레이션 줄들 — 이번 주 많이 가져간 · 내 다음 여행지 · 새로 올라온 · 많이 쓴 태그.
- *
- * <p>줄마다 몇 장만 받습니다(size). 줄 하나가 비면 그 줄은 안 그립니다.
- */
-function Curation({ onOpen, onTag }: { onOpen: (id: string) => void; onTag: (tag: string) => void }) {
-  const { user } = useAuth();
-  const trips = useAsync<{ trips: TripSummary[] }>(
-    (signal) => (user ? api.get('/api/trips', signal) : Promise.resolve({ trips: [] })),
-    [user?.id],
-  );
-  const tags = useAsync<{ tags: { tag: string; posts: number }[] }>((signal) => api.get('/api/posts/tags', signal), []);
-  /* 다음 여행 이름의 첫 낱말 — 「오사카 3박 4일」이면 오사카로 찾습니다. */
-  const nextTrip = (trips.data?.trips ?? [])
-    .filter((t) => (t.startIso ?? '') >= todayIso())
-    .sort((a, b) => (a.startIso ?? '').localeCompare(b.startIso ?? ''))[0];
-  const where = nextTrip?.title.split(/\s+/)[0] ?? null;
-  const topTag = tags.data?.tags[0]?.tag ?? null;
-  return (
-    <>
-      <ShelfRow title="이번 주 많이 가져간 여행" path="/api/posts?sort=copied&size=6" onOpen={onOpen} />
-      {where ? (
-        <ShelfRow
-          title={`${where} 여행 모음`}
-          path={`/api/posts?sort=hot&size=6&q=${encodeURIComponent(where)}`}
-          onOpen={onOpen}
-        />
-      ) : null}
-      <ShelfRow title="새로 올라온 여행" path="/api/posts?sort=new&size=6" onOpen={onOpen} />
-      {topTag ? (
-        <ShelfRow
-          title={`#${topTag}`}
-          path={`/api/posts?sort=hot&size=6&tag=${encodeURIComponent(topTag)}`}
-          onOpen={onOpen}
-          onMore={() => onTag(topTag)}
-        />
-      ) : null}
-    </>
-  );
-}
-
-function ShelfRow({
-  title,
-  path,
-  onOpen,
-  onMore,
-}: {
-  title: string;
-  path: string;
-  onOpen: (id: string) => void;
-  onMore?: () => void;
-}) {
-  const { data } = useAsync<PostPage>((signal) => api.get(path, signal), [path]);
-  const posts = data?.posts ?? [];
-  if (posts.length === 0) {
-    return null;
-  }
-  return (
-    <View style={styles.shelf}>
-      <Split>
-        <Body strong>{title}</Body>
-        {onMore ? <Button label="더 보기" variant="text" size="xs" onPress={onMore} /> : null}
-      </Split>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.shelfRow}>
-        {posts.map((p) => (
-          <Press key={p.id} onPress={() => onOpen(p.id)} scale={0.97} style={styles.shelfCard}>
-            {p.coverPhotoId ? (
-              <OurPhoto id={p.coverPhotoId} height={96} style={styles.flat} />
-            ) : (
-              <PostMap postId={p.id} title={p.title} height={96} />
-            )}
-            <View style={styles.shelfText}>
-              <Body small strong numberOfLines={2}>
-                {p.title}
-              </Body>
-              <Caption tone="muted" numberOfLines={1}>
-                {[p.region, `${p.dayCount}일`, (p.copyCount ?? 0) >= 3 ? `가져간 ${p.copyCount}명` : null]
-                  .filter(Boolean)
-                  .join(' · ')}
-              </Caption>
-            </View>
-          </Press>
-        ))}
-      </ScrollView>
-    </View>
   );
 }
 
@@ -781,34 +721,72 @@ function FewPosts() {
  */
 function PostRow({
   post,
+  stale,
   onOpen,
   onLike,
   onTag,
 }: {
   post: PostCard;
+  /**
+   * 바뀌기 전 것인지.
+   *
+   * <h3>띠를 옮겨도 목록이 비지 않습니다</h3>
+   *
+   * <p>13번은 「띠를 옮기면 목록이 한 번 비고 바퀴가 돈다」고 적었는데, 이
+   * 화면에서는 그런 일이 없습니다. {@link useAsync} 는 새로 받는 동안
+   * <b>먼저 받아 둔 쪽을 그대로 들고 있습니다</b> — {@code data} 를 비우는
+   * 자리가 없습니다.
+   *
+   * <p>실제로 일어나는 일은 이쪽입니다. 띠를 옮기거나 조건을 걸면 바뀌기 전
+   * 글들이 <b>아무 말 없이 그대로 서 있는 채로</b> 새것이 오고, 닿는 순간
+   * 한꺼번에 갈립니다. 「내 글」을 눌렀는데 남의 글이 한 박자 더 보이는
+   * 것입니다 — 눌렀는데 아무 일도 안 일어난 것처럼 보이고, 그 다음에 화면이
+   * 저절로 바뀝니다.
+   *
+   * <p>그동안 흐리게 둡니다. 자리를 한 픽셀도 옮기지 않고 「아직 바뀌기 전
+   * 것」을 말할 수 있는 유일한 방법입니다. 회색 칸으로 갈아 끼우는 쪽은
+   * 안 됩니다 — 그러려면 아직 화면에 서 있는 글들을 일부러 걷어야 하고,
+   * 그러면 13번이 적어 둔 「한 번 빈다」를 없는 데서 만들어 내는 셈입니다.
+   */
+  stale?: boolean;
   onOpen: () => void;
   onLike: () => void;
   /** 태그를 눌렀을 때. 그 태그로 좁힙니다. */
   onTag: (tag: string) => void;
 }) {
   return (
-    <Card style={styles.post}>
+    /*
+      흐린 정도는 카드마다 입힙니다.
+
+      <p>격자를 통째로 감싸는 쪽은 안 됩니다. 폰에서 {@link CardGrid} 는
+      <b>아무것도 감싸지 않으므로</b>(한 칸일 때는 그냥 children 입니다),
+      감싸는 칸 하나가 끼는 순간 카드들이 화면이 가진 간격 밖으로 나가 서로
+      붙어 섭니다. 카드끼리 겹치지 않으니 한 장씩 입힌 것과 보이는 결과는
+      같습니다.
+    */
+    <Card style={[styles.post, stale ? styles.stale : null]}>
       {/* 글로 들어가는 자리와 하트를 나눕니다. 카드 전체가 눌리면 하트를
           누르려다 글이 열립니다. */}
       <Pressable onPress={onOpen} accessibilityRole="button">
         {/*
-          표지가 있으면 표지, 없으면 동선 그림.
+          표지 → 첫 사진 → 동선 그림.
 
-          <p>둘 다 "이 글이 무엇인가" 를 한눈에 말하는 자리입니다. 사진이
-          더 빨리 말하지만, 안 올린 글도 많고 동선 그림은 그것대로 쓸모가
+          <p>셋 다 "이 글이 무엇인가" 를 한눈에 말하는 자리입니다. 사진이 더
+          빨리 말하지만 한 장도 없는 글도 많고, 동선 그림은 그것대로 쓸모가
           있습니다 — 오사카를 도는 선과 제주를 도는 선은 생김새가 다릅니다.
+
+          <p>세 칸의 순서와 그 까닭은 {@link TripThumb} 에 있습니다. 여기와
+          선반과 문에 각각 적어 두면 한 곳을 고칠 때 나머지가 남습니다.
         */}
         <View style={styles.media}>
-          {post.coverPhotoId ? (
-            <OurPhoto id={post.coverPhotoId} height={180} style={styles.flat} />
-          ) : (
-            <PostMap postId={post.id} title={post.title} height={180} />
-          )}
+          <TripThumb
+            postId={post.id}
+            coverPhotoId={post.coverPhotoId}
+            firstPhotoId={post.firstPhotoId}
+            height={180}
+            label={post.title}
+            style={styles.flat}
+          />
           {/* 며칠 여행인지는 사진 위에서 가장 빨리 읽힙니다. 글자 줄로
               내리면 메타에 섞여 묻힙니다. */}
           <View style={styles.span}>
@@ -891,22 +869,6 @@ const styles = StyleSheet.create({
     gap: Spacing.s2,
     paddingBottom: Spacing.s3,
   },
-  shelfRow: {
-    gap: Spacing.s3,
-  },
-  /* 큐레이션 카드. 목록 카드라 모서리 12. */
-  shelfCard: {
-    width: 168,
-    borderRadius: 12,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: Colors.border,
-    backgroundColor: Colors.surface,
-  },
-  shelfText: {
-    padding: Spacing.s2,
-    gap: 2,
-  },
   invite: {
     gap: Spacing.s1,
     padding: Spacing.s4,
@@ -944,6 +906,11 @@ const styles = StyleSheet.create({
     padding: 0,
     overflow: 'hidden',
     gap: 0,
+  },
+  /* 바뀌기 전 글. 흐린 정도는 {@link Skeleton} 의 칸이 가장 흐려졌을 때와
+     같은 값입니다 — 기다리는 것은 이 앱에서 한 가지 몸짓입니다. */
+  stale: {
+    opacity: 0.5,
   },
   media: {
     backgroundColor: Colors.fill,

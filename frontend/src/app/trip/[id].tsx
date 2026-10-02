@@ -12,6 +12,7 @@ import {
   StyleSheet,
   Text,
   View,
+  type ViewStyle,
 } from 'react-native';
 
 import { api, ApiError, UNEXPECTED } from '@/api/client';
@@ -198,6 +199,10 @@ export default function TripScreen() {
     [fresh, error, user?.id, id],
   );
   const data = fresh ?? kept?.data ?? null;
+
+  /* 매 렌더마다 새 배열이 되면 이것을 보는 useMemo·useEffect 가 전부 매번 다시
+     돕니다. 서버를 부르는 것이 끼어 있으면 요청이 끝없이 나갑니다. */
+  const days = useMemo(() => data?.days ?? [], [data]);
 
   /*
     안 터질 때 깔아 줄 동선 그림 한 장.
@@ -433,14 +438,37 @@ export default function TripScreen() {
   /* 방금 꽂았다는 표시. 잠깐 뒤 스스로 사라집니다 — 오래 남아 있으면 다음에
      열었을 때 방금 꽂은 줄 압니다. */
   /*
-    지도에서 핀을 누르면 그 줄로 목록을 굴립니다.
+    지도에서 핀을 누르면 그 날을 펴고 그 줄로 목록을 굴립니다.
 
-    전에는 줄에 색만 들어왔습니다. 그 줄이 판 아래 어딘가에 있으면 눌러도
+    <h3>굴리는 까닭</h3>
+
+    <p>전에는 줄에 색만 들어왔습니다. 그 줄이 판 아래 어딘가에 있으면 눌러도
     화면에는 아무 일도 안 일어난 것처럼 보이고, 몇 번째 곳인지 보려면 직접
     찾아 내려가야 했습니다.
 
-    목록에서 누른 것은 굴리지 않습니다 — 이미 눈앞에 있는 줄을 움직이면
+    <p>목록에서 누른 것은 굴리지 않습니다 — 이미 눈앞에 있는 줄을 움직이면
     누른 자리가 발밑에서 빠져나갑니다.
+
+    <h3>접힌 날도 같은 일입니다</h3>
+
+    <p>굴리는 것만으로는 모자랐습니다. 접힌 날은 줄을 아예 안 그리므로,
+    굴려 갈 자리도 없고 색이 들 줄도 없습니다. 핀을 눌러도 아무 일이 안
+    일어나는 것으로 보이는 것은 <b>같은 문제의 더 심한 쪽</b>이었습니다.
+
+    <p>그래서 접기 여부를 {@link DayCard} 안에 두지 않고 여기서 날짜별로
+    쥡니다. 안에 두면 핀을 누른 쪽에서 펼 길이 없어, 펴 달라는 뜻을 따로
+    흘려보내야 했습니다.
+
+    <h3>펴는 것과 굴리는 것의 순서</h3>
+
+    <p>펴자마자 굴릴 수는 없습니다. 굴리는 일은 그 줄이 목록의 어디쯤인지
+    재는 일이고({@link DragSheetHandle#reveal}), 그 줄은 방금 편 날 안에
+    있어 <b>아직 그려지지 않았습니다.</b>
+
+    <p>그래서 누를 때는 "이 줄을 보여 달라" 만 적어 두고(rollTo), 굴리는 것은
+    아래 {@code useEffect} 가 합니다. 펴기와 이 표시가 한 번에 반영되어 줄이
+    그려진 뒤에 돌아오므로, 그때는 {@link holdRow} 가 붙들어 둔 것이
+    있습니다. 같은 핀을 또 눌러도 돌게 {@code at} 을 함께 적습니다.
   */
   const sheet = useRef<DragSheetHandle>(null);
   const rowNodes = useRef(new Map<string, unknown>());
@@ -451,10 +479,41 @@ export default function TripScreen() {
       rowNodes.current.delete(placeId);
     }
   }, []);
-  const pickOnMap = useCallback((placeId: string) => {
-    setActivePlaceId(placeId);
-    sheet.current?.reveal(rowNodes.current.get(placeId));
+  /** 접어 둔 날들. 들어 있으면 접힌 것이고, 기본은 다 펴져 있습니다. */
+  const [foldedDays, setFoldedDays] = useState<ReadonlySet<string>>(new Set());
+  const foldDay = useCallback((dayId: string, fold: boolean) => {
+    setFoldedDays((was) => {
+      if (was.has(dayId) === fold) {
+        return was;
+      }
+      const next = new Set(was);
+      if (fold) {
+        next.add(dayId);
+      } else {
+        next.delete(dayId);
+      }
+      return next;
+    });
   }, []);
+  /** 굴려서 보여 줄 줄. 핀을 누른 그 순간을 함께 적습니다. */
+  const [rollTo, setRollTo] = useState<{ placeId: string; at: number } | null>(null);
+  const pickOnMap = useCallback(
+    (placeId: string) => {
+      setActivePlaceId(placeId);
+      const holder = days.find((d) => d.places.some((p) => p.id === placeId));
+      if (holder) {
+        foldDay(holder.id, false);
+      }
+      setRollTo({ placeId, at: Date.now() });
+    },
+    [days, foldDay],
+  );
+  useEffect(() => {
+    if (!rollTo) {
+      return;
+    }
+    sheet.current?.reveal(rowNodes.current.get(rollTo.placeId));
+  }, [rollTo]);
 
   const [asking, setAsking] = useState(false);
   const [packing, setPacking] = useState(false);
@@ -518,10 +577,6 @@ export default function TripScreen() {
     }
     return by;
   }, [data]);
-
-  /* 매 렌더마다 새 배열이 되면 이것을 보는 useMemo·useEffect 가 전부 매번 다시
-     돕니다. 서버를 부르는 것이 끼어 있으면 요청이 끝없이 나갑니다. */
-  const days = useMemo(() => data?.days ?? [], [data]);
 
   /**
    * 지금 이 여행 위에 있는가.
@@ -1505,8 +1560,8 @@ export default function TripScreen() {
               이것만 켜고 끄는 것입니다.
 
               <p>나머지 셋은 누르면 판이 하나 열리고 끝인데, 이것은 <b>켠
-              채로 남습니다.</b> 그래서 켜졌는지가 보여야 합니다 — 켜면 바탕이
-              물들고 글자에 색이 듭니다.
+              채로 남습니다.</b> 그래서 켜졌는지가 보여야 합니다 — 켜면 그림과
+              글자가 함께 물듭니다.
 
               <p>끄면 길찾기를 아예 안 부릅니다. 화면만 가리는 것이 아니라
               사 오지 않는 것이라, 기본은 꺼짐입니다.
@@ -1544,6 +1599,8 @@ export default function TripScreen() {
               changedGaps={changedGaps}
               onPick={(fromId, mode) => setPicked((p) => ({ ...p, [fromId]: mode }))}
               infoOf={infoOf}
+              folded={foldedDays.has(day.id)}
+              onFold={(fold) => foldDay(day.id, fold)}
               holdRow={holdRow}
               onLook={(place, mode) => setLooking({ place, mode })}
               tipCounts={tipCounts}
@@ -1566,12 +1623,16 @@ export default function TripScreen() {
 
           <p>한 장도 없으면 칸 자체가 안 섭니다. 「아직 없어요」를 띄우면
           올리라는 재촉으로 읽힙니다.
+
+          <p>누르면 <b>피드 글</b> 화면으로 갑니다. 여기 서는 것은 피드 글인데
+          여행기 화면({@code /community/[id]})으로 보내고 있었고, 그 화면은
+          받은 번호로 여행기를 찾습니다. 그래서 지운 적이 없는 사진인데도
+          "글을 찾을 수 없어요" 가 떴습니다 — 애초에 그 표에서 찾은 적이 없는
+          번호입니다.
         */}
         <TripAlbum
           tripId={id}
-          onOpen={(post) =>
-            router.push({ pathname: '/community/[id]', params: { id: post.id } })
-          }
+          onOpen={(post) => router.push({ pathname: '/feed/[id]', params: { id: post.id } })}
         />
 
       </MapAside>
@@ -2055,19 +2116,21 @@ function Shortcut({
       accessibilityState={active === undefined ? undefined : { selected: active }}
       style={styles.shortcut}>
       {/*
-        네모 칸에서 동그라미로.
+        바탕 없이 그림만.
 
-        <p>회색 네모 칸 넷이 나란히 서 있었습니다. 칸 자체가 바탕을 갖고
-        테두리까지 두르고 있어서, 일정 위에 <b>또 하나의 상자 줄</b>이
-        얹힌 모양이었습니다.
+        <p>회색 네모 칸 넷이었다가 동그라미 넷이 되었고, 지금은 아무 면도
+        없습니다. 칸을 걷은 까닭은 <b>일정이 어디서 시작하는지</b>를 가리지
+        않으려는 것이었는데, 동그라미도 결국 면 넷이라 같은 줄을 그었습니다.
 
-        <p>동그라미 하나에 글자 한 줄입니다. 칸의 경계가 사라지니 일정이
-        시작되는 자리가 바로 보이고, 켜진 것은 동그라미만 물들어 그 하나가
-        또렷합니다.
+        <p>면을 걷으면 켜진 것을 말할 자리가 없어집니다. 그래서 <b>그림과
+        글자의 색</b>이 그 일을 맡습니다 — 꺼진 것은 둘 다 회색, 켜진 것은
+        둘 다 바이올렛입니다. 둘을 같은 색으로 묶어야 한 칸이 함께 켜진 것으로
+        읽힙니다. 한쪽만 물들면 글자만 흐린 칸처럼 보입니다.
+
+        <p>면이 사라져도 누를 자리는 그대로입니다 — 높이는
+        {@code styles.shortcut} 가 {@code Tap.min} 으로 쥐고 있습니다.
       */}
-      <View style={[styles.shortcutDisc, active ? styles.shortcutDiscOn : null]}>
-        <Icon name={icon} size={24} tone={active ? 'brand' : 'secondary'} />
-      </View>
+      <Icon name={icon} size={24} tone={active ? 'brand' : 'secondary'} />
       <Text
         style={[styles.shortcutLabel, active ? styles.shortcutLabelOn : null]}
         numberOfLines={1}>
@@ -2098,7 +2161,7 @@ function MovingNote({
     return (
       <Row gap={Spacing.s1}>
         <ActivityIndicator size="small" color={Colors.textMuted} />
-        <Caption tone="secondary">이동 시간을 알아보는 중…</Caption>
+        <Caption tone="secondary">이동 시간을 알아보고 있어요</Caption>
       </Row>
     );
   }
@@ -2249,6 +2312,8 @@ function DayCard({
   changedGaps,
   onPick,
   infoOf,
+  folded,
+  onFold,
   holdRow,
   onLook,
   tipCounts,
@@ -2281,6 +2346,14 @@ function DayCard({
   onPick: (fromId: string, mode: TravelMode) => void;
   /** 장소별 영업시간 등. 좌표만 직접 넣은 곳에는 없습니다. */
   infoOf: Map<string, PlaceInfo>;
+  /**
+   * 이 날을 접어 두었는지.
+   *
+   * <p>안에서 쥐지 않습니다. 지도 핀이 접힌 날 안의 장소를 가리킬 때 펴 줘야
+   * 하는데, 그 일은 화면 전체를 보는 쪽만 할 수 있습니다.
+   */
+  folded: boolean;
+  onFold: (folded: boolean) => void;
   /** 줄이 목록의 어디쯤인지 재려고 화면 요소를 붙들어 둡니다. */
   holdRow: (placeId: string, node: unknown) => void;
   /** 장소 하나를 들여다보는 판을 엽니다. 한 줄도 그 판 안에 있습니다. */
@@ -2304,7 +2377,6 @@ function DayCard({
      그 장소 바로 다음 자리입니다. */
   const [addingAfter, setAddingAfter] = useState<string | null>(null);
   const [editing, setEditing] = useState<Place | null>(null);
-  const [folded, setFolded] = useState(false);
   /*
     보석함에서 꺼내 넣는 판.
 
@@ -2477,7 +2549,7 @@ function DayCard({
     <View style={styles.day}>
       <Split align="center" gap={Spacing.s3}>
         <Pressable
-          onPress={() => setFolded((v) => !v)}
+          onPress={() => onFold(!folded)}
           accessibilityRole="button"
           accessibilityLabel={`${title} ${folded ? '펴기' : '접기'}`}
           style={styles.dayTap}>
@@ -2500,7 +2572,7 @@ function DayCard({
         {/*
           머리에는 그림 단추를 하나만 둡니다.
 
-          <p>셋이 서 있었습니다 — 동선 정리, 저장에서 꺼내기, 장소 넣기.
+          <p>셋이 서 있었습니다 — 동선 정리, 보석함에서 꺼내기, 장소 넣기.
           글자가 없는 그림 셋이라 눌러 보기 전에는 무엇이 무엇인지 알 수
           없었고, 하루가 다섯이면 지도 아래에 그림이 열다섯이었습니다.
 
@@ -2528,7 +2600,7 @@ function DayCard({
               compact
               disabled={tidying}
               onPress={() => {
-                setFolded(false);
+                onFold(false);
                 askTidy();
               }}
             />
@@ -2739,7 +2811,7 @@ function DayCard({
             <b>그 날의 마지막 줄 다음</b>에 하는 일입니다 — 아홉 곳을 훑어
             내려와 열째를 넣으려면 다시 맨 위로 올라가야 했습니다.
 
-            <p>글자를 답니다. 그림만으로는 「저장에서 꺼내 넣기」가 책갈피
+            <p>글자를 답니다. 그림만으로는 「보석함에서 꺼내 넣기」가 책갈피
             그림 하나였고, 그것이 무엇인지 아는 사람은 이미 알던 사람뿐
             이었습니다.
           */}
@@ -2752,7 +2824,7 @@ function DayCard({
                 onPress={() => setAdding(true)}
               />
               <Button
-                label="저장에서 가져오기"
+                label="보석함에서 가져오기"
                 variant="ghost"
                 compact
                 onPress={() => setDigging(true)}
@@ -3371,7 +3443,7 @@ function PlaceRow({
         */
         <Row gap={Spacing.s1} style={styles.gap}>
           <ActivityIndicator size="small" color={Colors.textMuted} />
-          <Caption tone="muted">이동 시간을 알아보는 중…</Caption>
+          <Caption tone="muted">이동 시간을 알아보고 있어요</Caption>
         </Row>
       ) : null}
       </View>
@@ -4236,6 +4308,27 @@ function CloneSheet({
   );
 }
 
+/**
+ * 브라우저가 이 자리에서 화면을 굴리지 않게 합니다.
+ *
+ * <p>안 막으면 손잡이를 끌어도 목록만 위아래로 움직입니다. 웹에서만 뜻이 있는
+ * 값이고, 앱에서는 아무 일도 안 합니다.
+ *
+ * <h3>왜 스타일 표 안에 그냥 안 적나</h3>
+ *
+ * <p>{@code touchAction} 은 RN 의 {@link ViewStyle} 에 없는 이름입니다. 표
+ * 안에 그냥 적으면 타입스크립트가 그 줄만 나무라는 것이 아니라
+ * <b>{@code StyleSheet.create} 에 넘긴 덩이 전체</b>를 퇴짜 놓습니다 — 이
+ * 파일의 스타일 여든 몇 개가 한꺼번에 검사 밖으로 나갑니다. 그래서 오래
+ * 전부터 이 파일의 스타일은 하나도 검사를 받지 않고 있었습니다.
+ *
+ * <p>이름 붙은 값 하나로 떼어 두고 펴 넣습니다. 그러면 모르는 이름이 표에
+ * 닿지 않으니 나머지 여든 몇 개가 다시 검사를 받고, <b>안 맞는 값을 눌러
+ * 두는 자리가 여기 한 군데</b>로 모입니다. 표 안에 흩어 두면 어느 줄이
+ * 검사를 피하고 있는지 알 수 없습니다.
+ */
+const NO_SCROLL_HERE = { touchAction: 'none' } as unknown as ViewStyle;
+
 const styles = StyleSheet.create({
   /* 챙길 것을 맡을 사람 얼굴. 손가락 크기는 Tap.chip 높이에 맞춥니다. */
   packFace: {
@@ -4458,35 +4551,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: Spacing.s1,
+    /* 그림 아래 글자 한 줄뿐이라 저절로는 손가락만큼 안 됩니다. 면을 걷은
+       뒤로는 이 값이 누를 자리를 혼자 쥐고 있습니다. */
     minHeight: Tap.min,
-  },
-  /*
-    동그라미 안에 그림.
-
-    <p>회색 네모 칸이었습니다. 칸마다 바탕과 테두리가 있어서 일정 위에 또
-    하나의 상자 줄이 얹힌 모양이었고, 그 줄이 어디서 끝나고 일정이 어디서
-    시작하는지가 안 보였습니다.
-  */
-  shortcutDisc: {
-    width: 48,
-    height: 48,
-    borderRadius: Radius.full,
-    backgroundColor: Colors.fill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  /* 켜진 것. 나머지는 조용한 회색이라, 하나만 물들면 그것이 켜진 것으로
-     읽힙니다. */
-  shortcutDiscOn: {
-    backgroundColor: Colors.accentSoft,
   },
   shortcutLabel: {
     ...Type.caption,
     color: Colors.textSecondary,
   },
+  /*
+    켜진 것.
+
+    <p>옅은 면 위에 얹는 색(accentText)이었습니다. 그 면이 동그라미였고 지금은
+    없으니, 흰 바탕에 그대로 쓰기로 만든 색(accentInk)으로 바꿉니다. 그림이
+    쓰는 색({@code tone="brand"})과 같은 값이라 그림과 글자가 한 색으로
+    켜집니다.
+  */
   shortcutLabelOn: {
     fontWeight: Weight.semibold,
-    color: Colors.accentText,
+    color: Colors.accentInk,
   },
   live: {
     gap: Spacing.s2,
@@ -4694,9 +4777,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: Spacing.s2,
     borderRadius: Radius.r3,
-    /* 브라우저가 이 자리에서 화면을 굴리지 않게 합니다. 안 막으면 손잡이를
-       끌어도 목록만 위아래로 움직입니다. */
-    touchAction: 'none',
+    ...NO_SCROLL_HERE,
   },
   gripOn: {
     backgroundColor: Colors.accentSoft,

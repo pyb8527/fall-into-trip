@@ -16,7 +16,6 @@ import { forget, forgetAll, recentSearches, remember } from '@/lib/recent';
 import {
   Band,
   Body,
-  Caption,
   Chip,
   Empty,
   ErrorNote,
@@ -33,6 +32,7 @@ import {
   Snack,
   useUndo,
 } from '@/ui';
+import { ScreenTop } from '@/ui/nav';
 
 /**
  * 한 자리에서 찾기.
@@ -181,14 +181,22 @@ export default function Search() {
   return (
     <Screen
       snack={<Snack undo={undo} onHide={hideUndo} />}
+      /* 윗줄은 찾는 칸 하나입니다. {@link ScreenTop} 으로 감싸는 것은 모양을
+         바꾸려는 것이 아니라 <b>높이를 한 자리에서</b> 받으려는 것입니다 —
+         칸이 마침 44 라 지금은 같아 보이지만, 그것이 우연이면 칸을 손보는
+         날 이 화면만 다른 높이가 됩니다. */
       header={
-        <SearchField
-          label="찾기"
-          value={typed}
-          onChangeText={setTyped}
-          placeholder="교토, 온천, 아이랑"
-          onSearch={() => ask(typed)}
-          busy={busy}
+        <ScreenTop
+          left={
+            <SearchField
+              label="찾기"
+              value={typed}
+              onChangeText={setTyped}
+              placeholder="교토, 온천, 아이랑"
+              onSearch={() => ask(typed)}
+              busy={busy}
+            />
+          }
         />
       }>
       {failed ? <ErrorNote message={failed} /> : null}
@@ -402,22 +410,19 @@ export default function Search() {
             : null
         }
         onClose={() => setLooking(null)}
-        actions={
-          looking && !kept.has(looking.name) ? (
-            <Press
-              onPress={() => {
-                const target = looking;
-                setLooking(null);
-                keep(target);
-              }}
-              accessibilityLabel={`${looking.name} 보석함에 줍기`}
-              scale={0.98}>
-              <Caption tone="brand" strong>
-                보석함에 줍기
-              </Caption>
-            </Press>
-          ) : null
-        }
+        /*
+          담는 일은 글자 한 줄이 아니라 그림입니다.
+
+          <p>「보석함에 줍기」라는 글자가 판 맨 아래에 따로 섰습니다. 그런데
+          담는 일은 <b>구글 지도로 열기</b>와 같은 갈래입니다 — 이 곳을 두고
+          하는 한 번의 동작이고, 둘이 나란히 있어야 고를 수 있습니다. 판 맨
+          아래의 글자 한 줄은 그 줄에서 혼자 떨어져 있었습니다.
+
+          <p>누르고 나서 판을 닫지 않습니다. 닫는 쪽이었는데, 그러면 담겼다는
+          것을 <b>사라진 판</b>으로 알게 됩니다. 채워진 그림이 그 자리에서
+          대답하는 편이 낫습니다.
+        */
+        scrap={looking ? { kept: kept.has(looking.name), onPress: () => keep(looking) } : null}
       />
     </Screen>
   );

@@ -20,9 +20,14 @@ import java.time.Instant;
  *
  * <h3>여행기와 다릅니다</h3>
  *
- * <p>{@code TripPost}(여행기)는 제목·지역·사본·공개 범위를 가집니다. 남에게
- * 내놓는 글이라 그렇습니다. 이쪽은 하나도 안 가집니다 — 아는 사람들끼리 보는
- * 것이고, 그래서 올리는 데 드는 품이 사진 고르기 하나여야 합니다.
+ * <p>{@code TripPost}(여행기)는 제목·지역·사본을 가집니다. 남에게 내놓는 글이라
+ * 그렇습니다. 이쪽은 하나도 안 가집니다 — 아는 사람들끼리 보는 것이고, 그래서
+ * 올리는 데 드는 품이 사진 고르기 하나여야 합니다.
+ *
+ * <p>{@link Audience} 하나는 가집니다. 안 가졌을 때는 <b>올린 자리가 곧 공개
+ * 범위</b>였는데(모임에 올리면 그 모임, 내 피드면 나만), 그러면 범위를 바꾸는
+ * 길이 글을 지우고 다시 쓰는 것뿐이었습니다. 안 고르면 그 옛 규칙이 그대로
+ * 기본값이라 올리는 품은 늘지 않습니다.
  *
  * <h3>그룹이 이 글의 주인이 아닙니다</h3>
  *
@@ -70,6 +75,17 @@ public class Post {
     @JdbcTypeCode(SqlTypes.ARRAY)
     private String[] tags = new String[0];
 
+    /**
+     * 누가 볼 수 있는지.
+     *
+     * <p>{@link Audience} 에 갈래마다 왜 그렇게 두었는지 적어 두었습니다.
+     * 지키는 곳은 {@code FeedService.visible} 한 곳입니다 — 울타리가 두
+     * 군데면 언젠가 한쪽만 고칩니다.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 12)
+    private Audience audience = Audience.ONLY_ME;
+
     /** 신고를 받아 운영자가 내린 것. 지우지 않고 감춥니다. */
     @Column(nullable = false)
     private boolean hidden;
@@ -81,15 +97,41 @@ public class Post {
     private Instant updatedAt;
 
     @Builder
-    public Post(String authorId, String groupId, String tripId, String text, String[] tags) {
+    public Post(String authorId, String groupId, String tripId, String text, String[] tags,
+                Audience audience) {
         this.id = Ids.next();
         this.authorId = authorId;
         this.groupId = groupId;
         this.tripId = tripId;
         this.text = text;
         this.tags = tags == null ? new String[0] : tags;
+        /* 안 고르면 올린 자리가 정합니다 — 공개 범위가 없던 때의 동작
+           그대로입니다. 규칙을 여기 한 군데만 둡니다({@link #audienceFor}). */
+        this.audience = audience == null ? audienceFor(groupId) : audience;
         this.createdAt = Instant.now();
         this.updatedAt = this.createdAt;
+    }
+
+    /**
+     * 안 골랐을 때의 공개 범위.
+     *
+     * <h3>왜 올린 자리가 정하나</h3>
+     *
+     * <p>공개 범위가 없던 때 이 글이 실제로 보였던 범위입니다 — 모임에 올린
+     * 글은 그 모임 사람이 봤고, 내 피드에 쓴 글은 나만 봤습니다. 안 보낸 쪽을
+     * 그때 동작으로 두면 옛 글도 새 글도 보이는 범위가 안 달라집니다(V52 의
+     * 되메움도 같은 규칙입니다).
+     *
+     * <p>갈래 하나를 못 박고 싶었다면 {@link Audience#ONLY_ME} 여야 합니다 —
+     * 모르고 넓게 열리는 쪽이 모르고 좁게 닫히는 쪽보다 되돌리기 어렵습니다.
+     * 그런데 그러면 모임에 올린 글이 아무에게도 안 보이게 되어, 안 고른 사람이
+     * 「모임에 올렸는데 아무 말이 없다」를 겪습니다. 모임에 올리는 행위 자체가
+     * 이미 그 모임을 고른 것이라 그 뜻을 따릅니다.
+     *
+     * @param groupId 모임에 올리면 그 모임. 비어 있으면 내 피드입니다
+     */
+    public static Audience audienceFor(String groupId) {
+        return groupId == null ? Audience.ONLY_ME : Audience.MATES;
     }
 
     /** 고친 때를 지금으로. 고치는 자리마다 적는 것을 잊지 않으려고 둡니다. */

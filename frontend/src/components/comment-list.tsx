@@ -173,55 +173,35 @@ export function CommentList({
         />
       ) : null}
 
-      {shown.map((comment, i) => {
-        /* 장소별 판 안에서는 어느 장소인지 판 제목이 이미 말하고 있습니다.
-           같은 말을 한 번 더 붙이지 않습니다. */
-        const where = at ? null : whereOf(comment);
-        return (
-          <View key={comment.id} style={[styles.item, i > 0 ? styles.itemEdge : null]}>
-            {/* 누가 말하는지를 얼굴 자리로 먼저 말합니다. 이름 첫 글자를
-                동그라미에 담습니다 — 그림이 없어도 줄이 누구의 것인지
-                한눈에 갈립니다. */}
-            <View style={styles.face}>
-              <Text style={styles.faceLetter}>{comment.authorName.slice(0, 1)}</Text>
-            </View>
-
-            <View style={styles.said}>
-              {/*
-                누가 말하는지를 먼저 답니다.
-
-                <p>전에는 글이 먼저고 이름이 아래였습니다. 한둘일 때는 읽혔는데
-                여남은 개가 이어지면 어느 이름이 위의 글 것인지 아래 글 것인지
-                헷갈립니다 — 이름이 두 글 사이에 끼어 있기 때문입니다.
-              */}
-              <Split>
-                <Caption tone="secondary">
-                  {comment.authorName} · {comment.createdAt.slice(0, 10)}
-                </Caption>
-                {comment.mine ? (
-                  <IconButton
-                    name="trash-2"
-                    label="내가 쓴 댓글 지우기"
-                    tone="danger"
-                    bare
-                    disabled={busy}
-                    onPress={() => run(() => api.delete(`/api/comments/${comment.id}`))}
-                  />
-                ) : user ? (
-                  <IconButton
-                    name="flag"
-                    label="이 댓글 신고"
-                    bare
-                    onPress={() => setReporting(comment)}
-                  />
-                ) : null}
-              </Split>
-              {where ? <Badge label={where} tone="muted" /> : null}
-              <Body small>{comment.text}</Body>
-            </View>
-          </View>
-        );
-      })}
+      {shown.map((comment, i) => (
+        <CommentRow
+          key={comment.id}
+          comment={comment}
+          /* 장소별 판 안에서는 어느 장소인지 판 제목이 이미 말하고 있습니다.
+             같은 말을 한 번 더 붙이지 않습니다. */
+          where={at ? null : whereOf(comment)}
+          first={i === 0}
+          action={
+            comment.mine ? (
+              <IconButton
+                name="trash-2"
+                label="내가 쓴 댓글 지우기"
+                tone="danger"
+                bare
+                disabled={busy}
+                onPress={() => run(() => api.delete(`/api/comments/${comment.id}`))}
+              />
+            ) : user ? (
+              <IconButton
+                name="flag"
+                label="이 댓글 신고"
+                bare
+                onPress={() => setReporting(comment)}
+              />
+            ) : null
+          }
+        />
+      ))}
 
       <Divider />
 
@@ -275,6 +255,89 @@ export function CommentList({
           }
         }}
       />
+    </View>
+  );
+}
+
+/**
+ * 댓글 한 줄.
+ *
+ * <p>목록과 {@link CommentPeek} 이 같은 것을 봅니다. 두 곳에 따로 적어 두면
+ * 얼굴 자리 크기나 이름 줄의 모양이 한쪽만 바뀌어, <b>같은 댓글이 자리마다
+ * 다른 모양</b>이 됩니다.
+ *
+ * @param where  어디에 달린 것인지. 장소별 판에서는 판 제목이 말하므로 안 답니다
+ * @param action 이 줄에서 바로 하는 일 — 지우기·신고. 읽기만 하는 자리에는 없습니다
+ * @param first  목록의 첫 줄인지. 첫 줄 위에는 선을 안 긋습니다
+ */
+function CommentRow({
+  comment,
+  where,
+  action,
+  first,
+}: {
+  comment: Comment;
+  where?: string | null;
+  action?: React.ReactNode;
+  first?: boolean;
+}) {
+  return (
+    <View style={[styles.item, first ? null : styles.itemEdge]}>
+      {/* 누가 말하는지를 얼굴 자리로 먼저 말합니다. 이름 첫 글자를
+          동그라미에 담습니다 — 그림이 없어도 줄이 누구의 것인지
+          한눈에 갈립니다. */}
+      <View style={styles.face}>
+        <Text style={styles.faceLetter}>{comment.authorName.slice(0, 1)}</Text>
+      </View>
+
+      <View style={styles.said}>
+        {/*
+          누가 말하는지를 먼저 답니다.
+
+          <p>전에는 글이 먼저고 이름이 아래였습니다. 한둘일 때는 읽혔는데
+          여남은 개가 이어지면 어느 이름이 위의 글 것인지 아래 글 것인지
+          헷갈립니다 — 이름이 두 글 사이에 끼어 있기 때문입니다.
+        */}
+        <Split>
+          <Caption tone="secondary">
+            {comment.authorName} · {comment.createdAt.slice(0, 10)}
+          </Caption>
+          {action}
+        </Split>
+        {where ? <Badge label={where} tone="muted" /> : null}
+        <Body small>{comment.text}</Body>
+      </View>
+    </View>
+  );
+}
+
+/**
+ * 먼저 보여 주는 몇 줄.
+ *
+ * <h3>단추 하나만 있었습니다</h3>
+ *
+ * <p>장소 판에 「댓글 남기기」 단추만 서 있었습니다. 그러면 그 판은 구글이
+ * 아는 것만 적힌 자리이고, <b>남이 여기서 뭐라고 했는지</b>는 한 번 더 눌러야
+ * 알 수 있었습니다 — 거기에 읽을 것이 있는지 모르는 채로는 대개 안 누릅니다.
+ *
+ * <p>{@link CommentList} 를 그대로 얹지는 않습니다. 그쪽은 적는 칸과 신고
+ * 다이얼로그까지 거느린 <b>댓글을 다루는 자리</b>이고, 판에 필요한 것은
+ * <b>읽을 줄 몇 개</b>입니다. 지우기·신고도 안 답니다 — 다루는 일이 두
+ * 자리에 흩어지면 한쪽만 고치는 일이 생깁니다.
+ *
+ * @param max 몇 줄까지. 서버가 개수 한도를 안 받으므로 받아 온 것을 여기서 자릅니다
+ */
+export function CommentPeek({ comments, max = 5 }: { comments: Comment[]; max?: number }) {
+  /* 서버는 쓴 순서(오래된 것부터)로 줍니다. 「최근 다섯」은 그래서 <b>뒤에서
+     다섯</b>이고, 자른 뒤에 순서를 뒤집지는 않습니다 — 「더 보기」로 전체를
+     열었을 때 같은 줄이 같은 순서로 서 있어야 방금 읽던 자리를 다시 찾습니다. */
+  const shown = comments.slice(-max);
+
+  return (
+    <View style={styles.wrap}>
+      {shown.map((comment, i) => (
+        <CommentRow key={comment.id} comment={comment} first={i === 0} />
+      ))}
     </View>
   );
 }

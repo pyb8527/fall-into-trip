@@ -13,6 +13,7 @@ import { faceOf } from '@/constants/user-marks';
 import { countdownOf, formatSpan, type Countdown } from '@/lib/countdown';
 import {
   Body,
+  BottomSheet,
   Button,
   Caption,
   ErrorNote,
@@ -20,14 +21,14 @@ import {
   Grow,
   Icon,
   IconButton,
-  Loading,
+  ListRow,
   Mark,
   Press,
   Row,
   Screen,
-  Split,
-  Title,
+  Skeleton,
 } from '@/ui';
+import { ScreenTop } from '@/ui/nav';
 import { AppTabs } from '@/ui/tab-bar';
 
 /** 모임 목록이 카드에 얹어 받는 것(GroupCards). */
@@ -102,19 +103,50 @@ export default function Groups() {
     <Screen
       safeTop
       tabs={<AppTabs />}
+      /*
+        맨 윗줄 — 새 모임 만들기.
+
+        <h3>이름을 걷었습니다</h3>
+
+        <p>「모임」이라고 큰 제목으로 적고 있었습니다. 그런데 지금 어디인지는
+        <b>아래 갈래 띠가 이미 말합니다</b> — 「모임」 칸이 채워져 있는 채로
+        위에 같은 말이 한 번 더 적혀 있었습니다.
+
+        <p>다른 갈래 화면은 걷어낸 자리에 찾는 칸을 올렸는데, 여기는 올릴
+        것이 없습니다 — 모임은 대개 몇 개뿐이라 찾을 것도 거를 것도 없습니다.
+        단추만 줄 끝에 남습니다.
+
+        <p>줄 높이는 {@link ScreenTop} 이 44 로 못박습니다. 전에는 모임이
+        하나도 없으면 단추가 사라져 윗줄이 32 로 내려앉았고, 첫 모임을 만드는
+        순간 화면이 한 번 들썩였습니다.
+      */
       header={
-        <Split>
-          <Grow>
-            <Title>모임</Title>
-          </Grow>
-          {blank ? null : (
-            <IconButton name="plus" label="새 모임 만들기" bare onPress={() => setCreating(true)} />
-          )}
-        </Split>
+        <ScreenTop
+          right={
+            blank ? null : (
+              <IconButton name="plus" label="새 모임 만들기" bare onPress={() => setCreating(true)} />
+            )
+          }
+        />
       }>
       <Stack.Screen options={{ headerShown: false }} />
 
-      {loading && !data ? <Loading /> : null}
+      {/*
+        처음 받는 동안 — 카드가 올 자리를 미리 세웁니다.
+
+        <p>{@link Loading} 이 섰습니다. 모임이 둘뿐인 화면에서도 점 셋이 한 번
+        돌고 나서 카드가 들어서니, 들어올 때마다 화면이 비었다 찼습니다.
+
+        <p>둘입니다. 모임은 대개 하나나 둘이고, 넷을 세우면 받아 보니 하나인
+        날에 화면이 거꾸로 짧아집니다 — 없던 것을 약속하는 자리입니다.
+
+        <p>{@link Skeleton} 의 칸은 카드의 <b>첫 줄</b>(표식과 이름)만큼입니다.
+        카드는 얼굴 줄과 소식 줄까지 더 깊어서 자리를 다 잡아 주지는
+        못합니다 — 그 모양까지 맞추려면 카드 꼴의 칸이 따로 있어야 하고,
+        그것은 {@link Skeleton} 쪽에서 낼 일입니다. 그래도 바닥에서 솟는
+        것보다는 위에서 자라는 쪽이 눈에 덜 걸립니다.
+      */}
+      {loading && !data ? <Skeleton rows={2} /> : null}
       {error ? <ErrorNote message={error} onRetry={reload} /> : null}
 
       {/*
@@ -171,10 +203,15 @@ export default function Groups() {
         <p>초대 링크를 만드는 자리는 모임 안(사람들 판)에 있었고, 받은 링크로
         들어가는 길은 링크를 누르는 것뿐이었습니다. 메신저로 받은 링크를 앱
         안에서 붙여 넣을 곳이 없었습니다.
+
+        <p>이 자리는 카드마다 있는 단추가 아니라 <b>목록 아래 한 자리</b>라,
+        어느 모임에 부르는지를 여기서 골라야 합니다. 그래서 모임 전체를
+        넘깁니다 — 첫 모임 번호만 넘기던 때에는 카드가 고를 수 없어서 맨 앞
+        모임으로 그냥 들어갔습니다.
       */}
       {data ? (
         <InviteCard
-          firstGroupId={groups[0]?.id ?? null}
+          groups={groups}
           onInvite={(id) => router.push({ pathname: '/group/[id]', params: { id, invite: '1' } })}
           onJoin={(token) => router.push({ pathname: '/invite/[token]', params: { token } })}
         />
@@ -289,26 +326,43 @@ function GroupCardView({
  * <p>받은 것은 링크 통째로 붙여 넣어도 되고 끝의 코드만 넣어도 됩니다. 링크의
  * 마지막 조각을 꺼내 초대 화면으로 보냅니다 — 어떤 모양으로 받았는지 사람이
  * 가릴 일이 아닙니다.
+ *
+ * <h3>어느 모임에 부를지는 사람이 고릅니다</h3>
+ *
+ * <p>이 카드는 모임 줄마다 달린 단추가 아니라 목록 아래 한 자리입니다. 그래서
+ * 맨 앞 모임을 몰래 집어 그 모임의 사람들 판을 열고 있었습니다 — 모임이 둘만
+ * 돼도 <b>내가 고르지 않은 모임</b>에 부르는 링크를 만들게 됩니다. 모임이
+ * 여럿이면 판을 띄워 묻습니다.
+ *
+ * <p>모임이 하나일 때는 그냥 갑니다. 고를 것이 하나뿐인 판은 묻는 일이 아니라
+ * 한 번 더 누르게 하는 일입니다. 모임이 없으면 부를 자리가 없어 단추 자체를
+ * 안 냅니다.
  */
 function InviteCard({
-  firstGroupId,
+  groups,
   onInvite,
   onJoin,
 }: {
-  firstGroupId: string | null;
+  /** 내 모임들. 부를 모임을 이 안에서 고릅니다. */
+  groups: GroupCard[];
   onInvite: (groupId: string) => void;
   onJoin: (token: string) => void;
 }) {
   const [code, setCode] = useState('');
+  const [picking, setPicking] = useState(false);
   const token = code.trim().split(/[/?#]/).filter(Boolean).pop() ?? '';
 
   return (
     <View style={styles.invite}>
-      {firstGroupId ? (
+      {groups.length > 0 ? (
         <>
           <Body strong>친구를 불러 같이 짜 보세요</Body>
           <Caption tone="secondary">링크 하나를 보내면 바로 들어와요.</Caption>
-          <Button label="초대 링크 만들기" variant="secondary" onPress={() => onInvite(firstGroupId)} />
+          <Button
+            label="초대 링크 만들기"
+            variant="secondary"
+            onPress={() => (groups.length === 1 ? onInvite(groups[0].id) : setPicking(true))}
+          />
         </>
       ) : null}
       <Field
@@ -321,6 +375,25 @@ function InviteCard({
         onSubmitEditing={() => (token ? onJoin(token) : undefined)}
         action={{ icon: 'chevron-right', label: '초대로 들어가기', disabled: !token, onPress: () => onJoin(token) }}
       />
+
+      {/* 고르면 바로 그 모임의 사람들 판으로 갑니다 — 고른 뒤에 「다음」을 또
+          누를 일이 없어 판에 바닥 단추를 안 둡니다. */}
+      <BottomSheet visible={picking} title="어느 모임에 부를까요?" onClose={() => setPicking(false)}>
+        <Caption tone="secondary">링크는 고른 모임 하나에만 써요.</Caption>
+        {groups.map((g, i) => (
+          <ListRow
+            key={g.id}
+            left={<Mark emoji={g.emoji ?? '🧳'} />}
+            title={g.name}
+            subtitle={`${g.memberCount}명`}
+            last={i === groups.length - 1}
+            onPress={() => {
+              setPicking(false);
+              onInvite(g.id);
+            }}
+          />
+        ))}
+      </BottomSheet>
     </View>
   );
 }

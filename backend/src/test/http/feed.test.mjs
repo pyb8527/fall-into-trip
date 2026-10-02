@@ -292,5 +292,91 @@ T("태그는 다섯 개까지 — 넘으면 잘라서 받음", r.status === 200 
 r = await call("GET", "/api/feed", { token: mina });
 T("어느 피드인지 안 말하면 거부", r.status === 400, r.data);
 
+console.log("\n[17] 공개 범위 — 모두 · 내 모임 사람만 · 나만");
+/*
+  올린 자리가 곧 공개 범위였던 것을 글이 들고 있게 바꿨습니다(V52).
+
+  가장 조심할 자리는 「나만」입니다. 못 보는 사람에게 403 으로 답하면 "있긴
+  있는데 못 본다" 가 되어, 번호를 하나씩 넣어 보며 닫아 둔 글이 몇 편인지를
+  가려낼 수 있습니다. 404 여야 하고, 그래서 여기서는 상태를 그대로 짚습니다.
+
+  미나와 준은 새 모임을 함께 씁니다. 남은 어느 모임도 함께 쓰지 않습니다 —
+  앞 토막에서 모임을 지웠으므로 셋의 사이가 여기서 다시 시작됩니다.
+*/
+const ourGroup = await makeGroup(mina, "금요일 저녁", [jun]);
+T("새 모임", !!ourGroup);
+
+r = await call("POST", "/api/feed", { token: mina, body: { groupId: ourGroup, text: "모임에만", audience: "MATES" } });
+T("내 모임 사람만 — 모임 글", r.status === 200 && r.data.post.audience === "MATES", r.data.post);
+const forMates = r.data.post.id;
+r = await call("GET", `/api/feed/${forMates}`, { token: jun });
+T("그 모임 사람이 봄", r.status === 200, r.data);
+r = await call("GET", `/api/feed/${forMates}`, { token: nam });
+T("모임 밖은 404", r.status === 404, r.data);
+
+r = await call("POST", "/api/feed", { token: mina, body: { groupId: ourGroup, text: "올려 두고 나만", audience: "ONLY_ME" } });
+T("나만 — 모임에 올려 두고 닫음", r.status === 200 && r.data.post.audience === "ONLY_ME", r.data.post);
+const onlyMine = r.data.post.id;
+r = await call("GET", `/api/feed/${onlyMine}`, { token: jun });
+T("같은 모임 사람에게도 「볼 수 없다」가 아니라 「없다」", r.status === 404, r.data);
+r = await call("GET", `/api/feed/${onlyMine}`, { token: mina });
+T("글쓴이는 봄", r.status === 200, r.data);
+r = await call("GET", `/api/feed?group=${ourGroup}`, { token: jun });
+T("모임 피드에도 안 뜸", !r.data.posts.some((p) => p.id === onlyMine), r.data.posts.map((p) => p.id));
+r = await call("GET", `/api/feed?group=${ourGroup}`, { token: mina });
+T("글쓴이의 모임 피드에는 뜸", r.data.posts.some((p) => p.id === onlyMine), r.data.posts.map((p) => p.id));
+
+r = await call("POST", "/api/feed", { token: mina, body: { text: "내 피드에 쓰고 모두", audience: "EVERYONE" } });
+T("모두 — 내 피드 글", r.status === 200 && r.data.post.groupId == null, r.data.post);
+const forAll = r.data.post.id;
+r = await call("GET", `/api/feed/${forAll}`, { token: nam });
+T("함께 든 모임이 없는 사람도 봄", r.status === 200, r.data);
+
+r = await call("POST", "/api/feed", { token: mina, body: { text: "내 피드에 쓰고 모임 사람만", audience: "MATES" } });
+const mateFeed = r.data.post.id;
+r = await call("GET", `/api/feed/${mateFeed}`, { token: jun });
+T("모임을 함께 쓰는 사람이 봄 — 모임 없이 올린 글이라도", r.status === 200, r.data);
+r = await call("GET", `/api/feed/${mateFeed}`, { token: nam });
+T("함께 든 모임이 없으면 404", r.status === 404, r.data);
+
+console.log("\n[18] 안 보내면 올린 자리가 정한다");
+/* 공개 범위가 없던 때의 동작입니다. 옛 화면이 보내던 몸체가 그대로 통해야
+   하고, V52 의 되메움도 같은 규칙으로 옛 글을 채웁니다. */
+r = await call("POST", "/api/feed", { token: mina, body: { groupId: ourGroup, text: "안 골랐음" } });
+T("모임에 올리면 그 모임 사람", r.data.post.audience === "MATES", r.data.post);
+r = await call("GET", `/api/feed/${r.data.post.id}`, { token: jun });
+T("모임 사람이 그대로 봄", r.status === 200, r.data);
+r = await call("POST", "/api/feed", { token: mina, body: { text: "내 피드에 안 골랐음" } });
+T("내 피드에 쓰면 나만", r.data.post.audience === "ONLY_ME", r.data.post);
+r = await call("GET", `/api/feed/${r.data.post.id}`, { token: jun });
+T("모임 사람도 못 봄", r.status === 404, r.data);
+
+console.log("\n[19] 남의 피드 목록");
+const minaId = (await call("GET", "/api/auth/me", { token: mina })).data.user.id;
+T("미나의 번호", !!minaId, minaId);
+
+r = await call("GET", `/api/feed?author=${minaId}`, { token: jun });
+T("모임 글은 뜸", r.data.posts.some((p) => p.id === forMates), r.data.posts.map((p) => p.id));
+T("열어 둔 내 피드 글도 뜸 — 안 뜨면 고른 값이 아무 일도 안 한다",
+  r.data.posts.some((p) => p.id === mateFeed) && r.data.posts.some((p) => p.id === forAll),
+  r.data.posts.map((p) => p.id));
+T("나만 보는 글은 안 뜸", !r.data.posts.some((p) => p.id === onlyMine), r.data.posts.map((p) => p.id));
+
+r = await call("GET", `/api/feed?author=${minaId}`, { token: nam });
+T("함께 든 모임이 없으면 「모두」로 열어 둔 글도 목록에는 안 뜸 — 번호를 받아야 열립니다",
+  r.data.posts.length === 0, r.data.posts);
+
+console.log("\n[20] 올린 뒤에 바꾼다");
+r = await call("PATCH", `/api/feed/${forAll}`, { token: mina, body: { audience: "ONLY_ME" } });
+T("좁힘", r.status === 200 && r.data.post.audience === "ONLY_ME", r.data.post);
+r = await call("GET", `/api/feed/${forAll}`, { token: nam });
+T("보던 사람이 더는 못 봄", r.status === 404, r.data);
+r = await call("PATCH", `/api/feed/${forAll}`, { token: mina, body: { text: "말만 고침" } });
+T("안 보낸 범위는 그대로", r.status === 200 && r.data.post.audience === "ONLY_ME", r.data.post);
+r = await call("PATCH", `/api/feed/${forMates}`, { token: jun, body: { audience: "EVERYONE" } });
+T("남의 글 범위는 못 바꿈", r.status === 403, r.data);
+r = await call("POST", "/api/feed", { token: mina, body: { text: "없는 값", audience: "FRIENDS" } });
+T("없는 값은 거부", r.status === 400, r.data);
+
 console.log(`\n결과: ${pass} 통과 / ${fail} 실패`);
 process.exit(fail ? 1 : 0);

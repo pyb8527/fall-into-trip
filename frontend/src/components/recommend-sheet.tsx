@@ -153,6 +153,20 @@ export function RecommendSheet({
   const [kept, setKept] = useState<Record<string, Where>>({});
   /** 들여다보는 중인 곳. 카드를 누르면 지도와 사정이 뜹니다. */
   const [looking, setLooking] = useState<Card | null>(null);
+  /*
+    판 아래에 낼 것이 남았는지.
+
+    <p>담아만 두는 것이 책갈피 그림으로 올라간 뒤로 {@link Keep} 에 아무것도
+    안 남는 때가 생겼습니다 — 여행 밖에서 열어 갈 데가 없는 때, 그리고 이미
+    담아 둔 곳인 때. 판은 받은 것이 있으면 띠를 그으므로, 안 가려내면 아무것도
+    없는 자리에 <b>띠만</b> 섭니다.
+
+    <p>일정·투표장에 넣은 것은 그대로 냅니다. 「일정에 넣었어요.」는 책갈피가
+    하는 말과 다른 말입니다.
+  */
+  /* 이름을 {@code where} 로 두면 {@link keep} 의 매개변수를 가립니다. */
+  const keptAt = looking ? kept[looking.name] : undefined;
+  const keepLeft = keptAt !== 'saved' && (keptAt !== undefined || !!onDay || !!tripId);
   /* 서버가 준 순서는 구글이 매긴 순서입니다. 고르는 눈은 그것 하나가
      아닙니다. */
   const [by, setBy] = useState<SortBy>('given');
@@ -400,7 +414,7 @@ export function RecommendSheet({
         <Caption tone="success">이 문장은 이 기기 밖으로 나가지 않아요.</Caption>
       ) : null}
 
-      {busy ? <Loading label="찾는 중" /> : null}
+      {busy ? <Loading label="찾고 있어요" /> : null}
       {failed ? <ErrorNote message={failed} /> : null}
 
       {result?.note ? <Caption tone="secondary">{result.note}</Caption> : null}
@@ -478,7 +492,48 @@ export function RecommendSheet({
         onIso={day?.iso ?? null}
         here={here}
         onClose={() => setLooking(null)}
-        actions={looking ? <Keep card={looking} kept={kept} onKeep={keep} dayId={onDay} inTrip={!!tripId} /> : null}
+        /*
+          담아만 두는 것은 구글 지도 옆 책갈피입니다.
+
+          <p>「저장」이 일정·투표장과 나란한 글자 단추였습니다. 그런데 셋은 같은
+          종류가 아닙니다 — 일정과 투표장은 <b>갈 곳을 고르는 것</b>이고, 담아만
+          두는 것은 누르면 그걸로 끝나는 일입니다. 아래 추천 줄마다 이미 같은
+          일을 하고 있고, 목록에서도 책갈피 하나로 합니다.
+
+          <p>서버가 이미 담아 둔 곳({@code already})도 채워진 것으로 봅니다.
+          이번에 안 담았다는 이유로 빈 책갈피를 보여 주면, 눌러서 담긴 것이
+          아닌데 담긴 것으로 바뀝니다.
+        */
+        scrap={
+          looking
+            ? {
+                kept: kept[looking.name] === 'saved' || looking.already === 'saved',
+                onPress: () => keep(looking, 'saved'),
+              }
+            : null
+        }
+        /*
+          아래에 남는 것만 냅니다.
+
+          <p>이미 담은 곳이면 아래의 「보석함에 담았어요.」를 안 냅니다 —
+          채워진 책갈피가 같은 말을 이미 하고 있고, 같은 사실을 두 모양으로
+          말하면 둘이 다른 것인 줄 압니다. 일정·투표장에 넣은 것은 <b>다른
+          사실</b>이라 그대로 적습니다.
+
+          <p>갈 데가 없고(여행 밖에서 열었습니다) 담지도 않은 때는 아예 안
+          냅니다. {@link Keep} 은 그때 빈 줄 하나를 그리는데, 판은 받은 것이
+          있으면 띠를 긋기 때문에 <b>띠만 한 줄</b> 남습니다.
+        */
+        actions={keepLeft && looking ? (
+          <Keep
+            card={looking}
+            kept={kept}
+            onKeep={keep}
+            dayId={onDay}
+            inTrip={!!tripId}
+            scrapped
+          />
+        ) : null}
       />
 
       {/* 구글 약관이 요구하는 표시입니다. 결과가 있을 때만 답니다. */}
@@ -494,6 +549,8 @@ export function RecommendSheet({
  *
  * <p>카드 아래에도, 들여다보는 판 안에도 같은 것이 섭니다. 두 곳에 따로
  * 적어 두면 한쪽만 고쳤을 때 같은 자리에서 다른 것이 됩니다.
+ *
+ * @param scrapped 담아만 두는 것은 밖에서 책갈피 그림이 맡는지. 판 안이 그렇습니다
  */
 function Keep({
   card,
@@ -501,12 +558,14 @@ function Keep({
   onKeep,
   dayId,
   inTrip,
+  scrapped,
 }: {
   card: Card;
   kept: Record<string, Where>;
   onKeep: (card: Card, where: Where) => void;
   dayId: string | null;
   inTrip: boolean;
+  scrapped?: boolean;
 }) {
   if (kept[card.name]) {
     return (
@@ -540,7 +599,12 @@ function Keep({
           onPress={() => onKeep(card, 'candidate')}
         />
       ) : null}
-      <Button label="저장" variant="ghost" compact onPress={() => onKeep(card, 'saved')} />
+      {/* 판 안에서는 이 자리가 구글 지도 옆 책갈피입니다. 줄 아래에서는 글자
+          단추 그대로입니다 — 줄에는 나가는 길들의 줄이 없어 그림 하나만 서면
+          무엇을 하는 그림인지 짐작이 됩니다. */}
+      {scrapped ? null : (
+        <Button label="보석함에" variant="ghost" compact onPress={() => onKeep(card, 'saved')} />
+      )}
     </Row>
   );
 }

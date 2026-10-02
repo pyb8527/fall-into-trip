@@ -18,6 +18,7 @@ import type {
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
 import { markOf } from '@/constants/user-marks';
+import { KEEP } from '@/constants/words';
 import { PlaceDetailSheet, type Looked } from '@/components/place-detail-sheet';
 import { HomeHero, type HeroPhase } from '@/components/home-hero';
 import { TripThumb } from '@/components/trip-thumb';
@@ -47,7 +48,6 @@ import {
   Caption,
   Chip,
   ErrorNote,
-  Grow,
   Icon,
   IconButton,
   ListRow,
@@ -57,9 +57,9 @@ import {
   Row,
   Screen,
   SectionHeader,
-  Split,
 } from '@/ui';
 import { CardGap, useCardColumns } from '@/ui/layout';
+import { ScreenTop } from '@/ui/nav';
 import { LogoInline, LogoSymbol } from '@/ui/logo';
 import { AppTabs } from '@/ui/tab-bar';
 
@@ -204,32 +204,37 @@ export default function Home() {
       로고와 단추 줄은 고정합니다.
 
       <p>굴러가는 본문 안에 있었습니다. 그래서 목록을 조금만 내려도 로고가
-      화면 밖으로 나가고, 찾기·소식이 <b>어느 화면에도 없는 것</b>이
+      화면 밖으로 나가고, 찾기·알림함이 <b>어느 화면에도 없는 것</b>이
       되었습니다 — 다시 맨 위로 올라와야 눌렀습니다.
     */
     <Screen
       safeTop
       tabs={<AppTabs />}
       header={
-        <Split>
-          {/*
-            갈래 화면 넷이 같은 머리로 섭니다 — 왼쪽에 이 화면의 이름, 오른쪽에
-            그림 단추. 다른 셋은 그 자리에 큰 제목(「내 여행」·「모임」·「저장」)이
-            서고, 홈만 이름 대신 로고입니다. 홈은 앱의 첫 화면이라 「홈」이라고
-            적는 것이 아무 말도 안 하고, 로고가 그 자리에서 이름 노릇을 합니다.
+        /*
+          갈래 화면 다섯이 같은 줄을 나눠 씁니다({@link ScreenTop}).
 
-            <p>줄 높이는 그 안에서 가장 큰 것이 정합니다. 로고는 막대 안에서
-            22 입니다 — 더 키우면 막대가 그만큼 높아집니다.
-          */}
-          <Grow>
-            <LogoInline size={22} />
-          </Grow>
-          {/*
-            오른쪽에 찾기·소식, 그리고 얼굴.
+          <p>전에는 그 자리에 화면 이름이 큰 제목으로 섰습니다 — 「내
+          여행」·「모임」·「보석함」·「둘러보기」. 그런데 지금 어디인지는 <b>아래
+          갈래 띠가 이미 말하고 있습니다.</b> 켜진 칸이 채워져 있으니 같은
+          말을 위에 한 번 더 적는 셈이었고, 그 한 줄이 화면마다 44픽셀을
+          먹었습니다. 이름을 걷고 그 자리를 화면이 실제로 필요한 것에
+          씁니다 — 「내 여행」·「보석함」은 검색칸입니다.
+
+          <p>홈만 그 자리에 로고가 섭니다. 앱의 첫 화면이라 「홈」이라고
+          적는 것은 아무 말도 안 하지만, 로고는 <b>여기가 처음</b>이라고
+          말합니다. 줄 높이는 {@link ScreenTop} 이 44 로 못박으므로 로고를
+          키워도 줄은 안 높아집니다 — 22 는 「fit」이 옆 그림 단추들과 같은
+          무게로 읽히는 크기입니다.
+        */
+        <ScreenTop
+          left={<LogoInline size={22} />}
+          /*
+            오른쪽에 찾기·알림, 그리고 얼굴.
 
             <h3>한 번 내려보냈다가 되돌립니다</h3>
 
-            <p>처음엔 셋이었습니다 — 찾기·소식·설정(⚙). 「막대에 그림이 셋
+            <p>처음엔 셋이었습니다 — 찾기·알림·설정(⚙). 「막대에 그림이 셋
             서면 어느 것도 안 읽히고, 설정은 하루에 한 번도 안 누른다」가
             까닭이어서, 홈 맨 아래 「내 계정」 줄로 내려보냈습니다.
 
@@ -243,45 +248,49 @@ export default function Home() {
             섞였지만, 얼굴은 동그란 면에 든 이모지라 <b>그림이 아니라
             사람</b>으로 읽힙니다 — 셋이 서도 묻히지 않습니다. 「나」로 가는
             자리가 「나」 처럼 생긴 것은 어디서나 그렇습니다.
-          */}
-          <Row gap={Spacing.s1}>
-            {/* 찾기가 화면마다 흩어져 있었습니다 — 장소는 여행 안에서,
-                남의 일정은 둘러보기에서. 여행을 짜기 전에 하는 일이라
-                홈에서 바로 닿아야 합니다. */}
-            <IconButton
-              name="search"
-              label="찾기"
-              bare
-              onPress={() => router.push('/(app)/search')}
-            />
-            <IconButton
-              name="bell"
-              label={news?.unseen ? `알림 ${news.unseen}건` : '알림'}
-              dot={!!news?.unseen}
-              bare
-              onPress={() => router.push('/(app)/news')}
-            />
-            {/*
-              마이페이지로 가는 자리.
+          */
+          right={
+            <Row gap={Spacing.s1}>
+              {/* 찾기가 화면마다 흩어져 있었습니다 — 장소는 여행 안에서,
+                  남의 일정은 둘러보기에서. 여행을 짜기 전에 하는 일이라
+                  홈에서 바로 닿아야 합니다. */}
+              <IconButton
+                name="search"
+                label="찾기"
+                bare
+                onPress={() => router.push('/(app)/search')}
+              />
+              {/* 알림함으로 가는 자리. 「모임 소식」이라고 적던 구역이 아래에
+                  따로 있고, 둘이 같은 곳을 엽니다. */}
+              <IconButton
+                name="bell"
+                label={news?.unseen ? `알림함 ${news.unseen}건` : '알림함'}
+                dot={!!news?.unseen}
+                bare
+                onPress={() => router.push('/(app)/news')}
+              />
+              {/*
+                마이페이지로 가는 자리.
 
-              <p>표식을 골라 둔 사람은 그 이모지가, 안 고른 사람은 로고가
-              섭니다. 이름의 첫 글자를 쓰지 않습니다 — 「박」 이 든 동그라미는
-              남의 얼굴과 구별이 안 되고, 이 앱에는 이미 표식을 고르는
-              자리가 있습니다(내 계정 → 내 표식).
-            */}
-            <Press
-              onPress={() => router.push('/(app)/me')}
-              accessibilityLabel="내 계정"
-              hitSlop={Tap.compactSlop}
-              style={styles.face}>
-              {user?.mark ? (
-                <Text style={styles.faceEmoji}>{markOf(user.mark)}</Text>
-              ) : (
-                <LogoSymbol size={20} />
-              )}
-            </Press>
-          </Row>
-        </Split>
+                <p>표식을 골라 둔 사람은 그 이모지가, 안 고른 사람은 로고가
+                섭니다. 이름의 첫 글자를 쓰지 않습니다 — 「박」 이 든 동그라미는
+                남의 얼굴과 구별이 안 되고, 이 앱에는 이미 표식을 고르는
+                자리가 있습니다(내 계정 → 내 표식).
+              */}
+              <Press
+                onPress={() => router.push('/(app)/me')}
+                accessibilityLabel="내 계정"
+                hitSlop={Tap.compactSlop}
+                style={styles.face}>
+                {user?.mark ? (
+                  <Text style={styles.faceEmoji}>{markOf(user.mark)}</Text>
+                ) : (
+                  <LogoSymbol size={20} />
+                )}
+              </Press>
+            </Row>
+          }
+        />
       }>
       {/*
         히어로와 그 아래 바로가기는 <b>한 구역</b>입니다.
@@ -326,9 +335,18 @@ export default function Home() {
         여백은 띠와 머리가 가진 것만 남습니다.
       */}
       {/*
-        모임 소식.
+        알림함.
 
-        <p>소식은 알림 화면에만 있었습니다. 들어가 보지 않으면 모임에서 누가
+        <h3>「모임 소식」이었습니다</h3>
+
+        <p>모임 단위로 읽혔습니다 — 어느 모임의 소식인지 고르는 자리처럼
+        보였는데, 눌러서 들어가면 <b>나에게 온 것</b>이 전부 모인 개인
+        알림함입니다({@code /(app)/news}). 모임에서 누가 고친 것뿐 아니라
+        내 글에 달린 좋아요와 추천도 거기 있습니다.
+        {@code docs/ideas.md} 가 처음부터 개인 단위로
+        설계해 둔 그 자리라, 이름을 그쪽에 맞춥니다.
+
+        <p>알림은 알림 화면에만 있었습니다. 들어가 보지 않으면 모임에서 누가
         무엇을 했는지 몰랐습니다 — 같이 쓰는 앱인데 홈은 혼자 쓰는 앱처럼
         보였습니다. 맨 위 세 줄을 여기 둡니다.
 
@@ -340,8 +358,8 @@ export default function Home() {
           <Band />
           <SectionHeader
             tight
-            title="모임 소식"
-            action={<SeeAll what="모임 소식" onPress={() => router.push('/(app)/news')} />}
+            title="알림함"
+            action={<SeeAll what="알림함" onPress={() => router.push('/(app)/news')} />}
           />
           {news.items.slice(0, 3).map((item, i, rows) => (
             <ListRow
@@ -402,6 +420,7 @@ export default function Home() {
                   <TripThumb
                     postId={post.id}
                     coverPhotoId={post.coverPhotoId}
+                    firstPhotoId={post.firstPhotoId}
                     height={Math.round((cardWidth * 9) / 16)}
                     label={post.title}
                   />
@@ -453,9 +472,9 @@ export default function Home() {
             */
             const canLook = place.lat != null && place.lng != null;
             return (
-              /* 저장 단추는 줄 옆에 섭니다. 줄 안에 두면 단추 안에 단추가 들어가고,
-                 누른 자리가 줄인지 저장인지 흔들립니다. 바로 담습니다 — 판을 열어
-                 「저장」을 찾게 하면 순위를 훑던 손이 멈춥니다. */
+              /* 담는 단추는 줄 옆에 섭니다. 줄 안에 두면 단추 안에 단추가 들어가고,
+                 누른 자리가 줄인지 단추인지 흔들립니다. 바로 담습니다 — 판을 열어
+                 담는 단추를 찾게 하면 순위를 훑던 손이 멈춥니다. */
               <Row key={place.key} style={styles.topRow}>
                 <View style={styles.grow}>
                   <ListRow
@@ -493,7 +512,7 @@ export default function Home() {
                 </View>
                 <IconButton
                   name="bookmark"
-                  label={`${place.name} 저장`}
+                  label={`${place.name} ${KEEP}`}
                   active={kept.has(place.key)}
                   bare
                   onPress={() => keep(place)}

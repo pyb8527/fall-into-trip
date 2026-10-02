@@ -46,16 +46,6 @@ public class PostService {
     /** 이만큼 신고가 쌓이면 사람이 볼 때까지 감춥니다. */
     private static final long HIDE_AT_REPORTS = 3;
 
-    /**
-     * 고를 수 있는 지역.
-     *
-     * <p>나라 단위로 쪼개면 목록이 길어져 고르기가 일이 되고, 대륙 단위면
-     * "유럽" 하나에 다 들어가 거르는 뜻이 없어집니다. 여행지로 실제 묶이는
-     * 단위로 나눕니다.
-     *
-     * <p>화면에도 이 목록을 그대로 씁니다. 두 곳에서 따로 적으면 언젠가
-     * 어긋나고, 어긋나면 고른 값이 저장은 되는데 아무것도 안 걸립니다.
-     */
     /** 글 하나에 달 수 있는 태그 수. 이보다 많으면 분류가 아니라 검색 낚시입니다. */
     private static final int MAX_TAGS = 8;
 
@@ -70,8 +60,14 @@ public class PostService {
     /** 태그 하나의 길이. 문장을 태그로 다는 것을 막습니다. */
     private static final int MAX_TAG_LENGTH = 20;
 
-    public static final List<String> REGIONS = List.of(
-            "국내", "일본", "중화권", "동남아", "유럽", "미주", "오세아니아", "그 밖");
+    /**
+     * 고를 수 있는 지역. 화면도 이 목록을 그대로 받아 씁니다.
+     *
+     * <p>목록과 좌표 표가 {@link Regions} 한 곳에 있습니다. 여기에 다시 적어
+     * 두면 언젠가 어긋나고, 어긋나면 고른 값이 저장은 되는데 아무것도 안
+     * 걸립니다.
+     */
+    public static final List<String> REGIONS = Regions.ALL;
 
     private final TripPostRepository posts;
     private final PostLikeRepository likes;
@@ -122,13 +118,28 @@ public class PostService {
         }
 
         String clean = title == null || title.isBlank() ? trip.getTitle() : title.trim();
+        /*
+          지역을 안 골랐으면 좌표에서 꼽습니다.
+
+          <p>화면이 여행 이름과 장소 이름을 <b>글자로 훑어</b> 지역을 미리
+          골라 주고 있었습니다. 「도쿄 라멘 투어」는 도쿄가 되지만 「엄마랑
+          셋이」는 아무것도 안 되고, 「도쿄에서 산 물건들」도 도쿄 모음에
+          섰습니다. 제목은 지역에 대한 사실이 아닙니다.
+
+          <p>장소에는 좌표가 있고, 꼽을 칸은 대륙만 한 여덟 개뿐입니다
+          ({@link Regions}). 서버가 가진 사실로 꼽습니다 — 사람이 골랐으면
+          그것이 이기고, 목록에 없는 값이 오면 안 고른 것으로 봅니다.
+        */
+        String pickedRegion = known(region);
+        if (pickedRegion == null) {
+            pickedRegion = regionOf(dayList, placeList);
+        }
         TripPost post = posts.save(TripPost.builder()
                 .tripId(trip.getId())
                 .authorId(me.id())
                 .title(clean)
                 .summary(summary == null || summary.isBlank() ? null : summary.trim())
-                /* 목록에 없는 값이 들어오면 아무것도 안 걸리는 글이 됩니다. 버립니다. */
-                .region(known(region))
+                .region(pickedRegion)
                 .tags(cleanTags(tags))
                 .coverPhotoId(myPhoto(me, coverPhotoId))
                 .visibility(visibility)
@@ -482,6 +493,45 @@ public class PostService {
     }
 
     /**
+     * 여행의 첫 장소 좌표로 지역을 꼽습니다. 여행이 없으면 {@code null} 입니다.
+     */
+    private String regionOf(String tripId) {
+        return regionOf(days.findAllByTripIdOrderBySortAsc(tripId), places.findAllOfTrip(tripId));
+    }
+
+    /**
+     * 올리는 일정의 지역.
+     *
+     * <h3>왜 첫날 첫 장소인가</h3>
+     *
+     * <p>장소를 모두 꼽아 가장 많은 지역을 고르는 길도 있습니다. 그런데
+     * 「오사카 사흘, 교토 하루」 는 어느 쪽으로 세도 간사이라서 답이 같고,
+     * 「도쿄 들렀다 하와이」 처럼 답이 갈리는 일정은 <b>떠난 곳</b>이 지역입니다.
+     * 세는 쪽이 값만 더 들고 더 맞지는 않습니다.
+     *
+     * <p>좌표가 없는 장소는 건너뜁니다. 비워 둔 좌표는 0/0 으로 들어오는데,
+     * 그 자리는 기니만 바다입니다 — 「그 밖」이라고 답하면 그것도 틀린 말입니다.
+     *
+     * @param dayList  날짜 순서대로
+     * @param placeList 날 안에서는 {@code sort} 순서대로
+     * @return {@link Regions#ALL} 안의 값, 또는 좌표가 하나도 없으면 {@code null}
+     */
+    private static String regionOf(List<Day> dayList, List<Place> placeList) {
+        for (Day day : dayList) {
+            for (Place place : placeList) {
+                if (!day.getId().equals(place.getDayId())) {
+                    continue;
+                }
+                if (place.getLat() == 0 && place.getLng() == 0) {
+                    continue;
+                }
+                return Regions.of(place.getLat(), place.getLng());
+            }
+        }
+        return null;
+    }
+
+    /**
      * 올릴 날들.
      *
      * <h3>왜 하루만 올리고 싶은가</h3>
@@ -799,8 +849,20 @@ public class PostService {
         if (summary != null) {
             post.setSummary(summary.isBlank() ? null : summary.trim());
         }
+        /*
+          지역도 좌표에서 꼽습니다 — 올릴 때와 같은 규칙입니다.
+
+          <p>목록에 없는 값이 들어오면 아무것도 안 걸리는 글이 되므로
+          버리는데, 버린 자리를 비워 두면 고치기 전보다 못해집니다. 여행의
+          첫 장소 좌표로 다시 꼽습니다.
+
+          <p>그래서 「지역 없음」으로는 못 고칩니다. 고를 칸에 「그 밖」이
+          있어서 괜찮습니다 — 비우고 싶은 사람이 바라는 것이 그것입니다.
+          여행을 이미 지웠으면 좌표가 없어 비워집니다.
+        */
         if (region != null) {
-            post.setRegion(known(region));
+            String picked = known(region);
+            post.setRegion(picked != null ? picked : regionOf(post.getTripId()));
         }
         if (tags != null) {
             post.setTags(cleanTags(tags));
@@ -1083,6 +1145,16 @@ public class PostService {
                        boolean liked, java.time.Instant createdAt,
                        /** 표지 사진. 목록에서 이 글이 무엇인지 가장 빨리 말하는 것입니다. */
                        String coverPhotoId,
+                       /**
+                        * 표지를 안 골랐을 때 대신 세울 <b>이 글의 첫 사진</b>.
+                        * 글에 사진이 한 장도 없으면 비어 있습니다.
+                        *
+                        * <p>{@code coverPhotoId} 가 있어도 늘 채웁니다. 표지가 있으면
+                        * 화면이 이 값을 안 보지만, 「표지가 없을 때만 채우는 칸」으로
+                        * 두면 비어 있다는 것이 <b>사진이 없다</b>인지 <b>표지가 있다</b>
+                        * 인지 받는 쪽에서 구별할 수 없습니다.
+                        */
+                       String firstPhotoId,
                        /** 「내 여행으로 가져오기」 한 사람 수 · 모임 여행에서 나왔는지 */
                        int copyCount, boolean fromGroup) {
     }
@@ -1119,8 +1191,123 @@ public class PostService {
                     List.of(p.getTags()), authorNameOf(p),
                     p.getDayCount(), p.getPlaceCount(), p.getLikeCount(), p.getViewCount(),
                     mine.contains(p.getId()), p.getCreatedAt(), p.getCoverPhotoId(),
+                    firstPhotoOf(p),
                     p.getCopyCount(), p.isFromGroup()));
         }
         return out;
+    }
+
+    /**
+     * 이 글의 첫 사진 — 표지를 안 골랐을 때 목록이 세울 것.
+     *
+     * <h3>어디서 꼽는가 — 사본입니다</h3>
+     *
+     * <p>고를 수 있던 자리가 셋이었습니다.
+     *
+     * <ul>
+     *   <li>{@code placePhotos} 의 지금 모습 — <b>안 됩니다.</b> 거기 남은 것은
+     *       「다니면서 볼 사진」이라 메뉴판·예매 QR 이 섞여 있습니다
+     *       ({@link net.weeniebeenie.fit.trip.domain.PlacePhoto}). 공개 목록의
+     *       표지 자리에 남의 예매 화면을 세우는 일이 됩니다.
+     *   <li>{@code storyPhotos} 의 지금 모습 — <b>안 됩니다.</b> 글쓴이가 여행기에
+     *       싣겠다고 고른 것만 공개인데, 그 표를 그대로 읽으면 안 고른 피드 사진까지
+     *       걸립니다. 원본 여행이 지워진 옛 글은 걸 데조차 없습니다.
+     *   <li><b>사본</b> — 이것입니다. 사본에 든 사진은 올릴 때 글쓴이가 하나씩 골라
+     *       공개로 돌린 것이고, 읽는 사람이 글에서 실제로 보는 사진과 정확히 같은
+     *       묶음입니다. 「이 여행의 첫 사진」이 뜻하는 것이 그것입니다.
+     * </ul>
+     *
+     * <p>질의가 <b>하나도</b> 안 붙는다는 것이 덤입니다. 사본은 글 줄에 딸려
+     * 이미 메모리에 있어서({@code trip_posts.snapshot}), 목록 한 쪽에 사진을
+     * 채우는 값이 JSON 파싱 스물 번뿐입니다. 그 대신 그만큼의 구글 Static Maps
+     * 호출이 사라집니다 — 바깥 왕복을 CPU 몇 밀리초로 바꾸는 셈입니다.
+     *
+     * <h3>차례는 글을 읽는 차례입니다</h3>
+     *
+     * <p>글은 날마다 「장소들 → 그 날에 걸린 피드 글」 순서로 그려지고, 날에 안
+     * 걸린 글은 맨 뒤에 섭니다({@code community/[id].tsx}). 그 순서를 그대로
+     * 훑어 처음 만나는 한 장을 냅니다. 화면이 보여 주는 첫 사진과 목록의 사진이
+     * 같아야, 들어가 보고 "아까 그 사진이 어디 갔나" 가 안 됩니다.
+     *
+     * <p>사진이 없는 옛 글도 있습니다 — 장소 사진을 아예 안 담던 시절의 사본에는
+     * {@code photos} 칸이 없습니다. 그때는 {@code null} 이고, 빈 자리를 가리킬
+     * 번호를 억지로 지어내지 않습니다. 동선 그림이 그 자리를 맡습니다.
+     *
+     * @return 사진 번호, 또는 사진이 없거나 사본을 못 읽었으면 {@code null}
+     */
+    private String firstPhotoOf(TripPost post) {
+        try {
+            return firstPhotoIn(mapper.readTree(post.getSnapshot()));
+        } catch (Exception e) {
+            /* 목록 한 쪽이 사본 한 줄 때문에 통째로 깨지면 안 됩니다. 사진은
+               있으면 좋은 것이고, 없으면 동선 그림이 섭니다 — 상세 화면은
+               그대로 500 으로 답하니({@link #snapshotOf}) 고장이 묻히지도
+               않습니다. */
+            return null;
+        }
+    }
+
+    /**
+     * 사본 안을 읽는 차례대로 훑어 처음 만나는 사진.
+     *
+     * <p>{@link #firstPhotoOf(TripPost)} 와 나눠 둔 것은 차례를 그 자체로 짚을 수
+     * 있게 하려는 것입니다. 「장소보다 글이 먼저냐」 같은 것은 눈으로 봐서는 알 수
+     * 없고, 어긋나면 목록과 상세가 다른 사진을 보여 줍니다.
+     */
+    static String firstPhotoIn(JsonNode snap) {
+        JsonNode stories = snap.path("stories");
+
+        int at = 0;
+        for (JsonNode day : snap.path("days")) {
+            for (JsonNode place : day.path("places")) {
+                String shot = firstOf(place.path("photos"));
+                if (shot != null) {
+                    return shot;
+                }
+            }
+            String told = storyPhotoOn(stories, at);
+            if (told != null) {
+                return told;
+            }
+            at++;
+        }
+        /* 날에 안 걸린 글 — 글이 올라온 날이 올린 날들 가운데 없을 때입니다.
+           글에서도 맨 뒤에 서므로 여기서도 맨 뒤입니다. */
+        return storyPhotoOn(stories, null);
+    }
+
+    /**
+     * 그 날에 걸린 피드 글의 첫 사진.
+     *
+     * @param on 몇째 날인지(0부터). {@code null} 이면 날에 안 걸린 글만 봅니다
+     */
+    private static String storyPhotoOn(JsonNode stories, Integer on) {
+        for (JsonNode story : stories) {
+            JsonNode which = story.path("dayIndex");
+            boolean here = on == null ? !which.isInt() : which.isInt() && which.asInt() == on;
+            if (!here) {
+                continue;
+            }
+            String shot = firstOf(story.path("photos"));
+            if (shot != null) {
+                return shot;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 사진 번호 배열의 첫 값.
+     *
+     * <p>빈 글자를 걸러 냅니다. 받는 쪽은 번호를 그대로 주소에 붙이므로
+     * ({@code /api/photos/…}), 빈 값이 가면 없는 사진을 부르는 호출이 됩니다.
+     */
+    private static String firstOf(JsonNode photos) {
+        for (JsonNode id : photos) {
+            if (id.isTextual() && !id.asText().isBlank()) {
+                return id.asText();
+            }
+        }
+        return null;
     }
 }
