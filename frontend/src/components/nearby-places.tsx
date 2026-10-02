@@ -1,16 +1,17 @@
 import { usePathname, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { api, ApiError, query, UNEXPECTED } from '@/api/client';
 import type { PopularPlace } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
+import type { MapPlace } from '@/components/map-types';
 import { PlaceDetailSheet, type Looked } from '@/components/place-detail-sheet';
 import { SignUpGate } from '@/components/signup-gate';
-import { SpotMap } from '@/components/spot-map';
-import { glyphOf, labelOf } from '@/constants/place-icons';
-import { Spacing } from '@/constants/theme';
+import { TripMap } from '@/components/trip-map';
+import { glyphOf, iconOf, labelOf } from '@/constants/place-icons';
+import { Colors, Spacing } from '@/constants/theme';
 import type { Comeback } from '@/lib/comeback';
 import { readableMeters } from '@/lib/geo';
 import { useHereOnce } from '@/lib/here-once';
@@ -63,16 +64,21 @@ const ROWS = 5;
  * <p>자리는 한 번만 잡습니다 — 목록이 걸음마다 다시 세워지면 안 되기 때문이고,
  * 그 까닭은 {@link useHereOnce} 에 적혀 있습니다. 옮겼으면 「다시 보기」입니다.
  *
- * <h3>지도는 가장 가까운 한 곳입니다</h3>
+ * <h3>지도에 내 점과 다섯 곳을 함께 찍습니다</h3>
  *
- * <p>내 점과 다섯 곳을 한 장에 찍는 쪽이 보기에는 낫습니다. 그런데 그 그림의
- * 열쇠에는 <b>내 좌표</b>가 들어갑니다 — 사람마다 자리가 달라 캐시가 한 번도
- * 안 맞고, 그러면 묶음이 뜰 때마다 구글에 지도 한 장입니다. 그 값을 줄이려고
- * 그림 지도로 바꾼 것이었습니다({@link SpotMap}).
+ * <p>한동안 가장 가까운 한 곳만 그림으로 찍었습니다({@link SpotMap}) — 내
+ * 좌표가 그림의 열쇠에 들어가 사람마다 캐시가 안 맞고, 그러면 묶음이 뜰
+ * 때마다 구글에 지도 한 장이라 값을 줄이려던 것이었습니다. 그런데 「내
+ * 위치가 어디고 근처에 뭐가 있는지」가 이 묶음이 답해야 하는 바로 그
+ * 물음이라, 한 장짜리 고정 그림으로는 답이 안 됐습니다.
  *
- * <p>장소 한 곳의 그림은 열쇠가 그 장소라 여러 사람이 같은 장을 씁니다.
- * 가장 가까운 곳 하나를 그리고, 나머지는 줄이 맡습니다 — 줄을 누르면 그 곳의
- * 그림이 판에서 다시 뜹니다.
+ * <p>그래서 {@link TripMap} 으로 바꿉니다 — 일정 화면과 같은 살아 있는
+ * 지도입니다. 내 점과 다섯 곳이 한 번에 찍히고, 핀을 눌러도 줄을 눌러도
+ * 같은 판이 뜹니다. {@code link={false}} 입니다 — 이 다섯 곳은 동선이
+ * 아니라 저마다 따로인 추천입니다.
+ *
+ * <p>값은 다시 커집니다. Maps JavaScript 는 지도가 뜰 때마다 세고, 이 묶음은
+ * 여러 화면에 섭니다 — 어디인지 보여 주는 쪽이 캐시보다 급했습니다.
  */
 export function NearbyPlaces({
   kind = null,
@@ -128,10 +134,51 @@ export function NearbyPlaces({
   }
 
   const places = (data?.near ? data.places : []).slice(0, ROWS);
-  const nearest = places[0];
   /* 판에 떠 있는 곳이 목록의 어느 줄인지. 담았는지를 기억하는 것은 묶음
      열쇠 쪽인데 판은 그것을 안 들고 갑니다. */
   const lookingRow = rowFor(places, looking);
+
+  /* 줄을 눌러도 핀을 눌러도 같은 판이 뜹니다. 좌표 없는 곳은 둘 다 안
+     받습니다 — 판이 지도도 "구글 지도에서 열기"도 그릴 것이 없습니다. */
+  function open(place: NearPlace) {
+    if (place.lat == null || place.lng == null) {
+      return;
+    }
+    setLooking({
+      name: place.name,
+      lat: place.lat,
+      lng: place.lng,
+      placeId: place.placeId,
+      icon: place.icon,
+    });
+  }
+
+  /*
+    지도에 찍을 핀들.
+
+    <p>{@link TripMap} 의 {@code places} 모양에 맞춥니다. 날짜 개념이 없는
+    자리라 {@code dayIndex} 는 전부 0, {@code order} 는 목록 순서 그대로
+    씁니다 — 가까운 순이라 1번이 가장 가깝습니다.
+  */
+  const mapPlaces = useMemo<MapPlace[]>(
+    () =>
+      places
+        .filter((p) => p.lat != null && p.lng != null)
+        .map((p, i) => ({
+          id: p.key,
+          name: p.name,
+          lat: p.lat as number,
+          lng: p.lng as number,
+          dayIndex: 0,
+          order: i + 1,
+          emoji: iconOf(p.icon),
+          color: Colors.accent,
+          fit: true,
+          radius: null,
+          detail: { time: null, cat: null, cost: null, note: null, sub: null, dayLabel: '' },
+        })),
+    [places],
+  );
 
   async function keep(place: NearPlace) {
     if (!user) {
@@ -203,8 +250,20 @@ export function NearbyPlaces({
         </Caption>
       ) : null}
 
-      {nearest ? (
-        <SpotMap lat={nearest.lat} lng={nearest.lng} name={nearest.name} height={140} />
+      {mapPlaces.length > 0 ? (
+        <TripMap
+          places={mapPlaces}
+          activeId={lookingRow?.key ?? null}
+          onSelect={(id) => {
+            const hit = places.find((p) => p.key === id);
+            if (hit) {
+              open(hit);
+            }
+          }}
+          link={false}
+          here={at}
+          height={220}
+        />
       ) : null}
 
       {places.map((place, i, rows) => (
@@ -220,18 +279,7 @@ export function NearbyPlaces({
             .filter(Boolean)
             .join(' · ')}
           last={i === rows.length - 1}
-          onPress={
-            place.lat != null && place.lng != null
-              ? () =>
-                  setLooking({
-                    name: place.name,
-                    lat: place.lat as number,
-                    lng: place.lng as number,
-                    placeId: place.placeId,
-                    icon: place.icon,
-                  })
-              : undefined
-          }
+          onPress={place.lat != null && place.lng != null ? () => open(place) : undefined}
         />
       ))}
 

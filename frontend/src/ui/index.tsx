@@ -4904,8 +4904,21 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.md,
     paddingBottom: Spacing.sm,
   },
+  /*
+    끌어올렸을 때 안이 비지 않게 채웁니다.
+
+    <p>{@code flexGrow: 0} 이었습니다. 그래서 위로 끌어 {@link sheetTall} 이
+    판을 90%로 키워도 <b>이 안의 스크롤 자리는 내용 길이만큼만</b> 그대로였고,
+    남는 높이는 아래 단추({@code sheetFoot}) 밑으로 빈 면이 되어 버렸습니다 —
+    판은 커졌는데 단추는 하단에 안 붙고 중간 어딘가에 떠 있는 것처럼 보였습니다.
+
+    <p>{@code flexGrow: 1} 로 이 스크롤 자리가 남는 높이를 먹습니다. 그러면
+    단추는 저절로 바닥에 붙고, 짧은 내용도 판이 커진 만큼 스크롤할 여지가
+    생겨 끌어올린 보람이 있습니다. 내용이 원래 길어 꽉 차 있던 판에서는 아무
+    것도 안 바뀝니다 — 먹을 남는 높이가 없기 때문입니다.
+  */
   sheetBody: {
-    flexGrow: 0,
+    flexGrow: 1,
   },
   sheetBodyInner: {
     paddingHorizontal: Gutter,
