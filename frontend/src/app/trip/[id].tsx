@@ -3859,23 +3859,36 @@ function PackSheet({
             />
           </Row>
 
-          {/* 누가 챙길지. 아무도 안 맡으면 "각자 알아서" 가 됩니다. */}
+          {/*
+            누가 챙길지. 아무도 안 맡으면 "각자 알아서" 가 됩니다.
+
+            <p>사람마다 이름 칩이었습니다. 다섯 명이면 줄마다 칩 다섯이 늘어서
+            챙길 것보다 사람 이름이 더 많이 보였습니다. 작은 얼굴로 줄이고,
+            맡은 사람 이름만 옆에 적습니다.
+          */}
           {people.length > 1 ? (
             <Row gap={Spacing.s1} style={styles.packWho}>
-              {people.map((p) => (
-                <Chip
-                  key={p.id}
-                  label={p.name}
-                  selected={item.ownerId === p.id}
-                  onPress={() =>
-                    run(() =>
-                      api.patch(`/api/items/${item.id}`, {
-                        ownerId: item.ownerId === p.id ? '' : p.id,
-                      }),
-                    )
-                  }
-                />
-              ))}
+              {people.map((p) => {
+                const mine = item.ownerId === p.id;
+                return (
+                  <Press
+                    key={p.id}
+                    onPress={() =>
+                      run(() =>
+                        api.patch(`/api/items/${item.id}`, { ownerId: mine ? '' : p.id }),
+                      )
+                    }
+                    accessibilityLabel={mine ? `${p.name} 맡김 풀기` : `${p.name} 에게 맡기기`}
+                    accessibilityState={{ selected: mine }}
+                    scale={0.9}
+                    style={[styles.packFace, mine ? styles.packFaceOn : null]}>
+                    <Text style={styles.packFaceText}>{faceOf(p.mark, p.name)}</Text>
+                  </Press>
+                );
+              })}
+              {item.ownerName ? (
+                <Caption tone="secondary">{item.ownerName} 님이 챙겨요</Caption>
+              ) : null}
             </Row>
           ) : null}
         </View>
@@ -4208,6 +4221,25 @@ function CloneSheet({
 }
 
 const styles = StyleSheet.create({
+  /* 챙길 것을 맡을 사람 얼굴. 손가락 크기는 Tap.chip 높이에 맞춥니다. */
+  packFace: {
+    width: 32,
+    height: 32,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.fill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  /* 맡은 사람. 바이올렛 테두리 — 칩의 「고름」과 같은 뜻입니다. */
+  packFaceOn: {
+    borderColor: Colors.accent,
+    backgroundColor: Colors.accentSoft,
+  },
+  packFaceText: {
+    fontSize: 15,
+  },
   /* 붙여 넣는 칸과 그 아래 한 줄을 한 덩이로 묶습니다. */
   pasteBox: {
     gap: Spacing.s1,

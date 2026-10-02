@@ -224,6 +224,7 @@ export function TripMap({
   shape = 'default',
   panTo,
   follow,
+  onReady,
   bottomInset = 0,
   goHereAt,
 }: TripMapProps) {
@@ -647,7 +648,10 @@ export function TripMap({
       showsPointsOfInterests={false}
       toolbarEnabled={false}
       moveOnMarkerPress={false}
-      onMapReady={() => setReady(true)}
+      onMapReady={() => {
+        setReady(true);
+        onReady?.();
+      }}
       onLayout={(e) =>
         setSize({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })
       }

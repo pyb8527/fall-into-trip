@@ -364,6 +364,7 @@ export function TripMap({
   panTo,
   myFace,
   follow,
+  onReady,
 }: TripMapProps) {
   /*
     어느 날만 볼지.
@@ -446,6 +447,8 @@ export function TripMap({
         /* 첫 배치가 늦게 잡히는 기기를 위해 한 박자 뒤 한 번 더 재게 합니다. */
         gmaps().event.addListenerOnce(map.current, 'idle', () => {
           gmaps().event.trigger(map.current, 'resize');
+          /* 첫 타일까지 깔린 때입니다. 그 전에 알리면 빈 회색 판 위에서 일이 시작됩니다. */
+          onReady?.();
         });
         setReady(true);
       })

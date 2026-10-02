@@ -63,6 +63,11 @@ export type MapNote = {
 };
 
 export type TripMapProps = {
+  /**
+   * 지도가 처음 그려졌을 때 한 번. 지도가 뜨기 전에 무언가를 시작하면 안 되는
+   * 자리(요약의 동선 다시 보기)가 씁니다.
+   */
+  onReady?: () => void;
   /** 지금 켜 둔 동행자들. */
   mates?: MapMate[];
   /** 잠깐 꽂아 둔 핀들. */

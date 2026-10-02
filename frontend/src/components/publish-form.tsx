@@ -51,6 +51,19 @@ export function PublishForm({
        사람이 바라는 것도 대개 그것입니다. */
     visibility: 'LISTED',
   });
+  /* 더 고를 것들을 펼쳤는지. 처음에는 접혀 있습니다. */
+  const [more, setMore] = useState(false);
+  /*
+    「어디로 다녀오셨나요?」를 미리 골라 둡니다.
+
+    <p>여행 이름이나 장소 이름에 지역 이름이 들어 있으면 그것입니다 —
+    「오사카 3박 4일」을 내놓는 사람에게 오사카를 또 고르게 하지 않습니다.
+    못 알아내면 비워 둡니다. 틀린 지역으로 올라가면 엉뚱한 목록에 섞입니다.
+  */
+  const { data: regionList } = useAsync<{ regions: string[] }>(
+    (signal) => (visible ? api.get('/api/posts/regions', signal) : Promise.resolve({ regions: [] })),
+    [visible],
+  );
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
 
@@ -138,7 +151,20 @@ export function PublishForm({
     setBusy(false);
     setPickedStories([]);
     setPickedShots([]);
+    setMore(false);
   }, [visible, tripTitle]);
+
+  useEffect(() => {
+    if (!visible || !trip || !regionList || shape.region) {
+      return;
+    }
+    const text = [tripTitle, ...trip.days.flatMap((d) => d.places.map((p) => p.name))].join(' ');
+    const hit = regionList.regions.find((r) => text.includes(r));
+    if (hit) {
+      setShape((was) => (was.region ? was : { ...was, region: hit }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, trip, regionList]);
 
   async function submit() {
     if (busy) {
@@ -185,135 +211,152 @@ export function PublishForm({
         누가 다녀왔는지, 동행자가 누구인지는 올라가지 않아요. 날짜와 장소만 가요.
       </Caption>
 
-      {/*
-        어느 날을 올릴지.
-
-        <p>날이 둘 이상일 때만 냅니다. 하루짜리 여행에 "전부" 와 "1일차" 를
-        나란히 두면 고를 것이 없는 줄이 하나 생깁니다.
-      */}
-      {(tripDays?.days.length ?? 0) > 1 ? (
-        <>
-          <Caption tone="secondary">어느 날을 올릴까요?</Caption>
-          <Row gap={Spacing.s2} style={styles.wrap}>
-            <Chip
-              label="전부"
-              selected={pickedDays.length === 0}
-              onPress={() => setPickedDays([])}
-            />
-            {tripDays?.days.map((d) => (
-              <Chip
-                key={d.id}
-                label={d.date || d.label}
-                selected={pickedDays.includes(d.id)}
-                onPress={() =>
-                  setPickedDays((was) =>
-                    was.includes(d.id) ? was.filter((x) => x !== d.id) : [...was, d.id],
-                  )
-                }
-              />
-            ))}
-          </Row>
-        </>
-      ) : null}
+      <PostFields value={shape} onChange={setShape} />
 
       {/*
-        어떤 글을 같이 실을까요.
+        더 고를 것들 — 어느 날, 피드 이야기, 챙겨 둔 사진.
 
-        <p>기본은 <b>아무것도 안 고름</b>입니다. 피드에 올린 것은 아는
-        사람들끼리 보려고 올린 것이라, 공개 글에 통째로 딸려 가면 안 됩니다 —
-        공개로 돌리는 것은 한 편씩 고르는 일이어야 합니다.
+        <p>판을 열면 이것들이 제목보다 먼저 서 있었습니다. 내놓는 사람이 먼저
+        정할 것은 <b>표지 · 제목 · 소개</b>이고, 날과 사진은 대개 「전부」 그대로
+        둡니다. 접어 두고 고르고 싶은 사람만 엽니다.
       */}
-      {stories.length > 0 ? (
+      {more ? (
         <>
-          <Caption tone="secondary">
-            이 여행에 올린 글을 같이 실을까요? 고른 것만 공개돼요.
-          </Caption>
-          <View style={styles.stories}>
-            {stories.map((s) => {
-              const on = pickedStories.includes(s.id);
-              return (
-                <Press
-                  key={s.id}
-                  onPress={() =>
-                    setPickedStories((was) =>
-                      was.includes(s.id) ? was.filter((x) => x !== s.id) : [...was, s.id],
-                    )
-                  }
-                  accessibilityLabel={`${s.text ?? '사진'} 같이 싣기`}
-                  style={[styles.story, on ? styles.storyOn : null]}>
-                  <Row gap={Spacing.s2}>
-                    <Checkbox
-                      label=""
-                      checked={on}
-                      onChange={() =>
+          {/*
+            어느 날을 올릴지.
+
+            <p>날이 둘 이상일 때만 냅니다. 하루짜리 여행에 "전부" 와 "1일차" 를
+            나란히 두면 고를 것이 없는 줄이 하나 생깁니다.
+          */}
+          {(tripDays?.days.length ?? 0) > 1 ? (
+            <>
+              <Caption tone="secondary">어느 날을 올릴까요?</Caption>
+              <Row gap={Spacing.s2} style={styles.wrap}>
+                <Chip
+                  label="전부"
+                  selected={pickedDays.length === 0}
+                  onPress={() => setPickedDays([])}
+                />
+                {tripDays?.days.map((d) => (
+                  <Chip
+                    key={d.id}
+                    label={d.date || d.label}
+                    selected={pickedDays.includes(d.id)}
+                    onPress={() =>
+                      setPickedDays((was) =>
+                        was.includes(d.id) ? was.filter((x) => x !== d.id) : [...was, d.id],
+                      )
+                    }
+                  />
+                ))}
+              </Row>
+            </>
+          ) : null}
+
+          {/*
+            어떤 글을 같이 실을까요.
+
+            <p>기본은 <b>아무것도 안 고름</b>입니다. 피드에 올린 것은 아는
+            사람들끼리 보려고 올린 것이라, 공개 글에 통째로 딸려 가면 안 됩니다 —
+            공개로 돌리는 것은 한 편씩 고르는 일이어야 합니다.
+          */}
+          {stories.length > 0 ? (
+            <>
+              <Caption tone="secondary">
+                이 여행에 올린 글을 같이 실을까요? 고른 것만 공개돼요.
+              </Caption>
+              <View style={styles.stories}>
+                {stories.map((s) => {
+                  const on = pickedStories.includes(s.id);
+                  return (
+                    <Press
+                      key={s.id}
+                      onPress={() =>
                         setPickedStories((was) =>
                           was.includes(s.id) ? was.filter((x) => x !== s.id) : [...was, s.id],
                         )
                       }
-                    />
-                    {s.photoIds.length > 0 ? (
-                      <OurPhoto id={s.photoIds[0]} width={44} height={44} />
-                    ) : null}
-                    <Grow gap={1}>
-                      <Caption numberOfLines={2}>{s.text ?? '사진만 올린 글'}</Caption>
-                      {s.photoIds.length > 0 ? (
-                        <Caption tone="muted">사진 {s.photoIds.length}장</Caption>
-                      ) : null}
-                    </Grow>
-                  </Row>
-                </Press>
-              );
-            })}
-          </View>
-        </>
-      ) : null}
-
-      {/*
-        장소마다 챙겨 둔 사진.
-
-        <p>한동안 여행기에 사진이 한 장도 안 실렸습니다. 여기 쌓인 것이
-        「다니면서 볼 사진」이라 통째로 담으면 예매 화면이 섞여 나가기
-        때문인데, 그러느라 <b>장소마다 찍어 둔 진짜 사진도 같이 묻혔습니다</b> —
-        읽는 사람이 가장 보고 싶은 것이 그것인데 말입니다.
-
-        <p>한 장씩 고릅니다. 고른 것만 올라갑니다.
-      */}
-      {withShots.length > 0 ? (
-        <>
-          <Caption tone="secondary">
-            장소에 챙겨 둔 사진을 같이 실을까요? 고른 것만 공개돼요.
-          </Caption>
-          {withShots.map(({ day, place, shots }) => (
-            <View key={place.id} style={styles.spot}>
-              <Caption tone="muted" numberOfLines={1}>
-                {day.date || day.label} · {place.name}
-              </Caption>
-              <Row gap={Spacing.s2} style={styles.wrap}>
-                {shots.map((id) => {
-                  const on = pickedShots.includes(id);
-                  return (
-                    <Press
-                      key={id}
-                      onPress={() =>
-                        setPickedShots((was) =>
-                          was.includes(id) ? was.filter((x) => x !== id) : [...was, id],
-                        )
-                      }
-                      accessibilityLabel={`${place.name} 사진 같이 싣기`}
-                      accessibilityState={{ selected: on }}
-                      style={[styles.shot, on ? styles.shotOn : null]}>
-                      <OurPhoto id={id} width={THUMB} height={THUMB} />
+                      accessibilityLabel={`${s.text ?? '사진'} 같이 싣기`}
+                      style={[styles.story, on ? styles.storyOn : null]}>
+                      <Row gap={Spacing.s2}>
+                        <Checkbox
+                          label=""
+                          checked={on}
+                          onChange={() =>
+                            setPickedStories((was) =>
+                              was.includes(s.id) ? was.filter((x) => x !== s.id) : [...was, s.id],
+                            )
+                          }
+                        />
+                        {s.photoIds.length > 0 ? (
+                          <OurPhoto id={s.photoIds[0]} width={44} height={44} />
+                        ) : null}
+                        <Grow gap={1}>
+                          <Caption numberOfLines={2}>{s.text ?? '사진만 올린 글'}</Caption>
+                          {s.photoIds.length > 0 ? (
+                            <Caption tone="muted">사진 {s.photoIds.length}장</Caption>
+                          ) : null}
+                        </Grow>
+                      </Row>
                     </Press>
                   );
                 })}
-              </Row>
-            </View>
-          ))}
+              </View>
+            </>
+          ) : null}
+
+          {/*
+            장소마다 챙겨 둔 사진.
+
+            <p>한동안 여행기에 사진이 한 장도 안 실렸습니다. 여기 쌓인 것이
+            「다니면서 볼 사진」이라 통째로 담으면 예매 화면이 섞여 나가기
+            때문인데, 그러느라 <b>장소마다 찍어 둔 진짜 사진도 같이 묻혔습니다</b> —
+            읽는 사람이 가장 보고 싶은 것이 그것인데 말입니다.
+
+            <p>한 장씩 고릅니다. 고른 것만 올라갑니다.
+          */}
+          {withShots.length > 0 ? (
+            <>
+              <Caption tone="secondary">
+                장소에 챙겨 둔 사진을 같이 실을까요? 고른 것만 공개돼요.
+              </Caption>
+              {withShots.map(({ day, place, shots }) => (
+                <View key={place.id} style={styles.spot}>
+                  <Caption tone="muted" numberOfLines={1}>
+                    {day.date || day.label} · {place.name}
+                  </Caption>
+                  <Row gap={Spacing.s2} style={styles.wrap}>
+                    {shots.map((id) => {
+                      const on = pickedShots.includes(id);
+                      return (
+                        <Press
+                          key={id}
+                          onPress={() =>
+                            setPickedShots((was) =>
+                              was.includes(id) ? was.filter((x) => x !== id) : [...was, id],
+                            )
+                          }
+                          accessibilityLabel={`${place.name} 사진 같이 싣기`}
+                          accessibilityState={{ selected: on }}
+                          style={[styles.shot, on ? styles.shotOn : null]}>
+                          <OurPhoto id={id} width={THUMB} height={THUMB} />
+                        </Press>
+                      );
+                    })}
+                  </Row>
+                </View>
+              ))}
+            </>
+          ) : null}
         </>
-      ) : null}
-
-      <PostFields value={shape} onChange={setShape} />
-
+      ) : (
+        <Button
+          label="올릴 날 · 이야기 · 사진 고르기"
+          variant="ghost"
+          iconAfter="chevron-down"
+          onPress={() => setMore(true)}
+        />
+      )}
       {failed ? <ErrorNote message={failed} /> : null}
     </BottomSheet>
   );

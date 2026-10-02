@@ -218,7 +218,36 @@ function MyReviews({ whose, count }: { whose: string | null; count: number }) {
     <>
       <SectionHeader title="내가 남긴 것" tight note={`별점을 준 것 ${count}개`} />
       <Caption tone="secondary">장소 상세에서 남긴 별점과 한 줄이 여기 모여요.</Caption>
+      <TipReach />
     </>
+  );
+}
+
+/**
+ * 내가 남긴 한 줄이 얼마나 쓰였나.
+ *
+ * <p>소식함 맨 아래에 있었습니다. 소식은 읽으면 지나가는 것인데 이것은
+ * 쌓이는 숫자라, 소식함을 열 때마다 같은 줄을 또 읽었습니다. 「내가 해 온
+ * 것」이 모이는 자리가 여기입니다.
+ *
+ * <p>한 줄도 안 남겼으면 안 그립니다. 0 을 보여 주면 「너는 아무것도 안
+ * 했다」가 됩니다(서버가 그때 {@code mine} 을 비워 보냅니다).
+ */
+function TipReach() {
+  const { data } = useAsync<{ mine?: { tipCount: number; viewCount: number } | null }>(
+    (signal) => api.get('/api/news', signal),
+    [],
+  );
+  const mine = data?.mine;
+  if (!mine) {
+    return null;
+  }
+  return (
+    <Body small>
+      {mine.viewCount > 0
+        ? `남긴 한 줄 ${mine.tipCount}개가 ${mine.viewCount}번 쓰였어요.`
+        : `남긴 한 줄 ${mine.tipCount}개. 아직 읽은 사람이 없어요.`}
+    </Body>
   );
 }
 

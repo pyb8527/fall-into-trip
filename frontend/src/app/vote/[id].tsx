@@ -10,7 +10,7 @@ import { DayPicker } from '@/components/day-picker';
 import { PlaceDetailSheet, type Looked } from '@/components/place-detail-sheet';
 import { PlaceSearch } from '@/components/place-search';
 import { glyphOf, labelOf } from '@/constants/place-icons';
-import { Colors, Elevation, Radius, Spacing, Tap, Type, Weight } from '@/constants/theme';
+import { Colors, Elevation, Radius, Spacing, Type, Weight } from '@/constants/theme';
 import {
   Badge,
   BottomSheet,
@@ -315,33 +315,32 @@ export default function Vote() {
             안 누른 것은 회색 선 한 가닥으로 남아 "표를 받는 자리" 라는 것만
             말합니다.
           */}
-          <Split align="center" gap={Spacing.s3}>
-            <View style={styles.barTrack}>
-              <View
-                style={[
-                  styles.barFill,
-                  { width: `${share(candidate.yes, candidate.memberCount)}%` },
-                ]}
-              />
-            </View>
-            <Caption tone="muted">
-              {`${candidate.memberCount}명 중 ${candidate.yes}명 찬성`}
-              {candidate.no > 0 ? ` · ${candidate.no}명 반대` : ''}
-            </Caption>
-          </Split>
-
           {/*
-            고르는 단추 둘.
+            찬반 막대와 고르는 단추 둘을 한 줄에.
 
-            <p>「좋아요」 가 바이올렛으로 꽉 차 있었습니다. 후보 여덟이면 꽉
-            찬 바이올렛이 여덟인데, 색을 가득 쓰는 자리는 화면에 하나여야
-            합니다 — 그 하나는 아래 고정 줄의 「일정에 넣기」 입니다.
+            <p>단추 둘이 카드 폭을 반씩 나눠 가진 줄을 따로 먹었습니다. 후보
+            여덟이면 그 줄만 여덟이라 화면에 카드 세 장도 안 들어왔습니다.
+            단추를 줄 오른쪽의 작은 둘로 줄이고 막대 옆에 붙입니다 — 막대가
+            「지금 몇 명이」, 단추가 「나는」이라 한 줄에 읽힙니다.
 
             <p>내가 고른 쪽만 면을 깝니다. 안 고른 쪽은 테두리만 둡니다.
-            그러면 한 화면에서 <b>내가 이미 누른 것</b>이 어느 것인지가 면의
-            있고 없음으로 읽힙니다.
+            색을 가득 쓰는 자리는 아래 고정 줄의 「일정에 넣기」 하나입니다.
           */}
-          <Row gap={Spacing.s2} style={styles.choices}>
+          <Row gap={Spacing.s3} style={styles.voteRow}>
+            <View style={styles.voteInfo}>
+              <View style={[styles.barTrack, styles.barInline]}>
+                <View
+                  style={[
+                    styles.barFill,
+                    { width: `${share(candidate.yes, candidate.memberCount)}%` },
+                  ]}
+                />
+              </View>
+              <Caption tone="muted">
+                {`${candidate.memberCount}명 중 ${candidate.yes}명 찬성`}
+                {candidate.no > 0 ? ` · ${candidate.no}명 반대` : ''}
+              </Caption>
+            </View>
             <Choice
               icon="thumbs-up"
               label="좋아요"
@@ -350,7 +349,7 @@ export default function Vote() {
               onPress={() => vote(candidate, candidate.myVote === true ? null : true)}
             />
             <Choice
-              icon="thumbs-up"
+              icon="thumbs-down"
               label="별로예요"
               tone="no"
               chosen={candidate.myVote === false}
@@ -453,7 +452,7 @@ function Choice({
   chosen,
   onPress,
 }: {
-  icon: 'thumbs-up';
+  icon: 'thumbs-up' | 'thumbs-down';
   label: string;
   /** 좋다 쪽은 브랜드색 옅은 면, 아니다 쪽은 회색 면입니다. */
   tone: 'yes' | 'no';
@@ -465,11 +464,6 @@ function Choice({
       ? styles.choiceYes
       : styles.choiceNo
     : styles.choiceOff;
-  const color = chosen
-    ? tone === 'yes'
-      ? Colors.accentText
-      : Colors.text
-    : Colors.textSecondary;
 
   return (
     <Press
@@ -478,12 +472,9 @@ function Choice({
       accessibilityState={{ selected: chosen }}
       accessibilityLabel={chosen ? `${label} 무르기` : label}
       style={[styles.choice, face]}>
-      {/* 「별로예요」 는 같은 그림을 뒤집어 씁니다. 아이콘 묶음에 아래로
-          향한 엄지가 따로 없어서인데, 뒤집힌 엄지는 어디서나 같은 뜻입니다. */}
-      <View style={tone === 'no' ? styles.flip : undefined}>
-        <Icon name={icon} size={16} tone={chosen && tone === 'yes' ? 'brand' : 'secondary'} />
-      </View>
-      <Text style={[styles.choiceLabel, { color }]}>{label}</Text>
+      {/* 그림만 둡니다 — 글자는 읽어 주는 기기(accessibilityLabel)가 말합니다.
+          엄지 위·아래는 어디서나 같은 뜻이라 글자 없이도 읽힙니다. */}
+      <Icon name={icon} size={18} tone={chosen && tone === 'yes' ? 'brand' : 'secondary'} />
     </Press>
   );
 }
@@ -607,7 +598,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     borderRadius: Radius.r3,
     padding: Spacing.s4,
-    gap: Spacing.s3,
+    gap: Spacing.s2,
     ...Elevation.card,
   },
   cardHead: {
@@ -647,10 +638,26 @@ const styles = StyleSheet.create({
     줄 안에 드는 단추. 보이는 높이는 36 이고, 누르는 넓이는 좌우로 꽉 차서
     손가락이 모자라지 않습니다.
   */
-  choice: {
+  voteRow: {
+    alignItems: 'center',
+  },
+  voteInfo: {
     flex: 1,
-    height: Tap.compact,
-    borderRadius: Radius.r2,
+    gap: Spacing.s1,
+  },
+  /* 세로로 쌓이는 자리에서는 flex 로 자라면 높이가 0 이 됩니다. 폭만 채웁니다. */
+  barInline: {
+    flexGrow: 0,
+    flexShrink: 0,
+    flexBasis: 'auto',
+    minHeight: 6,
+    alignSelf: 'stretch',
+  },
+  /* 막대 옆 작은 단추. 보이는 크기는 40 — 손가락이 닿는 44 에 가깝게. */
+  choice: {
+    width: 40,
+    height: 40,
+    borderRadius: Radius.full,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

@@ -2,7 +2,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { PathTitle } from '@/ui/nav';
 import { LogoInline } from '@/ui/logo';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View, ActivityIndicator } from 'react-native';
 
 import { api, API_BASE } from '@/api/client';
 import type { Books, Person, TripDetail } from '@/api/types';
@@ -367,6 +367,14 @@ function Replay({ trip }: { trip: TripDetail }) {
   const [playing, setPlaying] = useState(true);
   /** 뒤로 물러나 전부 보여 달라는 신호. 값이 바뀌면 지도가 맞춥니다. */
   const [fitAt, setFitAt] = useState(0);
+  /*
+    지도가 떴는지.
+
+    <p>지도를 받는 동안 비행기가 먼저 출발해서, 지도가 뜰 즈음에는 이미 두세
+    곳을 지나 있었습니다 — 첫 곳을 못 봤습니다. 뜰 때까지 가리고 기다렸다가,
+    뜨면 경로 전체가 들어오게 맞춘 뒤 출발합니다.
+  */
+  const [mapReady, setMapReady] = useState(false);
 
   const all = useMemo(
     () =>
@@ -422,6 +430,9 @@ function Replay({ trip }: { trip: TripDetail }) {
   }, [dayPick]);
 
   useEffect(() => {
+    if (!mapReady) {
+      return;
+    }
     if (!playing || places.length === 0) {
       return;
     }
@@ -456,7 +467,7 @@ function Replay({ trip }: { trip: TripDetail }) {
       });
     }, TICK_MS);
     return () => clearInterval(timer);
-  }, [playing, places.length]);
+  }, [playing, places.length, mapReady]);
 
   const done = step >= places.length;
   const now = done ? null : places[step];
@@ -508,20 +519,33 @@ function Replay({ trip }: { trip: TripDetail }) {
         </ScrollView>
       ) : null}
 
-      <TripMap
-        places={places}
-        /* 지금 떠난 자리로 지도가 따라갑니다. follow 가 앞뒤 곳까지 한 화면에
-           넣으므로, 나는 동안 떠난 곳과 닿을 곳이 함께 보입니다. */
-        activeId={now?.id ?? null}
-        onSelect={() => {}}
-        traveler={traveler}
-        /* 따라가되 당기지 않습니다. 바짝 당기면 먼 다음 곳이 늘 화면 밖이고,
-           옮겨 가는 도중에 다음 옮김이 시작돼 앞엣것이 잘립니다 — 그것이
-           "멀리 있으면 끊긴다" 의 정체였습니다. */
-        follow
-        fitAt={fitAt}
-        height={360}
-      />
+      <View>
+        {!mapReady ? (
+          <View style={styles.replayVeil}>
+            <ActivityIndicator color={Colors.textMuted} />
+            <Caption tone="secondary">지도를 불러오는 중이에요</Caption>
+          </View>
+        ) : null}
+        <TripMap
+          onReady={() => {
+            setMapReady(true);
+            /* 출발 전에 경로 전체가 들어오게 한 번 맞춥니다. */
+            setFitAt((n) => n + 1);
+          }}
+          places={places}
+          /* 지금 떠난 자리로 지도가 따라갑니다. follow 가 앞뒤 곳까지 한 화면에
+             넣으므로, 나는 동안 떠난 곳과 닿을 곳이 함께 보입니다. */
+          activeId={now?.id ?? null}
+          onSelect={() => {}}
+          traveler={traveler}
+          /* 따라가되 당기지 않습니다. 바짝 당기면 먼 다음 곳이 늘 화면 밖이고,
+             옮겨 가는 도중에 다음 옮김이 시작돼 앞엣것이 잘립니다 — 그것이
+             "멀리 있으면 끊긴다" 의 정체였습니다. */
+          follow
+          fitAt={fitAt}
+          height={360}
+        />
+      </View>
 
       <Row gap={Spacing.s2}>
         <Button
@@ -563,6 +587,20 @@ function Replay({ trip }: { trip: TripDetail }) {
 }
 
 const styles = StyleSheet.create({
+  /* 지도가 뜨기 전 덮개. 지도와 같은 자리를 차지해 뜰 때 자리가 안 튑니다. */
+  replayVeil: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 2,
+    height: 300,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.s2,
+    backgroundColor: Colors.fill,
+    borderRadius: Radius.r3,
+  },
   /*
     영수증 한 장.
 

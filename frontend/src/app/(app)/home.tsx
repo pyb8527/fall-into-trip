@@ -363,7 +363,7 @@ export default function Home() {
             title="모임 여행"
             action={<SeeAll what="모임 여행" onPress={() => router.push('/(app)/trips')} />}
           />
-          <Carousel>
+          <Carousel count={crew.length}>
             {(cardWidth) =>
               crew.map((trip) => (
                 <Press
@@ -448,7 +448,7 @@ export default function Home() {
             title="이런 여행은 어때요?"
             action={<SeeAll what="남이 짜 둔 여행" onPress={() => router.push('/community')} />}
           />
-          <Carousel>
+          <Carousel count={Math.min(6, shared.posts.length)}>
             {(cardWidth) =>
               shared.posts.slice(0, 6).map((post) => (
                 <Press
@@ -518,7 +518,9 @@ export default function Home() {
                   </Row>
                 }
                 title={place.name}
-                subtitle={[labelOf(place.icon), `여행 ${place.posts}개에 담김`]
+                /* 「여행 1개에 담김」은 세는 말이 아니라 잡음입니다. 셋부터
+                   「여럿이 담았다」가 뜻을 가집니다(실측 전 — 3 으로 시작). */
+                subtitle={[labelOf(place.icon), place.posts >= 3 ? `여행 ${place.posts}개에 담김` : null]
                   .filter(Boolean)
                   .join(' · ')}
                 /* 아래에 「더 보러가기」가 붙습니다. 선까지 그으면 그 단추가
@@ -609,7 +611,17 @@ function SeeAll({ what, onPress }: { what: string; onPress: () => void }) {
  * <p>다음 카드가 48 보입니다. 아예 안 보이면 더 있는지 모르고, 반쯤 보이면
  * 잘린 것처럼 보입니다.
  */
-function Carousel({ children }: { children: (cardWidth: number) => React.ReactNode }) {
+function Carousel({
+  count,
+  children,
+}: {
+  /**
+   * 몇 장인지. 한 장이면 흘리지 않고 폭을 꽉 채웁니다 — 다음 장이 비칠 자리를
+   * 비워 두면 오른쪽 48 이 「뭔가 덜 그려진」 빈칸으로 남습니다.
+   */
+  count: number;
+  children: (cardWidth: number) => React.ReactNode;
+}) {
   const { width } = useWindowDimensions();
   /* 넓은 화면에서는 본문 폭이 묶여 있습니다. 그 안에서 재야 카드가 본문
      밖으로 나가지 않습니다. */
@@ -641,6 +653,14 @@ function Carousel({ children }: { children: (cardWidth: number) => React.ReactNo
   */
   const columns = useCardColumns();
   const [room, setRoom] = useState(0);
+
+  if (count === 1) {
+    return (
+      <View onLayout={(e) => setRoom(e.nativeEvent.layout.width)}>
+        {room > 0 ? children(room) : null}
+      </View>
+    );
+  }
 
   if (columns > 1) {
     const gridCard = room > 0 ? Math.floor((room - CardGap * (columns - 1)) / columns) : 0;

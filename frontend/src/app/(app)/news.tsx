@@ -142,7 +142,6 @@ export default function NewsScreen() {
       )}
       {/* 소식이 하나도 없어도 이 줄은 섭니다. 위 목록과 성격이 달라서입니다 —
           소식은 읽으면 지나가지만 이것은 사라지지 않고 쌓입니다. */}
-      {data?.mine ? <MineNote tipCount={data.mine.tipCount} viewCount={data.mine.viewCount} /> : null}
     </Screen>
   );
 }
@@ -173,39 +172,6 @@ function group(items: NewsItem[]): { label: string; items: NewsItem[] }[] {
   }
 
   return lots.filter((lot) => lot.items.length > 0);
-}
-
-/**
- * 내가 남긴 한 줄이 얼마나 쓰였는지.
- *
- * <p>한 줄 팁은 이 앱에서 <b>남에게 남기는</b> 거의 유일한 것인데, 남기고
- * 나면 아무것도 돌아오지 않았습니다. 남긴 사람에게 이 앱은 "한 번 글자를
- * 넣은 곳" 으로 끝났습니다.
- *
- * <p><b>"명" 이 아니라 "번" 입니다.</b> 같은 사람이 다음 주에 그 가게를 다시
- * 찾아보며 또 읽었다면 그것도 한 번 쓰인 것입니다. 사람 수를 세지 않으면서
- * "명" 이라고 적으면 아는 것과 다른 말을 하는 것이 됩니다.
- *
- * <p>뱃지도 등급도 없습니다. 수를 점수로 바꾸는 순간 수를 올리려는 행동이
- * 생기고, 그러면 팁 칸이 쓰레기로 찹니다.
- */
-function MineNote({ tipCount, viewCount }: { tipCount: number; viewCount: number }) {
-  return (
-    <>
-      {/* 선 한 가닥으로 갈랐습니다. 이 앱에서 구역을 가르는 것은 선이
-          아니라 8픽셀 띠입니다 — 선은 목록 줄 사이에서만 씁니다. */}
-      <Band />
-      {/* 위 묶음들과 같은 부품으로 이름을 답니다. 이름 없이 글 두 줄만
-          떠 있으면 위 목록의 꼬리말처럼 읽히는데, 이것은 성격이 다른
-          구역입니다. */}
-      <SectionHeader title="내가 남긴 한 줄" />
-      <Body>
-        {viewCount > 0
-          ? `남긴 한 줄 ${tipCount}개가 ${viewCount}번 쓰였어요.`
-          : `남긴 한 줄 ${tipCount}개. 아직 읽은 사람이 없어요.`}
-      </Body>
-    </>
-  );
 }
 
 /**

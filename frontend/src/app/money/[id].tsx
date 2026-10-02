@@ -282,24 +282,43 @@ export default function Money() {
       {totals.length > 0 ? (
         <View style={styles.summary}>
           <Caption tone="secondary">총 쓴 돈</Caption>
-          {totals.map(([currency, t], at) =>
-            at === 0 ? (
-              /* 첫 통화가 큰 글자입니다. 둘째부터는 한 줄로 이어 붙입니다 —
-                 두 나라를 도는 여행에서만 생기는 일이라, 큰 글자를 둘
-                 세우면 어느 쪽이 이 여행의 셈인지 알 수 없습니다. */
-              <Text key={currency} style={styles.total}>
-                {money(t.sum, currency, t.decimals)}
-              </Text>
-            ) : null,
+          {/*
+            적어 둔 환율로 전부 원화로 합칠 수 있으면 <b>원화가 큰 글자</b>입니다.
+
+            <p>「엔으로 얼마」보다 「우리 돈으로 얼마」가 먼저 궁금한 숫자입니다.
+            다만 통화 하나라도 환율이 비어 있으면 합치지 않습니다 — 엔만 바꿔
+            더한 값은 실제보다 적은 금액이 그럴듯하게 뜹니다(krwTotal). 그때는
+            지금처럼 첫 통화가 큰 글자입니다.
+          */}
+          {krwTotal != null && !(totals.length === 1 && totals[0][0] === 'KRW') ? (
+            <>
+              <Text style={styles.total}>{money(krwTotal, 'KRW', 0)}</Text>
+              <Body small tone="secondary">
+                {totals.map(([c, t]) => money(t.sum, c, t.decimals)).join(' · ')}
+              </Body>
+            </>
+          ) : (
+            <>
+              {totals.map(([currency, t], at) =>
+                at === 0 ? (
+                  /* 첫 통화가 큰 글자입니다. 둘째부터는 한 줄로 이어 붙입니다 —
+                     두 나라를 도는 여행에서만 생기는 일이라, 큰 글자를 둘
+                     세우면 어느 쪽이 이 여행의 셈인지 알 수 없습니다. */
+                  <Text key={currency} style={styles.total}>
+                    {money(t.sum, currency, t.decimals)}
+                  </Text>
+                ) : null,
+              )}
+              {totals.length > 1 ? (
+                <Body small tone="secondary">
+                  {totals
+                    .slice(1)
+                    .map(([c, t]) => money(t.sum, c, t.decimals))
+                    .join(' · ')}
+                </Body>
+              ) : null}
+            </>
           )}
-          {totals.length > 1 ? (
-            <Body small tone="secondary">
-              {totals
-                .slice(1)
-                .map(([c, t]) => money(t.sum, c, t.decimals))
-                .join(' · ')}
-            </Body>
-          ) : null}
 
           {/*
             대충 얼마인지.
@@ -316,9 +335,7 @@ export default function Money() {
             실제로 겪은 환율입니다.
           */}
           {krwTotal != null ? (
-            <Body small tone="secondary">
-              ≈ {money(krwTotal, 'KRW', 0)}
-            </Body>
+            <Caption tone="muted">적어 둔 환전 환율로 합친 금액이에요.</Caption>
           ) : needed.length > 0 ? (
             <Press onPress={() => setNoting(needed[0])} style={styles.askRate}>
               <Body small tone="brand">
