@@ -131,6 +131,8 @@ services:
         # 지도 키는 번들에 박히므로 여기서 넣어야 합니다. 바꾸면 다시 빌드해야
         # 반영됩니다(--build).
         EXPO_PUBLIC_GMAPS_KEY: ${EXPO_PUBLIC_GMAPS_KEY:-}
+        # 카카오톡 공유 카드(JavaScript 키). 이것도 번들에 박힙니다.
+        EXPO_PUBLIC_KAKAO_JS_KEY: ${EXPO_PUBLIC_KAKAO_JS_KEY:-}
     container_name: fit-web
     restart: unless-stopped
     # nginx 접속 로그의 시각도 같은 시계로 찍습니다. 세 컨테이너의 로그를

@@ -133,6 +133,10 @@ public class SecurityConfig {
                            문입니다 — CalendarService 가 해시로 맞춰 보고,
                            모르는 열쇠에는 404 입니다. */
                         .requestMatchers(HttpMethod.GET, "/api/cal/*").permitAll()
+                        /* 로그인 없이 보는 일정. 링크 속 열쇠가 문입니다 —
+                           ViewLinkService 가 해시로 맞춰 보고, 모르는·끊은·
+                           지난 열쇠에는 똑같이 404 입니다. */
+                        .requestMatchers(HttpMethod.GET, "/api/view/*").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().denyAll())

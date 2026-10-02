@@ -65,6 +65,15 @@ public class Trip {
     @Column(name = "notice_at")
     private Instant noticeAt;
 
+    /**
+     * 로그인 없이 보는 일정 링크의 열쇠 — SHA-256 만 둡니다.
+     *
+     * <p>비어 있으면 링크가 없습니다. 언제 죽는지는 적지 않고 날짜에서 셉니다
+     * ({@code ViewLinkService}).
+     */
+    @Column(name = "view_token_hash", length = 64)
+    private String viewTokenHash;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 

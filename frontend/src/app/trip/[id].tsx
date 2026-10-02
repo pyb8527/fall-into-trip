@@ -20,6 +20,7 @@ import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
 import { DatePollSheet } from '@/components/date-poll-sheet';
 import { NoticeBox } from '@/components/notice-box';
+import { ViewLinkSheet } from '@/components/view-link-sheet';
 import { PeopleSheet } from '@/components/people-sheet';
 import type { RouteLine } from '@/components/map-types';
 import { PlaceForm } from '@/components/place-form';
@@ -359,6 +360,8 @@ export default function TripScreen() {
   const [people, setPeople] = useState(false);
   /* 언제 갈까 판. 모임 여행에서만 엽니다 — 혼자면 물을 사람이 없습니다. */
   const [dating, setDating] = useState(false);
+  /* 로그인 없이 보는 일정 링크 판. */
+  const [linking, setLinking] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [dropping, setDropping] = useState(false);
   const me = useHere();
@@ -1742,6 +1745,23 @@ export default function TripScreen() {
           이쪽은 <b>고치려는 것</b>입니다 — 정산을 다시 셈해 보거나, 회사에
           낼 양식에 옮겨 붙이거나, 다음 여행의 밑그림으로 씁니다.
         */}
+        {/*
+          일정만 보는 링크.
+
+          <p>숙소 주인, 같이 가는 친구의 가족처럼 모임에 안 들어올 사람에게
+          일정만 보냅니다. 인쇄 바로 아래 — 둘 다 「이 일정을 밖으로
+          내보내는」 일입니다.
+        */}
+        <ListRow
+          left={<Icon name="share-2" tone="secondary" />}
+          title="일정 링크 보내기"
+          subtitle="계정 없이 일정만 봐요. 가계부·위치는 안 보여요."
+          onPress={() => {
+            setMore(false);
+            setLinking(true);
+          }}
+        />
+
         <ListRow
           left={<Icon name="download" tone="secondary" />}
           title="엑셀로 받기"
@@ -1798,6 +1818,13 @@ export default function TripScreen() {
           onConfirmed={reload}
         />
       ) : null}
+
+      <ViewLinkSheet
+        visible={linking}
+        tripId={data.trip.id}
+        tripTitle={data.trip.title}
+        onClose={() => setLinking(false)}
+      />
 
       <PeopleSheet
         visible={people}
