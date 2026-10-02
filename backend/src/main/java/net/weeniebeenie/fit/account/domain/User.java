@@ -72,6 +72,14 @@ public class User {
     @Column(name = "news_seen_at")
     private Instant newsSeenAt;
 
+    /**
+     * 캘린더 구독 주소의 열쇠 — SHA-256 만 둡니다.
+     *
+     * <p>비어 있으면 구독을 안 켠 것입니다. 새로 만들면 옛 주소가 죽습니다.
+     */
+    @Column(name = "cal_token_hash", length = 64)
+    private String calTokenHash;
+
     @Builder
     public User(String email, String name, String passwordHash, Role role) {
         this.id = Ids.next();

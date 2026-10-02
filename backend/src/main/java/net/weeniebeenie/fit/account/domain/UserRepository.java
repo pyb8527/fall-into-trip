@@ -20,6 +20,9 @@ public interface UserRepository extends JpaRepository<User, String> {
 
     List<User> findAllByOrderByCreatedAtAsc();
 
+    /** 캘린더 구독 주소로 사람을 찾습니다. 해시로만 묻습니다. */
+    Optional<User> findByCalTokenHash(String calTokenHash);
+
     long countByRoleAndDisabledFalse(Role role);
 
     long countByDisabledTrue();

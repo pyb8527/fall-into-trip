@@ -128,6 +128,10 @@ public class SecurityConfig {
                           생겨야 합니다.
                         */
                         .requestMatchers(HttpMethod.GET, "/api/photos/*").permitAll()
+                        /* 폰 캘린더가 읽어 갑니다. 로그인 대신 주소 속 열쇠가
+                           문입니다 — CalendarService 가 해시로 맞춰 보고,
+                           모르는 열쇠에는 404 입니다. */
+                        .requestMatchers(HttpMethod.GET, "/api/cal/*").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().denyAll())

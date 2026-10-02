@@ -3,10 +3,11 @@ import { Stack, useLocalSearchParams, useNavigation, useRouter } from 'expo-rout
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { api, ApiError, UNEXPECTED } from '@/api/client';
+import { api, API_BASE, ApiError, UNEXPECTED } from '@/api/client';
 import { GoogleButton } from '@/components/google-button';
 import { canSignInWithKakao, KakaoButton } from '@/components/kakao-button';
 import { canNotify, notifyState, turnOff, turnOn } from '@/lib/notify';
+import { shareLink } from '@/lib/share';
 import { useAuth } from '@/auth/auth-provider';
 import { USER_MARKS, markOf } from '@/constants/user-marks';
 import { Colors, Radius, Spacing, Tap, Type } from '@/constants/theme';
@@ -116,6 +117,8 @@ export default function Settings() {
       <NotifyGroup />
 
       <MarkGroup />
+
+      <CalendarGroup />
 
       <AccountGroup />
 
@@ -402,6 +405,129 @@ function MarkGroup() {
             />
           ))}
         </Row>
+      </BottomSheet>
+    </>
+  );
+}
+
+/**
+ * 내 폰 캘린더에 넣기 — 캘린더 구독(.ics).
+ *
+ * <p>앱 안 달력은 앱을 열어야 보이고, 이것은 폰 캘린더에 뜹니다. 회사 일정
+ * 옆에 「제주 2박 3일」이 보여야 그 주에 다른 약속을 안 잡습니다.
+ *
+ * <p>주소는 만들 때 한 번만 보여 줍니다. 서버에는 해시만 있어서 다시 꺼낼
+ * 수가 없습니다 — 잃어버렸으면 새로 만들고, 그러면 옛 주소는 죽습니다.
+ */
+function CalendarGroup() {
+  const [on, setOn] = useState<boolean | null>(null);
+  const [url, setUrl] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+
+  useEffect(() => {
+    api
+      .get<{ on: boolean }>('/api/me/calendar')
+      .then((got) => setOn(got.on))
+      .catch(() => setOn(null));
+  }, []);
+
+  async function issue() {
+    setBusy(true);
+    setError(null);
+    setNote(null);
+    try {
+      const got = await api.post<{ path: string }>('/api/me/calendar');
+      /* 웹은 같은 주소에서 서버를 부르므로 API_BASE 가 비어 있습니다. */
+      const origin =
+        API_BASE || (typeof window !== 'undefined' && window.location ? window.location.origin : '');
+      setUrl(origin + got.path);
+      setOn(true);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : UNEXPECTED);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function revoke() {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.delete('/api/me/calendar');
+      setOn(false);
+      setUrl(null);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : UNEXPECTED);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (on === null) {
+    return null;
+  }
+  return (
+    <>
+      <Band />
+      <SectionHeader title="캘린더" tight />
+      <Line
+        label="내 폰 캘린더에 넣기"
+        badge={on ? <Badge label="켜짐" tone="success" /> : null}
+        last
+        onPress={() => setOpen(true)}
+      />
+
+      <BottomSheet visible={open} title="내 폰 캘린더에 넣기" onClose={() => setOpen(false)}>
+        <Body small tone="secondary">
+          내가 가는 여행이 폰 캘린더에 하루 종일 일정으로 떠요. 「못 가요」라고 한 여행은 빠지고,
+          가계부·위치·메모는 안 들어가요.
+        </Body>
+        {url ? (
+          <>
+            {/* 한 번만 보여 줍니다. 서버에는 해시만 있습니다. */}
+            <Caption tone="warning">이 주소는 지금만 보여요. 아는 사람은 누구나 내 여행 일정을 볼 수 있으니 남에게 주지 마세요.</Caption>
+            <Body small selectable>
+              {url}
+            </Body>
+            <Button
+              label="주소 보내기 · 복사"
+              variant="secondary"
+              onPress={async () => {
+                const done = await shareLink(url, 'FIT 여행 캘린더');
+                setNote(done === 'copied' ? '복사했어요. 캘린더 앱의 「URL로 구독」에 붙여 넣으세요.' : null);
+              }}
+            />
+            <Button
+              label="애플 캘린더로 열기"
+              variant="ghost"
+              onPress={() => {
+                if (typeof window !== 'undefined') {
+                  window.location.assign(url.replace(/^https?:/, 'webcal:'));
+                }
+              }}
+            />
+            {note ? <Caption tone="success">{note}</Caption> : null}
+          </>
+        ) : (
+          <Button
+            label={on ? '주소 새로 만들기' : '주소 만들기'}
+            busy={busy}
+            onPress={issue}
+          />
+        )}
+        {on && !url ? (
+          <Caption tone="muted">
+            켜 둔 주소는 다시 볼 수 없어요. 잃어버렸으면 새로 만드세요 — 옛 주소는 그때 끊겨요.
+          </Caption>
+        ) : null}
+        <Caption tone="muted">
+          구글 캘린더는 몇 시간에 한 번 다시 읽어 가요. 고친 일정이 바로 안 보일 수 있어요.
+        </Caption>
+        {error ? <ErrorNote message={error} /> : null}
+        {on ? <Button label="끄기" variant="dangerText" busy={busy} onPress={revoke} /> : null}
       </BottomSheet>
     </>
   );
