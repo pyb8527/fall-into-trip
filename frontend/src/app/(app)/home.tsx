@@ -8,7 +8,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 
-import { api } from '@/api/client';
+import { api, ApiError, UNEXPECTED } from '@/api/client';
 import type {
   News,
   PopularPlace,
@@ -21,6 +21,7 @@ import { markOf } from '@/constants/user-marks';
 import { KEEP } from '@/constants/words';
 import { PlaceDetailSheet, type Looked } from '@/components/place-detail-sheet';
 import { HomeHero, type HeroPhase } from '@/components/home-hero';
+import { ProfileFace } from '@/components/profile-face';
 import { TripThumb } from '@/components/trip-thumb';
 import { glyphOf, labelOf } from '@/constants/place-icons';
 import {
@@ -125,12 +126,41 @@ export default function Home() {
 
   /* 지금 뜨는 곳에서 바로 담은 것. 다시 누르면 또 담기지 않게 표만 해 둡니다. */
   const [kept, setKept] = useState<Set<string>>(new Set());
+  /**
+   * 담고 나서 할 말. 담았으면 띠가 뜨고, 못 담았으면 왜인지 적습니다.
+   *
+   * <h3>아무 말도 안 하고 있었습니다</h3>
+   *
+   * <p>눌러도 아무 일이 안 일어난다는 말을 들었습니다. 읽어 보니 이 함수가
+   * <b>조용히 빠져나가는 길이 셋</b>이었습니다 — 좌표가 없으면 그냥
+   * {@code return}, 서버가 거절하면 {@code catch} 가 통째로 삼킴, 담겼어도
+   * 알리는 것은 책갈피 색 하나.
+   *
+   * <p>그 색도 말을 안 합니다. {@link IconButton} 의 {@code active} 가
+   * 「{@code bare} 와 함께 쓰면 회색에서 검정으로만 바뀌어 아무 말도 안
+   * 합니다」라고 제 문서에 적어 두었는데, 여기가 바로 그 조합이었습니다.
+   *
+   * <p>그래서 세 길을 모두 화면에 꺼냅니다. 어디서 멈췄는지 눌러 본 사람이
+   * 알 수 있어야 합니다.
+   */
+  const [keepNote, setKeepNote] = useState<string | null>(null);
+  const [keepFailed, setKeepFailed] = useState<string | null>(null);
+
   async function keep(place: PopularPlace) {
+    setKeepNote(null);
+    setKeepFailed(null);
     if (!user) {
       router.push('/(auth)/login');
       return;
     }
-    if (kept.has(place.key) || place.lat == null || place.lng == null) {
+    if (kept.has(place.key)) {
+      setKeepNote(`「${place.name}」 는 이미 보석함에 있어요.`);
+      return;
+    }
+    /* 좌표 없이는 담아도 지도에 안 섭니다. 말없이 넘어가면 눌린 적이 없는
+       것처럼 보입니다. */
+    if (place.lat == null || place.lng == null) {
+      setKeepFailed(`「${place.name}」 는 자리를 몰라서 담을 수 없어요.`);
       return;
     }
     try {
@@ -142,8 +172,11 @@ export default function Home() {
         icon: place.icon,
       });
       setKept((was) => new Set(was).add(place.key));
-    } catch {
-      /* 못 담았으면 표를 안 바꿉니다. 단추가 그대로라 다시 누를 수 있습니다. */
+      setKeepNote(`「${place.name}」 를 보석함에 담았어요.`);
+    } catch (e) {
+      /* 삼키지 않습니다. 서버가 보낸 말이 그대로 쓸모 있습니다 — 「보석함이
+         가득 찼어요」 같은 것은 사람이 할 일을 알려 줍니다. */
+      setKeepFailed(e instanceof ApiError ? e.message : UNEXPECTED);
     }
   }
 
@@ -272,21 +305,31 @@ export default function Home() {
               {/*
                 마이페이지로 가는 자리.
 
-                <p>표식을 골라 둔 사람은 그 이모지가, 안 고른 사람은 로고가
-                섭니다. 이름의 첫 글자를 쓰지 않습니다 — 「박」 이 든 동그라미는
-                남의 얼굴과 구별이 안 되고, 이 앱에는 이미 표식을 고르는
-                자리가 있습니다(내 계정 → 내 표식).
+                <p>사진을 올려 둔 사람은 그 사진이, 표식을 골라 둔 사람은 그
+                이모지가, 둘 다 없으면 로고가 섭니다. 이름의 첫 글자를 쓰지
+                않습니다 — 「박」 이 든 동그라미는 남의 얼굴과 구별이 안 되고,
+                이 앱에는 이미 얼굴을 고르는 자리가 있습니다(마이페이지 →
+                프로필 편집, 내 계정 → 내 표식).
+
+                <p>그 세 갈래를 이 화면이 손수 가르고 있었습니다. 마이페이지와
+                설정이 같은 것을 또 그리고 있어 한 칸으로 묶었습니다
+                ({@link ProfileFace}).
+
+                <p>동그라미 크기는 32 를 그대로 둡니다 — 옆의 그림 단추들이
+                24 인데, 동그란 면에 든 것은 같은 크기로 두면 더 작아
+                보입니다.
               */}
               <Press
                 onPress={() => router.push('/(app)/me')}
                 accessibilityLabel="내 계정"
-                hitSlop={Tap.compactSlop}
-                style={styles.face}>
-                {user?.mark ? (
-                  <Text style={styles.faceEmoji}>{markOf(user.mark)}</Text>
-                ) : (
-                  <LogoSymbol size={20} />
-                )}
+                hitSlop={Tap.compactSlop}>
+                <ProfileFace
+                  photoId={user?.photoId}
+                  mark={user?.mark ? markOf(user.mark) : null}
+                  fallback={<LogoSymbol size={20} />}
+                  size={32}
+                  label={user?.name ? `${user.name}의 얼굴` : '내 얼굴'}
+                />
               </Press>
             </Row>
           }
@@ -463,6 +506,23 @@ export default function Home() {
         <View>
           <Band />
           <SectionHeader title="지금 뜨는 곳" tight />
+
+          {/* 담고 나서 할 말은 머리 바로 아래입니다 — 누른 줄 옆에 띄우면
+              줄 높이가 흔들려 다음 줄을 누르려던 손이 빗나갑니다. */}
+          {keepNote ? (
+            <Press
+              onPress={() => router.push('/(app)/saved')}
+              scale={0.99}
+              accessibilityLabel="보석함으로"
+              style={styles.keepNote}>
+              <Caption tone="brand" strong>
+                {keepNote}
+              </Caption>
+              <Caption tone="secondary">보석함으로</Caption>
+            </Press>
+          ) : null}
+          {keepFailed ? <ErrorNote message={keepFailed} /> : null}
+
           {top.places.slice(0, 5).map((place, i, rows) => {
             /*
               누르면 그 곳이 어떤 데인지 봅니다.
@@ -514,6 +574,11 @@ export default function Home() {
                   name="bookmark"
                   label={`${place.name} ${KEEP}`}
                   active={kept.has(place.key)}
+                  /* {@link IconButton} 의 문서가 적어 둔 그대로입니다 —
+                     「bare 와 함께 쓰면 회색에서 검정으로만 바뀌어 아무 말도
+                     안 합니다. 코랄로 물들여야 하는 자리는 tone="brand"」.
+                     담겼다는 것이 보여야 하는 자리라 그대로 따릅니다. */
+                  tone={kept.has(place.key) ? 'brand' : undefined}
                   bare
                   onPress={() => keep(place)}
                 />
@@ -720,27 +785,6 @@ const styles = StyleSheet.create({
   bleed: {
     marginHorizontal: -Gutter,
   },
-  /*
-    막대 오른쪽의 얼굴.
-
-    <p>32 입니다. 옆의 그림 단추들이 24 인데, 동그란 면에 든 것은 같은
-    크기로 두면 더 작아 보입니다 — 면의 가장자리가 그림의 여백을 먹습니다.
-
-    <p>누르는 넓이는 {@code hitSlop} 이 44 로 채웁니다.
-  */
-  face: {
-    width: 32,
-    height: 32,
-    borderRadius: Radius.full,
-    backgroundColor: Colors.fill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  faceEmoji: {
-    fontSize: 17,
-    /* 이모지는 글꼴이 제 높이를 갖고 있어, 줄 높이를 두면 아래로 처집니다. */
-    lineHeight: undefined,
-  },
   strip: {
     paddingHorizontal: Gutter,
     gap: Spacing.s3,
@@ -865,6 +909,16 @@ const styles = StyleSheet.create({
   },
   more: {
     paddingTop: Spacing.s3,
+  },
+
+  /* 담았다는 말. 누르면 보석함으로 가므로 한 줄 전체가 누르는 자리입니다. */
+  keepNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.s2,
+    paddingVertical: Spacing.s2,
+    backgroundColor: 'transparent',
   },
 
   /* 아직 아무것도 없는 사람의 첫 칸. 면 카드입니다 — 눌러서 들어가는

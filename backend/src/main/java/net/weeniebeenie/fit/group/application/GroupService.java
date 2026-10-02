@@ -113,6 +113,7 @@ public class GroupService {
                             m.getId().getUserId(),
                             u == null ? "알 수 없음" : u.getName(),
                             u == null ? null : u.getMark(),
+                            u == null ? null : u.getPhotoId(),
                             m.getRole(),
                             m.getRole() == GroupRole.OWNER);
                 })
@@ -268,6 +269,24 @@ public class GroupService {
         return clean.length() > max ? clean.substring(0, max) : clean;
     }
 
-    public record Mate(String id, String name, String mark, GroupRole role, boolean owner) {
+    /**
+     * 모임에 있는 사람 하나.
+     *
+     * <h3>얼굴은 사진 · 표식 · 이름 차례입니다</h3>
+     *
+     * <p>{@code photoId} 는 {@code mark} 를 <b>지우는 값이 아닙니다</b>
+     * ({@code components/profile-face}). 표식은 사진을 안 올린 사람의 자리이고,
+     * 그것마저 없으면 이름에서 따온 것이 섭니다. 둘이 함께 와야 받는 쪽이 그
+     * 차례를 지킬 수 있습니다 — 하나만 실으면 사람들 판의 절반이 빈
+     * 동그라미가 됩니다.
+     *
+     * @param mark    지도에서 이 사람을 가리키는 그림의 이름. 안 골랐으면 비어
+     *                있습니다
+     * @param photoId 올려 둔 얼굴 사진. 안 올렸으면 비어 있습니다. 사람을 다시
+     *                묻지 않습니다 — 위에서 이미 꺼내 둔 {@link User} 에서
+     *                표식과 함께 읽습니다
+     */
+    public record Mate(String id, String name, String mark, String photoId,
+                       GroupRole role, boolean owner) {
     }
 }

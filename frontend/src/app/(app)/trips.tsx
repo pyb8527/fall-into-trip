@@ -12,7 +12,6 @@ import { FolderSheet } from '@/components/folder-sheet';
 import { TripForm } from '@/components/trip-form';
 import { CountdownBadge } from '@/components/countdown-badge';
 import { TripCard } from '@/components/trip-card';
-import { faceOf } from '@/constants/user-marks';
 import { Colors, Gutter, Radius, Spacing, Type, Weight } from '@/constants/theme';
 import { countdownOf, formatNights, formatSpan, todayIso } from '@/lib/countdown';
 import { money } from '@/lib/money';
@@ -527,22 +526,40 @@ export default function Trips() {
       {/*
         다음은 어디로.
 
-        <h3>앞으로 갈 것이 없을 때만 섭니다</h3>
+        <h3>늘 섭니다</h3>
 
-        <p>{@link WhereNext} 는 이 화면에 서라고 만든 것입니다. 그런데 늘
-        세우지는 않습니다 — 떠날 여행이 잡혀 있는 사람에게 「다음은 어디로」는
-        지금 할 일이 아니고, 그 줄들이 세우는 요청 둘이 여행 목록 앞에 얹힙니다.
-        여행 중이거나 곧 떠나는 것이 하나라도 있으면 안 냅니다.
+        <p>「앞으로 갈 것이 없을 때만」으로 걸어 두고 있었습니다 — 여행 중이나
+        곧 떠나는 것이 하나라도 있으면 안 냈습니다. 떠날 여행이 잡힌 사람에게
+        「다음은 어디로」는 지금 할 일이 아니라는 것이 그때의 까닭이었습니다.
 
-        <p>남는 자리는 <b>여행이 하나도 없는 사람</b>과 <b>다녀온 것만 남은
-        사람</b>입니다. 둘 다 이 화면에서 할 일이 없고, 다음 여행이 시작되는
-        자리가 여기입니다.
+        <p>걷습니다. 다음에 갈 곳을 찾는 일에는 <b>떠날 것이 잡혀 있는지와
+        상관이 없습니다</b> — 다음 주에 교토를 가는 사람도 그다음을 찾아보고,
+        무엇보다 그 조건은 <b>여행 하나가 날짜를 넘어가는 날 줄이 혼자
+        생겼다가 사라지는</b> 것이었습니다. 늘 서 있으면 그 자리에 무엇이
+        있는지가 외워집니다.
 
-        <p>거르는 것을 {@code sections} 로 셈합니다 — {@link byWhen} 이 빈
-        묶음을 이미 빼고 주므로, 「여행 중」·「곧 떠나요」가 목록에 있는지만
-        보면 됩니다. 날짜를 여기서 다시 셈하면 그 둘이 어긋납니다.
+        <p>거르는 칸(전체 · 혼자 · 모임)도 안 봅니다. 그 칸은 <b>내 여행</b>을
+        가르는 것이고, 이 줄들은 남이 다녀온 데와 지금 내 옆을 보여 주는 것이라
+        가를 것이 없습니다.
+
+        <p><b>값은 요청 둘에서 셋입니다</b> — 지역 묶음({@code
+        /api/popular/regions})과 하트 많은 여행기({@code /api/posts}), 그리고
+        자리를 내준 기기에서는 가까운 곳({@code /api/popular/places})까지. 위치를
+        못 쓰거나 아직 안 잡힌 기기에서는 셋째가 안 갑니다({@link
+        NearbyPlaces}). 다시 걸어 둘 일이 생기면 되찾는 것이 이것입니다.
+
+        <p>{@code goal} 은 그대로 둡니다. 그쪽은 여행 상태가 아니라 <b>이 화면이
+        무엇을 하고 있는지</b>입니다 — 가계부에 쓸 여행을 고르러 들어온 사람에게
+        이 화면은 고르는 판 하나이고, 그 일 가운데에 남의 여행기 줄이 끼면
+        고르던 것을 잃습니다.
+
+        <p>{@code data} 는 받아 왔는지만 봅니다. 여행 수는 안 봅니다 — 여행이
+        <b>하나도 없는 사람</b>에게 가장 보여 주고 싶은 줄이 이것입니다. 빈
+        목록은 안 받은 것이 아니라 <b>받아 온 빈 목록</b>이고({@code
+        {trips: []}} 는 참입니다), {@link useAsync} 는 다시 읽을 때 {@code data}
+        를 비우지 않아 화면으로 돌아올 때마다 줄이 사라지지도 않습니다.
       */}
-      {data && goal == null && !sections.some((s) => s.kind === 'going' || s.kind === 'coming') ? (
+      {data && goal == null ? (
         <View>
           <Band />
           <WhereNext />
@@ -908,9 +925,9 @@ function NextCard({
         : Promise.resolve({ going: [] }),
     [trip.id, trip.groupId],
   );
-  const faces = (going.data?.going ?? [])
-    .filter((g) => g.answer === 'GOING')
-    .map((g) => faceOf(g.mark, g.name));
+  /* 「갈게요」 한 사람만. 이모지 한 글자씩 뽑아 넘기고 있었는데, 사진은
+     글자가 아니라 사람을 그대로 넘깁니다({@link TripCard} 의 faces). */
+  const faces = (going.data?.going ?? []).filter((g) => g.answer === 'GOING');
   return (
     <TripCard
       trip={trip}

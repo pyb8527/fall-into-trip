@@ -6,6 +6,7 @@ import { api, API_BASE, ApiError, UNEXPECTED } from '@/api/client';
 import type { InviteRow, Mate, Maybe, NewInvite } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
+import { ProfileFace } from '@/components/profile-face';
 import { Colors, Gutter, Radius, Spacing, Tap } from '@/constants/theme';
 import { faceOf } from '@/constants/user-marks';
 import { openPerson } from '@/lib/person';
@@ -25,7 +26,6 @@ import {
   Icon,
   IconButton,
   Loading,
-  Mark,
   Press,
   Row,
   Split,
@@ -137,9 +137,27 @@ function Inner({
         <Split key={m.id} gap={Spacing.s3} style={styles.mate}>
           <Grow>
             <Row gap={Spacing.s3}>
-              {/* 지도에 찍히는 그림을 여기에도 답니다. 지도에서 곰을 보고
-                  누구인지 알려면 어딘가에서 한 번은 짝지어져야 합니다. */}
-              <Mark emoji={faceOf(m.mark, m.name)} />
+              {/*
+                지도에 찍히는 그림을 여기에도 답니다. 지도에서 곰을 보고
+                누구인지 알려면 어딘가에서 한 번은 짝지어져야 합니다.
+
+                <p>{@link Mark} 에 담고 있었습니다. 그쪽은 <b>갈래를 그리는
+                칸</b>입니다(장소 갈래·지출 갈래·모임 표식) — 이모지 한 글자를
+                받는 것이 그 칸의 일 전부이고, 사람의 얼굴이 아닙니다. 사진이
+                들어오면서 거기에 사진 칸을 하나 더 내면, <b>사진 · 표식 ·
+                이름</b>의 차례를 아는 곳이 둘이 됩니다. 얼굴은 얼굴 칸으로
+                옮깁니다({@link ProfileFace}).
+
+                <p>동그라미는 40 그대로이고 바탕색도 같습니다. 안의 이모지만
+                15 에서 19 로 커집니다 — {@link Mark} 의 15 는 갈래 그림의
+                크기이고, 19 는 이 앱이 얼굴에 쓰는 크기입니다.
+              */}
+              <ProfileFace
+                photoId={m.photoId}
+                mark={faceOf(m.mark, m.name)}
+                size={40}
+                label={`${m.name}의 얼굴`}
+              />
               <Grow gap={2}>
                 {/* 이름을 누르면 그 사람 페이지로. 판은 닫고 갑니다. */}
                 <Press

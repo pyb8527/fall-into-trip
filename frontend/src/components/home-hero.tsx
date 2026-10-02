@@ -7,7 +7,6 @@ import type { Candidate, Going, Spend, TripDetail, TripSummary } from '@/api/typ
 import { useAsync } from '@/api/use-async';
 import { TripCard, type TodoChip } from '@/components/trip-card';
 import { Spacing } from '@/constants/theme';
-import { faceOf } from '@/constants/user-marks';
 import { daysBetween, todayIso, type Countdown } from '@/lib/countdown';
 import { money } from '@/lib/money';
 import { Body, Button, Caption, Row } from '@/ui';
@@ -76,9 +75,9 @@ export function HomeHero({
     [trip.id, phase],
   );
 
-  const faces = (going.data?.going ?? [])
-    .filter((g) => g.answer === 'GOING')
-    .map((g) => faceOf(g.mark, g.name));
+  /* 「갈게요」 한 사람만. 이모지 한 글자씩 뽑아 넘기고 있었는데, 사진은
+     글자가 아니라 사람을 그대로 넘깁니다({@link TripCard} 의 faces). */
+  const faces = (going.data?.going ?? []).filter((g) => g.answer === 'GOING');
 
   const open = (pathname: '/trip/[id]' | '/vote/[id]' | '/money/[id]' | '/card/[id]', extra?: object) =>
     router.push({ pathname, params: { id: trip.id, ...extra } });

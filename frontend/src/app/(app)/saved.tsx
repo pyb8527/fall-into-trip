@@ -10,6 +10,7 @@ import type { MapPlace } from '@/components/map-types';
 import { PlaceDetailSheet } from '@/components/place-detail-sheet';
 import { PlaceSearch } from '@/components/place-search';
 import { RecommendSheet } from '@/components/recommend-sheet';
+import { WhereNext } from '@/components/curation';
 import { DayPicker } from '@/components/day-picker';
 import { SavedRow } from '@/components/saved-row';
 import { SORT_GIVEN, SORT_NAME, SortBar, type SortBy } from '@/components/sort-bar';
@@ -744,6 +745,31 @@ export default function Saved() {
           ))}
         </View>
       </View>
+
+      {/*
+        다음은 어디로.
+
+        <h3>내 여행과 같은 줄을 세웁니다</h3>
+
+        <p>{@link WhereNext} 는 내 여행에 세우려고 뗀 것인데, 담을 거리를
+        구하는 자리가 하나 더 있습니다 — <b>여기</b>입니다. 보석함을 열고
+        「더 담을 것이 없나」 하는 자리와, 내 여행을 열고 「다음은 어디로」
+        하는 자리는 같은 물음입니다.
+
+        <p>줄마다 <b>다음 한 걸음</b>이 다릅니다 — 지역은 그 지역 둘러보기로,
+        여행기는 그 글로, 내 근처는 장소 판으로. 그 판에서 바로 담깁니다.
+
+        <h3>조건을 안 겁니다</h3>
+
+        <p>담아 둔 것이 없을 때만 낼까 했습니다. 그런데 보석함이 찬 사람이야말로
+        더 담을 거리를 찾는 사람이고, 비어 있는 자리에는 이미
+        {@link StarterPicks} 가 섭니다. 늘 세웁니다.
+
+        <p>값은 적어 둡니다 — 이 줄들이 서면 서버에 두 번 더 묻습니다. 다시
+        조건을 걸고 싶어지면 되찾을 수 있는 것이 그만큼입니다.
+      */}
+      <Band />
+      <WhereNext />
 
       {/*
         담는 판.

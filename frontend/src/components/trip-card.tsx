@@ -1,9 +1,11 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import type { TripSummary } from '@/api/types';
+import type { GroupFace, TripSummary } from '@/api/types';
 import { CountdownBadge } from '@/components/countdown-badge';
+import { ProfileFace } from '@/components/profile-face';
 import { TripMark } from '@/components/trip-mark';
 import { Colors, Radius, Spacing, Type, Weight } from '@/constants/theme';
+import { faceOf } from '@/constants/user-marks';
 import { formatNights, formatSpan, type Countdown } from '@/lib/countdown';
 import { Icon, IconButton, Press, Row, type IconName } from '@/ui';
 
@@ -33,7 +35,7 @@ export type CardAction = { icon: IconName; label: string; onPress: () => void };
  * 할 일 칩과 하는 일이 겹쳐 보여서, 카드 오른쪽 아래 작은 그림 단추로
  * 줄였습니다.
  *
- * @param faces    「갈게요」 한 사람들의 얼굴. 넷까지 그리고 나머지는 수로
+ * @param faces    「갈게요」 한 사람들. 넷까지 그리고 나머지는 수로
  * @param middle   카드 가운데 — 시기마다 다른 것(여행 중이면 오늘 다음 곳)
  * @param todos    남은 할 일. 내 여행 목록에서는 안 줍니다
  */
@@ -51,7 +53,18 @@ export function TripCard({
   at: Countdown | null;
   /** D-day 배지 글자를 바꿀 때(「여행 중 2일째」) */
   label?: string;
-  faces?: string[];
+  /*
+    「갈게요」 한 사람들.
+
+    <p>{@code string[]} 이었습니다 — 부르는 쪽이 {@code faceOf} 로 이모지
+    한 글자씩 뽑아 넘겼습니다. 사진은 글자가 아니라, <b>넘기는 모양부터</b>
+    바뀌어야 했습니다. 이름과 표식과 사진을 그대로 받아 어느 것을 세울지는
+    이 안에서 정합니다({@link ProfileFace}).
+
+    <p>{@link GroupFace} 를 씁니다. {@code Going} 을 그대로 받으면 투표 답과
+    한마디까지 따라 들어오는데, 얼굴을 그리는 데 쓸 것이 아닙니다.
+  */
+  faces?: GroupFace[];
   middle?: React.ReactNode;
   todos?: TodoChip[];
   actions?: CardAction[];
@@ -126,14 +139,31 @@ export function TripCard({
  * <p>넷까지 그립니다. 다섯부터는 겹친 동그라미가 줄을 넘쳐 무엇이 누구인지
  * 안 보입니다 — 나머지는 「+3」.
  */
-function Faces({ faces }: { faces: string[] }) {
+function Faces({ faces }: { faces: GroupFace[] }) {
   const shown = faces.slice(0, 4);
   const more = faces.length - shown.length;
   return (
     <Row style={styles.faces}>
+      {/*
+        테는 바깥 칸이 두르고 얼굴은 그 안에 섭니다. 36 짜리 칸에 2 짜리 테를
+        두르면 안쪽이 32 라 그 값을 줍니다 — 얼굴에 테를 달면 사진이 테까지
+        덮어 그려서 겹침이 안 읽힙니다.
+
+        <p>안쪽 바탕은 이제 {@link ProfileFace} 의 것입니다(회색 fill). 바깥
+        칸의 흰 바탕은 그만큼 덮여 안 보입니다 — 바이올렛 카드 위에서 흰
+        동그라미가 아주 옅은 회색 동그라미가 됩니다. 테가 겹침을 그리므로
+        가장자리는 그대로 읽히는데, 흰 것으로 돌려야 하면 그때 얼굴 칸에
+        바탕색을 받는 칸을 하나 내는 것이 맞습니다 — 이 파일에서 또 그릴
+        일이 아닙니다.
+      */}
       {shown.map((f, i) => (
         <View key={i} style={[styles.face, i > 0 ? styles.faceOver : null]}>
-          <Text style={styles.faceText}>{f}</Text>
+          <ProfileFace
+            photoId={f.photoId}
+            mark={faceOf(f.mark, f.name)}
+            size={32}
+            label={`${f.name}의 얼굴`}
+          />
         </View>
       ))}
       {more > 0 ? (
@@ -215,9 +245,6 @@ const styles = StyleSheet.create({
   /* 앞 얼굴에 3분의 1쯤 겹칩니다. */
   faceOver: {
     marginLeft: -10,
-  },
-  faceText: {
-    fontSize: 16,
   },
   faceMore: {
     backgroundColor: Colors.accentSoftPressed,

@@ -699,6 +699,7 @@ public class FeedService {
                     p.getAuthorId(),
                     u == null ? "알 수 없음" : u.getName(),
                     u == null ? null : u.getMark(),
+                    u == null ? null : u.getPhotoId(),
                     p.getGroupId(),
                     p.getAudience(),
                     p.getTripId(),
@@ -914,8 +915,18 @@ public class FeedService {
      * @param placeName 그 장소의 이름. 내놓기 판이 장소마다 사진을 모을 때는
      *                  번호로 묶고, 이름은 화면에 적을 때만 씁니다
      * @param mine      내가 쓴 것인지. 고치기·지우기 단추가 여기에 걸립니다
+     * @param authorMark 글쓴이의 표식. 안 골랐으면 비어 있습니다
+     * @param authorPhotoId 글쓴이가 올려 둔 얼굴 사진. 안 올렸으면 비어 있습니다.
+     *                  <b>{@code authorMark} 를 대신하는 값이 아닙니다</b> — 얼굴을
+     *                  세우는 차례가 사진 · 표식 · 이름이라
+     *                  ({@code components/profile-face}) 셋이 다 필요합니다.
+     *                  하나만 실으면 사진 없는 사람의 카드가 빈 동그라미가 됩니다.
+     *                  사람을 다시 묻지 않습니다 — {@code cardsOf} 가 글쓴이들을
+     *                  한꺼번에 받아 두고({@code who}) 거기서 표식과 함께
+     *                  꺼냅니다. 피드 한 판에 왕복 스물이 더 붙으면 안 됩니다
      */
     public record Card(String id, String authorId, String authorName, String authorMark,
+                       String authorPhotoId,
                        String groupId, Audience audience, String tripId, String tripTitle,
                        String placeId, String placeName,
                        String text, List<String> tags, List<String> photoIds,

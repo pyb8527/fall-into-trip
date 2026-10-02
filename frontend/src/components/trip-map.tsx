@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -13,6 +14,7 @@ import {
 import MapView, { Circle, Marker, PROVIDER_GOOGLE, Polyline } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { API_BASE } from '@/api/client';
 import { CLUMP_PX, DRAW_MS, EDGE, FOCUS_SPAN, PAD } from '@/components/map-tune';
 import type { MapPlace, TripMapProps } from '@/components/map-types';
 import { QUIET_MAP } from '@/lib/map-style';
@@ -102,6 +104,7 @@ function FaceMark({
   lat,
   lng,
   face,
+  photo,
   color,
   title,
   layer,
@@ -109,13 +112,26 @@ function FaceMark({
   lat: number;
   lng: number;
   face: string;
+  photo?: string | null;
   color: string;
   title: string;
   layer: number;
 }) {
-  /* 얼굴과 색이 바뀔 때만 다시 굽습니다. 자리가 바뀌는 것은 그림이 아니라
-     얹히는 곳이 바뀌는 것이라 다시 구울 일이 아닙니다. */
-  const drawing = useBake([face, color]);
+  /*
+    사진이 다 와야 굽습니다.
+
+    <p>굽기는 한 번 멎으면({@code tracksViewChanges=false}) 다시 그리지
+    않습니다. 사진이 아직 안 왔을 때 멎으면 그 핀은 <b>영영 빈 흰
+    동그라미</b>입니다 — 사진은 망을 타고 오는 것이라 {@link DRAW_MS} 안에
+    온다는 보장이 없습니다.
+
+    <p>그래서 사진이 올라온 것도 다시 굽는 조건에 넣습니다. 받기 전에 한 번
+    (표식으로), 받은 뒤에 한 번 더 굽습니다. 얼굴과 색이 바뀔 때도 다시
+    굽습니다 — 자리가 바뀌는 것은 그림이 아니라 얹히는 곳이 바뀌는 것이라
+    다시 구울 일이 아닙니다.
+  */
+  const [got, setGot] = useState(0);
+  const drawing = useBake([face, photo, color, got]);
 
   return (
     <Marker
@@ -124,7 +140,7 @@ function FaceMark({
       title={title}
       tracksViewChanges={drawing}
       zIndex={layer}>
-      <FacePin face={face} color={color} />
+      <FacePin face={face} photo={photo} color={color} onDrawn={() => setGot((n) => n + 1)} />
     </Marker>
   );
 }
@@ -155,8 +171,26 @@ function FlagMark({ lat, lng, title }: { lat: number; lng: number; title: string
  *
  * <p>나와 동행자가 같은 판을 씁니다. 색만 다릅니다 — 나만 다른 모양으로 두면
  * 지도에서 내가 어디 있는지를 다른 규칙으로 찾아야 합니다.
+ *
+ * <p>차례는 <b>사진 · 표식 · 이름</b>입니다({@code components/profile-face} 와
+ * 같은 차례). 서른 픽셀짜리 동그라미는 얼굴이 들어갈 자리가 됩니다 — 테두리
+ * 안쪽이 스물넷입니다. 사진이 있으면 사진만 서고, 둘을 겹치면 어느 쪽도
+ * 안 읽힙니다.
+ *
+ * @param onDrawn 사진을 다 받았을 때. 그때 한 번 더 구워야 빈 판이 구워진
+ *                채로 멎지 않습니다({@link FaceMark})
  */
-function FacePin({ face, color }: { face: string; color: string }) {
+function FacePin({
+  face,
+  photo,
+  color,
+  onDrawn,
+}: {
+  face: string;
+  photo?: string | null;
+  color: string;
+  onDrawn: () => void;
+}) {
   const r = 30;
   return (
     <View
@@ -171,7 +205,25 @@ function FacePin({ face, color }: { face: string; color: string }) {
           backgroundColor: '#FFFFFF',
         },
       ]}>
-      <Text style={styles.face}>{face}</Text>
+      {photo ? (
+        /* 자르는 칸을 따로 둡니다. 바깥 판에 overflow 를 걸면 그림자까지
+           함께 잘려(iOS 는 masksToBounds, 안드로이드는 elevation),
+           사진을 올린 사람의 핀만 지도에 납작하게 붙습니다. */
+        <View style={styles.facePlate}>
+          <Image
+            source={{ uri: `${API_BASE}/api/photos/${photo}` }}
+            style={styles.facePhoto}
+            contentFit="cover"
+            /* 서서히 띄우지 않습니다. 굽는 동안의 반투명한 한 장이 그대로
+               구워지면 그 뒤로 영영 흐린 얼굴입니다. */
+            transition={0}
+            /* 못 받았을 때도 부릅니다. 안 그러면 기다리는 채로 굽기가 멎습니다. */
+            onLoadEnd={onDrawn}
+          />
+        </View>
+      ) : (
+        <Text style={styles.face}>{face}</Text>
+      )}
     </View>
   );
 }
@@ -213,6 +265,7 @@ export function TripMap({
   here,
   mates,
   myFace,
+  myPhoto,
   notes,
   dayFilter = false,
   height = 300,
@@ -755,6 +808,7 @@ export function TripMap({
           lat={here.lat}
           lng={here.lng}
           face={myFace ?? ''}
+          photo={myPhoto}
           color={Colors.accentInk}
           title={HERE}
           layer={999}
@@ -767,8 +821,9 @@ export function TripMap({
           key={`mate-${mate.id}`}
           lat={mate.lat}
           lng={mate.lng}
-          /* 고른 동물, 안 골랐으면 이름 첫 글자. 첫 글자만으로는 "지영" 과
-             "지훈" 이 지도에서 같아 보입니다. */
+          /* 사진, 없으면 고른 동물, 그것도 없으면 이름 첫 글자. 첫 글자만으로는
+             "지영" 과 "지훈" 이 지도에서 같아 보입니다. */
+          photo={mate.photo}
           face={mate.face}
           color={Colors.success}
           title={`${mate.name} 님이 지금 있는 곳`}
@@ -1290,6 +1345,17 @@ const styles = StyleSheet.create({
     /* 동물 이모지도 이름 첫 글자도 들어옵니다. 줄 높이를 비워 둬야 둘 다
        동그라미 한가운데에 섭니다. */
     lineHeight: undefined,
+  },
+  /* 테두리 안쪽을 꽉 채우는 동그란 칸. 사진이 이 밖으로 비어져 나오지 않게. */
+  facePlate: {
+    width: '100%',
+    height: '100%',
+    borderRadius: Radius.full,
+    overflow: 'hidden',
+  },
+  facePhoto: {
+    width: '100%',
+    height: '100%',
   },
   /* 깃대 아래 끝이 자리이므로, 그림의 왼쪽 아래를 기준으로 세웁니다. */
   flag: {

@@ -12,6 +12,7 @@ import { useAuth } from '@/auth/auth-provider';
 import { FeedList } from '@/components/feed-list';
 import { GroupForm } from '@/components/group-form';
 import { MatesSheet } from '@/components/mates-sheet';
+import { ProfileFace } from '@/components/profile-face';
 import { TripForm } from '@/components/trip-form';
 import { TripSlot } from '@/components/trip-slot';
 import { Colors, Gutter, Radius, Spacing, Tap } from '@/constants/theme';
@@ -221,9 +222,18 @@ export default function GroupScreen() {
               onPress={() => setMates(true)}
               accessibilityLabel="모임 사람들 보기"
               style={styles.faces}>
+              {/* 얼굴은 이모지 한 글자를 글줄에 그냥 세운 것이었습니다. 사진은
+                  글자가 아니라, 동그란 칸이 섭니다({@link ProfileFace}) — 그
+                  칸 덕에 기기마다 다르던 이모지 높이도 한 자리에 맞습니다. */}
               <Row gap={Spacing.s1} style={styles.name}>
                 {data.members.slice(0, 6).map((m) => (
-                  <Body key={m.id}>{faceOf(m.mark, m.name)}</Body>
+                  <ProfileFace
+                    key={m.id}
+                    photoId={m.photoId}
+                    mark={faceOf(m.mark, m.name)}
+                    size={28}
+                    label={`${m.name}의 얼굴`}
+                  />
                 ))}
                 <Caption tone="secondary">{data.members.length}명</Caption>
               </Row>

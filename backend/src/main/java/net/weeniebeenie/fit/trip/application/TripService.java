@@ -363,15 +363,32 @@ public class TripService {
         Trip trip = access.mine(tripId, me.id());
         return access.peopleOf(trip).stream()
                 .map(id -> users.findById(id)
-                        .map(u -> new Person(u.getId(), u.getName(), u.getMark(),
+                        .map(u -> new Person(u.getId(), u.getName(), u.getMark(), u.getPhotoId(),
                                 u.getId().equals(trip.getOwnerId())))
                         .orElse(null))
                 .filter(java.util.Objects::nonNull)
                 .toList();
     }
 
-    /** @param owner 이 여행을 만든 사람인지. 이름 옆에 표를 다는 데 씁니다. */
-    public record Person(String id, String name, String mark, boolean owner) {
+    /**
+     * 이 여행을 같이 보는 사람 하나.
+     *
+     * <h3>얼굴은 사진 · 표식 · 이름 차례입니다</h3>
+     *
+     * <p>{@code photoId} 는 {@code mark} 를 <b>대신하는 값이 아니라 앞서는</b>
+     * 값입니다({@code components/profile-face}). 둘을 같이 내려보냅니다 —
+     * 표식은 사진을 안 올린 사람의 자리이고, 그것마저 없으면 이름에서 따온
+     * 것이 섭니다. 하나만 실으면 사람들 판과 챙길 것의 맡은 사람 자리에서
+     * 한쪽 사람들이 빈 동그라미가 됩니다.
+     *
+     * @param owner   이 여행을 만든 사람인지. 이름 옆에 표를 다는 데 씁니다.
+     * @param mark    지도에서 이 사람을 가리키는 그림의 이름. 안 골랐으면 비어
+     *                있습니다
+     * @param photoId 올려 둔 얼굴 사진. 안 올렸으면 비어 있습니다. 사람을 다시
+     *                묻지 않습니다 — 위에서 이미 찾아 둔 {@code User} 에서
+     *                표식과 함께 꺼냅니다
+     */
+    public record Person(String id, String name, String mark, String photoId, boolean owner) {
     }
 
     /* ------------------------------------------------------- 안내판 */
@@ -440,7 +457,7 @@ public class TripService {
                 .map(id -> users.findById(id).map(u -> {
                     TripGoing g = said.get(id);
                     return new Going(
-                            u.getId(), u.getName(), u.getMark(),
+                            u.getId(), u.getName(), u.getMark(), u.getPhotoId(),
                             u.getId().equals(trip.getOwnerId()),
                             /* 답이 없으면 「아직 몰라요」입니다 — 여행을 만들 때
                                멤버 수만큼 줄을 미리 깔지 않습니다. */
@@ -484,10 +501,24 @@ public class TripService {
     }
 
     /**
-     * @param answer 줄이 없으면 {@link GoingAnswer#MAYBE} 입니다
-     * @param note   「셋째 날만 못 가요」 같은 것. 모두에게 보입니다
+     * 한 사람의 참석 응답.
+     *
+     * <h3>얼굴은 사진 · 표식 · 이름 차례입니다</h3>
+     *
+     * <p>내 여행 카드의 겹친 얼굴들이 이것을 씁니다. {@code photoId} 가
+     * {@code mark} 를 <b>지우지 않습니다</b>({@code components/profile-face}) —
+     * 표식은 사진을 안 올린 사람의 자리이고, 그것마저 없으면 이름에서 따온
+     * 것이 섭니다. 둘이 함께 와야 섞여 선 얼굴들이 제대로 그려집니다.
+     *
+     * @param answer  줄이 없으면 {@link GoingAnswer#MAYBE} 입니다
+     * @param note    「셋째 날만 못 가요」 같은 것. 모두에게 보입니다
+     * @param mark    지도에서 이 사람을 가리키는 그림의 이름. 안 골랐으면 비어
+     *                있습니다
+     * @param photoId 올려 둔 얼굴 사진. 안 올렸으면 비어 있습니다. 사람을 다시
+     *                묻지 않습니다 — 위에서 이미 찾아 둔 {@code User} 에서
+     *                표식과 함께 꺼냅니다
      */
-    public record Going(String id, String name, String mark, boolean owner,
+    public record Going(String id, String name, String mark, String photoId, boolean owner,
                         GoingAnswer answer, String note) {
     }
 

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
+import { API_BASE } from '@/api/client';
 import type { MapPlace, TripMapProps } from '@/components/map-types';
 import { CLUMP_PX, EDGE, FOCUS_ZOOM } from '@/components/map-tune';
 import { gmaps, hasMaps, loadMaps } from '@/lib/gmaps.web';
@@ -254,24 +255,230 @@ function flagIcon(g: ReturnType<typeof gmaps>, color: string) {
 }
 
 /**
- * 사람을 가리키는 동그란 판.
+ * 사람 판의 자.
+ *
+ * <p>표식 판({@link personIcon})과 사진 판({@link drawFace})이 같은 자를
+ * 씁니다. 사람마다 다른 것이 서는 자리라 둘이 한 눈금이라도 다르면, 사진을
+ * 올린 사람의 핀만 지도에서 조금 크거나 조금 비켜 앉습니다.
+ */
+const FACE_R = 15;
+const FACE_RING = 3;
+const FACE_BOX = (FACE_R + FACE_RING) * 2;
+
+/**
+ * 사람을 가리키는 동그란 판 — 사진이 없을 때.
  *
  * <p>장소 핀(물방울)과 생김새를 달리합니다. 같은 모양으로 두면 지도만 보고는
  * 일정에 넣어 둔 곳과 지금 누가 서 있는 자리를 구별할 수 없습니다.
+ *
+ * <p>속이 빈 흰 판입니다. 표식(또는 이름 첫 글자)은 마커의 글자 자리에
+ * 얹히므로 여기서 그리지 않습니다. 사진이 있는 사람은 {@link faceIcon} 이
+ * 이 자리를 대신합니다.
  */
 function personIcon(color: string) {
-  const r = 15;
-  const box = (r + 3) * 2;
-  const c = box / 2;
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${box}" height="${box}" viewBox="0 0 ${box} ${box}">
-<circle cx="${c}" cy="${c}" r="${r}" fill="#FFFFFF" stroke="${color}" stroke-width="3"/>
+  const c = FACE_BOX / 2;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${FACE_BOX}" height="${FACE_BOX}" viewBox="0 0 ${FACE_BOX} ${FACE_BOX}">
+<circle cx="${c}" cy="${c}" r="${FACE_R}" fill="#FFFFFF" stroke="${color}" stroke-width="${FACE_RING}"/>
 </svg>`;
   return {
     url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
-    scaledSize: new (gmaps().Size)(box, box),
+    scaledSize: new (gmaps().Size)(FACE_BOX, FACE_BOX),
     anchor: new (gmaps().Point)(c, c),
     labelOrigin: new (gmaps().Point)(c, c),
   };
+}
+
+/**
+ * 사진을 얹은 동그란 판.
+ *
+ * <h3>글자 자리에는 사진을 못 넣습니다</h3>
+ *
+ * <p>사람 핀의 얼굴은 마커의 <b>글자</b>(label)로 얹고 있었습니다. 이모지
+ * 한 자였으니 그것으로 됐는데, 사진은 글자가 아닙니다 — 구글 지도의 label 은
+ * 문자열만 받습니다.
+ *
+ * <p>{@code AdvancedMarkerElement} 로 HTML 을 그대로 얹는 길이 있습니다.
+ * 안 씁니다: 그쪽은 지도에 {@code mapId} 가 있어야 하고, mapId 를 주면 구글이
+ * 생김새를 <b>클라우드에서</b> 가져오면서 우리가 넘기는 {@code styles} 를
+ * 무시합니다. 조용한 지도({@code QUIET_MAP})는 그 위에 얹히는 핀과 동선이
+ * 화면에서 가장 진한 것이 되게 하려고 눌러 둔 것이라, 그것을 잃으면 사진
+ * 하나 얹으려고 지도 전체를 바꾸는 셈입니다. marker 라이브러리도 더 받아야
+ * 합니다.
+ *
+ * <p>SVG 안에 {@code <image>} 를 넣는 길도 막혀 있습니다. 마커 아이콘은
+ * {@code <img src="data:...">} 로 들어가고, 그렇게 쓰인 SVG 는 <b>바깥 자원을
+ * 못 불러옵니다</b>(브라우저 규칙이라 우회할 수 없습니다). 사진을 base64 로
+ * SVG 안에 박아 넣으면 되지만, 그러면 원본 사진 전체가 URI 로 들어가 핀마다
+ * 수백 킬로바이트가 됩니다.
+ *
+ * <p>그래서 캔버스에 직접 굽습니다. 서른여섯 픽셀짜리 PNG 한 장이고, 값은
+ * 사람마다 사진 한 번 받는 것입니다 — 그마저 브라우저가 캐시하고, 구운 판은
+ * 아래에 남아 두 번 굽지 않습니다.
+ */
+const plates = new Map<string, string | null>();
+/** 굽고 있는 것. 같은 얼굴이 두 자리에 서도 한 번만 받습니다. */
+const baking = new Map<string, Promise<string | null>>();
+
+/* 테두리 색까지 열쇠에 넣습니다. 같은 사람이 나(파랑)로도 동행자(초록)로도
+   설 수 있고, 색은 지도가 "누구/어느 날" 을 말하는 방법입니다. */
+function plateKey(photoId: string, color: string) {
+  return `${photoId}|${color}`;
+}
+
+/** 못 구운 것은 {@code null} 로 남겨 다시 받지 않습니다. */
+function bakeFace(photoId: string, color: string): Promise<string | null> {
+  const key = plateKey(photoId, color);
+  if (plates.has(key)) {
+    return Promise.resolve(plates.get(key) ?? null);
+  }
+  const already = baking.get(key);
+  if (already) {
+    return already;
+  }
+  const job = new Promise<string | null>((resolve) => {
+    const img = new window.Image();
+    img.onload = () => resolve(drawFace(img, color));
+    /* 지워졌거나 못 받은 사진. 표식이 그대로 서 있게 둡니다. */
+    img.onerror = () => resolve(null);
+    img.src = `${API_BASE}/api/photos/${photoId}`;
+  }).then((url) => {
+    plates.set(key, url);
+    baking.delete(key);
+    return url;
+  });
+  baking.set(key, job);
+  return job;
+}
+
+/**
+ * 동그라미 안에 사진을 채우고 테두리를 두릅니다.
+ *
+ * <p>{@code cover} 입니다 — 짧은 쪽을 꽉 채우고 넘치는 쪽을 자릅니다. 늘여서
+ * 찌그러뜨리는 것보다 낫고, 올릴 때 네모로 자르지 못한 사진도 이 자리에서는
+ * 네모로 보입니다({@code components/profile-face} 와 같은 규칙).
+ *
+ * <p>두 배로 그려 절반 크기로 얹습니다. 레티나 화면에서 서른여섯 픽셀 그림을
+ * 그대로 두면 얼굴이 뭉개집니다.
+ *
+ * <p>사진이 다른 출처에 있으면(개발 중 {@code EXPO_PUBLIC_API_BASE} 를 LAN
+ * 주소로 둘 때) 캔버스가 오염되어 {@code toDataURL} 이 막힙니다. 그때는 못
+ * 구운 것으로 두고 표식을 세웁니다 — 배포에서는 nginx 가 같은 주소에서
+ * /api 를 넘겨 주므로(API_BASE 가 빈 문자열) 걸리지 않습니다.
+ */
+function drawFace(img: HTMLImageElement, color: string): string | null {
+  const side = Math.min(img.naturalWidth, img.naturalHeight);
+  /* 폭이 0 인 그림을 잘라 그리면 브라우저가 던집니다. */
+  if (!side) {
+    return null;
+  }
+  const dpr = 2;
+  const canvas = document.createElement('canvas');
+  canvas.width = FACE_BOX * dpr;
+  canvas.height = FACE_BOX * dpr;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    return null;
+  }
+  ctx.scale(dpr, dpr);
+  const c = FACE_BOX / 2;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(c, c, FACE_R, 0, Math.PI * 2);
+  /* 흰 바탕을 먼저 깝니다. 비치는 사진(PNG)이 와도 지도의 건물·글자가
+     얼굴 뒤로 비치지 않습니다. */
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fill();
+  ctx.clip();
+  ctx.drawImage(
+    img,
+    (img.naturalWidth - side) / 2,
+    (img.naturalHeight - side) / 2,
+    side,
+    side,
+    c - FACE_R,
+    c - FACE_R,
+    FACE_R * 2,
+    FACE_R * 2,
+  );
+  ctx.restore();
+
+  /* 테두리는 사진 위에 얹습니다. 먼저 두르면 사진이 그 위를 덮어 선이 안쪽
+     절반만큼 잘립니다. 색은 지도가 "누구인지" 를 말하는 것이라 뺄 수 없습니다. */
+  ctx.beginPath();
+  ctx.arc(c, c, FACE_R, 0, Math.PI * 2);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = FACE_RING;
+  ctx.stroke();
+
+  try {
+    return canvas.toDataURL('image/png');
+  } catch {
+    return null;
+  }
+}
+
+/** 구운 판을 구글 지도가 받는 모양으로. 자리는 {@link personIcon} 과 같습니다. */
+function faceIcon(g: ReturnType<typeof gmaps>, url: string) {
+  const c = FACE_BOX / 2;
+  return {
+    url,
+    scaledSize: new g.Size(FACE_BOX, FACE_BOX),
+    anchor: new g.Point(c, c),
+  };
+}
+
+/**
+ * 사람 핀 하나 — 지도에 얹는 것까지.
+ *
+ * <p>차례는 <b>사진 · 표식 · 이름</b>입니다({@code components/profile-face} 와
+ * 같은 차례). 사진이 있으면 사진만 서고, 없으면 지금까지처럼 표식(또는 이름
+ * 첫 글자)이 글자로 얹힙니다 — 둘을 한 동그라미에 겹치면 어느 쪽도 안 읽힙니다.
+ *
+ * <p>사진은 받아서 굽는 데 한 박자 걸립니다. 그동안 빈 판을 세우지 않고
+ * 표식을 먼저 세웠다가 갈아 끼웁니다. 처음 한 번은 표식이 잠깐 보이지만,
+ * 구운 판이 남아 있으므로 그 뒤로는 바로 사진으로 섭니다 — 동행자 자리는
+ * 자리가 올 때마다 통째로 다시 그려지는 곳이라, 이것이 없으면 그때마다
+ * 사진이 깜빡입니다.
+ */
+function facedMarker(
+  g: ReturnType<typeof gmaps>,
+  host: any,
+  spot: {
+    lat: number;
+    lng: number;
+    title: string;
+    color: string;
+    layer: number;
+    photoId?: string | null;
+    face?: string;
+  },
+) {
+  const { color, photoId, face } = spot;
+  const baked = photoId ? plates.get(plateKey(photoId, color)) : null;
+  const marker = new g.Marker({
+    position: { lat: spot.lat, lng: spot.lng },
+    map: host,
+    title: spot.title,
+    zIndex: spot.layer,
+    icon: baked ? faceIcon(g, baked) : personIcon(color),
+    label: baked || !face ? undefined : { text: face, fontSize: '16px', fontWeight: '700' },
+  });
+
+  if (photoId && !baked) {
+    bakeFace(photoId, color).then((url) => {
+      /* 굽는 동안 지워졌을 수 있습니다(동행자가 껐거나 화면을 떠났거나).
+         setMap(null) 한 마커는 getMap() 이 비므로 그것으로 가립니다 — 안
+         가리면 지도에서 지운 핀이 사진과 함께 되살아납니다. */
+      if (!url || !marker.getMap()) {
+        return;
+      }
+      marker.setIcon(faceIcon(g, url));
+      /* 사진 위에 표식을 또 얹지 않습니다. null 이 글자를 지우는 쪽입니다. */
+      marker.setLabel(null);
+    });
+  }
+  return marker;
 }
 
 /**
@@ -363,6 +570,7 @@ export function TripMap({
   shape = 'default',
   panTo,
   myFace,
+  myPhoto,
   follow,
   onReady,
 }: TripMapProps) {
@@ -585,15 +793,16 @@ export function TripMap({
       fillOpacity: 0.08,
       zIndex: 1,
     });
-    meDot.current = new g.Marker({
-      position: at,
-      map: map.current,
-      zIndex: 999,
+    /* 나도 동행자와 같은 방식으로 그립니다. 나만 점으로 두면 지도에서
+       내가 어디 있는지를 다른 규칙으로 찾아야 합니다. */
+    meDot.current = facedMarker(g, map.current, {
+      lat: here.lat,
+      lng: here.lng,
       title: HERE,
-      /* 나도 동행자와 같은 방식으로 그립니다. 나만 점으로 두면 지도에서
-         내가 어디 있는지를 다른 규칙으로 찾아야 합니다. */
-      icon: personIcon(Colors.accentInk),
-      label: myFace ? { text: myFace, fontSize: '16px', fontWeight: '700' } : undefined,
+      color: Colors.accentInk,
+      layer: 999,
+      photoId: myPhoto,
+      face: myFace,
     });
   }, [ready, here]);
 
@@ -817,15 +1026,16 @@ export function TripMap({
 
     for (const mate of mates ?? []) {
       mateMarks.current.push(
-        new g.Marker({
-          position: { lat: mate.lat, lng: mate.lng },
-          map: map.current,
+        facedMarker(g, map.current, {
+          lat: mate.lat,
+          lng: mate.lng,
           title: `${mate.name} 님이 지금 있는 곳`,
-          zIndex: 800,
-          /* 고른 동물, 안 골랐으면 이름 첫 글자. 첫 글자만으로는 "지영" 과
-             "지훈" 이 지도에서 같아 보입니다. */
-          label: { text: mate.face, fontSize: '16px', fontWeight: '700' },
-          icon: personIcon(Colors.success),
+          color: Colors.success,
+          layer: 800,
+          /* 사진, 없으면 고른 동물, 그것도 없으면 이름 첫 글자. 첫 글자만으로는
+             "지영" 과 "지훈" 이 지도에서 같아 보입니다. */
+          photoId: mate.photo,
+          face: mate.face,
         }),
       );
     }

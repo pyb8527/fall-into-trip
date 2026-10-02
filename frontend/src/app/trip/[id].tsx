@@ -1201,14 +1201,19 @@ export default function TripScreen() {
         onSelect={pickOnMap}
         routes={routeLines}
         here={me.here}
+        /* 지도에 서는 얼굴은 사진 · 표식 · 이름 차례입니다(components/profile-face
+           와 같은 차례). 표식은 사진을 안 올린 사람의 자리라서 함께 넘깁니다 —
+           사진이 없는 동행자의 핀은 그대로 표식으로 섭니다. */
         mates={mates.map((m) => ({
           id: m.userId,
           name: m.name,
+          photo: m.photoId,
           face: faceOf(m.mark, m.name),
           lat: m.lat,
           lng: m.lng,
         }))}
         myFace={faceOf(user?.mark, user?.name ?? '나')}
+        myPhoto={user?.photoId}
         notes={pins.map((p) => ({ id: p.id, label: p.label ?? null, lat: p.lat, lng: p.lng }))}
         bleed
         chrome={false}
@@ -2026,10 +2031,33 @@ const MARKS = ['✈️', '🏖️', '⛰️', '🏯', '🍜', '🎒', '🚗', '�
 function TripMarkPicker({ trip, onChanged }: { trip: Trip; onChanged: () => void }) {
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
+  /**
+   * 고쳐 쓰는 중인 이름.
+   *
+   * <p>여행 이름을 고치는 길이 어디에도 없었습니다. 서버는 처음부터 받고
+   * 있었는데({@code PATCH /api/trips/{id}} 의 {@code title}) 부르는 화면이
+   * 없었습니다 — 모임은 한 판에서 이름까지 고치는데 여행만 못 고쳤습니다.
+   *
+   * <p>표식과 같은 자리에 둡니다. 여기가 「이 여행을 목록에서 어떻게 알아볼
+   * 것인가」를 정하는 자리이고, 이름이 그 가운데 가장 먼저 읽히는 것입니다.
+   */
+  const [name, setName] = useState(trip.title);
+
+  /* 판을 닫았다 다시 열거나 다른 데서 이름이 바뀌면 칸도 따라갑니다. 안 맞추면
+     옛 이름이 칸에 남아 있다가 저장될 수 있습니다. */
+  useEffect(() => {
+    setName(trip.title);
+  }, [trip.title]);
+
+  const trimmed = name.trim();
+  /* 서버도 빈 이름을 막습니다(「여행 이름이 비어 있어요.」). 여기서 먼저
+     잠가 두면 눌러 보고 나서 혼나지 않습니다. */
+  const canRename = trimmed.length > 0 && trimmed !== trip.title;
 
   /* 고르면 바로 저장합니다. 따로 저장 단추를 두면 두 번 눌러야 하는데,
-     그러기에는 되돌리기 쉬운 일입니다. */
-  async function save(patch: { theme?: string; emoji?: string }) {
+     그러기에는 되돌리기 쉬운 일입니다. 이름은 다릅니다 — 치는 일에는 끝나는
+     지점이 없어서 단추가 있어야 합니다. */
+  async function save(patch: { theme?: string; emoji?: string; title?: string }) {
     setBusy(true);
     setFailed(null);
     try {
@@ -2046,6 +2074,38 @@ function TripMarkPicker({ trip, onChanged }: { trip: Trip; onChanged: () => void
 
   return (
     <View style={styles.mark}>
+      {/*
+        이름 고치기.
+
+        <p>치는 대로 아래 미리보기의 이름이 같이 바뀝니다 — 목록에서 어떻게
+        보일지를 그 자리에서 봅니다.
+
+        <p>표식은 고르는 즉시 저장하는데 이름은 단추를 둡니다. 고르는 일에는
+        끝나는 지점이 있지만 치는 일에는 없어서, 한 글자마다 보내면 요청이
+        쏟아지고 중간 글자가 저장됩니다.
+
+        <p>안 바뀌었거나 비었으면 단추가 잠깁니다. 빈 이름은 서버도 막는데
+        ({@code 여행 이름이 비어 있어요.}) 눌러 보고 나서 혼나는 것보다
+        안 눌리는 편이 낫습니다.
+      */}
+      <Field
+        label="여행 이름"
+        value={name}
+        onChangeText={setName}
+        placeholder="오사카 3박 4일"
+        maxLength={60}
+        returnKeyType="done"
+        onSubmitEditing={() => (canRename ? save({ title: trimmed }) : undefined)}
+      />
+      <Button
+        label="이름 바꾸기"
+        variant="secondary"
+        compact
+        busy={busy}
+        disabled={!canRename}
+        onPress={() => save({ title: trimmed })}
+      />
+
       {/*
         고른 것을 그 자리에서 보여 줍니다.
 
@@ -2069,8 +2129,12 @@ function TripMarkPicker({ trip, onChanged }: { trip: Trip; onChanged: () => void
         </Grow>
         <Row gap={Spacing.s2}>
           <TripMark theme={trip.theme} emoji={trip.emoji} />
+          {/* 저장한 이름이 아니라 <b>지금 칸에 든 이름</b>입니다. 치는 대로
+              여기가 바뀌어야 「목록에서 이렇게 보여요」가 참이 됩니다. 비웠을
+              때만 지금 이름으로 돌아갑니다 — 빈 줄을 보여 주면 이름이 지워진
+              것처럼 읽힙니다. */}
           <Body small numberOfLines={1} tone={chosen ? 'default' : 'muted'}>
-            {trip.title}
+            {trimmed || trip.title}
           </Body>
         </Row>
       </Split>

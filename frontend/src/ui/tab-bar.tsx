@@ -3,6 +3,7 @@ import { Platform, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAuth } from '@/auth/auth-provider';
+import { ProfileFace } from '@/components/profile-face';
 import {
   Colors,
   Radius,
@@ -12,7 +13,7 @@ import {
   Type,
   Weight,
 } from '@/constants/theme';
-import { Icon, type IconName, Mark, Press } from '@/ui';
+import { Icon, type IconName, Press } from '@/ui';
 import { SidebarWidth, useWide } from '@/ui/layout';
 import { LogoMark, LogoSymbol } from '@/ui/logo';
 import { faceOf } from '@/constants/user-marks';
@@ -307,7 +308,29 @@ function Sidebar({
         scale={1}
         accessibilityLabel={user ? '내 계정' : '로그인'}
         style={styles.railMe}>
-        <Mark emoji={faceOf(user?.mark, user?.name ?? '나')} fallback="🙂" />
+        {/*
+          얼굴.
+
+          <p>{@link Mark} 에 담고 있었습니다. 그쪽은 갈래를 그리는 칸이라 받는
+          것이 이모지 한 글자뿐이고, 사진은 글자가 아닙니다. 사진 칸을 거기에
+          내면 <b>사진 · 표식 · 이름</b>의 차례를 아는 곳이 둘이 됩니다 —
+          얼굴 칸으로 옮깁니다({@link ProfileFace}).
+
+          <p>동그라미는 40 그대로이고 바탕색도 같습니다. 안의 이모지는
+          15 에서 19 로 커집니다 — {@link Mark} 의 15 는 <b>갈래 그림</b>의
+          크기이고, 19 는 이 앱이 얼굴에 쓰는 크기(칸의 절반쯤)입니다. 피드
+          카드와 마이페이지의 얼굴이 이미 그 비율입니다.
+
+          <p>{@code fallback="🙂"} 을 걷었습니다. {@code faceOf} 는 빈 값을
+          안 돌려줘서(없으면 이름 첫 글자, 이름도 없으면 "?") 그 웃는 얼굴이
+          설 수 있는 경우가 없었습니다. 로그인 전에는 "나" 가 섭니다.
+        */}
+        <ProfileFace
+          photoId={user?.photoId}
+          mark={faceOf(user?.mark, user?.name ?? '나')}
+          size={40}
+          label={user?.name ? `${user.name}의 얼굴` : '내 얼굴'}
+        />
         <View style={styles.railMeText}>
           <Text style={styles.railMeName} numberOfLines={1}>
             {user?.name ?? '로그인'}

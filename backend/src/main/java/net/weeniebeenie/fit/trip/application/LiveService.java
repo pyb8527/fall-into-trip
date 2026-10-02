@@ -174,6 +174,7 @@ public class LiveService {
             out.add(new Where(row.getUserId(),
                     who == null ? "알 수 없음" : who.getName(),
                     who == null ? null : who.getMark(),
+                    who == null ? null : who.getPhotoId(),
                     row.getLat(), row.getLng(), row.getAccuracy(), row.getUpdatedAt()));
         }
         return out;
@@ -198,10 +199,26 @@ public class LiveService {
     /**
      * 지금 켜 둔 동행자의 자리.
      *
-     * @param mark 지도에서 이 사람을 가리키는 그림의 이름. 안 골랐으면 비어
-     *             있고, 그때는 화면이 이름 첫 글자로 그립니다.
+     * <h3>얼굴은 사진 · 표식 · 이름 차례입니다</h3>
+     *
+     * <p>{@code photoId} 가 {@code mark} 를 <b>대신하는 값이 아니라 앞서는</b>
+     * 값입니다({@code components/profile-face}). 그래서 둘을 같이 내려보냅니다 —
+     * 사진을 올린 사람은 열에 하나쯤이고, 나머지의 핀은 그대로 표식으로 서야
+     * 합니다. 하나만 실으면 한쪽 사람들의 핀이 빈 동그라미가 됩니다.
+     *
+     * <p>지도 핀에도 사진이 섭니다. 핀은 서른 픽셀짜리 동그라미라서
+     * ({@code components/trip-map} 의 {@code FacePin}) 얼굴이 들어갈 자리가
+     * 됩니다 — 「작아서 누구인지 안 보인다」는 것은 핀 안의 이모지 글자 크기를
+     * 핀 크기로 잘못 읽은 것이었습니다.
+     *
+     * @param mark    지도에서 이 사람을 가리키는 그림의 이름. 안 골랐으면 비어
+     *                있고, 그때는 화면이 이름 첫 글자로 그립니다.
+     * @param photoId 올려 둔 얼굴 사진. 안 올렸으면 비어 있습니다. 사람을 다시
+     *                묻지 않습니다 — 위에서 이미 들고 있는 {@link User} 에서
+     *                표식과 함께 꺼냅니다.
      */
-    public record Where(String userId, String name, String mark, double lat, double lng,
+    public record Where(String userId, String name, String mark, String photoId,
+                        double lat, double lng,
                         Double accuracy, Instant updatedAt) {
     }
 }

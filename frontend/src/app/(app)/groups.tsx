@@ -3,11 +3,12 @@ import { useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { api } from '@/api/client';
-import type { Group, TripSummary } from '@/api/types';
+import type { Group, GroupFace, TripSummary } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { CountdownBadge } from '@/components/countdown-badge';
 import { GroupForm } from '@/components/group-form';
 import { OurPhoto } from '@/components/our-photo';
+import { ProfileFace } from '@/components/profile-face';
 import { Colors, Radius, Spacing, Type, Weight } from '@/constants/theme';
 import { faceOf } from '@/constants/user-marks';
 import { countdownOf, formatSpan, type Countdown } from '@/lib/countdown';
@@ -33,7 +34,15 @@ import { AppTabs } from '@/ui/tab-bar';
 
 /** 모임 목록이 카드에 얹어 받는 것(GroupCards). */
 type GroupCard = Group & {
-  faces?: { name: string; mark?: string | null }[];
+  /*
+    겹쳐 그릴 얼굴들.
+
+    <p>모양을 여기 손으로 적어 두고 있었습니다({@code { name; mark }}). 서버가
+    사진까지 보내게 되면서 이 자리에만 칸을 하나 더 적는 꼴이 되는데, 같은
+    얼굴을 받는 자리가 여럿입니다 — 계약을 {@link GroupFace} 한 군데에
+    둡니다({@code api/types}).
+  */
+  faces?: GroupFace[];
   activity?: { kind: 'feed.post' | 'group.join'; actorName: string; at: string } | null;
   photoIds?: string[];
   /** 마지막으로 소식함을 연 뒤에 남이 무언가를 했는지 */
@@ -265,13 +274,29 @@ function GroupCardView({
           <Icon name="chevron-right" size={18} tone="muted" />
         </Row>
 
-        {/* 누가 있나 — 얼굴을 겹치고 이름을 적습니다. 「2명」으로는 누구와의
-            모임인지 안 보입니다. */}
+        {/*
+          누가 있나 — 얼굴을 겹치고 이름을 적습니다. 「2명」으로는 누구와의
+          모임인지 안 보입니다.
+
+          <p>얼굴 하나하나는 이모지 한 글자였습니다. 사진은 글자가 아니라,
+          <b>글자를 그리는 자리</b>를 {@link ProfileFace} 로 바꿔야 했습니다.
+          겹치는 흰 테는 남깁니다 — 그것이 없으면 네 동그라미가 한 덩어리로
+          붙어 몇 명인지 안 보입니다.
+
+          <p>그래서 테는 바깥 칸이 두르고 얼굴은 그 안에 섭니다. 28 짜리 칸에
+          2 짜리 테를 두르면 안쪽이 24 라 그 값을 줍니다 — 얼굴에 테를 달면
+          사진이 테까지 덮어 그려서 겹침이 안 읽힙니다.
+        */}
         <Row gap={Spacing.s2}>
           <Row>
             {faces.map((f, i) => (
               <View key={i} style={[styles.face, i > 0 ? styles.faceOver : null]}>
-                <Text style={styles.faceText}>{faceOf(f.mark ?? null, f.name)}</Text>
+                <ProfileFace
+                  photoId={f.photoId}
+                  mark={faceOf(f.mark, f.name)}
+                  size={24}
+                  label={`${f.name}의 얼굴`}
+                />
               </View>
             ))}
           </Row>
@@ -468,9 +493,6 @@ const styles = StyleSheet.create({
   },
   faceOver: {
     marginLeft: -8,
-  },
-  faceText: {
-    fontSize: 13,
   },
   thumb: {
     borderRadius: Radius.r2,

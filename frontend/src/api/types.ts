@@ -30,8 +30,14 @@ export type User = {
    * 올려 둔 얼굴 사진. 안 올렸으면 비어 있습니다.
    *
    * <p>{@code mark} 와 <b>함께</b> 옵니다 — 하나가 다른 하나를 대신하는 값이
-   * 아닙니다. 사진은 프로필에 서고 표식은 지도 핀에 섭니다. 얼굴 사진을
-   * 16픽셀로 줄이면 누구인지 안 보이므로 핀은 계속 그림을 씁니다.
+   * 아니라 <b>앞서는</b> 값입니다. 차례는 사진 · 표식 · 이름이고
+   * ({@code components/profile-face}) 지도 핀도 같은 차례를 따릅니다. 표식은
+   * 사진을 안 올린 사람의 자리라서 지워지지 않습니다.
+   *
+   * <p>처음에는 「핀은 16픽셀이라 얼굴이 안 보인다」고 보아 핀만 표식을
+   * 쓰게 두었습니다. 그 16은 <b>핀 안 이모지의 글자 크기</b>였고 핀 자체는
+   * 서른 픽셀짜리 동그라미입니다({@code FacePin}). 얼굴이 서는 자리 가운데
+   * 사진이 안 들어갈 만큼 작은 곳은 없습니다.
    */
   photoId: Maybe<string>;
   role: Role;
@@ -319,9 +325,39 @@ export type Group = {
 export type Mate = {
   id: string;
   name: string;
+  /** 지도에서 이 사람을 가리키는 그림의 이름. 안 골랐으면 비어 있습니다. */
   mark: Maybe<string>;
+  /**
+   * 올려 둔 얼굴 사진. 안 올렸으면 비어 있습니다.
+   *
+   * <p>{@code mark} 보다 <b>앞섭니다</b> — 사진 · 표식 · 이름 차례입니다
+   * ({@code components/profile-face}). 표식을 <b>대신하는 값이 아닙니다</b>:
+   * 사진을 올린 사람은 열에 하나쯤이고 나머지는 그대로 표식으로 섭니다.
+   * 둘 중 하나를 지우면 사람들 판의 절반이 빈 동그라미가 됩니다.
+   */
+  photoId: Maybe<string>;
   role: GroupRole;
   owner: boolean;
+};
+
+/**
+ * 모임 카드에 겹쳐 그리는 얼굴 하나(서버 {@code GroupCards.Face}).
+ *
+ * <p>주인이 맨 앞, 넷까지 옵니다. 세우는 차례는 다른 얼굴 자리와 같습니다 —
+ * 사진 · 표식 · 이름({@code components/profile-face}).
+ */
+export type GroupFace = {
+  name: string;
+  /** 골라 둔 표식. 안 골랐으면 비어 있습니다. */
+  mark: Maybe<string>;
+  /**
+   * 올려 둔 얼굴 사진. 안 올렸으면 비어 있습니다.
+   *
+   * <p>{@code mark} 를 <b>대신하는 값이 아닙니다</b> — 앞서는 값입니다. 둘이
+   * 함께 오는 까닭은 한 카드 안에 사진 쓰는 사람과 표식 쓰는 사람이 섞여
+   * 서기 때문입니다.
+   */
+  photoId: Maybe<string>;
 };
 
 /**
@@ -338,7 +374,16 @@ export type FeedPost = {
   id: string;
   authorId: string;
   authorName: string;
+  /** 글쓴이의 표식. 안 골랐으면 비어 있습니다. */
   authorMark: Maybe<string>;
+  /**
+   * 글쓴이가 올려 둔 얼굴 사진. 안 올렸으면 비어 있습니다.
+   *
+   * <p>{@code authorMark} 보다 <b>앞섭니다</b> — 사진 · 표식 · 이름 차례입니다
+   * ({@code components/profile-face}). 표식을 <b>대신하는 값이 아닙니다</b>:
+   * 사진 안 올린 사람의 카드는 그대로 표식으로 섭니다.
+   */
+  authorPhotoId: Maybe<string>;
   /** 모임 글이면 그 모임. 내 피드면 비어 있습니다. */
   groupId: Maybe<string>;
   /** 누가 볼 수 있는지. */
@@ -403,7 +448,17 @@ export type FeedSlice = {
 export type Person = {
   id: string;
   name: string;
+  /** 지도에서 이 사람을 가리키는 그림의 이름. 안 골랐으면 비어 있습니다. */
   mark: Maybe<string>;
+  /**
+   * 올려 둔 얼굴 사진. 안 올렸으면 비어 있습니다.
+   *
+   * <p>{@code mark} 보다 <b>앞섭니다</b> — 사진 · 표식 · 이름 차례입니다
+   * ({@code components/profile-face}). 표식을 <b>지우는 값이 아닙니다</b>:
+   * 표식은 사진을 안 올린 사람의 자리이고, 그것마저 없으면 이름에서 따온
+   * 것이 섭니다.
+   */
+  photoId: Maybe<string>;
   /** 이 여행을 만든 사람인지. 이름 옆에 표를 다는 데 씁니다. */
   owner: boolean;
 };
@@ -897,7 +952,17 @@ export type GoingAnswer = 'GOING' | 'NOT_GOING' | 'MAYBE';
 export type Going = {
   id: string;
   name: string;
+  /** 지도에서 이 사람을 가리키는 그림의 이름. 안 골랐으면 비어 있습니다. */
   mark: Maybe<string>;
+  /**
+   * 올려 둔 얼굴 사진. 안 올렸으면 비어 있습니다.
+   *
+   * <p>{@code mark} 보다 <b>앞섭니다</b> — 사진 · 표식 · 이름 차례입니다
+   * ({@code components/profile-face}). 표식을 <b>대신하는 값이 아닙니다</b>:
+   * 내 여행 카드의 겹친 얼굴들에는 사진 쓰는 사람과 표식 쓰는 사람이 섞여
+   * 섭니다.
+   */
+  photoId: Maybe<string>;
   owner: boolean;
   answer: GoingAnswer;
   /** 「셋째 날만 못 가요」 같은 것. 모두에게 보입니다 */
@@ -1028,6 +1093,19 @@ export type LiveWhere = {
   name: string;
   /** 지도에서 이 사람을 가리키는 그림의 이름. 안 골랐으면 비어 있습니다. */
   mark: Maybe<string>;
+  /**
+   * 올려 둔 얼굴 사진. 안 올렸으면 비어 있습니다.
+   *
+   * <p>{@code mark} 보다 <b>앞섭니다</b> — 사진 · 표식 · 이름 차례입니다
+   * ({@code components/profile-face}). 표식을 <b>대신하는 값이 아닙니다</b>:
+   * 사진을 안 올린 동행자의 핀은 그대로 표식으로 섭니다.
+   *
+   * <p>지도 핀도 이것을 씁니다. 핀은 서른 픽셀짜리 동그라미라서
+   * ({@code components/trip-map} 의 {@code FacePin}) 얼굴이 들어갈 자리가
+   * 됩니다 — 핀 안의 이모지 <b>글자 크기</b>를 핀 크기로 잘못 읽어서 사진이
+   * 안 들어간다고 보았던 자리입니다.
+   */
+  photoId: Maybe<string>;
   lat: number;
   lng: number;
   accuracy: Maybe<number>;

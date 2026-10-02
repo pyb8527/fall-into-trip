@@ -84,8 +84,27 @@ T("남의 방문 기록은 안 실림", JSON.stringify(r.data.itinerary).include
 console.log("\n[4-2] 골라 보기");
 r = await call("GET", "/api/posts/regions");
 T("지역 목록이 열림", r.status === 200 && r.data.regions.includes("일본"), r.data);
+/*
+  지역을 안 골라도 서버가 좌표로 정합니다.
+
+  전에는 「안 골랐으면 안 걸린다」를 잡고 있었습니다. 그때는 올릴 때 화면이
+  글 제목을 글자로 훑어 지역을 찍었고(「도쿄 여행」이면 도쿄), 안 걸리면 그냥
+  비워 뒀습니다. 그래서 대부분의 글에 지역이 안 붙어 지역 거르기가 사실상
+  비어 있었습니다.
+
+  이제 서버가 첫날 첫 장소의 좌표로 정합니다(Regions). 이 글의 장소는
+  도톤보리(34.6687, 135.5013)라 일본입니다 — 글쓴이가 안 골라도 일본
+  목록에서 보이는 것이 맞습니다.
+
+  묶음이 여덟(국내·일본·중화권·동남아·유럽·미주·오세아니아·그 밖)이라
+  좌표로 가릅니다. 도시 단위였으면 이렇게 못 합니다.
+*/
 r = await call("GET", "/api/posts?region=" + encodeURIComponent("일본"));
-T("지역을 안 골랐으면 안 걸림", !r.data.posts.some(p => p.id === postId), r.data.posts?.[0]);
+T("안 골라도 좌표로 지역이 정해짐", r.data.posts.some(p => p.id === postId), r.data.posts?.[0]);
+T("그 지역이 일본", r.data.posts.find(p => p.id === postId)?.region === "일본",
+  r.data.posts.find(p => p.id === postId));
+r = await call("GET", "/api/posts?region=" + encodeURIComponent("국내"));
+T("다른 지역에는 안 걸림", !r.data.posts.some(p => p.id === postId), r.data.posts?.[0]);
 r = await call("GET", "/api/posts?q=" + encodeURIComponent("오사카"));
 T("제목으로 찾음", r.data.posts.some(p => p.id === postId), r.data.posts?.[0]);
 r = await call("GET", "/api/posts?q=" + encodeURIComponent("없는말없는말"));

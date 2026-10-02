@@ -47,7 +47,22 @@ public class GroupCards {
     public record Card(List<Face> faces, Activity activity, List<String> photoIds, boolean fresh) {
     }
 
-    public record Face(String name, String mark) {
+    /**
+     * 카드에 겹쳐 그리는 얼굴 하나.
+     *
+     * <h3>사진과 표식을 함께 냅니다</h3>
+     *
+     * <p>얼굴을 세우는 차례는 <b>사진 · 표식 · 이름</b>입니다
+     * ({@code components/profile-face}). {@code photoId} 가 {@code mark} 를
+     * 대신하는 것이 아니라 <b>앞서는</b> 것이라 둘을 같이 보냅니다 — 표식은
+     * 사진을 안 올린 사람의 자리이고, 그것마저 없으면 이름에서 따온 것이
+     * 섭니다. 하나만 실으면 한쪽 사람들의 얼굴이 빈 동그라미가 됩니다.
+     *
+     * <p>사람을 다시 묻지 않습니다. 위에서 {@code users.findAllById} 로 한꺼번에
+     * 받아 둔 {@link User} 에서 둘을 함께 꺼냅니다 — 사진 때문에 얼굴마다 왕복이
+     * 하나씩 붙으면 카드 한 장이 넷, 모임 다섯이면 스물이 됩니다.
+     */
+    public record Face(String name, String mark, String photoId) {
     }
 
     /**
@@ -113,7 +128,7 @@ public class GroupCards {
                     .limit(FACES)
                     .map(r -> byId.get((String) r[1]))
                     .filter(Objects::nonNull)
-                    .map(u -> new Face(u.getName(), u.getMark()))
+                    .map(u -> new Face(u.getName(), u.getMark(), u.getPhotoId()))
                     .toList();
 
             List<Object[]> posts = postRows.stream().filter(r -> gid.equals(r[0])).toList();

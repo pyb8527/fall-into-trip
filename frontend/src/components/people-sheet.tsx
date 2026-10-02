@@ -6,6 +6,7 @@ import { api, ApiError, UNEXPECTED } from '@/api/client';
 import type { Going, GoingAnswer, Group } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
+import { ProfileFace } from '@/components/profile-face';
 import { Colors, Gutter, Spacing, Tap } from '@/constants/theme';
 import { faceOf } from '@/constants/user-marks';
 import { openPerson } from '@/lib/person';
@@ -20,7 +21,6 @@ import {
   ErrorNote,
   Grow,
   Loading,
-  Mark,
   Press,
   Row,
   Subtitle,
@@ -182,8 +182,16 @@ function Inner({
       {data?.going.map((p) => (
         <Row key={p.id} gap={Spacing.s3} style={styles.mate}>
           {/* 지도에 찍히는 그림을 여기에도 답니다. 지도에서 곰을 보고
-              누구인지 알려면 어딘가에서 한 번은 짝지어져야 합니다. */}
-          <Mark emoji={faceOf(p.mark, p.name)} />
+              누구인지 알려면 어딘가에서 한 번은 짝지어져야 합니다.
+
+              얼굴 칸은 {@link ProfileFace} 입니다 — 까닭은 모임 사람들
+              판({@code components/mates-sheet})에 적어 두었습니다. */}
+          <ProfileFace
+            photoId={p.photoId}
+            mark={faceOf(p.mark, p.name)}
+            size={40}
+            label={`${p.name}의 얼굴`}
+          />
           <Grow gap={2}>
             <Press
               onPress={() => {

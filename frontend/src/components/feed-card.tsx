@@ -1,13 +1,14 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { api, ApiError, UNEXPECTED } from '@/api/client';
 import type { FeedAudience, FeedPost } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
 import { PhotoStrip } from '@/components/photo-strip';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { ProfileFace } from '@/components/profile-face';
+import { Spacing } from '@/constants/theme';
 import { faceOf } from '@/constants/user-marks';
 import { openPerson } from '@/lib/person';
 import {
@@ -111,17 +112,31 @@ export function FeedCard({
   return (
     <Card>
       <Split gap={Spacing.s2}>
-        {/* 얼굴은 동그라미에 담습니다. 이모지를 글자 사이에 그냥 두면
-            기기마다 다른 높이로 그려져 이름 줄이 들쭉날쭉합니다. */}
-        {/* 글쓴이를 누르면 그 사람 페이지로. */}
+        {/*
+          글쓴이. 누르면 그 사람 페이지로.
+
+          <p>동그라미와 그 안의 크기를 이 카드가 손수 그리고 있었습니다. 사진이
+          들어오면서 <b>사진 · 표식 · 이름</b> 세 갈래가 이 파일에도 한 벌
+          생길 자리였습니다 — 한 칸으로 묶습니다({@link ProfileFace}).
+
+          <p>{@code faceOf} 를 {@code mark} 자리에 넘깁니다. 그 함수가 곧
+          「표식, 없으면 이름 첫 글자」라서, 사진이 먼저 걸리고 없을 때 이것이
+          서는 것이 그대로 세 갈래의 차례입니다.
+
+          <p>40 입니다. 댓글 줄의 이름보다 한 단 큽니다 — 글 한 편의
+          주인입니다.
+        */}
         <Press
           onPress={() => openPerson(router, post.authorId, user?.id)}
           scale={0.98}
           accessibilityLabel={`${post.authorName} 페이지`}
           style={[styles.who, styles.whoRow]}>
-          <View style={styles.face}>
-            <Text style={styles.faceEmoji}>{faceOf(post.authorMark, post.authorName)}</Text>
-          </View>
+          <ProfileFace
+            photoId={post.authorPhotoId}
+            mark={faceOf(post.authorMark, post.authorName)}
+            size={40}
+            label={`${post.authorName}의 얼굴`}
+          />
           <View style={styles.name}>
             <Body strong numberOfLines={1}>
               {post.authorName}
@@ -411,20 +426,6 @@ const styles = StyleSheet.create({
   },
   who: {
     flexShrink: 1,
-  },
-  /* 글쓴이 얼굴. 댓글 줄의 32보다 한 단 큽니다 — 글 한 편의 주인입니다. */
-  face: {
-    width: 40,
-    height: 40,
-    borderRadius: Radius.full,
-    backgroundColor: Colors.fill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  faceEmoji: {
-    fontSize: 20,
-    /* 이모지는 글꼴이 제 높이를 갖고 있어, 줄 높이를 두면 아래로 처집니다. */
-    lineHeight: undefined,
   },
   name: {
     flexShrink: 1,
