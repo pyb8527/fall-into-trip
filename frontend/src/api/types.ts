@@ -803,6 +803,48 @@ export type Going = {
   note: Maybe<string>;
 };
 
+/** 그날 되는지. 「어쩔 수 없으면」은 「안 돼요」가 아니라서 2순위 셈에 남습니다. */
+export type DateChoice = 'YES' | 'IF_NEED' | 'NO';
+
+/**
+ * 날짜 후보 하나. 서버가 줄 세운 차례로 옵니다.
+ *
+ * <p>{@code tier} — 1 가는 사람 모두 돼요 · 2 안 돼요 없음 · 3 나머지.
+ * 많이 된다는 날이 아니라 <b>모두 되는 날</b>을 찾습니다.
+ */
+export type DateOption = {
+  id: string;
+  startIso: string;
+  endIso: string;
+  nights: number;
+  createdBy: Maybe<string>;
+  confirmed: boolean;
+  tier: 1 | 2 | 3;
+  yes: number;
+  no: number;
+  /** 가는 사람 중 답한 수 */
+  answered: number;
+  mine?: Maybe<DateChoice>;
+  answers: { userId: string; name: string; answer: DateChoice }[];
+};
+
+export type DatePoll = {
+  options: DateOption[];
+  /** 지금 「가는 사람」 수 */
+  people: number;
+  amOwner: boolean;
+};
+
+/** 모임 달력에 빗금으로 그리는, 아직 정하는 중인 후보. */
+export type OpenDate = {
+  id: string;
+  tripId: string;
+  tripTitle: string;
+  startIso: string;
+  endIso: string;
+  mine?: Maybe<DateChoice>;
+};
+
 /**
  * 마이페이지가 받는 것 — 이 사람이 어떤 여행을 해 왔나.
  *

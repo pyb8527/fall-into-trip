@@ -286,13 +286,23 @@ public class ExpenseService {
                 .orElseThrow(() -> ApiException.notFound("그런 지출이 없어요."));
     }
 
+    /**
+     * 낸 사람·나눌 사람으로 적을 수 있는 사람.
+     *
+     * <p>「가는 사람」이 아니라 여행에 딸린 사람 전부입니다. 못 가게 된
+     * 사람이 떠나기 전에 긁어 둔 항공권도 적을 수 있어야 합니다 — 그 돈을
+     * 못 적게 막으면 셈이 아니라 기록이 사라집니다. 지정 안 한 지출을 누구와
+     * 나누는지는 {@link #settlers} 가 따로 정합니다.
+     */
     private List<String> memberIdsOf(String tripId) {
-        return access.peopleOf(tripId);
+        return access.everyoneOf(tripId);
     }
 
+    /* 이름도 전부에게서 받습니다. 「못 가요」 한 사람이 낸 돈이 정산에
+       「나간 사람」으로 찍히면 모임을 나간 줄 압니다. */
     private Map<String, String> namesOf(String tripId) {
         Map<String, String> out = new LinkedHashMap<>();
-        access.peopleOf(tripId).forEach(id -> users.findById(id)
+        access.everyoneOf(tripId).forEach(id -> users.findById(id)
                 .ifPresent(u -> out.put(u.getId(), u.getName())));
         return out;
     }

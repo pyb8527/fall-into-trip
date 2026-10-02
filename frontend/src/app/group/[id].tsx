@@ -3,8 +3,9 @@ import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { api, ApiError, UNEXPECTED } from '@/api/client';
-import type { Group, Mate, Trip, TripSummary } from '@/api/types';
+import type { Group, Mate, OpenDate, Trip, TripSummary } from '@/api/types';
 import { useAsync } from '@/api/use-async';
+import { DatePollSheet } from '@/components/date-poll-sheet';
 import { TripCalendar } from '@/components/trip-calendar';
 import { useAuth } from '@/auth/auth-provider';
 import { FeedList } from '@/components/feed-list';
@@ -115,6 +116,12 @@ export default function GroupScreen() {
     [],
   );
   const ours = (all.data?.trips ?? []).filter((t) => t.groupId === id);
+  /* 이 모임에서 아직 날짜를 정하는 중인 후보. 달력에 속 빈 점으로 찍습니다. */
+  const polls = useAsync<{ options: OpenDate[] }>(
+    (signal) => api.get(`/api/groups/${encodeURIComponent(id)}/dates`, signal),
+    [id],
+  );
+  const [dating, setDating] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [mates, setMates] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -226,6 +233,8 @@ export default function GroupScreen() {
             <TripCalendar
               trips={ours}
               onOpen={(t) => router.push({ pathname: '/trip/[id]', params: { id: t.id } })}
+              polls={polls.data?.options ?? []}
+              onPoll={setDating}
             />
           ) : lane === 'trips' ? (
             <>
@@ -276,6 +285,21 @@ export default function GroupScreen() {
               reload();
             }}
           />
+
+          {dating ? (
+            <DatePollSheet
+              visible
+              tripId={dating}
+              onClose={() => {
+                setDating(null);
+                polls.reload();
+              }}
+              onConfirmed={() => {
+                polls.reload();
+                all.reload();
+              }}
+            />
+          ) : null}
 
           <MatesSheet
             visible={mates}

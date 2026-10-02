@@ -18,6 +18,7 @@ import { api, ApiError, UNEXPECTED } from '@/api/client';
 import type { Day, Gap, GapOption, LivePin, LiveWhere, Money, OurStars, Person, Place, PlaceInfo, Spend, TravelMode, Trip, TripDetail } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
+import { DatePollSheet } from '@/components/date-poll-sheet';
 import { PeopleSheet } from '@/components/people-sheet';
 import type { RouteLine } from '@/components/map-types';
 import { PlaceForm } from '@/components/place-form';
@@ -355,6 +356,8 @@ export default function TripScreen() {
   }, [spending]);
 
   const [people, setPeople] = useState(false);
+  /* 언제 갈까 판. 모임 여행에서만 엽니다 — 혼자면 물을 사람이 없습니다. */
+  const [dating, setDating] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [dropping, setDropping] = useState(false);
   const me = useHere();
@@ -1686,6 +1689,24 @@ export default function TripScreen() {
       */}
       <BottomSheet visible={more} title="이 여행 다루기" onClose={() => setMore(false)}>
         {/*
+          언제 갈까.
+
+          <p>모임 여행에서만 둡니다. 혼자 여행의 날짜는 여행 고치기에서
+          바로 옮기면 되고, 물을 사람이 없습니다.
+        */}
+        {data.trip.groupId ? (
+          <ListRow
+            left={<Icon name="calendar" tone="secondary" />}
+            title="언제 갈지 정하기"
+            subtitle="날짜 후보를 올리고 되는지 답해요. 모두 되는 날이 위로 와요."
+            onPress={() => {
+              setMore(false);
+              setDating(true);
+            }}
+          />
+        ) : null}
+
+        {/*
           종이로 한 장.
 
           길에서 배터리가 나가도, 데이터가 안 터지는 지하철에서도 보입니다.
@@ -1757,6 +1778,15 @@ export default function TripScreen() {
           </>
         ) : null}
       </BottomSheet>
+
+      {data.trip.groupId ? (
+        <DatePollSheet
+          visible={dating}
+          tripId={data.trip.id}
+          onClose={() => setDating(false)}
+          onConfirmed={reload}
+        />
+      ) : null}
 
       <PeopleSheet
         visible={people}

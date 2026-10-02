@@ -61,7 +61,6 @@ public class TripController {
         return Map.of("people", trips.peopleOf(me, id));
     }
 
-    /** 혼자 여행을 모임으로 옮기거나 다시 뺍니다. 만든 사람만 합니다. */
     /**
      * 누가 가고 누가 못 가나.
      *
@@ -94,6 +93,7 @@ public class TripController {
     public record GoingBody(net.weeniebeenie.fit.trip.domain.GoingAnswer answer, String note) {
     }
 
+    /** 혼자 여행을 모임으로 옮기거나 다시 뺍니다. 만든 사람만 합니다. */
     @PatchMapping("/trips/{id}/group")
     public Map<String, Object> group(@CurrentUser AuthPrincipal me,
                                      @PathVariable String id,

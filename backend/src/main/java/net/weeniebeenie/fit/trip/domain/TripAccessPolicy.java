@@ -160,8 +160,14 @@ public class TripAccessPolicy {
      *
      * <p>{@link #peopleOf} 가 「가는 사람」이 된 뒤에도 전부가 필요한 자리가
      * 있습니다 — 참석 응답 화면이 그렇습니다. 누가 못 간다고 했는지를
-     * 보여 주려면 그 사람도 목록에 있어야 합니다.
+     * 보여 주려면 그 사람도 목록에 있어야 합니다. 가계부도 그렇습니다 —
+     * 못 가게 된 사람이 미리 낸 돈을 적을 수 있어야 하고, 정산에 그 사람
+     * 이름이 「나간 사람」으로 찍히면 안 됩니다.
      */
+    public List<String> everyoneOf(String tripId) {
+        return trips.findById(tripId).map(this::everyoneOf).orElse(List.of());
+    }
+
     public List<String> everyoneOf(Trip trip) {
         Set<String> out = new LinkedHashSet<>();
         out.add(trip.getOwnerId());

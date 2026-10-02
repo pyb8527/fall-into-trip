@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { StyleSheet, Text, View, type ViewStyle } from 'react-native';
 
-import type { TripSummary } from '@/api/types';
+import type { OpenDate, TripSummary } from '@/api/types';
 import { Colors, Radius, Spacing, Tabular, Type, Weight, dayColor } from '@/constants/theme';
 import { formatSpan, todayIso } from '@/lib/countdown';
 import { Caption, Icon, Press, Row } from '@/ui';
@@ -33,11 +33,22 @@ export function TripCalendar({
   trips,
   onOpen,
   showGroup = false,
+  polls = [],
+  onPoll,
 }: {
   trips: TripSummary[];
   onOpen: (trip: TripSummary) => void;
   /** 모임 이름을 줄에 붙일지. 마이페이지에서는 켭니다(여러 모임이 섞입니다) */
   showGroup?: boolean;
+  /**
+   * 아직 정하는 중인 날짜 후보(모임 달력).
+   *
+   * <p>여행 막대와 섞이지 않게 <b>속이 빈 점</b>으로 찍습니다. 정해진 것과
+   * 정하는 중인 것이 같은 모양이면 「그날 가기로 했나」로 읽힙니다.
+   */
+  polls?: OpenDate[];
+  /** 후보 줄을 누르면 그 여행의 「언제 갈까」 판을 엽니다 */
+  onPoll?: (tripId: string) => void;
 }) {
   /* 보고 있는 달. 오늘이 든 달에서 시작합니다. */
   const [at, setAt] = useState(() => {
@@ -82,6 +93,32 @@ export function TripCalendar({
     }
     return box;
   }, [month, at]);
+
+  /** 날짜 → 그날 걸치는 후보 수. 속 빈 점을 찍는 데 씁니다. */
+  const pollDay = useMemo(() => {
+    const box = new Map<number, number>();
+    const days = new Date(at.year, at.month + 1, 0).getDate();
+    for (let d = 1; d <= days; d++) {
+      const iso = `${at.year}-${String(at.month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const n = polls.filter((p) => p.startIso <= iso && p.endIso >= iso).length;
+      if (n > 0) {
+        box.set(d, n);
+      }
+    }
+    return box;
+  }, [polls, at]);
+
+  /* 이 달에 걸치는 후보. 날을 눌러 두면 그날 것만. */
+  const monthPolls = useMemo(() => {
+    const first = `${at.year}-${String(at.month + 1).padStart(2, '0')}-01`;
+    const last = `${at.year}-${String(at.month + 1).padStart(2, '0')}-31`;
+    return polls.filter(
+      (p) =>
+        p.startIso <= last &&
+        p.endIso >= first &&
+        (picked == null || (p.startIso <= picked && p.endIso >= picked)),
+    );
+  }, [polls, at, picked]);
 
   /* 이 달에 아무것도 없을 때 건너뛸 곳. 오늘 이후로 가장 가까운 여행입니다. */
   const next = useMemo(() => {
@@ -167,7 +204,7 @@ export function TripCalendar({
 
                   <p>셋까지만 찍습니다. 넷이 겹치는 날은 점이 칸을 넘칩니다.
                 */}
-                {on.length > 0 ? (
+                {on.length > 0 || pollDay.has(d) ? (
                   <View style={styles.dots}>
                     {on.slice(0, 3).map((t) => (
                       <View
@@ -175,6 +212,7 @@ export function TripCalendar({
                         style={[styles.dot, { backgroundColor: t.theme ?? dayColor(0) }]}
                       />
                     ))}
+                    {pollDay.has(d) && on.length < 3 ? <View style={styles.pollDot} /> : null}
                   </View>
                 ) : null}
               </View>
@@ -182,6 +220,28 @@ export function TripCalendar({
           );
         })}
       </View>
+
+      {/*
+        정하는 중인 날짜.
+
+        <p>여행 목록 위에 둡니다. 답해야 하는 일이 이미 정해진 일보다
+        먼저입니다 — 아래에 두면 여행이 많은 달에 안 보입니다.
+      */}
+      {monthPolls.map((p) => (
+        <Press key={p.id} onPress={() => onPoll?.(p.tripId)} scale={1} style={styles.row}>
+          <View style={[styles.mark, styles.pollMark]} />
+          <View style={styles.rowText}>
+            <Text style={styles.rowTitle} numberOfLines={1}>
+              {p.tripTitle}
+            </Text>
+            <Caption tone="secondary" numberOfLines={1}>
+              날짜 후보 · {formatSpan(p.startIso, p.endIso)}
+              {p.mine ? '' : ' · 아직 답 안 함'}
+            </Caption>
+          </View>
+          <Icon name="chevron-right" size={20} tone="muted" />
+        </Press>
+      ))}
 
       {/* 이 달 목록. 날을 눌러 두면 그날로 좁혀집니다. */}
       {shown.length > 0 ? (
@@ -336,6 +396,20 @@ const styles = StyleSheet.create({
     width: 4,
     height: 4,
     borderRadius: Radius.full,
+  },
+  /* 정하는 중인 후보. 속을 비워 정해진 여행 점과 가릅니다. */
+  pollDot: {
+    width: 4,
+    height: 4,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    borderColor: Colors.accent,
+  },
+  pollMark: {
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: Colors.accent,
   },
   row: {
     flexDirection: 'row',
