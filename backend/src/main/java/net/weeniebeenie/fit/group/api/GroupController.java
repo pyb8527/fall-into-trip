@@ -3,6 +3,7 @@ package net.weeniebeenie.fit.group.api;
 import lombok.RequiredArgsConstructor;
 import net.weeniebeenie.fit.account.infrastructure.security.AuthPrincipal;
 import net.weeniebeenie.fit.account.infrastructure.security.CurrentUser;
+import net.weeniebeenie.fit.group.application.GroupCards;
 import net.weeniebeenie.fit.group.application.GroupService;
 import net.weeniebeenie.fit.group.domain.Group;
 import net.weeniebeenie.fit.trip.domain.Trip;
@@ -22,6 +23,8 @@ import java.util.Map;
 public class GroupController {
 
     private final GroupService groups;
+    private final GroupCards cards;
+    private final net.weeniebeenie.fit.account.domain.UserRepository users;
 
     @PostMapping
     public Map<String, Object> create(@CurrentUser AuthPrincipal me,
@@ -41,10 +44,33 @@ public class GroupController {
      */
     @GetMapping
     public Map<String, Object> mine(@CurrentUser AuthPrincipal me) {
-        List<Map<String, Object>> out = groups.mine(me).stream()
-                .map(g -> view(g,
-                        groups.peopleOf(me, g.getId()).size(),
-                        groups.tripsOf(me, g.getId()).size()))
+        List<Group> list = groups.mine(me);
+        /*
+          카드에 얹을 것 — 앞 몇 사람의 얼굴, 최근 활동 한 줄, 최근 사진.
+
+          <p>목록이 「이름 · 인원 · 여행 수」 한 줄씩이라 모임이 둘이면 화면이
+          비었습니다. 넘기는 번호는 <b>내가 든 모임</b>뿐입니다 — 안 든 모임의
+          활동은 읽지도 않습니다(GroupCards).
+        */
+        java.time.Instant seenAt = users.findById(me.id())
+                .map(net.weeniebeenie.fit.account.domain.User::getNewsSeenAt).orElse(null);
+        Map<String, GroupCards.Card> cards = this.cards.of(
+                list.stream().map(Group::getId).toList(), me.id(), seenAt);
+
+        List<Map<String, Object>> out = list.stream()
+                .map(g -> {
+                    Map<String, Object> v = view(g,
+                            groups.peopleOf(me, g.getId()).size(),
+                            groups.tripsOf(me, g.getId()).size());
+                    GroupCards.Card c = cards.get(g.getId());
+                    if (c != null) {
+                        v.put("faces", c.faces());
+                        v.put("activity", c.activity());
+                        v.put("photoIds", c.photoIds());
+                        v.put("fresh", c.fresh());
+                    }
+                    return v;
+                })
                 .toList();
         return Map.of("groups", out);
     }

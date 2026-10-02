@@ -88,7 +88,9 @@ type Detail = {
 };
 
 export default function GroupScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  /* invite — 모임 목록의 「초대 링크 만들기」나 새로 만든 직후. 사람들 판을
+     바로 엽니다 — 다음에 할 일이 사람을 부르는 것입니다. */
+  const { id, invite } = useLocalSearchParams<{ id: string; invite?: string }>();
   const router = useRouter();
   const { user } = useAuth();
 
@@ -123,7 +125,7 @@ export default function GroupScreen() {
   );
   const [dating, setDating] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
-  const [mates, setMates] = useState(false);
+  const [mates, setMates] = useState(invite === '1');
   const [adding, setAdding] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [busy, setBusy] = useState(false);

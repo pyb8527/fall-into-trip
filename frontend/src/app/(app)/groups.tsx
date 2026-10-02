@@ -1,62 +1,102 @@
 import { Stack, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { api } from '@/api/client';
-import type { Group } from '@/api/types';
+import type { Group, TripSummary } from '@/api/types';
 import { useAsync } from '@/api/use-async';
+import { CountdownBadge } from '@/components/countdown-badge';
 import { GroupForm } from '@/components/group-form';
+import { OurPhoto } from '@/components/our-photo';
+import { Colors, Radius, Spacing, Type, Weight } from '@/constants/theme';
+import { faceOf } from '@/constants/user-marks';
+import { countdownOf, formatSpan, type Countdown } from '@/lib/countdown';
 import {
+  Body,
   Button,
   Caption,
-  Empty,
   ErrorNote,
+  Field,
   Grow,
   Icon,
   IconButton,
-  ListRow,
   Loading,
   Mark,
+  Press,
+  Row,
   Screen,
   Split,
   Title,
 } from '@/ui';
 import { AppTabs } from '@/ui/tab-bar';
 
+/** 모임 목록이 카드에 얹어 받는 것(GroupCards). */
+type GroupCard = Group & {
+  faces?: { name: string; mark?: string | null }[];
+  activity?: { kind: 'feed.post' | 'group.join'; actorName: string; at: string } | null;
+  photoIds?: string[];
+  /** 마지막으로 소식함을 연 뒤에 남이 무언가를 했는지 */
+  fresh?: boolean;
+};
+
 /**
  * 내 모임.
  *
- * <h3>사람 수와 여행 수를 함께 냅니다</h3>
+ * <h3>한 줄 목록이 카드가 됐습니다</h3>
  *
- * <p>이름만 늘어놓으면 어느 것이 살아 있는 모임인지 안 보입니다. 모임이
- * 다섯만 되어도 「어디서 그 여행을 짰더라」 를 들어가 봐야 알게 됩니다.
+ * <p>「이름 · 인원 · 여행 수」 한 줄씩이라 모임이 둘이면 화면이 텅 비었습니다.
+ * 모임마다 카드 한 장 — 누가 있나(얼굴과 이름), 다음 여행, 최근에 무슨 일이
+ * 있었나, 최근 사진. 그 위에 가장 가까운 모임 여행 하나, 아래에 사람을 부르고
+ * 초대받는 자리를 둡니다. 모임이 둘이어도 한 화면이 찹니다.
  *
- * <h3>왜 여행 목록과 따로인가</h3>
+ * <h3>여행은 모임이 아니라 사람</h3>
  *
- * <p>여행은 일이고 모임은 사람입니다. 한 모임에서 여행을 여러 번 가는 것이
- * 이 기능의 뜻이라, 모임을 여행 목록 안에 접어 넣으면 그 뜻이 안 보입니다
- * — 내 여행 화면은 「모임」 칸으로 그 결과만 보여 줍니다.
+ * <p>여행은 일이고 모임은 사람입니다. 그래서 카드의 첫 줄은 얼굴입니다 —
+ * 「2명」이라는 숫자로는 누구와의 모임인지 안 보입니다.
  *
- * <h3>만들기를 위로 올렸습니다</h3>
+ * <h3>만들기는 제목 오른쪽 +</h3>
  *
- * <p>아래에 고정 단추를 두었더니 갈래 띠와 겹쳐 아래쪽이 두 겹으로
- * 무거웠습니다. 갈래 화면에는 이미 띠가 서 있으니 그 위에 단추 판을 또
- * 얹으면 목록이 설 자리가 그만큼 줄어듭니다. 목록이 있을 때는 제목 오른쪽
- * <b>+</b> 하나로 충분합니다 — 모임을 만드는 일은 자주 하는 일이 아닙니다.
- *
- * <p>비었을 때는 다릅니다. 그때는 만들기가 이 화면의 하나뿐인 할 일이라,
- * 빈자리 아래에 채운 단추로 세웁니다.
+ * <p>갈래 화면에는 아래 띠가 이미 서 있어 그 위에 단추 판을 또 얹으면 목록이
+ * 설 자리가 줄어듭니다. 비었을 때만 빈자리 아래에 채운 단추를 세웁니다.
  */
 export default function Groups() {
   const router = useRouter();
   const [creating, setCreating] = useState(false);
 
-  const { data, error, loading, reload } = useAsync<{ groups: Group[] }>(
+  const { data, error, loading, reload } = useAsync<{ groups: GroupCard[] }>(
     (signal) => api.get('/api/groups', signal),
     [],
   );
+  /* 다가오는 모임 여행과, 모임마다 다음 여행. 목록이 날짜와 모임 번호를 이미 줍니다. */
+  const trips = useAsync<{ trips: TripSummary[] }>((signal) => api.get('/api/trips', signal), []);
 
   const groups = data?.groups ?? [];
   const blank = data != null && groups.length === 0;
+
+  /** 모임 번호 → 그 모임의 다음 여행(여행 중이거나 다가오는 것 중 가장 이른 것). */
+  const nextOf = useMemo(() => {
+    const out = new Map<string, { trip: TripSummary; at: Countdown }>();
+    const rows = (trips.data?.trips ?? [])
+      .filter((t) => t.groupId != null)
+      .map((trip) => ({ trip, at: countdownOf(trip.startIso, trip.endIso) }))
+      .filter((r): r is { trip: TripSummary; at: Countdown } => r.at != null)
+      .sort((a, b) => (a.trip.startIso ?? '').localeCompare(b.trip.startIso ?? ''));
+    for (const r of rows) {
+      if (!out.has(r.trip.groupId as string)) {
+        out.set(r.trip.groupId as string, r);
+      }
+    }
+    return out;
+  }, [trips.data]);
+
+  /* 맨 위 배너 — 모든 모임 여행 중 가장 가까운 것 하나. */
+  const soonest = useMemo(
+    () =>
+      [...nextOf.values()].sort((a, b) =>
+        (a.trip.startIso ?? '').localeCompare(b.trip.startIso ?? ''),
+      )[0] ?? null,
+    [nextOf],
+  );
 
   return (
     <Screen
@@ -67,62 +107,321 @@ export default function Groups() {
           <Grow>
             <Title>모임</Title>
           </Grow>
-          {/* 비었을 때는 빈자리 쪽 단추가 이 일을 맡습니다. 둘을 같이 두면
-              같은 일을 하는 자리가 한 화면에 둘입니다. */}
           {blank ? null : (
             <IconButton name="plus" label="새 모임 만들기" bare onPress={() => setCreating(true)} />
           )}
         </Split>
       }>
-      {/*
-        큰 제목이 본문 위에 서므로 상단바는 걷습니다.
-
-        <p>갈래 띠로 오는 화면입니다. 뒤로 갈 데가 없으니 상단바가 할 일이
-        없는데, 작은 제목 하나를 위해 56픽셀을 먹고 있었습니다 — 게다가
-        아래 큰 제목과 같은 말을 두 번 적는 셈이었습니다.
-      */}
       <Stack.Screen options={{ headerShown: false }} />
 
       {loading && !data ? <Loading /> : null}
       {error ? <ErrorNote message={error} onRetry={reload} /> : null}
 
-      {blank ? (
-        <>
-          {/* 「없어요」 만 적으면 무엇을 위한 자리인지 모릅니다. 모임이
-              무엇을 바꾸는지를 빈자리에서 한 번 말해 줍니다. */}
-          <Empty message="함께 여행할 사람들을 모아 보세요." />
-          <Caption tone="secondary">
-            모임에 사람을 부르면 그 안에서 만든 여행이 모두에게 보이고, 일정도 누구나
-            고칠 수 있어요.
-          </Caption>
-          <Button label="모임 만들기" compact onPress={() => setCreating(true)} />
-        </>
+      {/*
+        다가오는 일정.
+
+        <p>모임 화면을 여는 가장 흔한 까닭이 「다음에 언제 가지」입니다. 모임
+        카드 안에도 다음 여행이 있지만, 여러 모임 가운데 가장 가까운 하나는
+        카드들을 훑지 않아도 맨 위에서 보여야 합니다.
+      */}
+      {soonest ? (
+        <Press
+          onPress={() => router.push({ pathname: '/trip/[id]', params: { id: soonest.trip.id } })}
+          scale={0.99}
+          accessibilityLabel={`${soonest.trip.title} 열기`}
+          style={styles.banner}>
+          <Grow gap={2}>
+            <Caption tone="secondary" numberOfLines={1}>
+              {soonest.trip.groupName ?? '모임'} · 다가오는 일정
+            </Caption>
+            <Text style={styles.bannerTitle} numberOfLines={1}>
+              {soonest.trip.title}
+            </Text>
+            <Caption tone="secondary">{formatSpan(soonest.trip.startIso, soonest.trip.endIso)}</Caption>
+          </Grow>
+          <CountdownBadge at={soonest.at} />
+        </Press>
       ) : null}
 
-      {groups.map((g, i) => (
-        <ListRow
+      {blank ? (
+        <View style={styles.blank}>
+          <Mark icon="users" />
+          <Body strong>함께 여행할 사람들을 모아 보세요</Body>
+          <Caption tone="secondary">
+            모임을 만들면 그 안에서 짠 여행을 모두 함께 봐요.{'\n'}일정 · 가계부 · 가고 싶은 곳
+            투표를 같이 써요.{'\n'}부르는 것은 링크 하나면 돼요.
+          </Caption>
+          <Button label="새 모임 만들기" onPress={() => setCreating(true)} />
+        </View>
+      ) : null}
+
+      {groups.map((g) => (
+        <GroupCardView
           key={g.id}
-          left={<Mark emoji={g.emoji ?? '🧳'} />}
-          title={g.name}
-          subtitle={`${g.memberCount}명 · 여행 ${g.tripCount}개`}
-          right={<Icon name="chevron-right" size={20} tone="muted" />}
-          /* 마지막 줄에는 선을 안 긋습니다. 목록이 끝났는데 선이 하나 더
-             있으면 아래에 뭔가 더 있는 줄 압니다. */
-          last={i === groups.length - 1}
-          onPress={() => router.push({ pathname: '/group/[id]', params: { id: g.id } })}
+          group={g}
+          next={nextOf.get(g.id) ?? null}
+          onOpen={() => router.push({ pathname: '/group/[id]', params: { id: g.id } })}
+          onTrip={(id) => router.push({ pathname: '/trip/[id]', params: { id } })}
         />
       ))}
+
+      {/*
+        사람을 부르고, 초대받는 자리.
+
+        <p>초대 링크를 만드는 자리는 모임 안(사람들 판)에 있었고, 받은 링크로
+        들어가는 길은 링크를 누르는 것뿐이었습니다. 메신저로 받은 링크를 앱
+        안에서 붙여 넣을 곳이 없었습니다.
+      */}
+      {data ? (
+        <InviteCard
+          firstGroupId={groups[0]?.id ?? null}
+          onInvite={(id) => router.push({ pathname: '/group/[id]', params: { id, invite: '1' } })}
+          onJoin={(token) => router.push({ pathname: '/invite/[token]', params: { token } })}
+        />
+      ) : null}
 
       <GroupForm
         visible={creating}
         onClose={() => setCreating(false)}
         onDone={(made) => {
           setCreating(false);
-          /* 만들자마자 그 모임으로 들어갑니다. 다음에 할 일은 사람을 부르는
-             것이고, 그 자리가 거기입니다. */
-          router.push({ pathname: '/group/[id]', params: { id: made.id } });
+          router.push({ pathname: '/group/[id]', params: { id: made.id, invite: '1' } });
         }}
       />
     </Screen>
   );
 }
+
+/**
+ * 모임 카드 한 장.
+ *
+ * <p>목록 카드라 모서리 12(plan-review Q1). 흰 바탕에 테두리 — 바닥이 흰
+ * 종이라 테두리가 없으면 어디까지가 한 모임인지 안 보입니다.
+ */
+function GroupCardView({
+  group,
+  next,
+  onOpen,
+  onTrip,
+}: {
+  group: GroupCard;
+  next: { trip: TripSummary; at: Countdown } | null;
+  onOpen: () => void;
+  onTrip: (tripId: string) => void;
+}) {
+  const faces = group.faces ?? [];
+  const names = faces.map((f) => f.name).join(', ');
+  const more = group.memberCount - faces.length;
+
+  return (
+    <View style={styles.card}>
+      <Press onPress={onOpen} scale={0.99} accessibilityLabel={`${group.name} 열기`} style={styles.cardOpen}>
+        <Row gap={Spacing.s3}>
+          <Mark emoji={group.emoji ?? '🧳'} />
+          <Grow>
+            <Text style={styles.cardTitle} numberOfLines={1}>
+              {group.name}
+            </Text>
+          </Grow>
+          {/* 새 소식 점. 숫자는 안 씁니다 — 「들어가 볼 것이 있다」면 됩니다. */}
+          {group.fresh ? <View style={styles.dot} accessibilityLabel="새 소식" /> : null}
+          <Icon name="chevron-right" size={18} tone="muted" />
+        </Row>
+
+        {/* 누가 있나 — 얼굴을 겹치고 이름을 적습니다. 「2명」으로는 누구와의
+            모임인지 안 보입니다. */}
+        <Row gap={Spacing.s2}>
+          <Row>
+            {faces.map((f, i) => (
+              <View key={i} style={[styles.face, i > 0 ? styles.faceOver : null]}>
+                <Text style={styles.faceText}>{faceOf(f.mark ?? null, f.name)}</Text>
+              </View>
+            ))}
+          </Row>
+          <Caption tone="secondary" numberOfLines={1}>
+            {names}
+            {more > 0 ? ` 외 ${more}명` : ''}
+          </Caption>
+        </Row>
+
+        {group.activity ? (
+          <Caption tone="muted" numberOfLines={1}>
+            {group.activity.actorName} 님이{' '}
+            {group.activity.kind === 'feed.post' ? '피드에 글을 올렸어요' : '모임에 들어왔어요'} ·{' '}
+            {ago(group.activity.at)}
+          </Caption>
+        ) : null}
+
+        {(group.photoIds ?? []).length > 0 ? (
+          <Row gap={Spacing.s1}>
+            {(group.photoIds ?? []).map((id) => (
+              <OurPhoto key={id} id={id} width={72} height={72} style={styles.thumb} />
+            ))}
+          </Row>
+        ) : null}
+      </Press>
+
+      {/* 다음 여행. 없으면 만들러 가는 길을 둡니다 — 모임 화면에서 만들면
+          그 모임 것으로 만들어집니다. */}
+      {next ? (
+        <Press onPress={() => onTrip(next.trip.id)} scale={0.97} style={styles.nextChip}>
+          <Icon name="calendar" size={16} tone="brand" />
+          <Text style={styles.nextText} numberOfLines={1}>
+            {next.trip.title}
+          </Text>
+          <CountdownBadge at={next.at} />
+        </Press>
+      ) : (
+        <Press onPress={onOpen} scale={0.97} style={styles.nextChip}>
+          <Caption tone="secondary">아직 여행이 없어요 · </Caption>
+          <Caption tone="brand" strong>
+            여행 만들기
+          </Caption>
+        </Press>
+      )}
+    </View>
+  );
+}
+
+/**
+ * 초대 카드 — 부르기와, 받은 링크 붙여 넣기.
+ *
+ * <p>받은 것은 링크 통째로 붙여 넣어도 되고 끝의 코드만 넣어도 됩니다. 링크의
+ * 마지막 조각을 꺼내 초대 화면으로 보냅니다 — 어떤 모양으로 받았는지 사람이
+ * 가릴 일이 아닙니다.
+ */
+function InviteCard({
+  firstGroupId,
+  onInvite,
+  onJoin,
+}: {
+  firstGroupId: string | null;
+  onInvite: (groupId: string) => void;
+  onJoin: (token: string) => void;
+}) {
+  const [code, setCode] = useState('');
+  const token = code.trim().split(/[/?#]/).filter(Boolean).pop() ?? '';
+
+  return (
+    <View style={styles.invite}>
+      {firstGroupId ? (
+        <>
+          <Body strong>친구를 불러 같이 짜 보세요</Body>
+          <Caption tone="secondary">링크 하나를 보내면 바로 들어와요.</Caption>
+          <Button label="초대 링크 만들기" variant="secondary" onPress={() => onInvite(firstGroupId)} />
+        </>
+      ) : null}
+      <Field
+        label="초대받았어요"
+        value={code}
+        onChangeText={setCode}
+        placeholder="받은 초대 링크나 코드"
+        autoCapitalize="none"
+        returnKeyType="go"
+        onSubmitEditing={() => (token ? onJoin(token) : undefined)}
+        action={{ icon: 'chevron-right', label: '초대로 들어가기', disabled: !token, onPress: () => onJoin(token) }}
+      />
+    </View>
+  );
+}
+
+/** 「3시간 전」. 소식함과 같은 말씨입니다. */
+function ago(iso: string) {
+  const ms = Date.now() - new Date(iso).getTime();
+  const min = Math.floor(ms / 60000);
+  if (min < 1) {
+    return '방금';
+  }
+  if (min < 60) {
+    return `${min}분 전`;
+  }
+  const h = Math.floor(min / 60);
+  if (h < 24) {
+    return `${h}시간 전`;
+  }
+  return `${Math.floor(h / 24)}일 전`;
+}
+
+const styles = StyleSheet.create({
+  banner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.s3,
+    padding: Spacing.s4,
+    borderRadius: 16,
+    backgroundColor: Colors.accentSoft,
+  },
+  bannerTitle: {
+    ...Type.headline,
+    fontWeight: Weight.bold,
+    color: Colors.text,
+  },
+  blank: {
+    alignItems: 'center',
+    gap: Spacing.s3,
+    paddingVertical: Spacing.s6,
+  },
+  card: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surface,
+    padding: Spacing.s4,
+    gap: Spacing.s3,
+  },
+  cardOpen: {
+    gap: Spacing.s2,
+  },
+  cardTitle: {
+    ...Type.headline,
+    fontWeight: Weight.semibold,
+    color: Colors.text,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.danger,
+  },
+  face: {
+    width: 28,
+    height: 28,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.fill,
+    borderWidth: 2,
+    borderColor: Colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  faceOver: {
+    marginLeft: -8,
+  },
+  faceText: {
+    fontSize: 13,
+  },
+  thumb: {
+    borderRadius: Radius.r2,
+  },
+  nextChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.s2,
+    alignSelf: 'flex-start',
+    paddingVertical: Spacing.s2,
+    paddingHorizontal: Spacing.s3,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.fill,
+  },
+  nextText: {
+    ...Type.caption,
+    fontWeight: Weight.semibold,
+    color: Colors.text,
+    flexShrink: 1,
+  },
+  invite: {
+    gap: Spacing.s2,
+    padding: Spacing.s4,
+    borderRadius: 12,
+    backgroundColor: Colors.fill,
+  },
+});
