@@ -165,7 +165,9 @@ const MODE_FITS: Record<TravelMode, string> = {
  * 커지고, 핀을 누르면 목록의 그 줄이 켜집니다.
  */
 export default function TripScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  /* open — 밖에서 이 여행의 판 하나를 바로 열고 들어올 때(홈 카드의 할 일 칩).
+     「챙길 것 0/3」을 눌렀는데 일정만 뜨면 그 판을 또 찾아 눌러야 합니다. */
+  const { id, open } = useLocalSearchParams<{ id: string; open?: 'pack' | 'publish' }>();
   const router = useRouter();
   const navigation = useNavigation();
   const { user } = useAuth();
@@ -456,6 +458,20 @@ export default function TripScreen() {
 
   const [asking, setAsking] = useState(false);
   const [packing, setPacking] = useState(false);
+  /* 밖에서 열고 들어오라고 한 판. 한 번만 엽니다 — 닫은 뒤 다시 그려질 때
+     또 열리면 닫을 수가 없습니다. */
+  const opened = useRef(false);
+  useEffect(() => {
+    if (opened.current || !open) {
+      return;
+    }
+    opened.current = true;
+    if (open === 'pack') {
+      setPacking(true);
+    } else if (open === 'publish') {
+      setPublishing(true);
+    }
+  }, [open]);
   /*
     일정에 넣어 둔 곳도 들여다봅니다.
 

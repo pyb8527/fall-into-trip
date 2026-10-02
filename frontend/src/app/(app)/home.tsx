@@ -13,16 +13,14 @@ import type {
   News,
   PopularPlace,
   PostPage,
-  TripDetail,
   TripSummary,
 } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
 import { markOf } from '@/constants/user-marks';
 import { PlaceDetailSheet, type Looked } from '@/components/place-detail-sheet';
-import { TripMark } from '@/components/trip-mark';
+import { HomeHero, type HeroPhase } from '@/components/home-hero';
 import { TripThumb } from '@/components/trip-thumb';
-import { CountdownBadge } from '@/components/countdown-badge';
 import { glyphOf, labelOf } from '@/constants/place-icons';
 import {
   Colors,
@@ -39,13 +37,15 @@ import type { Countdown } from '@/lib/countdown';
 import {
   countdownOf,
   daysBetween,
-  formatSpan,
+  formatNights,
   todayIso,
 } from '@/lib/countdown';
 import {
+  Badge,
   Band,
   Button,
   Caption,
+  Chip,
   ErrorNote,
   Grow,
   Icon,
@@ -118,6 +118,34 @@ export default function Home() {
     (signal) => api.get('/api/popular/places', signal),
     [],
   );
+  const { data: regions } = useAsync<{ regions: string[] }>(
+    (signal) => api.get('/api/posts/regions', signal),
+    [],
+  );
+
+  /* 지금 뜨는 곳에서 바로 담은 것. 다시 누르면 또 담기지 않게 표만 해 둡니다. */
+  const [kept, setKept] = useState<Set<string>>(new Set());
+  async function keep(place: PopularPlace) {
+    if (!user) {
+      router.push('/(auth)/login');
+      return;
+    }
+    if (kept.has(place.key) || place.lat == null || place.lng == null) {
+      return;
+    }
+    try {
+      await api.post('/api/saved', {
+        name: place.name,
+        lat: place.lat,
+        lng: place.lng,
+        placeId: place.placeId,
+        icon: place.icon,
+      });
+      setKept((was) => new Set(was).add(place.key));
+    } catch {
+      /* 못 담았으면 표를 안 바꿉니다. 단추가 그대로라 다시 누를 수 있습니다. */
+    }
+  }
 
   /*
     가장 가까운 여행 하나.
@@ -140,60 +168,36 @@ export default function Home() {
   }, [mine]);
 
   /*
-    길 위에 있으면 오늘이 어떻게 돼 가는지.
+    다녀온 지 일주일 안의 여행.
 
-    <p>여행 중일 때만 한 번 더 부릅니다. 목록(`/api/trips`)에는 장소가 없고,
-    여행 중인 사람은 하루에 여러 번 여는데 그때 알고 싶은 것이 정확히
-    "오늘 몇 곳" 입니다. 여행 중이 아니면 한 번도 안 부릅니다.
-
-    <p>실패해도 조용히 넘어갑니다. 이것 때문에 홈이 멈추면 여행 안 가는
-    사람까지 느려집니다.
+    <p>그때가 영수증을 보고 여행기로 남길 때입니다. 일주일이 지나면 그 일을
+    안 합니다 — 근거 없이 고른 기간이라 써 보고 고칩니다.
   */
-  const goingId = next?.at.kind === 'going' ? next.trip.id : null;
-  const { data: today } = useAsync<TripDetail | null>(
-    (signal) =>
-      goingId
-        ? api.get(`/api/trip?trip=${encodeURIComponent(goingId)}`, signal)
-        : Promise.resolve(null),
-    [goingId],
-  );
-
-  /** 오늘 갈 곳이 몇 군데인지. 여행 사이의 빈 날이면 비어 있습니다. */
-  const todayCount = useMemo(() => {
-    if (!today) {
-      return null;
-    }
-    const day = today.days.find((d) => d.iso === todayIso()) ?? null;
-    return day && day.places.length > 0 ? day.places.length : null;
-  }, [today]);
+  const back = useMemo(() => {
+    const today = todayIso();
+    return (
+      (mine?.trips ?? [])
+        .filter((t) => t.endIso != null && t.endIso < today && daysBetween(t.endIso, today) <= 7)
+        .sort((a, b) => (b.endIso ?? '').localeCompare(a.endIso ?? ''))[0] ?? null
+    );
+  }, [mine]);
 
   /*
-    히어로에 이미 선 여행은 아래 목록에서 뺍니다.
+    맨 위 카드에 무엇을 세울지 — 여행 중 → 다녀온 지 일주일 → 다가오는 것.
 
-    <p>같은 제목에 같은 배지가 한 화면에 두 번 있으면 둘 중 무엇이 진짜인지
-    잠깐 헷갈리고, 무엇보다 자리가 아깝습니다.
-
-    <p>가장 최근에 만든 것부터 봅니다 — 서버는 만든 차례대로 주므로 뒤에서
-    자릅니다. 마흔 개를 가진 사람에게 삼 년 전 여행부터 보여 줄 이유가
-    없습니다.
+    <p>떠난 여행이 있으면 그것이 먼저입니다. 다녀온 여행은 다가오는 것보다
+    앞섭니다 — 다음 여행은 아직 시간이 있고, 여행기는 기억이 남은 동안에만
+    씁니다.
   */
-  const rest = useMemo(() => {
-    const all = mine?.trips ?? [];
-    return all.filter((t) => t.id !== next?.trip.id).reverse();
-  }, [mine, next]);
+  const hero: { trip: TripSummary; at: Countdown | null; phase: HeroPhase } | null =
+    next?.at.kind === 'going'
+      ? { trip: next.trip, at: next.at, phase: 'going' }
+      : back
+        ? { trip: back, at: null, phase: 'after' }
+        : next
+          ? { trip: next.trip, at: next.at, phase: 'before' }
+          : null;
 
-  /*
-    혼자 짠 것과 모임 것을 가릅니다.
-
-    <p>섞어 놓으면 어느 것이 나만 보는 것이고 어느 것이 모임 사람들에게도
-    보이는 것인지 알 수 없습니다. 그 둘은 <b>고치면 누가 보는가</b>가 달라서,
-    섞여 있으면 안 됩니다.
-
-    <p>모임 것은 가로로 흘립니다. 세로로 두 묶음을 쌓으면 홈이 그만큼
-    길어지고, 홈이 목록이 되면 홈이 아닙니다.
-  */
-  const crew = useMemo(() => rest.filter((t) => t.groupId != null).slice(0, 6), [rest]);
-  const solo = useMemo(() => rest.filter((t) => t.groupId == null).slice(0, 3), [rest]);
 
   return (
     /*
@@ -305,47 +309,13 @@ export default function Home() {
         */}
         {mineError ? (
           <ErrorNote message={mineError} onRetry={reloadMine} />
-        ) : next ? (
-          <Hero
-            trip={next.trip}
-            at={next.at}
-            todayCount={todayCount}
-            onPress={() => router.push(`/trip/${next.trip.id}`)}
-          />
+        ) : hero ? (
+          <HomeHero trip={hero.trip} at={hero.at} phase={hero.phase} />
         ) : mine ? (
           <FirstSteps />
         ) : (
           <Loading />
         )}
-
-        {/*
-          히어로 아래 바로가기.
-
-          <p>여행 안에 들어가서 아래 갈래 띠로 옮겨야 닿던 것들입니다. 길 위에
-          있는 사람이 하루에 몇 번씩 가는 자리라 한 번에 닿는 편이 맞습니다.
-
-          <p>「챙길 것」과 「공유」는 아직 여행 안에서만 열립니다 — 바깥에서
-          가리킬 주소가 없어서 넣지 않았습니다. 주소가 생기면 여기 붙습니다.
-        */}
-        {next ? (
-          <Row gap={Spacing.s2} style={styles.shortcuts}>
-            <Shortcut
-              icon="thumbs-up"
-              label="가고 싶은 곳"
-              onPress={() => router.push({ pathname: '/vote/[id]', params: { id: next.trip.id } })}
-            />
-            <Shortcut
-              icon="credit-card"
-              label="가계부"
-              onPress={() => router.push({ pathname: '/money/[id]', params: { id: next.trip.id } })}
-            />
-            <Shortcut
-              icon="book-open"
-              label="여행 요약"
-              onPress={() => router.push({ pathname: '/card/[id]', params: { id: next.trip.id } })}
-            />
-          </Row>
-        ) : null}
       </View>
 
       {/*
@@ -355,81 +325,33 @@ export default function Home() {
         화면 기본 간격이 끼어 띠 아래가 쓸데없이 벌어졌습니다. 한 칸에 넣으면
         여백은 띠와 머리가 가진 것만 남습니다.
       */}
-      {crew.length > 0 ? (
-        <View>
-          <Band />
-          <SectionHeader
-            tight
-            title="모임 여행"
-            action={<SeeAll what="모임 여행" onPress={() => router.push('/(app)/trips')} />}
-          />
-          <Carousel count={crew.length}>
-            {(cardWidth) =>
-              crew.map((trip) => (
-                <Press
-                  key={trip.id}
-                  onPress={() => router.push(`/trip/${trip.id}`)}
-                  scale={0.98}
-                  accessibilityLabel={`${trip.title} 열기`}
-                  style={[styles.tripCard, { width: cardWidth }]}>
-                  <Row gap={Spacing.s3}>
-                    <TripMark theme={trip.theme} emoji={trip.emoji} />
-                    <View style={styles.grow}>
-                      {/* 어느 모임의 것인지가 이 칸의 뜻입니다. 제목보다
-                          먼저 둡니다 — 같은 이름의 여행이 둘일 수 있어도
-                          모임은 안 겹칩니다. */}
-                      <Caption tone="muted" numberOfLines={1}>
-                        {trip.groupName ?? '모임'}
-                      </Caption>
-                      <Text style={styles.cardTitle} numberOfLines={1}>
-                        {trip.title}
-                      </Text>
-                      <Caption tone="muted" numberOfLines={1}>
-                        {[formatSpan(trip.startIso, trip.endIso), `${trip.placeCount}곳`]
-                          .filter(Boolean)
-                          .join(' · ')}
-                      </Caption>
-                    </View>
-                  </Row>
-                </Press>
-              ))
-            }
-          </Carousel>
-        </View>
-      ) : null}
+      {/*
+        모임 소식.
 
-      {solo.length > 0 ? (
+        <p>소식은 알림 화면에만 있었습니다. 들어가 보지 않으면 모임에서 누가
+        무엇을 했는지 몰랐습니다 — 같이 쓰는 앱인데 홈은 혼자 쓰는 앱처럼
+        보였습니다. 맨 위 세 줄을 여기 둡니다.
+
+        <p>그 아래 「모임 여행」과 「내 여행」 목록이 있었습니다. 둘 다 아래 띠의
+        「내 여행」이 하는 일이라 걷었습니다 — 홈이 목록이 되면 홈이 아닙니다.
+      */}
+      {news && news.items.length > 0 ? (
         <View>
           <Band />
           <SectionHeader
             tight
-            title="내 여행"
-            action={<SeeAll what="내 여행" onPress={() => router.push('/(app)/trips')} />}
+            title="모임 소식"
+            action={<SeeAll what="모임 소식" onPress={() => router.push('/(app)/news')} />}
           />
-          {solo.map((trip, i) => {
-            const at = countdownOf(trip.startIso, trip.endIso);
-            return (
-              <ListRow
-                key={trip.id}
-                left={<TripMark theme={trip.theme} emoji={trip.emoji} />}
-                title={trip.title}
-                subtitle={[formatSpan(trip.startIso, trip.endIso), `${trip.placeCount}곳`]
-                  .filter(Boolean)
-                  .join(' · ')}
-                right={
-                  at ? (
-                    <CountdownBadge at={at} />
-                  ) : (
-                    <Icon name="chevron-right" size={20} tone="muted" />
-                  )
-                }
-                /* 마지막 줄에는 선을 안 긋습니다. 아래가 띠로 끊기는데 선까지
-                   있으면 줄이 하나 더 있는 줄 압니다. */
-                last={i === solo.length - 1}
-                onPress={() => router.push(`/trip/${trip.id}`)}
-              />
-            );
-          })}
+          {news.items.slice(0, 3).map((item, i, rows) => (
+            <ListRow
+              key={`${item.at}-${i}`}
+              title={item.actorName ? `${item.actorName} 님이 ${item.text}` : item.text}
+              subtitle={item.tripTitle ?? undefined}
+              last={i === rows.length - 1}
+              onPress={() => router.push(item.url as never)}
+            />
+          ))}
         </View>
       ) : null}
 
@@ -448,6 +370,23 @@ export default function Home() {
             title="이런 여행은 어때요?"
             action={<SeeAll what="남이 짜 둔 여행" onPress={() => router.push('/community')} />}
           />
+          {/* 지역 칩. 여행기가 몇 장 없을 때도 어디로 갈지 고를 길이 하나
+              더 있습니다. 누르면 둘러보기가 그 지역으로 걸러 열립니다. */}
+          {(regions?.regions.length ?? 0) > 0 ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.regionRow}>
+              {regions?.regions.slice(0, 8).map((r) => (
+                <Chip
+                  key={r}
+                  label={r}
+                  selected={false}
+                  onPress={() => router.push({ pathname: '/community', params: { region: r } })}
+                />
+              ))}
+            </ScrollView>
+          ) : null}
           <Carousel count={Math.min(6, shared.posts.length)}>
             {(cardWidth) =>
               shared.posts.slice(0, 6).map((post) => (
@@ -470,12 +409,20 @@ export default function Home() {
                     <Text style={styles.cardTitle} numberOfLines={2}>
                       {post.title}
                     </Text>
-                    <Caption tone="muted" numberOfLines={1}>
-                      {[post.region, `${post.dayCount}일`, `${post.placeCount}곳`]
+                    {/* 「3박 4일」 「일본」 같은 꼬리표가 고르는 데 가장 빠릅니다.
+                        작은 숫자(♥ 1)는 뺐습니다 — 적을 때는 세는 말이 아니라
+                        잡음입니다. */}
+                    <Row gap={Spacing.s1} style={styles.tags}>
+                      {[
+                        post.region,
+                        formatNights(post.dayCount),
+                        ...post.tags.slice(0, 2),
+                      ]
                         .filter(Boolean)
-                        .join(' · ')}
-                      {post.likeCount > 0 ? ` · ♥ ${post.likeCount}` : ''}
-                    </Caption>
+                        .map((t) => (
+                          <Badge key={t as string} label={t as string} tone="muted" />
+                        ))}
+                    </Row>
                   </View>
                 </Press>
               ))
@@ -506,39 +453,52 @@ export default function Home() {
             */
             const canLook = place.lat != null && place.lng != null;
             return (
-              <ListRow
-                key={place.key}
-                left={
-                  <Row gap={Spacing.s3}>
-                    {/* 1~3위만 브랜드색입니다. 다 물들이면 순위가 아니라
-                        색칠이 되고, 위에서 세 번째까지가 사람들이 실제로
-                        눈여겨보는 자리입니다. */}
-                    <Text style={[styles.rank, i < 3 ? styles.rankTop : null]}>{i + 1}</Text>
-                    <Mark icon={glyphOf(place.icon)} />
-                  </Row>
-                }
-                title={place.name}
-                /* 「여행 1개에 담김」은 세는 말이 아니라 잡음입니다. 셋부터
-                   「여럿이 담았다」가 뜻을 가집니다(실측 전 — 3 으로 시작). */
-                subtitle={[labelOf(place.icon), place.posts >= 3 ? `여행 ${place.posts}개에 담김` : null]
-                  .filter(Boolean)
-                  .join(' · ')}
-                /* 아래에 「더 보러가기」가 붙습니다. 선까지 그으면 그 단추가
-                   순위의 여섯째 줄처럼 보입니다. */
-                last={i === rows.length - 1}
-                onPress={
-                  canLook
-                    ? () =>
-                        setLooking({
-                          name: place.name,
-                          lat: place.lat as number,
-                          lng: place.lng as number,
-                          placeId: place.placeId,
-                          icon: place.icon,
-                        })
-                    : () => router.push('/(app)/popular')
-                }
-              />
+              /* 저장 단추는 줄 옆에 섭니다. 줄 안에 두면 단추 안에 단추가 들어가고,
+                 누른 자리가 줄인지 저장인지 흔들립니다. 바로 담습니다 — 판을 열어
+                 「저장」을 찾게 하면 순위를 훑던 손이 멈춥니다. */
+              <Row key={place.key} style={styles.topRow}>
+                <View style={styles.grow}>
+                  <ListRow
+                    left={
+                      <Row gap={Spacing.s3}>
+                        {/* 1~3위만 브랜드색입니다. 다 물들이면 순위가 아니라
+                            색칠이 되고, 위에서 세 번째까지가 사람들이 실제로
+                            눈여겨보는 자리입니다. */}
+                        <Text style={[styles.rank, i < 3 ? styles.rankTop : null]}>{i + 1}</Text>
+                        <Mark icon={glyphOf(place.icon)} />
+                      </Row>
+                    }
+                    title={place.name}
+                    /* 「여행 1개에 담김」은 세는 말이 아니라 잡음입니다. 셋부터
+                       「여럿이 담았다」가 뜻을 가집니다(실측 전 — 3 으로 시작). */
+                    subtitle={[labelOf(place.icon), place.posts >= 3 ? `여행 ${place.posts}개에 담김` : null]
+                      .filter(Boolean)
+                      .join(' · ')}
+                    /* 아래에 「더 보러가기」가 붙습니다. 선까지 그으면 그 단추가
+                       순위의 여섯째 줄처럼 보입니다. */
+                    last={i === rows.length - 1}
+                    onPress={
+                      canLook
+                        ? () =>
+                            setLooking({
+                              name: place.name,
+                              lat: place.lat as number,
+                              lng: place.lng as number,
+                              placeId: place.placeId,
+                              icon: place.icon,
+                            })
+                        : () => router.push('/(app)/popular')
+                    }
+                  />
+                </View>
+                <IconButton
+                  name="bookmark"
+                  label={`${place.name} 저장`}
+                  active={kept.has(place.key)}
+                  bare
+                  onPress={() => keep(place)}
+                />
+              </Row>
             );
           })}
           <View style={styles.more}>
@@ -687,116 +647,6 @@ function Carousel({
 }
 
 /**
- * 가장 가까운 여행 한 장.
- *
- * <h3>왜 이것만 큰가</h3>
- *
- * <p>홈에서 가장 흔한 일이 이 여행을 여는 것입니다. 목록의 한 줄로 두면
- * 다른 줄들과 같은 무게가 되어, 가장 자주 하는 일이 가장 찾기 어려운
- * 자리에 놓입니다.
- *
- * <h3>사진 자리를 안 만듭니다</h3>
- *
- * <p>여기에 동선 그림(구글 Static Maps)을 깔고 아래쪽을 어둡게 덮어 흰 글씨를
- * 얹었습니다. 사진처럼 보여서 눈은 끌었는데, 두 가지가 틀렸습니다.
- *
- * <p>하나는 <b>내 여행에는 올릴 사진이 없다</b>는 것입니다. 표지를 고르는
- * 칸은 여행기(둘러보기에 내놓는 글)에만 있습니다. 그래서 이 자리는 영영
- * 채워지지 않는 사진 자리였고, 덮개까지 깔려 지도는 지도대로 안 보였습니다 —
- * 무엇을 보여 주려는 자리인지 알 수 없었습니다.
- *
- * <p>다른 하나는 <b>값</b>입니다. 그림 한 장이 구글 Static Maps 한 번이고,
- * 홈은 이 앱에서 가장 자주 여는 화면입니다. 돈이 드는 것을 가장 자주 열리는
- * 자리의 기본값으로 두면 안 됩니다.
- *
- * <p>여행이 이미 가진 것으로 그립니다 — 사람이 고른 색과 표식입니다. 색을
- * 옅게 깔고 그 위에 검은 글씨를 얹으면 덮개도 필요 없습니다.
- */
-function Hero({
-  trip,
-  at,
-  todayCount,
-  onPress,
-}: {
-  trip: TripSummary;
-  at: Countdown;
-  /** 오늘 갈 곳 수. 길 위에 있을 때만 있습니다. */
-  todayCount: number | null;
-  onPress: () => void;
-}) {
-  const going = at.kind === 'going';
-  const nth = going && trip.startIso ? daysBetween(trip.startIso, todayIso()) + 1 : 0;
-
-  return (
-    <Press
-      onPress={onPress}
-      scale={0.98}
-      accessibilityLabel={`${trip.title} 열기`}
-      /*
-        바탕은 바이올렛 50 입니다.
-
-        <p>여행 색을 옅게 깔았습니다. 그런데 여행 색 여덟 가운데 첫째가 파랑이라
-        대부분의 첫 여행이 하늘색 카드가 됐고, 주 버튼의 바이올렛 옆에 하늘색이
-        서서 브랜드 색이 둘로 읽혔습니다. 여행이 무슨 색인지는 왼쪽 위 표식이
-        말합니다.
-      */
-      style={styles.hero}>
-      <View style={styles.heroTop}>
-        <TripMark theme={trip.theme} emoji={trip.emoji} />
-        <CountdownBadge at={at} label={going ? `여행 중 ${nth}일째` : undefined} />
-      </View>
-
-      <View style={styles.heroFoot}>
-        <View style={styles.grow}>
-          <Text style={styles.heroTitle} numberOfLines={1}>
-            {trip.title}
-          </Text>
-          <Text style={styles.heroMeta} numberOfLines={1}>
-            {[
-              formatSpan(trip.startIso, trip.endIso),
-              going && todayCount ? `오늘 ${todayCount}곳` : `${trip.placeCount}곳`,
-            ]
-              .filter(Boolean)
-              .join(' · ')}
-          </Text>
-        </View>
-        {/* 눌러서 들어가는 것이라고 말하는 동그라미. 줄 끝의 꺽쇠가 하는
-            일을 큰 칸에서는 이것이 합니다. */}
-        <View style={styles.heroGo}>
-          <Icon name="chevron-right" size={20} />
-        </View>
-      </View>
-    </Press>
-  );
-}
-
-/** 히어로 아래 동그라미 넷 중 하나. */
-function Shortcut({
-  icon,
-  label,
-  onPress,
-}: {
-  icon: 'thumbs-up' | 'credit-card' | 'book-open';
-  label: string;
-  onPress: () => void;
-}) {
-  return (
-    <Press
-      onPress={onPress}
-      scale={0.96}
-      accessibilityLabel={label}
-      style={styles.shortcut}>
-      <View style={styles.shortcutDisc}>
-        <Icon name={icon} size={24} tone="secondary" />
-      </View>
-      <Caption tone="secondary" numberOfLines={1}>
-        {label}
-      </Caption>
-    </Press>
-  );
-}
-
-/**
  * 아직 아무것도 없는 사람에게, 어디서 시작하는지.
  *
  * <p>히어로가 설 자리에 대신 섭니다. 그 자리를 비워 두면 화면이 「지금 뜨는
@@ -808,7 +658,7 @@ function FirstSteps() {
 
   return (
     <View style={styles.firstSteps}>
-      <Text style={styles.cardTitle}>어디서 시작할까요?</Text>
+      <Text style={styles.cardTitle}>어디로 떠나 볼까요?</Text>
       <Caption tone="secondary">
         날짜와 도시만 정하면 나머지는 다니면서 채워도 돼요.
       </Caption>
@@ -835,6 +685,17 @@ function FirstSteps() {
 const HERO_HEIGHT = 200;
 
 const styles = StyleSheet.create({
+  topRow: {
+    alignItems: 'center',
+  },
+  /* 지역 칩 줄. 좌우 여백까지 흘러야 마지막 칩이 잘린 것처럼 안 보입니다. */
+  regionRow: {
+    gap: Spacing.s2,
+    paddingBottom: Spacing.s3,
+  },
+  tags: {
+    flexWrap: 'wrap',
+  },
   /* 가로로 흘리는 것은 여백 밖으로 나가고, 안쪽 여백은 내용이 가집니다 —
      그래야 첫 카드가 왼쪽 20 선에 맞고 마지막 카드가 끝까지 흘러갑니다. */
   bleed: {
