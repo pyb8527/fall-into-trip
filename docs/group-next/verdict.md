@@ -94,7 +94,7 @@
 | 구글 호출 | 0 |
 | 서버 저장 | 여행 × 멤버 한 줄 |
 | EAS 재빌드 | 필요 없음 |
-| 스키마 변경 | **있음** — `trip_going(trip_id, user_id, answer, note, updated_at)` (다음 번호 **V42** — V40 은 환율, V41 은 4단계 별점이 씁니다) |
+| 스키마 변경 | **있음** — `trip_going(trip_id, user_id, answer, note, updated_at)` (다음 번호 **V43** — V40 환율, V41 별점, V42 는 그 별점 칸의 타입을 고친 것입니다) |
 | 백엔드 변경 | 새 엔드포인트 + **`peopleOf()` 수정** (쓰는 곳 다섯) |
 
 ### 지켜야 할 것

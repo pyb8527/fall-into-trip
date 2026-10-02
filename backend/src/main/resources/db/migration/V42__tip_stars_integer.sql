@@ -1,0 +1,31 @@
+-- 별 칸의 타입을 엔티티에 맞춥니다.
+--
+-- 무슨 일이 있었나
+--
+--   V41 이 `stars SMALLINT` 로 칸을 만들었는데, 엔티티는 `Integer` 입니다.
+--   이 앱은 `ddl-auto: validate` 라 Hibernate 가 뜰 때 표와 엔티티를 맞춰
+--   보고, 안 맞으면 <b>아예 안 뜹니다</b>:
+--
+--     Schema-validation: wrong column type encountered in column [stars]
+--     in table [place_tips]; found [int2 (Types#SMALLINT)],
+--     but expecting [integer (Types#INTEGER)]
+--
+--   운영에서 api 가 이것으로 멈췄습니다. V41 은 이미 적용돼 있어서 그 파일을
+--   고칠 수 없습니다 — Flyway 가 적용할 때 셈한 checksum 이 데이터베이스에
+--   남아 있고, 내용이 한 바이트만 달라져도 다음 배포가 멈춥니다.
+--
+-- 왜 칸을 바꾸고 엔티티를 안 바꾸는가
+--
+--   `Short` 로 내리면 마이그레이션 없이 끝나지만, 그 타입이 컨트롤러의
+--   요청 꼴과 서비스의 셈(1~5 비교)까지 타고 올라갑니다. 지금은 운영이
+--   멈춰 있는 상황이라, 한 줄로 끝나고 놓칠 자리가 없는 쪽을 고릅니다.
+--
+--   2바이트가 4바이트가 됩니다. 한 줄에 2바이트이고, 이 표는 사람이 손으로
+--   남기는 한 줄들입니다.
+--
+--   V32·V36 도 별점을 SMALLINT 로 두었는데 그 둘은 V37 에서 지운 표라
+--   지금 걸리지 않습니다. 앞으로 별점 칸은 INTEGER 로 둡니다.
+
+-- CHECK(1~5)과 부분 인덱스(ix_tips_stars)는 타입을 바꿔도 남습니다 —
+-- Postgres 가 인덱스를 다시 만듭니다.
+ALTER TABLE place_tips ALTER COLUMN stars TYPE INTEGER;
