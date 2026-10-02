@@ -13,6 +13,7 @@ import { api, query } from '@/api/client';
 import type { PopularPlace, PopularRegion, PostCard, PostPage } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { SignUpGate } from '@/components/signup-gate';
+import { TripTaste } from '@/components/trip-taste';
 import { TripThumb } from '@/components/trip-thumb';
 import { glyphOf, labelOf } from '@/constants/place-icons';
 import {
@@ -26,7 +27,7 @@ import {
   Weight,
 } from '@/constants/theme';
 import type { Comeback } from '@/lib/comeback';
-import { Body, Button, Caption, ListRow, Mark, Press, Screen } from '@/ui';
+import { Body, Button, Caption, ListRow, Mark, Press, Rise, Screen } from '@/ui';
 import { LogoMark } from '@/ui/logo';
 
 /**
@@ -74,50 +75,111 @@ import { LogoMark } from '@/ui/logo';
  *
  * <p>늘릴 자리가 생겼습니다. 한 장이 곧 구글 호출 한 번이라 못 늘리고
  * 있었는데, {@link TripThumb} 가 표지 → 첫 사진 → 동선 그림 순으로 고르게
- * 되면서 <b>사진이 있는 글은 호출이 0</b> 입니다. 그래서 아래에 세 줄을
- * 더 깔았습니다. <b>셋 다 글자가 아니라 서버가 센 값</b>이고, 셋 다 계정
- * 없이 열립니다.
+ * 되면서 <b>사진이 있는 글은 호출이 0</b> 입니다.
+ *
+ * <h3>슬라이드쇼를 안 골랐습니다</h3>
+ *
+ * <p>넘기는 장 셋에 「함께 짜요 · 모아 둬요 · 가져와요」를 적는 쪽이
+ * 흔한 길입니다. 안 골랐습니다. 까닭이 셋인데, 공교롭게 <b>셋 다 이
+ * 저장소가 이미 내린 판단과 같은 방향</b>입니다.
+ *
+ * <ol>
+ *   <li><b>그 장에 적을 것이 다시 「말」입니다.</b> 넘기는 장의 내용은
+ *       기능 설명이고, 기능 설명은 읽는 사람이 참인지 알 수 없는
+ *       것입니다 — 위에서 걷어낸 세 줄을 장 셋으로 다시 세우는 셈입니다
+ *   <li><b>장 뒤로 숨깁니다.</b> 요구가 「볼 거리가 많게」인데, 슬라이드쇼는
+ *       한 화면에 <b>하나</b>만 보입니다. 나머지는 밀어야 나오고, 밀지
+ *       않으면 없는 것입니다. 한 장 긴 화면이 같은 자리에 더 많이 깝니다
+ *   <li><b>서버가 비면 더 나쁩니다.</b> 세로로 깐 것은 빈 묶음이
+ *       사라지면 그만큼 짧아지는데, 장은 <b>빈 장으로 남습니다</b> —
+ *       둘째 장을 밀어서 열었더니 아무것도 없는 것이 가장 나쁜 첫인상
+ *       입니다
+ * </ol>
+ *
+ * <p>밖에서 재어 본 것도 같은 말을 합니다. 넘기는 장 묶음은 대개 <b>읽지
+ * 않고 밀어 넘기고</b>, 거기서 떨어져 나가는 사람이 적지 않으며(아직
+ * 아무 일도 안 일어났으니까), 성과가 좋은 쪽은 거의 다 <b>가입 전에
+ * 제품을 만져 보게 하는</b> 쪽입니다. 같은 자료가 「장을 하나 더 늘릴수록
+ * 끝까지 가는 사람이 줄어든다」고도 말합니다.
+ *
+ * <h3>대신 만져 볼 것을 깔았습니다</h3>
+ *
+ * <p>가입 전에 제품을 만져 보게 하라는 것이 밖에서 가장 세게 나온
+ * 말이었습니다. 이 앱에서 만져 볼 수 있는 가장 작은 단위는 <b>일정
+ * 한 장</b>이고, 그것이 계정 없이 열립니다. 그래서 진짜 글 하나의 일정을
+ * 문 안에 펼치고 날을 눌러 옮겨 다닐 수 있게 둡니다({@link TripTaste}).
+ * 꾸민 예시가 아니라 받아 온 글입니다.
+ *
+ * <h3>스크롤로 나타나게 하는 것은 반만 했습니다</h3>
+ *
+ * <p>굴려 내려갈 때 묶음이 차례로 떠오르게 하려면 <b>굴린 양</b>을 알아야
+ * 합니다. 그 값을 쥐고 있는 것은 {@link Screen} 의 {@code ScrollView}
+ * 이고, 거기에는 {@code onScroll} 을 받는 칸이 없습니다. 내려면
+ * {@code ui/index.tsx}(사천구백 줄, 서른여덟 화면이 같이 씁니다)를 고쳐야
+ * 하는데, <b>한 화면의 꾸밈을 위해 모두가 쓰는 뼈대를 건드릴 일이
+ * 아닙니다.</b> {@code scroll={false}} 로 두고 제 {@code ScrollView} 를
+ * 세우는 쪽도 막혔습니다 — 그때 본문을 감싸는 틀에 {@code flex} 가 없어
+ * 안쪽에 굴러가는 것을 넣으면 높이가 0이 됩니다.
+ *
+ * <p>그래서 {@link Rise} 로 합니다. 묶음마다 <b>제 것이 닿는 순간</b>
+ * 떠오릅니다 — 넷을 따로 부르므로 닿는 때가 저절로 다르고, 그래서 화면이
+ * 한꺼번에 완성되지 않고 차례로 들어섭니다. 굴린 양에 맞춘 것은 아니라
+ * 「스크롤 액티베이션」이라고 부르지는 않겠습니다. 움직임을 줄여 둔
+ * 사람에게는 처음부터 다 보입니다({@code useCalm}).
+ *
+ * <h3>단추는 바닥에 붙어 있습니다</h3>
+ *
+ * <p>화면이 길어지면 아래 단추가 멀어집니다. 마음을 정한 자리에서 단추가
+ * 두 화면 위에 있으면 되감아 올라가야 하고, 대개 안 올라갑니다.
+ * {@link Screen} 의 {@code footer} 는 굴러가는 본문 밖에 서므로 <b>어디를
+ * 보고 있어도 엄지 밑에</b> 있습니다. 길게 깔면서 따로 손댈 것이 없었던
+ * 자리입니다.
+ *
+ * <p>맨 아래에 단추를 하나 더 두는 쪽은 안 합니다. 붙어 있는 것이 이미
+ * 늘 보이므로, 같은 일을 하는 셋째 단추가 되고 그것은 위에서 지운
+ * 것입니다.
  *
  * <h3>깐 순서 — 읽는 사람의 물음 순서입니다</h3>
  *
  * <ol>
+ *   <li><b>헤드라인과 세어 둔 숫자</b> — 「여기 뭐가 얼마나 있나」.
+ *       아래 카드들이 그 숫자의 일부라서, 말이 아니라 바로 아래에서
+ *       확인되는 숫자입니다
  *   <li><b>여행기 넷</b>(가로) — "여기가 뭐 하는 곳인가". 일정 한 장이
- *       그림과 함께 서면 설명이 필요 없습니다. 그래서 그대로 맨 위입니다
+ *       그림과 함께 서면 설명이 필요 없습니다
+ *   <li><b>일정 한 장을 만져 보기</b> — "그래서 이걸로 만든 게 어떻게
+ *       생겼나". 카드는 겉이고 이것이 안입니다. 날을 눌러 보는 것이 이
+ *       화면에서 유일하게 <b>무언가 일어나는</b> 자리라 캐러셀 바로
+ *       아래입니다
  *   <li><b>지역</b>({@code /api/popular/regions}) — "내가 가려는 데가
- *       여기 있나". 이것이 구경하러 온 사람의 <b>첫 물음</b>입니다. 넷째
- *       물음이 아니라 둘째인 까닭은, 남의 일정 넷을 보고 나면 바로
- *       "그래서 내 목적지는?" 이 오기 때문입니다. 글 수가 붙어 있어
- *       말 대신 깊이를 셉니다
+ *       여기 있나". 글 수가 붙어 있어 말 대신 깊이를 셉니다
  *   <li><b>지금 뜨는 곳</b>({@code /api/popular/places}) — "글만 있는 게
- *       아니라 <b>곳</b>이 쌓여 있다". 이것이 보석함이 왜 있는지를 말합니다.
- *       지역보다 아래인 까닭은 장소는 목적지를 정한 다음에 고르는 것이고,
- *       <b>막는 자리가 여기뿐</b>이라 그 전에 공짜인 것을 다 보여 준 뒤에
- *       서야 하기 때문입니다
+ *       아니라 <b>곳</b>이 쌓여 있다". 보석함이 왜 있는지를 말합니다.
+ *       <b>막는 자리가 여기뿐</b>이라 그 전에 공짜인 것을 다 보여 준
+ *       뒤에 섭니다
  *   <li><b>많이 찾는 태그</b>({@code /api/posts/tags}) — 가장 약합니다.
  *       태그는 분류일 뿐이라 "나한테 뭘 해 주나" 를 직접 답하지 않습니다.
- *       그래도 깔 값이 0이고(그림이 없습니다), "여기 글이 돌고 있다" 를
- *       한 줄로 말해 주므로 맨 아래 닫는 줄로 둡니다
+ *       깔 값이 0이라 맨 아래 닫는 줄로 둡니다
  * </ol>
  *
- * <h3>태그는 <b>안 눌립니다</b></h3>
+ * <h3>숫자는 세어서 적습니다</h3>
  *
- * <p>칩으로 깔고 싶었습니다. 그런데 {@code /community} 는 주소에서
- * {@code region} 만 읽습니다({@code community/index.tsx} 의
- * {@code useLocalSearchParams}) — {@code tag=} 를 실어 보내면 조건이 안
- * 걸린 전체 목록이 뜹니다. 그 파일에 이미 적혀 있는 고장이고, <b>이번에
- * 그 파일을 못 건드립니다.</b>
+ * <p>헤드라인 밑의 한 줄은 「여행기 N개 · 지역 N곳」입니다. 「수많은
+ * 여행기」가 아닙니다 — 두루뭉술한 양은 아무 말도 아니고, 밖에서 재어
+ * 본 것도 <b>구체적인 수가 두루뭉술한 수보다 믿긴다</b>고 말합니다.
+ * N 은 {@code PostPage.total} 과 지역 묶음 수로, 둘 다 서버가 센 값입니다.
  *
- * <p>그래서 글자 한 줄로 둡니다. 누르는 꼴을 입히지 않으면 아무것도
- * 약속하지 않으므로 거짓말이 아닙니다. {@code community/index.tsx} 가
- * {@code tag} 를 읽게 되면 그때 칩으로 바꿉니다.
+ * <p>적게 올라온 판에서는 안 냅니다({@link ENOUGH}). 「여행기 3개」는
+ * 참이지만 제 발등을 찍는 참입니다. 숨기는 것이 거짓은 아닙니다 —
+ * 그 자리에 다른 말을 지어 넣지 않습니다.
  *
  * <h3>막는 자리는 하나입니다</h3>
  *
- * <p>이 화면의 모든 것이 계정 없이 읽힙니다. 여행기 카드 · 지역 칸 ·
- * 태그 줄은 눌러도 공개 화면으로 갑니다. 계정이 필요한 것은 <b>장소
- * 담기</b> 하나이고, 거기서만 {@link SignUpGate} 가 섭니다 — 로그인
- * 화면으로 말없이 튕기지 않고 보석함이 왜 사람마다 따로인지를 그 자리에서
- * 말합니다.
+ * <p>이 화면의 모든 것이 계정 없이 읽힙니다. 여행기 카드 · 만져 보는
+ * 일정 · 지역 칸 · 태그 줄은 눌러도 공개 화면으로 갑니다. 계정이 필요한
+ * 것은 <b>장소 담기</b> 하나이고, 거기서만 {@link SignUpGate} 가 섭니다 —
+ * 로그인 화면으로 말없이 튕기지 않고 보석함이 왜 사람마다 따로인지를 그
+ * 자리에서 말합니다.
  *
  * <p>돌아올 자리는 {@code /(app)/popular} 입니다. 두 가지를 셈에 넣은
  * 값입니다.
@@ -134,13 +196,14 @@ import { LogoMark } from '@/ui/logo';
  *
  * <h3>비어 있을 때를 대비합니다</h3>
  *
- * <p>네 줄이 섰다고 <b>빈 머리글 네 개</b>가 생기면 안 됩니다. 아무것도
- * 안 올라온 판에서 머리글만 줄줄이 서는 것이 가장 나쁜 첫인상입니다.
+ * <p>묶음이 늘어난 만큼 이 셈이 더 중요해졌습니다. 아무것도 안 올라온
+ * 판에서 <b>빈 머리글 다섯 개</b>가 서는 것이 가장 나쁜 첫인상입니다.
  *
- * <p>다행히 넷이 <b>같은 뿌리</b>입니다 — 지역·장소·태그는 다 올라온
- * 글을 세어 나온 것이라, 글이 없으면 셋도 같이 빕니다. 그래서 줄마다
- * 제 목록이 비면 <b>그 줄을 아예 안 그리고</b>, 넷이 다 비면 예전의 세
- * 줄로 돌아갑니다. 중간은 없습니다.
+ * <p>다행히 전부 <b>같은 뿌리</b>입니다 — 지역·장소·태그는 다 올라온
+ * 글을 세어 나온 것이고, 만져 보는 일정은 그 글 하나를 펼친 것입니다.
+ * 글이 없으면 다 같이 빕니다. 그래서 묶음마다 제 것이 비면 <b>그 묶음을
+ * 아예 안 그리고</b>, 전부 비면 예전의 세 줄로 돌아갑니다. 중간은
+ * 없습니다.
  *
  * <p>그 세 줄은 <b>넷이 다 답을 한 뒤에만</b> 섭니다({@link answered}).
  * 받는 중에 내밀면 글이 쌓인 판에서도 문이 열릴 때마다 말 세 줄이
@@ -148,15 +211,30 @@ import { LogoMark } from '@/ui/logo';
  *
  * <h3>값</h3>
  *
- * <p>서버를 한 번 부르던 화면이 <b>네 번</b> 부릅니다 — 글 한 쪽과
- * 세어 둔 것 셋입니다. 새로 붙은 셋은 <b>구글 호출이 0</b> 입니다. 지역
- * 칸과 태그 줄에는 그림이 없고, 장소 줄은 선 그림({@link Mark})입니다.
- * 가장 가까운 곳 한 장을 {@code SpotMap} 으로 그리는 쪽도 있었는데
- * 뺐습니다 — 문에서 한 장은 곧 모든 방문자에게 한 장입니다.
+ * <p>서버를 한 번 부르던 화면이 <b>다섯 번</b> 부릅니다 — 글 한 쪽,
+ * 세어 둔 것 셋, 그리고 만져 볼 글 하나입니다. 마지막 것은 첫 응답에서
+ * 글 번호를 받아야 하므로 <b>한 박자 뒤</b>에 나갑니다. 아래쪽에 서는
+ * 묶음이라 그 늦음이 첫 그림을 안 늦춥니다.
+ *
+ * <p>새로 붙은 넷은 <b>구글 호출이 0</b> 입니다. 지역 칸과 태그 줄에는
+ * 그림이 없고, 장소 줄과 만져 보는 일정은 선 그림({@link Mark})입니다.
+ * 가장 가까운 곳 한 장을 {@code SpotMap} 으로 그리는 쪽도, 만져 보는
+ * 일정에 동선 그림을 붙이는 쪽도 뺐습니다 — 문에서 한 장은 곧 모든
+ * 방문자에게 한 장입니다.
  *
  * <p>그래서 구글 정적 지도는 <b>최악에도 넷</b>으로 그대로입니다 —
  * 캐러셀 카드 넷이 모두 사진 한 장도 없는 글일 때입니다. 사진이 있는
  * 만큼 줄어듭니다.
+ *
+ * <h3>새 꾸러미를 안 들였습니다</h3>
+ *
+ * <p>넘기는 장이든 굴림에 맞춘 움직임이든 {@code react-native-reanimated}
+ * 를 부르고 싶어지는 일입니다. 들어 있기는 합니다(4.5.1). 그런데
+ * {@code src/} 안에서 <b>아무도 안 쓰고</b> {@code babel.config.js} 조차
+ * 없어서, 처음 쓰는 자리가 되면 설정이 맞는지부터 확인해야 하고 틀리면
+ * EAS 재빌드 뒤로 밀립니다. 이 화면의 움직임은 {@link Rise} 가 쓰는
+ * {@code react-native} 의 {@code Animated} 로 충분합니다 — 이미 이
+ * 저장소가 쓰고 있는 것입니다.
  *
  * <h3>"본 적 있음" 을 기억하지 않습니다</h3>
  *
@@ -178,7 +256,7 @@ import { LogoMark } from '@/ui/logo';
  * 그것이 구글 호출 한 번입니다({@link TripThumb}). 로그인 안 한 사람이 가장
  * 자주 여는 화면이라 늘릴 자리가 아닙니다.
  *
- * <p>아래에 줄을 셋 더 깔면서도 이 값은 안 건드렸습니다. 더 깐 셋은
+ * <p>아래에 묶음을 넷 더 깔면서도 이 값은 안 건드렸습니다. 더 깐 넷은
  * 그림이 없어 호출이 0이고, 늘릴 자리가 아닌 것은 <b>여기</b>뿐입니다.
  */
 const SHOW = 4;
@@ -207,6 +285,15 @@ const PLACES = 5;
  * "많이 찾는" 이 아니라 "전부" 로 읽힙니다.
  */
 const TAGS = 5;
+
+/**
+ * 숫자를 적기 시작하는 개수.
+ *
+ * <p>「여행기 3개」는 참이지만 제 발등을 찍습니다. 열쯤 되면 "쌓여
+ * 있다" 로 읽히고, 그 아래로는 카드 넷이 곧 전부라는 말이 됩니다 —
+ * 그때는 숫자 없이 카드만 보여 주는 편이 낫습니다.
+ */
+const ENOUGH = 10;
 
 export default function Welcome() {
   const router = useRouter();
@@ -252,8 +339,25 @@ export default function Welcome() {
   const spots = places.data?.places.slice(0, PLACES) ?? [];
   const words = tags.data?.tags.slice(0, TAGS) ?? [];
 
+  /* 펼쳐 볼 글. 인기순 첫 글입니다 — 가장 많이 읽힌 것이 대개 가장
+     잘 짜인 것이고, 문에 세울 것이면 그래야 합니다. */
+  const taste = shown[0];
+
   /*
-    넷이 다 비었는가.
+    헤드라인 밑의 숫자 한 줄.
+
+    <p>둘 다 서버가 센 값입니다. 하나라도 아직 안 왔으면 안 적습니다 —
+    「여행기 128개 · 지역 0곳」이 한 박자 서 있다가 고쳐지면, 고쳐지는
+    것을 본 사람은 둘 다 안 믿습니다.
+  */
+  const counted = hot.data?.total ?? 0;
+  const proof =
+    counted >= ENOUGH && where.length > 0
+      ? `여행기 ${counted.toLocaleString()}개 · 지역 ${where.length}곳`
+      : null;
+
+  /*
+    전부 비었는가.
 
     <p>받는 중은 비어 있는 것이 아닙니다. 넷이 다 답을 한 뒤에만 참이
     됩니다 — 그러지 않으면 글이 쌓인 판에서도 문이 열릴 때마다 말 세
@@ -300,69 +404,100 @@ export default function Welcome() {
         <Body small tone="secondary">
           일정 한 장을 여럿이 같이 고치고, 가고 싶은 곳을 모아 둬요.
         </Body>
+        {/* 바로 아래 카드들이 이 숫자의 일부입니다. 말 밑에 말을 덧대는
+            것이 아니라, 세어 둔 것 위에 세어 둔 것을 적습니다. */}
+        {proof ? (
+          <Rise>
+            <Caption tone="muted">{proof}</Caption>
+          </Rise>
+        ) : null}
       </View>
 
       {shown.length > 0 ? (
-        /*
-          옆으로 미는 줄입니다.
+        /* 밖으로 미는 것을 <b>이 겹에</b> 답니다. 안쪽 ScrollView 에
+           두면 좌우로 삐져나온 카드가 이 겹의 바깥이 되고, 안드로이드
+           에서는 그 자리가 잘릴 수 있습니다. 겹을 하나 더 두르면서
+           삐져나오는 겹은 그대로 하나로 둡니다. */
+        <Rise style={styles.railOut}>
+          {/*
+            옆으로 미는 줄입니다.
 
-          <p>세로로 쌓아 두었습니다. 그러면 첫 장만 보이고 둘째 장부터는
-          굴려야 나오는데, <b>문에서 굴리는 사람은 많지 않습니다.</b> 눕혀
-          두면 한 화면에 하나 반이 보여 "더 있다" 가 그냥 보입니다.
+            <p>세로로 쌓아 두었습니다. 그러면 첫 장만 보이고 둘째 장부터는
+            굴려야 나오는데, <b>문에서 굴리는 사람은 많지 않습니다.</b> 눕혀
+            두면 한 화면에 하나 반이 보여 "더 있다" 가 그냥 보입니다.
 
-          <p>좌우 여백만큼 밖으로 밀어 두고 그만큼을 안쪽 여백으로 돌려
-          놓습니다 — 첫 카드는 글자와 같은 선에서 시작하고, 미는 카드는
-          화면 끝까지 흘러갑니다.
-        */
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.railOut}
-          contentContainerStyle={styles.rail}>
-          {shown.map((post) => (
-            <Peek
-              key={post.id}
-              post={post}
-              width={card}
-              onOpen={() => router.push(`/community/${post.id}`)}
+            <p>좌우 여백만큼 밖으로 밀어 두고 그만큼을 안쪽 여백으로 돌려
+            놓습니다 — 첫 카드는 글자와 같은 선에서 시작하고, 미는 카드는
+            화면 끝까지 흘러갑니다.
+          */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.rail}>
+            {shown.map((post) => (
+              <Peek
+                key={post.id}
+                post={post}
+                width={card}
+                onOpen={() => router.push(`/community/${post.id}`)}
+              />
+            ))}
+          </ScrollView>
+        </Rise>
+      ) : null}
+
+      {taste ? (
+        /* 카드 넷이 겉이면 이것이 안입니다. 받는 동안과 펼칠 것이 없는
+           글에서는 스스로 사라집니다({@link TripTaste}). */
+        <Rise order={1}>
+          <View style={styles.shelf}>
+            <TripTaste
+              postId={taste.id}
+              onOpen={() => router.push(`/community/${taste.id}`)}
             />
-          ))}
-        </ScrollView>
+          </View>
+        </Rise>
       ) : null}
 
       {where.length > 0 ? (
-        <RegionRail
-          regions={where}
-          onRegion={(region) =>
-            router.push(`/community?region=${encodeURIComponent(region)}`)
-          }
-        />
+        <Rise order={2}>
+          <RegionRail
+            regions={where}
+            onRegion={(region) =>
+              router.push(`/community?region=${encodeURIComponent(region)}`)
+            }
+          />
+        </Rise>
       ) : null}
 
       {spots.length > 0 ? (
-        <HotPlaces
-          places={spots}
-          /* 담기만 막습니다. 어느 곳을 누른 것인지는 안 싣습니다 —
-             돌아갈 화면이 그 뜻을 꺼내 쓰지 않으므로, 실어 두면 아무도
-             안 읽는 값이 주소를 타고 돌아다닙니다. */
-          onKeep={() => setGate({ where: '/(app)/popular', what: 'save' })}
-        />
+        <Rise order={3}>
+          <HotPlaces
+            places={spots}
+            /* 담기만 막습니다. 어느 곳을 누른 것인지는 안 싣습니다 —
+               돌아갈 화면이 그 뜻을 꺼내 쓰지 않으므로, 실어 두면 아무도
+               안 읽는 값이 주소를 타고 돌아다닙니다. */
+            onKeep={() => setGate({ where: '/(app)/popular', what: 'save' })}
+          />
+        </Rise>
       ) : null}
 
       {words.length > 0 ? (
-        /*
-          누르는 꼴을 안 입힌 줄입니다.
+        <Rise order={4}>
+          {/*
+            누르는 꼴을 안 입힌 줄입니다.
 
-          <p>칩이면 눌릴 것처럼 보이는데 갈 데가 없습니다 — 머리글에
-          적어 둔 {@code community/index.tsx} 의 {@code tag} 때문입니다.
-          글자는 아무것도 약속하지 않습니다.
-        */
-        <View style={styles.tags}>
-          <Body strong>요즘 이런 여행을 찾아요</Body>
-          <Body small tone="secondary">
-            {words.map((t) => `#${t.tag}`).join('  ')}
-          </Body>
-        </View>
+            <p>칩이면 눌릴 것처럼 보이는데 갈 데가 없습니다 — 아래에
+            적어 둔 {@code community/index.tsx} 의 {@code tag} 때문입니다.
+            글자는 아무것도 약속하지 않습니다.
+          */}
+          <View style={styles.tags}>
+            <Body strong>요즘 이런 여행을 찾아요</Body>
+            <Body small tone="secondary">
+              {words.map((t) => `#${t.tag}`).join('  ')}
+            </Body>
+          </View>
+        </Rise>
       ) : null}
 
       {bare ? (
@@ -485,13 +620,22 @@ function RegionRail({
     <View style={styles.shelf}>
       <Body strong>여기 글이 쌓여 있는 곳</Body>
       <Caption tone="secondary">누르면 그 지역 여행기를 둘러봐요.</Caption>
-      {/* 캐러셀과 같은 수법입니다 — 좌우 여백만큼 밖으로 밀고 그만큼을
-          안쪽 여백으로 돌려놓습니다. */}
+      {/*
+        캐러셀처럼 밖으로 밀지 <b>않습니다.</b>
+
+        <p>밀면 마지막 칸이 화면 끝으로 흘러가 "더 있다" 가 보입니다.
+        그런데 이 줄은 머리글 묶음 안에, 그 묶음은 또 {@link Rise} 안에
+        있어서 삐져나오는 겹이 둘 더 생깁니다 — 안드로이드에서 그 자리가
+        잘리는지 여기서 확인할 길이 없습니다.
+
+        <p>{@code curation.tsx} 의 같은 줄도 안 밀고 내보냈습니다. 지역은
+        여덟을 안 넘고 칸이 좁아 대개 다 들어오므로, 안 밀어서 잃는 것이
+        작습니다. 이미 돌아가는 모양과 같은 쪽을 고릅니다.
+      */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        style={styles.railOutTight}
-        contentContainerStyle={styles.rail}>
+        contentContainerStyle={styles.regionRow}>
         {regions.map((r) => (
           <Press
             key={r.region}
@@ -589,13 +733,13 @@ const styles = StyleSheet.create({
     marginTop: Spacing.s5,
     marginHorizontal: -Gutter,
   },
-  /* 묶음 머리글 바로 아래 서는 줄. 구역 간격은 바깥 묶음이 이미
-     주었으므로 여기서 또 띄우지 않습니다 — 밖으로 미는 것만 남깁니다. */
-  railOutTight: {
-    marginHorizontal: -Gutter,
-  },
   rail: {
     paddingHorizontal: Gutter,
+    gap: Spacing.s3,
+  },
+  /* 지역 줄. 밖으로 안 미므로 안쪽 여백도 없습니다 — 여백은 화면이
+     이미 쥐고 있습니다. */
+  regionRow: {
     gap: Spacing.s3,
   },
   /* 새로 깐 묶음들. 캐러셀과 같은 32 로 떨어집니다(12 + 20). */
