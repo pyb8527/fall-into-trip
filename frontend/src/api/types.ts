@@ -778,6 +778,32 @@ export type Tip = {
 };
 
 /**
+ * 이 여행에 가는지 하는 답.
+ *
+ * <p>줄이 없는 사람은 {@code 'MAYBE'} 입니다 — 여행을 만들 때 멤버 수만큼
+ * 줄을 미리 깔지 않습니다.
+ */
+export type GoingAnswer = 'GOING' | 'NOT_GOING' | 'MAYBE';
+
+/**
+ * 한 사람의 참석 응답.
+ *
+ * <p><b>「못 가요」만 셈에서 빠집니다.</b> 「아직 몰라요」는 남습니다 — 표
+ * 안 던진 사람을 미정으로 보는 규칙과 같은 결입니다.
+ *
+ * <p>보는 것은 안 바뀝니다. 못 간다고 한 사람도 그 여행을 그대로 봅니다.
+ */
+export type Going = {
+  id: string;
+  name: string;
+  mark: Maybe<string>;
+  owner: boolean;
+  answer: GoingAnswer;
+  /** 「셋째 날만 못 가요」 같은 것. 모두에게 보입니다 */
+  note: Maybe<string>;
+};
+
+/**
  * 마이페이지가 받는 것 — 이 사람이 어떤 여행을 해 왔나.
  *
  * <p>내 것과 남의 것이 같은 꼴입니다. {@code mine} 으로만 갈립니다 —

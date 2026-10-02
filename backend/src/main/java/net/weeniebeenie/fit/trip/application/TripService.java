@@ -31,6 +31,7 @@ public class TripService {
     private final DayRepository days;
     private final PlaceRepository places;
     private final TripAccessPolicy access;
+    private final TripGoingRepository going;
     private final net.weeniebeenie.fit.account.domain.UserRepository users;
     private final GroupService groups;
     private final GroupRepository groupBook;
@@ -325,6 +326,78 @@ public class TripService {
 
     /** @param owner 이 여행을 만든 사람인지. 이름 옆에 표를 다는 데 씁니다. */
     public record Person(String id, String name, String mark, boolean owner) {
+    }
+
+    /* ------------------------------------------------------- 참석 응답 */
+
+    /**
+     * 누가 가고 누가 못 가나.
+     *
+     * <p>{@code peopleOf} 가 아니라 {@code everyoneOf} 를 씁니다 — 전자는
+     * 이제 「가는 사람」이라 못 간다고 한 사람이 빠져 있습니다. 그 사람을
+     * 빼고 보여 주면 <b>누가 못 간다고 했는지</b>를 알 수가 없습니다.
+     */
+    @Transactional(readOnly = true)
+    public List<Going> goingOf(AuthPrincipal me, String tripId) {
+        Trip trip = access.mine(tripId, me.id());
+
+        Map<String, TripGoing> said = going.findAllByIdTripId(tripId).stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        g -> g.getId().getUserId(), g -> g));
+
+        return access.everyoneOf(trip).stream()
+                .map(id -> users.findById(id).map(u -> {
+                    TripGoing g = said.get(id);
+                    return new Going(
+                            u.getId(), u.getName(), u.getMark(),
+                            u.getId().equals(trip.getOwnerId()),
+                            /* 답이 없으면 「아직 몰라요」입니다 — 여행을 만들 때
+                               멤버 수만큼 줄을 미리 깔지 않습니다. */
+                            g == null ? GoingAnswer.MAYBE : g.getAnswer(),
+                            g == null ? null : g.getNote());
+                }).orElse(null))
+                .filter(java.util.Objects::nonNull)
+                .toList();
+    }
+
+    /**
+     * 간다 · 못 간다 · 아직 모른다.
+     *
+     * <h3>볼 수 있으면 답할 수 있습니다</h3>
+     *
+     * <p>고칠 수 있는 사람만으로 막지 않습니다. 모임 여행은 멤버 누구나
+     * 고칠 수 있으므로 지금은 같은 말이지만, 뜻이 다릅니다 — <b>제 참석은
+     * 제가 정합니다.</b> 남이 내 답을 바꿀 수 있으면 그것은 참석 응답이
+     * 아니라 명단입니다.
+     *
+     * <p>그래서 남의 답은 못 바꿉니다. 어느 줄을 고칠지 받지 않고, 늘
+     * 부른 사람 제 줄입니다.
+     */
+    @Transactional
+    public void answerGoing(AuthPrincipal me, String tripId, GoingAnswer answer, String note) {
+        access.requireCanRead(tripId, me.id());
+
+        String clean = note == null || note.isBlank() ? null : note.trim();
+        if (clean != null && clean.length() > 200) {
+            throw ApiException.badRequest("한 줄은 200자까지예요.");
+        }
+
+        TripGoing row = going.findById(new TripGoingId(tripId, me.id()))
+                .orElseGet(() -> new TripGoing(tripId, me.id(), answer, clean));
+        row.setAnswer(answer == null ? GoingAnswer.MAYBE : answer);
+        row.setNote(clean);
+        row.setUpdatedAt(java.time.Instant.now());
+        going.save(row);
+
+        audit.log(me.id(), "trip.going", tripId, Map.of("answer", String.valueOf(answer)));
+    }
+
+    /**
+     * @param answer 줄이 없으면 {@link GoingAnswer#MAYBE} 입니다
+     * @param note   「셋째 날만 못 가요」 같은 것. 모두에게 보입니다
+     */
+    public record Going(String id, String name, String mark, boolean owner,
+                        GoingAnswer answer, String note) {
     }
 
     /**

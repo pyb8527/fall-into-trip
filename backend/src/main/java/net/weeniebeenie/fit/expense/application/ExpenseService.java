@@ -19,6 +19,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -91,7 +93,7 @@ public class ExpenseService {
     public List<Books> settle(AuthPrincipal me, String tripId) {
         access.requireCanRead(tripId, me.id());
 
-        List<String> memberIds = access.peopleOf(tripId);
+        List<String> memberIds = settlers(tripId);
         Map<String, String> names = namesOf(tripId);
 
         /* 적어 둔 환율. 통화별 장부마다 "원화로 얼마" 를 얹는 데 씁니다. */
@@ -134,6 +136,41 @@ public class ExpenseService {
             out.add(new Books(currency, Currencies.decimals(currency), total, krw, owes, sends));
         });
         return out;
+    }
+
+    /**
+     * 정산에 세울 사람들.
+     *
+     * <h3>「가는 사람」만으로는 안 됩니다</h3>
+     *
+     * <p>{@code peopleOf} 가 「못 가요」라고 한 사람을 뺍니다. 그런데
+     * <b>이미 돈이 걸린 사람</b>을 빼면 셈이 깨집니다.
+     *
+     * <ul>
+     *   <li>떠나기 전 항공권을 긁어 준 사람이 「못 가요」로 바꾸면, 그
+     *       사람이 <b>낸 돈이 아무에게도 안 돌아갑니다</b></li>
+     *   <li>「민수만 내는 것」으로 지정해 둔 지출이 있는데 민수가 빠지면,
+     *       그 지출을 나눌 사람이 하나도 없습니다</li>
+     * </ul>
+     *
+     * <p>그래서 가는 사람에 <b>낸 사람과 나눌 사람으로 지정된 사람</b>을
+     * 더합니다. 돈이 안 걸린 사람만 빠집니다.
+     *
+     * <p>안 가게 된 사람이 낸 돈을 돌려받는 일은 여기서 막을 것이
+     * 아닙니다 — 그건 사람끼리 정할 일이고, 앱은 숫자를 안 잃기만 하면
+     * 됩니다.
+     */
+    private List<String> settlers(String tripId) {
+        List<String> going = access.peopleOf(tripId);
+        Set<String> out = new LinkedHashSet<>(going);
+
+        for (Expense e : expenses.findAllByTripIdOrderByCreatedAtAsc(tripId)) {
+            out.add(e.getPayerId());
+            for (String id : sharesOf(e)) {
+                out.add(id);
+            }
+        }
+        return new ArrayList<>(out);
     }
 
     /* --------------------------------------------------------------- 쓰기 */

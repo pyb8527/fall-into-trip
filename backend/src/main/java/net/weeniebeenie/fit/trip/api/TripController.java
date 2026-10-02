@@ -62,6 +62,38 @@ public class TripController {
     }
 
     /** 혼자 여행을 모임으로 옮기거나 다시 뺍니다. 만든 사람만 합니다. */
+    /**
+     * 누가 가고 누가 못 가나.
+     *
+     * <p>{@code /people} 과 따로 둡니다. 그쪽은 이제 「가는 사람」만
+     * 내므로(TripAccessPolicy.peopleOf), 못 간다고 한 사람을 보여 주려면
+     * 다른 길이 필요합니다.
+     */
+    @GetMapping("/trips/{id}/going")
+    public Map<String, Object> going(@CurrentUser AuthPrincipal me, @PathVariable String id) {
+        return Map.of("going", trips.goingOf(me, id));
+    }
+
+    /**
+     * 내 답을 적습니다.
+     *
+     * <p>누구 줄을 고칠지 받지 않습니다. 늘 <b>부른 사람 제 줄</b>입니다 —
+     * 제 참석은 제가 정합니다. 남이 바꿀 수 있으면 그것은 참석 응답이
+     * 아니라 명단입니다.
+     */
+    @PutMapping("/trips/{id}/going")
+    public Map<String, Object> answerGoing(@CurrentUser AuthPrincipal me,
+                                           @PathVariable String id,
+                                           @RequestBody GoingBody body) {
+        trips.answerGoing(me, id, body == null ? null : body.answer(),
+                body == null ? null : body.note());
+        return Map.of("ok", true);
+    }
+
+    /** @param answer GOING · NOT_GOING · MAYBE */
+    public record GoingBody(net.weeniebeenie.fit.trip.domain.GoingAnswer answer, String note) {
+    }
+
     @PatchMapping("/trips/{id}/group")
     public Map<String, Object> group(@CurrentUser AuthPrincipal me,
                                      @PathVariable String id,

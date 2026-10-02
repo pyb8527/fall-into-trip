@@ -48,6 +48,7 @@ public class TripAccessPolicy {
 
     private final TripRepository trips;
     private final GroupMemberRepository groupMembers;
+    private final TripGoingRepository going;
 
     /** 볼 수 있는가. 못 보면 404. */
     public void requireCanRead(String tripId, String userId) {
@@ -101,19 +102,67 @@ public class TripAccessPolicy {
     }
 
     /**
-     * 이 여행에 딸린 사람들.
+     * 이 여행에 <b>가는</b> 사람들.
      *
-     * <p>만든 사람과, 그룹 여행이면 그 그룹 멤버 전부입니다. 만든 사람이 늘
-     * 맨 앞입니다 — 정산에서 "누가 냈나" 를 세울 때 차례가 흔들리면 안
-     * 됩니다.
+     * <h3>「딸린 사람」에서 「가는 사람」으로 바뀌었습니다</h3>
      *
-     * <p>혼자 여행이면 한 사람입니다.
+     * <p>전에는 만든 사람 + 그룹 멤버 <b>전부</b>였습니다. 그룹을 들이기
+     * 전에는 여행마다 사람을 불렀으니 「부른 사람 = 가는 사람」이었는데,
+     * 여행 멤버를 그룹 멤버로 합치면서 그 둘이 갈렸고 아무도 그 자리를
+     * 채우지 않았습니다.
+     *
+     * <p>열두 명 모임에서 넷이 가는 여행이면 이렇게 됐습니다 — 넷이 다
+     * 좋다고 해도 <b>영영 합의가 안 되고</b>(4/12), 지정 안 한 지출이
+     * <b>열두 명에게 나뉘고</b>, 안 가는 여덟 명에게도 일정 푸시가 갔습니다.
+     *
+     * <p>이제 「못 가요」({@link GoingAnswer#NOT_GOING})라고 한 사람이
+     * 빠집니다. <b>그 하나만</b> 빠집니다 — 「아직 몰라요」와 아무 답도 안
+     * 한 사람은 남습니다. 표 안 던진 사람을 미정으로 보는 지금
+     * 규칙({@code CandidateService})과 같은 결입니다.
+     *
+     * <p>만든 사람은 무슨 답을 했든 남습니다. 제 여행을 안 간다고 해도
+     * 그 여행의 셈에서 빠지면 「누가 냈나」의 차례가 비어 버립니다.
+     *
+     * <p>만든 사람이 늘 맨 앞입니다 — 정산에서 차례가 흔들리면 안 됩니다.
+     *
+     * <h3>보는 것은 안 바뀝니다</h3>
+     *
+     * <p>「못 가요」라고 한 사람도 그룹 여행을 그대로 봅니다
+     * ({@link #requireCanRead} 는 이것을 안 봅니다). 셈에서만 빠집니다 —
+     * 안 가는 여행이라고 안 보이게 하면, 같이 짜 주다가 못 가게 된 사람이
+     * 제가 넣은 장소를 못 보게 됩니다.
      */
     public List<String> peopleOf(String tripId) {
         return trips.findById(tripId).map(this::peopleOf).orElse(List.of());
     }
 
     public List<String> peopleOf(Trip trip) {
+        Set<String> out = new LinkedHashSet<>();
+        out.add(trip.getOwnerId());
+        if (trip.getGroupId() != null) {
+            /* 「못 가요」라고 한 사람들. 아래에서 뺍니다. */
+            Set<String> away = going
+                    .findAllByIdTripIdAndAnswer(trip.getId(), GoingAnswer.NOT_GOING)
+                    .stream()
+                    .map(g -> g.getId().getUserId())
+                    .collect(java.util.stream.Collectors.toSet());
+
+            groupMembers.findAllByIdGroupId(trip.getGroupId()).stream()
+                    .map(m -> m.getId().getUserId())
+                    .filter(id -> !away.contains(id))
+                    .forEach(out::add);
+        }
+        return new ArrayList<>(out);
+    }
+
+    /**
+     * 이 여행에 딸린 사람 <b>전부</b> — 못 간다고 한 사람까지.
+     *
+     * <p>{@link #peopleOf} 가 「가는 사람」이 된 뒤에도 전부가 필요한 자리가
+     * 있습니다 — 참석 응답 화면이 그렇습니다. 누가 못 간다고 했는지를
+     * 보여 주려면 그 사람도 목록에 있어야 합니다.
+     */
+    public List<String> everyoneOf(Trip trip) {
         Set<String> out = new LinkedHashSet<>();
         out.add(trip.getOwnerId());
         if (trip.getGroupId() != null) {

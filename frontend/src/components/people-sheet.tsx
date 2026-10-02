@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { api, ApiError, UNEXPECTED } from '@/api/client';
-import type { Group, Person } from '@/api/types';
+import type { Going, GoingAnswer, Group } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
 import { Colors, Gutter, Spacing, Tap } from '@/constants/theme';
@@ -84,19 +84,100 @@ function Inner({
   const router = useRouter();
   const { user } = useAuth();
 
-  const { data, error, loading, reload } = useAsync<{ people: Person[] }>(
-    (signal) => api.get(`/api/trips/${encodeURIComponent(tripId)}/people`, signal),
+  /*
+    누가 가고 누가 못 가나.
+
+    <p>{@code /people} 이 아니라 {@code /going} 입니다. 앞쪽은 이제
+    「가는 사람」만 내므로, 못 간다고 한 사람이 목록에서 사라집니다 —
+    그러면 <b>누가 못 간다고 했는지</b>를 알 수가 없습니다.
+  */
+  const { data, error, loading, reload } = useAsync<{ going: Going[] }>(
+    (signal) => api.get(`/api/trips/${encodeURIComponent(tripId)}/going`, signal),
     [tripId],
   );
+
+  const [saving, setSaving] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
+  const mine = data?.going.find((g) => g.id === user?.id) ?? null;
+
+  /*
+    내 답을 적습니다.
+
+    <p>적고 나면 목록만 다시 받는 것으로는 모자랍니다 — 「가는 사람」이
+    바뀌면 <b>합의 셈과 정산 나눔이 함께 바뀝니다.</b> 부른 화면에
+    알려서 그쪽도 다시 받게 합니다.
+  */
+  async function answer(next: GoingAnswer) {
+    setSaving(true);
+    setFailed(null);
+    try {
+      await api.put(`/api/trips/${encodeURIComponent(tripId)}/going`, { answer: next });
+      reload();
+      onChanged();
+    } catch (e) {
+      setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <>
       {loading && !data ? <Loading /> : null}
       {error ? <ErrorNote message={error} onRetry={reload} /> : null}
+      {failed ? <ErrorNote message={failed} /> : null}
+
+      {/*
+        내 답.
+
+        <p>목록 위에 둡니다. 남이 뭐라고 했는지보다 <b>내가 답했는지</b>가
+        먼저입니다 — 안 답하면 「아직 몰라요」로 셈에 남으므로, 못 가는데
+        안 답한 사람이 끝까지 셈에 들어 있게 됩니다.
+
+        <p>혼자 여행에는 안 세웁니다. 물을 것이 없습니다.
+      */}
+      {groupId ? (
+        <>
+          <Caption tone="secondary">이 여행에 가세요?</Caption>
+          <Row gap={Spacing.s2}>
+            <Chip
+              label="갈게요"
+              selected={mine?.answer === 'GOING'}
+              onPress={() => answer('GOING')}
+            />
+            <Chip
+              label="아직 몰라요"
+              selected={mine?.answer === 'MAYBE' || mine == null}
+              onPress={() => answer('MAYBE')}
+            />
+            <Chip
+              label="못 가요"
+              selected={mine?.answer === 'NOT_GOING'}
+              onPress={() => answer('NOT_GOING')}
+            />
+          </Row>
+          {/*
+            셈이 바뀐다는 말을 미리 합니다.
+
+            <p>「못 가요」로 바꾸면 그 사람이 합의 셈과 정산 나눔에서
+            빠집니다 — <b>이미 적힌 지출의 1인당 금액이 바뀝니다.</b>
+            누르고 나서 금액이 달라진 것을 발견하면 무엇이 그랬는지
+            찾기가 어렵습니다.
+
+            <p>이미 낸 돈은 안 사라집니다. 낸 사람과 나눌 사람으로
+            지정된 사람은 셈에 남습니다(ExpenseService.settlers).
+          */}
+          <Caption tone="muted">
+            「못 가요」로 두면 가고 싶은 곳 합의와 가계부 나눔에서 빠져요. 이미 낸 돈은 그대로
+            남아요.
+          </Caption>
+          <Band />
+        </>
+      ) : null}
 
       {/* 모임 사람들 판(MatesSheet)과 같은 줄 모양입니다. 같은 것을 두 군데서
           다른 모양으로 내면 같은 앱으로 안 읽힙니다. */}
-      {data?.people.map((p) => (
+      {data?.going.map((p) => (
         <Row key={p.id} gap={Spacing.s3} style={styles.mate}>
           {/* 지도에 찍히는 그림을 여기에도 답니다. 지도에서 곰을 보고
               누구인지 알려면 어딘가에서 한 번은 짝지어져야 합니다. */}
@@ -105,6 +186,14 @@ function Inner({
             <Body strong numberOfLines={1}>
               {p.name}
             </Body>
+            {/* 못 간다고 한 사람은 그렇게 적습니다. 목록에서 빼지
+                않습니다 — 빼면 「답을 안 한 사람」과 구별이 안 됩니다. */}
+            {p.answer !== 'MAYBE' || p.note ? (
+              <Caption tone={p.answer === 'NOT_GOING' ? 'danger' : 'brand'}>
+                {p.answer === 'GOING' ? '갈게요' : p.answer === 'NOT_GOING' ? '못 가요' : ''}
+                {p.note ? ' · ' + p.note : ''}
+              </Caption>
+            ) : null}
             {p.owner || p.id === user?.id ? (
               <Caption tone="secondary">
                 {[p.owner ? '만든 사람' : null, p.id === user?.id ? '나' : null]
