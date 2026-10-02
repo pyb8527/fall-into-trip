@@ -123,14 +123,23 @@ public class TipService {
         return out;
     }
 
+    /**
+     * 한 줄과 별점을 남깁니다.
+     *
+     * <p><b>둘 중 하나만 써도 됩니다</b>(G-11). 별만 주고 싶은 사람도 있고
+     * 할 말만 있는 사람도 있습니다. 둘 다 비면 남길 것이 없습니다.
+     */
     @Transactional
-    public PlaceTip add(AuthPrincipal me, String placeId, String text) {
+    public PlaceTip add(AuthPrincipal me, String placeId, String text, Integer stars) {
         if (placeId == null || placeId.isBlank()) {
             throw ApiException.badRequest("어느 장소인지 알 수 없어요.");
         }
+        if (stars != null && (stars < 1 || stars > 5)) {
+            throw ApiException.badRequest("별점은 1에서 5까지예요.");
+        }
         String clean = text == null ? "" : text.trim();
-        if (clean.isEmpty()) {
-            throw ApiException.badRequest("남길 말을 적어 주세요.");
+        if (clean.isEmpty() && stars == null) {
+            throw ApiException.badRequest("별점을 주거나 한 줄을 남겨 주세요.");
         }
         if (clean.length() > MAX_LENGTH) {
             throw ApiException.badRequest("한 줄 팁은 " + MAX_LENGTH + "자까지예요.");
@@ -144,6 +153,7 @@ public class TipService {
                 .placeId(placeId)
                 .userId(me.id())
                 .text(clean)
+                .stars(stars)
                 .build());
         audit.log(me.id(), "tip.add", tip.getId());
         return tip;
@@ -207,7 +217,7 @@ public class TipService {
     }
 
     public Card cardOf(PlaceTip tip, String meId) {
-        return new Card(tip.getId(), tip.getText(), nameOf(tip.getUserId()),
+        return new Card(tip.getId(), tip.getText(), tip.getStars(), nameOf(tip.getUserId()),
                 tip.getUserId().equals(meId), tip.getCreatedAt());
     }
 
@@ -215,7 +225,41 @@ public class TipService {
         return users.findById(userId).map(User::getName).orElse("알 수 없음");
     }
 
-    /** @param mine 내가 남긴 것인지. 지울 수 있는지를 이걸로 정합니다. */
-    public record Card(String id, String text, String authorName, boolean mine, Instant createdAt) {
+    /**
+     * @param mine  내가 남긴 것인지. 지울 수 있는지를 이걸로 정합니다
+     * @param stars 별 1~5. 안 준 것은 비어 있습니다 — 0 이 아닙니다
+     */
+    public record Card(String id, String text, Integer stars, String authorName,
+                       boolean mine, Instant createdAt) {
+    }
+
+    /**
+     * 장소마다 우리 별점.
+     *
+     * <p>구글 평점과 나란히 둡니다. 다르면 그것이 정보입니다 — 구글 4.2 에
+     * 우리 4.6 이면 「우리 같은 사람들은 더 좋게 봤다」는 말이고, 그 반대면
+     * 「소문보다 별로」입니다.
+     *
+     * @param average 1.0~5.0. 소수 한 자리까지만 씁니다
+     * @param count   몇 명이 줬는지. 수가 적으면 화면이 평균을 덜 믿게 적습니다
+     */
+    public record Stars(double average, int count) {
+    }
+
+    /** 장소마다 우리 별점. 기한이 없습니다 — 별점은 안 늙습니다. */
+    @Transactional(readOnly = true)
+    public Map<String, Stars> starsOf(Collection<String> placeIds) {
+        if (placeIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, Stars> out = new HashMap<>();
+        for (Object[] row : tips.starsOf(placeIds)) {
+            double avg = ((Number) row[1]).doubleValue();
+            /* 소수 한 자리. 4.666… 을 그대로 내려보내면 화면마다 다르게
+               자릅니다. */
+            out.put((String) row[0],
+                    new Stars(Math.round(avg * 10) / 10.0, ((Number) row[2]).intValue()));
+        }
+        return out;
     }
 }

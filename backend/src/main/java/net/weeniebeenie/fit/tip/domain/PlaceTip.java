@@ -14,6 +14,18 @@ import java.time.Instant;
  *
  * <p>여행이 아니라 <b>구글 장소 번호</b>에 답니다. 여행에 달면 같은 가게를
  * 넣어 둔 남의 일정에서는 안 보이는데, 그러면 팁이 쌓일 데가 없습니다.
+ *
+ * <h3>별이 여기 붙습니다</h3>
+ *
+ * <p>V37 에서 걷어 낸 {@code places.stars} 는 <b>내 일정의 그 장소</b>에
+ * 달려 있었습니다. 같은 가게를 넣어 둔 남의 일정에서는 안 보였고, 그래서
+ * 열 사람이 다녀가도 별점이 열 군데에 하나씩 흩어졌습니다. 쌓이는 곳이
+ * 없으면 평균도 없습니다.
+ *
+ * <p>별점표를 따로 만들지 않습니다. 따로 두면 한 사람이 같은 가게에 별
+ * 따로 · 한 줄 따로 남길 수 있고, 그 둘을 한 화면에 묶어 보여 주려면 매번
+ * 맞춰 붙여야 합니다. 화면이 그리는 모양이 이미 「얼굴 · 이름 · 별 · 한 줄」
+ * 한 덩어리입니다.
  */
 @Entity
 @Table(name = "place_tips")
@@ -35,6 +47,18 @@ public class PlaceTip {
     @Column(nullable = false, length = 200)
     private String text;
 
+    /**
+     * 별 1~5. 비워 둘 수 있습니다.
+     *
+     * <p>「별 다섯 + 한 줄, 둘 중 하나만 써도 됩니다」(G-11) 입니다 — 별만
+     * 주고 싶은 사람도 있고 할 말만 있는 사람도 있습니다.
+     *
+     * <p>{@link Integer} 입니다. {@code int} 로 두면 안 준 것이 0 이 되고,
+     * 0 은 평균에 들어가 별 하나보다 나쁜 점수가 됩니다.
+     */
+    @Column
+    private Integer stars;
+
     /** 신고를 받아 운영자가 내린 글. 지우지 않고 감춥니다. */
     @Column(nullable = false)
     private boolean hidden;
@@ -43,11 +67,12 @@ public class PlaceTip {
     private Instant createdAt;
 
     @Builder
-    public PlaceTip(String placeId, String userId, String text) {
+    public PlaceTip(String placeId, String userId, String text, Integer stars) {
         this.id = Ids.next();
         this.placeId = placeId;
         this.userId = userId;
         this.text = text;
+        this.stars = stars;
         this.createdAt = Instant.now();
     }
 }

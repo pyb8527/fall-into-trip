@@ -47,14 +47,23 @@ public class TipController {
     @PostMapping("/api/tips/counts")
     public Map<String, Object> counts(@RequestBody CountsRequest req) {
         List<String> ids = req == null || req.placeIds() == null ? List.of() : req.placeIds();
-        return Map.of("counts", tips.countsOf(ids));
+        /*
+          별점도 같이 냅니다.
+
+          <p>장소 목록은 팁 수와 별점을 늘 함께 보여 줍니다. 길을 둘로
+          나누면 화면이 두 번 묻고, 그 둘이 서로 다른 순간의 값일 수
+          있습니다.
+        */
+        return Map.of("counts", tips.countsOf(ids), "stars", tips.starsOf(ids));
     }
 
     @PostMapping("/api/places/{placeId}/tips")
     public Map<String, Object> add(@CurrentUser AuthPrincipal me,
                                    @PathVariable String placeId,
-                                   @RequestBody TextRequest req) {
-        var tip = tips.add(me, placeId, req == null ? null : req.text());
+                                   @RequestBody TipRequest req) {
+        var tip = tips.add(me, placeId,
+                req == null ? null : req.text(),
+                req == null ? null : req.stars());
         return Map.of("tip", tips.cardOf(tip, me.id()));
     }
 
@@ -75,7 +84,13 @@ public class TipController {
     public record CountsRequest(List<String> placeIds) {
     }
 
-    public record TextRequest(String text) {
+    /**
+     * 남기는 것 — 한 줄과 별점.
+     *
+     * <p>둘 중 하나만 보내도 됩니다. 옛 이름({@code TextRequest})에서 바꿨습니다 —
+     * 이제 글만 받는 것이 아닙니다.
+     */
+    public record TipRequest(String text, Integer stars) {
     }
 
     public record ReasonRequest(String reason) {
