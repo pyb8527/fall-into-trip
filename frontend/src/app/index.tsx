@@ -1,9 +1,14 @@
 import { Redirect } from 'expo-router';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { Image, StyleSheet, View } from 'react-native';
 
 import { useAuth } from '@/auth/auth-provider';
-import { Colors, Spacing } from '@/constants/theme';
-import { LogoLockup } from '@/ui/logo';
+
+/**
+ * 앱 시작 화면과 같은 것. app.json 의 expo-splash-screen 설정을 그대로
+ * 옮겨 둡니다 — 한쪽만 고치면 시작할 때 화면이 다시 두 번 바뀝니다.
+ */
+const SPLASH_BG = '#6D5BF6';
+const SPLASH_WIDTH = 120;
 
 /**
  * 어디로 보낼지 정하는 자리.
@@ -42,11 +47,26 @@ export default function Entry() {
   return <Redirect href="/(auth)/welcome" />;
 }
 
+/*
+  시작 화면.
+
+  <p>흰 바탕에 로고와 도는 표시를 그렸습니다. 그런데 그 앞에 앱(네이티브)과
+  웹 머리(+html)의 시작 화면이 <b>바이올렛 바탕에 그림 하나</b>로 이미 떠
+  있어서, 켤 때마다 바이올렛 → 흰 로고 → 첫 화면으로 두 번 바뀌었습니다.
+
+  <p>앞의 것과 똑같이 그립니다 — 같은 바탕, 같은 그림, 같은 자리와 크기.
+  그러면 넘어가는 자리가 안 보이고 한 장으로 읽힙니다. 도는 표시는
+  뺍니다. 앞의 시작 화면에도 없습니다.
+*/
 function Splash() {
   return (
     <View style={styles.splash}>
-      <LogoLockup size={104} />
-      <ActivityIndicator color={Colors.textDisabled} />
+      <Image
+        source={require('../../assets/images/splash-icon.png')}
+        style={styles.mark}
+        resizeMode="contain"
+        accessibilityIgnoresInvertColors
+      />
     </View>
   );
 }
@@ -56,7 +76,10 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: Spacing.xxxl,
-    backgroundColor: Colors.surface,
+    backgroundColor: SPLASH_BG,
+  },
+  mark: {
+    width: SPLASH_WIDTH,
+    height: SPLASH_WIDTH,
   },
 });

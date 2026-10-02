@@ -332,7 +332,10 @@ export default function Money() {
               <Split align="start">
                 <View style={styles.myHalf}>
                   <Caption tone="secondary">내가 받을 돈</Caption>
-                  <Text style={[styles.myAmount, styles.take]}>
+                  {/* 없으면 색을 뺍니다. 「없음」이 주황·초록이면 할 일이 있는
+                      줄로 읽힙니다. */}
+                  <Text
+                    style={[styles.myAmount, mine.take.length === 0 ? styles.none : styles.take]}>
                     {mine.take.length === 0
                       ? '없음'
                       : mine.take
@@ -348,7 +351,8 @@ export default function Money() {
                 </View>
                 <View style={styles.myHalf}>
                   <Caption tone="secondary">내가 줄 돈</Caption>
-                  <Text style={[styles.myAmount, styles.give]}>
+                  <Text
+                    style={[styles.myAmount, mine.give.length === 0 ? styles.none : styles.give]}>
                     {mine.give.length === 0
                       ? '없음'
                       : mine.give
@@ -1262,6 +1266,10 @@ const styles = StyleSheet.create({
     color: Colors.success,
   },
   /** 줄 돈. 마감 임박과 같은 주황입니다 — 빨강은 지우기 자리입니다. */
+  /* 받을 것·줄 것이 없을 때. 회색 — 할 일이 없습니다. */
+  none: {
+    color: Colors.textMuted,
+  },
   give: {
     color: Colors.warning,
   },

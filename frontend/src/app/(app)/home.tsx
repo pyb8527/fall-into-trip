@@ -560,20 +560,6 @@ export default function Home() {
         자리라 <b>막대 오른쪽 얼굴</b>로 올렸습니다 — 제 계정에 가려고 남의
         추천 여행을 훑어 내려갈 일이 아닙니다.
       */}
-      {user?.role === 'ADMIN' ? (
-        <View>
-          <Band />
-          <ListRow
-            left={<Icon name="users" size={24} tone="secondary" />}
-            title="운영 관리"
-            subtitle="계정 관리 · 감사 로그"
-            right={<Icon name="chevron-right" size={20} tone="muted" />}
-            last
-            onPress={() => router.push('/admin')}
-          />
-        </View>
-      ) : null}
-
       <PlaceDetailSheet place={looking} onClose={() => setLooking(null)} />
     </Screen>
   );

@@ -76,6 +76,7 @@ import {
   Caption,
   Card,
   Chip,
+  Checkbox,
   ConfirmDialog,
   Divider,
   Empty,
@@ -3752,8 +3753,18 @@ function PackSheet({
   );
   const [text, setText] = useState('');
   const [failed, setFailed] = useState<string | null>(null);
+  /* 지울지 묻고 있는 것. 줄마다 빨간 휴지통을 두지 않고 ⋯ 뒤로 넣었습니다 —
+     빨강은 「정말 지울까요」의 확인 단추에만 남깁니다. */
+  const [dropping, setDropping] = useState<Packed | null>(null);
 
-  const items = data?.items ?? [];
+  /*
+    챙긴 것은 아래로 내립니다.
+
+    <p>챙길 것 목록을 여는 까닭은 「아직 뭐가 남았나」입니다. 챙긴 것이 섞여
+    있으면 남은 것을 찾으려고 줄마다 체크를 봐야 합니다. 같은 무리 안에서는
+    적은 차례를 지킵니다 — 체크할 때마다 줄이 뒤섞이면 손가락 밑이 바뀝니다.
+  */
+  const items = [...(data?.items ?? [])].sort((a, b) => Number(a.done) - Number(b.done));
   const done = items.filter((i) => i.done).length;
 
   async function run(action: () => Promise<unknown>) {
@@ -3809,12 +3820,17 @@ function PackSheet({
       {items.map((item) => (
         <View key={item.id} style={styles.packRow}>
           <Row gap={Spacing.s2} style={styles.stayRow}>
-            <IconButton
-              name="check"
+            {/*
+              체크 칸.
+
+              <p>체크 모양 단추였습니다. 안 챙긴 것도 늘 체크 모양이고 켜짐
+              색만 달라서, <b>목록이 전부 챙긴 것처럼 보였습니다.</b> 안 챙긴
+              것은 빈 칸, 챙긴 것은 채운 칸입니다.
+            */}
+            <Checkbox
+              checked={item.done}
               label={item.done ? `${item.name} 안 챙김으로` : `${item.name} 챙김으로`}
-              tone="success"
-              active={item.done}
-              onPress={() => {
+              onChange={() => {
                 /* 안 챙김으로 되돌릴 때는 안 울립니다. 되돌리는 것은
                    해낸 일이 아닙니다. */
                 if (!item.done) {
@@ -3830,10 +3846,10 @@ function PackSheet({
               </Body>
             </View>
             <IconButton
-              name="trash-2"
+              name="more-horizontal"
               label={`${item.name} 지우기`}
-              tone="danger"
-              onPress={() => run(() => api.delete(`/api/items/${item.id}`))}
+              bare
+              onPress={() => setDropping(item)}
             />
           </Row>
 
@@ -3860,6 +3876,22 @@ function PackSheet({
       ))}
 
       {failed ? <ErrorNote message={failed} /> : null}
+
+      <ConfirmDialog
+        visible={dropping != null}
+        title={dropping ? `「${dropping.name}」을 지울까요?` : ''}
+        message="챙길 것 목록에서 빠져요."
+        confirmLabel="지우기"
+        danger
+        onCancel={() => setDropping(null)}
+        onConfirm={() => {
+          const it = dropping;
+          setDropping(null);
+          if (it) {
+            run(() => api.delete(`/api/items/${it.id}`));
+          }
+        }}
+      />
     </BottomSheet>
   );
 }

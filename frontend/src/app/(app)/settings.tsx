@@ -6,6 +6,8 @@ import { StyleSheet, Text, View } from 'react-native';
 import { api, API_BASE, ApiError, UNEXPECTED } from '@/api/client';
 import { GoogleButton } from '@/components/google-button';
 import { canSignInWithKakao, KakaoButton } from '@/components/kakao-button';
+import { canParseHere, dropModel, fetchModel, intentState, modelNote } from '@/lib/intent';
+import type { IntentState } from '@/lib/intent-types';
 import { canLinkKakao } from '@/lib/kakao-signin';
 import { canNotify, notifyState, turnOff, turnOn } from '@/lib/notify';
 import { shareLink } from '@/lib/share';
@@ -120,6 +122,8 @@ export default function Settings() {
       <MarkGroup />
 
       <CalendarGroup />
+
+      <DeviceGroup />
 
       <AccountGroup />
 
@@ -407,6 +411,55 @@ function MarkGroup() {
           ))}
         </Row>
       </BottomSheet>
+    </>
+  );
+}
+
+/**
+ * 기기 안에서 처리하기 — 「어디 갈지 물어보기」의 문장을 이 기기에서 쪼갭니다.
+ *
+ * <p>받으라는 안내가 물어보기 판 안에 있었습니다. 물어보려고 연 판에 「약
+ * 1GB」가 끼어 있으면 그것이 그 판의 할 일처럼 읽힙니다. 받을지는 한 번
+ * 정하면 되는 일이라 설정으로 옮겼습니다.
+ *
+ * <p>조르지 않습니다 — 안 받아도 물어보기는 그대로 돕니다. 문장이 서버를
+ * 거쳐 갈 뿐입니다.
+ */
+function DeviceGroup() {
+  const [brain, setBrain] = useState<IntentState>(() => intentState());
+  const [pulling, setPulling] = useState(0);
+
+  if (!canParseHere) {
+    return null;
+  }
+
+  async function pull() {
+    setBrain('fetching');
+    const ok = await fetchModel((p) => setPulling(p));
+    setBrain(ok ? 'ready' : 'absent');
+  }
+
+  async function drop() {
+    await dropModel();
+    setBrain(intentState());
+  }
+
+  return (
+    <>
+      <Band />
+      <SectionHeader title="기기 안에서 처리하기" tight />
+      <Body small tone="secondary">
+        {brain === 'ready'
+          ? '물어본 문장을 이 기기에서 먼저 추려요. 문장이 기기 밖으로 나가지 않아요.'
+          : `지금은 물어본 문장이 서버를 거쳐 구글로 가요. 모델을 받아 두면 이 기기에서 먼저 추려요. ${modelNote()}`}
+      </Body>
+      {brain === 'fetching' ? (
+        <Caption tone="secondary">받는 중이에요 ({Math.round(pulling * 100)}%).</Caption>
+      ) : brain === 'ready' ? (
+        <Line label="받아 둔 모델 지우기" last onPress={drop} />
+      ) : (
+        <Line label="모델 받기" last onPress={pull} />
+      )}
     </>
   );
 }

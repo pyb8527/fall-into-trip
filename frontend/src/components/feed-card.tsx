@@ -11,6 +11,7 @@ import { Colors, Radius, Spacing } from '@/constants/theme';
 import { faceOf } from '@/constants/user-marks';
 import {
   Body,
+  BottomSheet,
   Caption,
   Card,
   Chip,
@@ -20,6 +21,7 @@ import {
   Field,
   Icon,
   IconButton,
+  ListRow,
   Press,
   Row,
   Split,
@@ -52,6 +54,9 @@ export function FeedCard({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [dropping, setDropping] = useState(false);
+  /* 이 글 다루기 판. 고치기와 지우기를 그림 둘로 세워 두었는데, 지우기가
+     빨간 X 라 글마다 빨강이 하나씩 떠 있었습니다. ⋯ 하나로 접습니다. */
+  const [acting, setActing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
 
@@ -87,18 +92,12 @@ export function FeedCard({
         {/* 지우기는 글쓴이와 모임 주인이 합니다. 주인인지는 서버만 아는데,
             눌러 보고 알게 하는 것보다 눌러서 막히는 편이 낫습니다 — 치울
             길이 아예 안 보이면 치울 수 있다는 것도 모릅니다. */}
-        <Row gap={Spacing.s2}>
-          {post.mine && onEdit ? (
-            <IconButton name="settings" label="이 글 고치기" bare onPress={() => onEdit(post)} />
-          ) : null}
-          <IconButton
-            name="x"
-            label="이 글 지우기"
-            tone="danger"
-            bare
-            onPress={() => setDropping(true)}
-          />
-        </Row>
+        <IconButton
+          name="more-horizontal"
+          label="이 글 다루기"
+          bare
+          onPress={() => setActing(true)}
+        />
       </Split>
 
       {post.photoIds.length > 0 ? <PhotoStrip ids={post.photoIds} height={320} /> : null}
@@ -153,6 +152,28 @@ export function FeedCard({
       </Press>
 
       {open ? <Talk postId={post.id} onChanged={onChanged} /> : null}
+
+      <BottomSheet visible={acting} title="이 글" onClose={() => setActing(false)}>
+        {post.mine && onEdit ? (
+          <ListRow
+            left={<Icon name="edit-2" tone="secondary" />}
+            title="고치기"
+            onPress={() => {
+              setActing(false);
+              onEdit(post);
+            }}
+          />
+        ) : null}
+        <ListRow
+          left={<Icon name="trash-2" tone="secondary" />}
+          title="지우기"
+          last
+          onPress={() => {
+            setActing(false);
+            setDropping(true);
+          }}
+        />
+      </BottomSheet>
 
       <ConfirmDialog
         visible={dropping}

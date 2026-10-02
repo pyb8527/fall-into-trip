@@ -261,24 +261,17 @@ export default function GroupScreen() {
             <FeedList groupId={group.id} groupName={group.name} />
           )}
 
-          {amOwner ? (
-            <>
-              <Band />
-              {/* 손으로 그린 줄이었습니다. 목록 줄 부품을 쓰면 위 여행 목록과
-                  높이·여백이 같아져 「맨 아래에 있는 또 하나의 줄」 로
-                  읽힙니다 — 단추가 아니라 줄이어야 하는 자리입니다. */}
-              <ListRow
-                left={<Icon name="trash-2" size={20} tone="danger" />}
-                title={<Body strong tone="danger">모임 지우기</Body>}
-                last
-                onPress={() => setDeleting(true)}
-              />
-            </>
-          ) : null}
-
           <GroupForm
             visible={editing}
             group={group}
+            onDelete={
+              amOwner
+                ? () => {
+                    setEditing(false);
+                    setDeleting(true);
+                  }
+                : undefined
+            }
             onClose={() => setEditing(false)}
             onDone={() => {
               setEditing(false);

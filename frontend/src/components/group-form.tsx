@@ -4,7 +4,7 @@ import { StyleSheet } from 'react-native';
 import { api, ApiError, UNEXPECTED } from '@/api/client';
 import type { Group } from '@/api/types';
 import { Spacing } from '@/constants/theme';
-import { Body, BottomSheet, Button, Caption, ChoiceTile, ErrorNote, Field, Row } from '@/ui';
+import { Body, BottomSheet, Button, Caption, ChoiceTile, Divider, ErrorNote, Field, Row } from '@/ui';
 
 /**
  * 모임을 만들거나 고치는 판.
@@ -38,11 +38,20 @@ export function GroupForm({
   group,
   onClose,
   onDone,
+  onDelete,
 }: {
   visible: boolean;
   group?: Group | null;
   onClose: () => void;
   onDone: (group: Group) => void;
+  /**
+   * 모임 지우기. 만든 사람이 고칠 때만 줍니다.
+   *
+   * <p>모임 화면 맨 아래에 빨간 줄로 서 있었습니다. 지우는 것은 모임을
+   * 다루는 일이라 편집 판 맨 아래, 선 하나 건너에 둡니다. 빨강은 「정말
+   * 지울까요」의 확인 단추에만 남습니다.
+   */
+  onDelete?: () => void;
 }) {
   const editing = group != null;
 
@@ -146,6 +155,13 @@ export function GroupForm({
       </Row>
 
       {error ? <ErrorNote message={error} /> : null}
+
+      {editing && onDelete ? (
+        <>
+          <Divider />
+          <Button label="모임 지우기" variant="ghost" onPress={onDelete} />
+        </>
+      ) : null}
     </BottomSheet>
   );
 }

@@ -13,7 +13,7 @@ import {
 } from '@/components/sort-bar';
 import { iconOf } from '@/constants/place-icons';
 import type { IntentState } from '@/lib/intent-types';
-import { canParseHere, fetchModel, intentState, modelNote, parseIntent } from '@/lib/intent';
+import { canParseHere, intentState, parseIntent } from '@/lib/intent';
 import { readableMeters } from '@/lib/geo';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { HERE } from '@/constants/words';
@@ -182,14 +182,8 @@ export function RecommendSheet({
     없으면 문장을 그대로 보냅니다. 그래도 추천은 그대로 돕니다 — 조금 덜
     맞을 뿐입니다. 그래서 이것을 켜라고 조르지 않습니다.
   */
-  const [brain, setBrain] = useState<IntentState>(() => intentState());
-  const [pulling, setPulling] = useState(0);
-
-  async function pullModel() {
-    setBrain('fetching');
-    const ok = await fetchModel((p) => setPulling(p));
-    setBrain(ok ? 'ready' : 'absent');
-  }
+  /* 받는 일은 설정(「기기 안에서 처리하기」)이 합니다. 여기서는 받아 뒀는지만 봅니다. */
+  const [brain] = useState<IntentState>(() => intentState());
 
   async function ask() {
     const q = query.trim();
@@ -398,28 +392,11 @@ export function RecommendSheet({
       {/*
         기기 안에서 쪼개기.
 
-        조르지 않습니다 — 없어도 추천은 그대로 돕니다. 한 번 접어 두고,
-        받을지는 사람이 정합니다. 1GB 는 아무 데서나 받을 크기가 아닙니다.
+        <p>받으라는 안내(「약 1GB」)가 여기 있었습니다. 물어보려고 연 판에
+        모델 크기 얘기가 끼어 있으면 그것이 이 판의 할 일처럼 읽힙니다.
+        설정의 「기기 안에서 처리하기」로 옮겼습니다. 받아 둔 사람에게만
+        「이 기기 밖으로 안 나가요」를 적습니다.
       */}
-      {canParseHere && brain !== 'ready' ? (
-        brain === 'fetching' ? (
-          <Caption tone="secondary">
-            기기에 넣을 모델을 받는 중이에요 ({Math.round(pulling * 100)}%). 그동안에도 물어볼 수
-            있어요.
-          </Caption>
-        ) : (
-          <Row gap={Spacing.s2} style={styles.brain}>
-            <View style={styles.grow}>
-              <Caption tone="secondary">
-                지금은 물어본 문장이 서버를 거쳐 구글로 가요. 여기서 먼저 추리게 하면 문장은
-                이 기기 밖으로 나가지 않아요. {modelNote()}
-              </Caption>
-            </View>
-            <Button label="받기" variant="ghost" compact onPress={pullModel} />
-          </Row>
-        )
-      ) : null}
-
       {canParseHere && brain === 'ready' ? (
         <Caption tone="success">이 문장은 이 기기 밖으로 나가지 않아요.</Caption>
       ) : null}

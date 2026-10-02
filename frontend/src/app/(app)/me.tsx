@@ -227,10 +227,7 @@ function MyReviews({ whose, count }: { whose: string | null; count: number }) {
   return (
     <>
       <SectionHeader title="내가 남긴 것" tight note={`별점을 준 것 ${count}개`} />
-      <Caption tone="secondary">
-        장소 상세에서 남긴 별점과 한 줄이 여기 모여요. 장소 이름을 같이 보여 주는 일은 다음
-        묶음입니다.
-      </Caption>
+      <Caption tone="secondary">장소 상세에서 남긴 별점과 한 줄이 여기 모여요.</Caption>
     </>
   );
 }

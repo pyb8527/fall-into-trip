@@ -165,7 +165,8 @@ body {
   background: #6D5BF6;
   transition: opacity .25s ease;
 }
-#fit-splash img { width: 96px; height: auto; }
+/* 앱 시작 화면(app.json imageWidth)과 같은 크기. 다르면 넘어갈 때 그림이 커졌다 줄어듭니다. */
+#fit-splash img { width: 120px; height: auto; }
 #fit-splash.gone { opacity: 0; pointer-events: none; }
 /* 움직임을 줄여 달라고 해 둔 사람에게는 서서히 사라지는 것도 안 해요. */
 @media (prefers-reduced-motion: reduce) { #fit-splash { transition: none; } }`,
