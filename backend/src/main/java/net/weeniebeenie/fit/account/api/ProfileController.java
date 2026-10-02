@@ -29,13 +29,25 @@ public class ProfileController {
         return profiles.of(me, null);
     }
 
-    /** 이름과 한 줄 소개. 늘 제 것만 고칩니다. */
+    /**
+     * 이름·한 줄 소개·얼굴 사진. 늘 제 것만 고칩니다.
+     *
+     * <p>안 보낸 칸은 그대로 둡니다. 지우는 것은 빈 글("")입니다 — 얼굴
+     * 사진도 같습니다(규칙은 {@link ProfileService#edit}).
+     */
     @PatchMapping("/api/me/profile")
     public ProfileService.Profile edit(@CurrentUser AuthPrincipal me, @RequestBody EditBody body) {
-        return profiles.edit(me, body == null ? null : body.name(), body == null ? null : body.bio());
+        return profiles.edit(me,
+                body == null ? null : body.name(),
+                body == null ? null : body.bio(),
+                body == null ? null : body.photoId());
     }
 
-    public record EditBody(String name, String bio) {
+    /**
+     * @param photoId 올릴 얼굴 사진의 번호. <b>내가 올린 사진이어야</b> 합니다 —
+     *                안 보면 남의 사진을 제 얼굴에 박아 넣을 수 있습니다
+     */
+    public record EditBody(String name, String bio, String photoId) {
     }
 
     @GetMapping("/api/users/{userId}/profile")

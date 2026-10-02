@@ -66,6 +66,22 @@ public class PlaceTip {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
+    /**
+     * 고친 때. <b>비어 있으면 한 번도 안 고친 것입니다.</b>
+     *
+     * <p>고쳐도 {@code createdAt} 은 안 건드립니다. 그 값은 「언제 다녀와서 쓴
+     * 것인가」이고, 보여 줄지 말지를 가리는 이레 기한
+     * ({@code TipService.FRESH})과 줄 순서가 거기에 매여 있습니다. 고칠 때마다
+     * 새 글로 세면 같은 한 줄을 다시 저장하는 것만으로 장소 맨 위에 영원히
+     * 세워 둘 수 있고, 그것은 {@code MAX_PER_DAY} 로 막아 둔 도배와 같은
+     * 일입니다.
+     *
+     * <p>대신 고친 때를 읽는 쪽에 함께 내려보냅니다. 대기 시간처럼 금방
+     * 달라지는 것은 <b>언제 적힌 것인지</b>가 내용만큼 중요합니다.
+     */
+    @Column(name = "edited_at")
+    private Instant editedAt;
+
     @Builder
     public PlaceTip(String placeId, String userId, String text, Integer stars) {
         this.id = Ids.next();

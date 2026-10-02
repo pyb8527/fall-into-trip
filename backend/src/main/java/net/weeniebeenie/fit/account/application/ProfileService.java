@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -51,6 +52,15 @@ public class ProfileService {
     private final GroupMemberRepository members;
     private final net.weeniebeenie.fit.group.domain.GroupRepository groupBook;
     private final net.weeniebeenie.fit.trip.domain.DayRepository days;
+    /* 얼굴 사진이 올린 사람의 것인지 보는 자리. */
+    private final net.weeniebeenie.fit.photo.domain.PhotoRepository photos;
+    /*
+      바꿔 끼운 뒤에 옛 장을 지우는 자리.
+
+      <p>표를 직접 건드리지 않고 이것을 거칩니다 — 올린 글에 실려 있으면
+      파일을 두고 떼기만 하는 규칙이 그쪽에 있습니다.
+    */
+    private final net.weeniebeenie.fit.photo.application.PhotoService photoBook;
 
     /**
      * 한 사람의 프로필.
@@ -73,8 +83,8 @@ public class ProfileService {
 
         if (mine) {
             return new Profile(
-                    user.getId(), user.getName(), user.getMark(), user.getBio(),
-                    user.getCreatedAt(), true,
+                    user.getId(), user.getName(), user.getMark(), user.getPhotoId(),
+                    user.getBio(), user.getCreatedAt(), true,
                     companionsOf(target, groupsOf(target)),
                     new Counts(
                             trips.countByOwnerId(target),
@@ -115,8 +125,8 @@ public class ProfileService {
                 .toList();
 
         return new Profile(
-                user.getId(), user.getName(), user.getMark(), user.getBio(),
-                user.getCreatedAt(), false,
+                user.getId(), user.getName(), user.getMark(), user.getPhotoId(),
+                user.getBio(), user.getCreatedAt(), false,
                 companionsOf(target, shared),
                 new Counts(theirTrips, theirPosts,
                         tips.countByUserIdAndHiddenFalseAndStarsIsNotNull(target),
@@ -125,12 +135,14 @@ public class ProfileService {
     }
 
     /**
-     * 이름과 한 줄 소개를 고칩니다. 늘 제 것만입니다.
+     * 이름·한 줄 소개·얼굴 사진을 고칩니다. 늘 제 것만입니다.
      *
-     * <p>{@code null} 인 칸은 그대로 둡니다. 소개를 지우는 것은 빈 글("")입니다.
+     * <p>{@code null} 인 칸은 그대로 둡니다. 지우는 것은 빈 글("")입니다 —
+     * 소개도, 얼굴 사진도 같습니다. 둘을 가르면 「안 보냈다」와 「비웠다」를
+     * 구별할 길이 없어져서, 한 번 올린 사진을 뺄 수가 없습니다.
      */
     @Transactional
-    public Profile edit(AuthPrincipal me, String name, String bio) {
+    public Profile edit(AuthPrincipal me, String name, String bio, String photoId) {
         User user = users.findById(me.id())
                 .orElseThrow(() -> ApiException.unauthorized("로그인이 필요해요."));
         if (name != null) {
@@ -150,7 +162,78 @@ public class ProfileService {
             }
             user.setBio(clean.isEmpty() ? null : clean);
         }
+        if (photoId != null) {
+            setFace(me, user, photoId.trim());
+        }
         return of(me, me.id());
+    }
+
+    /**
+     * 얼굴 사진을 바꿔 끼웁니다.
+     *
+     * <h3>내 사진인지 봅니다</h3>
+     *
+     * <p>안 보면 <b>남의 사진 번호를 제 얼굴에 박아 넣을 수 있습니다.</b> 그러면
+     * 그 사람이 가족 사진을 올린 것이 남의 프로필에 서고, 올린 사람은 그 일이
+     * 일어난 것을 모릅니다. 번호는 열여섯 글자 난수라 찍어서 맞히기 어렵지만,
+     * 어렵다는 것이 막았다는 뜻은 아닙니다 —
+     * {@code FeedService.minePhotos} 와 같은 자리입니다.
+     *
+     * <p>없는 사진과 남의 사진에 <b>같은 말</b>을 돌려줍니다. 가르면 번호를
+     * 하나씩 넣어 보는 것으로 「이 번호는 있는데 남의 것」을 알아낼 수 있고,
+     * 그것이 곧 사진이 몇 장 올라가 있는지를 세는 길이 됩니다.
+     *
+     * <h3>바꿔 끼운 뒤에 옛 장을 지웁니다</h3>
+     *
+     * <p>얼굴 사진도 사람당 1000장을 함께 먹습니다(PhotoService 의
+     * MAX_PER_USER). 얼굴은 바꾸는 것이라 그대로 두면 바꾼 횟수만큼 묵은 장이
+     * 남습니다 — 스무 번 바꾼 사람이 스무 장을 먹습니다.
+     *
+     * <p><b>바꿔 끼운 다음에</b> 지웁니다. 고르는 자리에서 바로 지우면 판을
+     * 저장 안 하고 닫은 사람의 얼굴이 깨집니다 — 사람은 아직 옛 장을
+     * 가리키는데 그 장이 없어진 상태입니다.
+     *
+     * <p>지우는 일은 {@code PhotoService.drop} 에 맡깁니다 — 올린 글에 실려
+     * 있으면 파일을 두고 떼기만 하는 규칙이 거기 있습니다. 여기서 직접
+     * 지우면 그 규칙이 두 군데에 생기고, 한쪽만 고치는 날 남이 보던 여행기에
+     * 깨진 자리가 납니다.
+     *
+     * <p><b>부르기 전에 그 장이 내 것인지 먼저 봅니다.</b> {@code drop} 은
+     * 같은 트랜잭션에 들어오므로, 거기서 던진 예외를 여기서 받아 삼켜도
+     * 스프링이 트랜잭션을 「되돌릴 것」으로 표시해 둡니다 — 그러면 프로필을
+     * 고친 것까지 통째로 날아가고, 커밋할 때 엉뚱한 오류가 납니다. 던질
+     * 자리를 미리 없애는 쪽이 맞습니다.
+     *
+     * @param face 새 사진 번호. 빈 글이면 얼굴을 뺍니다
+     */
+    private void setFace(AuthPrincipal me, User user, String face) {
+        String was = user.getPhotoId();
+        String now = face.isEmpty() ? null : face;
+
+        if (now != null) {
+            photos.findById(now)
+                    .filter(p -> p.getOwnerId().equals(me.id()))
+                    .orElseThrow(() -> ApiException.badRequest("그런 사진이 없어요."));
+        }
+        if (Objects.equals(was, now)) {
+            /* 안 바뀌었습니다. 같은 번호를 다시 보낸 것으로 옛 장을 지우면
+               방금 끼운 그 사진을 지웁니다. */
+            return;
+        }
+
+        user.setPhotoId(now);
+
+        /*
+          옛 장이 아직 내 것으로 남아 있을 때만 지웁니다.
+
+          <p>이미 보관함에서 지운 장이면 users.photo_id 가 그때 비워졌으므로
+          (V55 의 ON DELETE SET NULL) 여기 올 일이 거의 없습니다. 그래도
+          봅니다 — 없는 번호로 drop 을 부르면 그것이 위에 적은 「되돌릴
+          것」 표시가 됩니다.
+        */
+        if (was != null && photos.findById(was).filter(p -> p.getOwnerId().equals(me.id())).isPresent()) {
+            photoBook.drop(me, was);
+        }
     }
 
     /**
@@ -201,11 +284,15 @@ public class ProfileService {
     }
 
     /**
-     * @param mark 골라 둔 표식. 안 골랐으면 비어 있고, 화면이 로고를 세웁니다
-     * @param mine 내 것인지. 「내 계정」 줄을 붙일지를 이걸로 정합니다
+     * @param mark    골라 둔 표식. 안 골랐으면 비어 있고, 화면이 로고를 세웁니다
+     * @param photoId 올려 둔 얼굴 사진. 비어 있으면 {@code mark} 가 그 자리에
+     *                섭니다. 표식을 대신하지 않습니다 — 지도의 핀은 계속
+     *                표식입니다({@code User.photoId})
+     * @param mine    내 것인지. 「내 계정」 줄을 붙일지를 이걸로 정합니다
      */
-    public record Profile(String id, String name, String mark, String bio, Instant since,
-                          boolean mine, long companions, Counts counts, Between between) {
+    public record Profile(String id, String name, String mark, String photoId, String bio,
+                          Instant since, boolean mine, long companions, Counts counts,
+                          Between between) {
     }
 
     /**

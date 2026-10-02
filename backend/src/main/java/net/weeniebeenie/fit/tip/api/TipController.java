@@ -81,6 +81,27 @@ public class TipController {
         return Map.of("tip", tips.cardOf(tip, me.id()));
     }
 
+    /**
+     * 남긴 별점과 한 줄 고치기.
+     *
+     * <p>남긴 사람만입니다 — 지우기는 운영자도 할 수 있지만 고치기는 아닙니다.
+     * 규칙은 {@link TipService#edit}.
+     *
+     * <p>{@code POST} 와 같은 몸({@link TipRequest})을 받습니다. 고치는 일은
+     * 「별과 한 줄을 다시 정하는 일」이라 보낼 것이 같습니다. 비워 보낸 별은
+     * <b>별을 떼는 것</b>입니다 — 잘못 누른 별 하나를 거둘 길이 없으면 안
+     * 됩니다.
+     */
+    @PatchMapping("/api/tips/{tipId}")
+    public Map<String, Object> edit(@CurrentUser AuthPrincipal me,
+                                    @PathVariable String tipId,
+                                    @RequestBody TipRequest req) {
+        var tip = tips.edit(me, tipId,
+                req == null ? null : req.text(),
+                req == null ? null : req.stars());
+        return Map.of("tip", tips.cardOf(tip, me.id()));
+    }
+
     @DeleteMapping("/api/tips/{tipId}")
     public Map<String, Object> remove(@CurrentUser AuthPrincipal me, @PathVariable String tipId) {
         tips.remove(me, tipId);

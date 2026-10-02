@@ -7,6 +7,7 @@ import type { Folder, Going, TripSummary } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
 import { TripSlot } from '@/components/trip-slot';
+import { WhereNext } from '@/components/curation';
 import { FolderSheet } from '@/components/folder-sheet';
 import { TripForm } from '@/components/trip-form';
 import { CountdownBadge } from '@/components/countdown-badge';
@@ -520,6 +521,31 @@ export default function Trips() {
         <View>
           <Band />
           <MoneyCard onPress={() => router.push('/(app)/money')} />
+        </View>
+      ) : null}
+
+      {/*
+        다음은 어디로.
+
+        <h3>앞으로 갈 것이 없을 때만 섭니다</h3>
+
+        <p>{@link WhereNext} 는 이 화면에 서라고 만든 것입니다. 그런데 늘
+        세우지는 않습니다 — 떠날 여행이 잡혀 있는 사람에게 「다음은 어디로」는
+        지금 할 일이 아니고, 그 줄들이 세우는 요청 둘이 여행 목록 앞에 얹힙니다.
+        여행 중이거나 곧 떠나는 것이 하나라도 있으면 안 냅니다.
+
+        <p>남는 자리는 <b>여행이 하나도 없는 사람</b>과 <b>다녀온 것만 남은
+        사람</b>입니다. 둘 다 이 화면에서 할 일이 없고, 다음 여행이 시작되는
+        자리가 여기입니다.
+
+        <p>거르는 것을 {@code sections} 로 셈합니다 — {@link byWhen} 이 빈
+        묶음을 이미 빼고 주므로, 「여행 중」·「곧 떠나요」가 목록에 있는지만
+        보면 됩니다. 날짜를 여기서 다시 셈하면 그 둘이 어긋납니다.
+      */}
+      {data && goal == null && !sections.some((s) => s.kind === 'going' || s.kind === 'coming') ? (
+        <View>
+          <Band />
+          <WhereNext />
         </View>
       ) : null}
 

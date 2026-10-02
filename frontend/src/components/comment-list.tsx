@@ -68,6 +68,15 @@ export function useComments(postId: string, enabled: boolean) {
   return { comments, failed, reload };
 }
 
+/*
+  고친 자취를 읽는 쪽에도 보입니다.
+
+  <p>댓글은 위아래가 서로 받는 글이라, 자취 없이 바뀌면 아래의 대답이 위의
+  물음에 안 맞게 됩니다. 「그 집 말고 옆집」에 「저도 그렇게 생각해요」가 달린
+  뒤 위를 「여기가 제일 낫다」로 고치면, 동의한 사람이 반대한 것처럼 됩니다.
+  그래서 {@link Comment#editedAt} 이 있으면 「고침」을 붙입니다.
+*/
+
 /** 그 장소를 가리키는 댓글이 몇 개인지. 목록에서 바로 셀 수 있게 키로 만듭니다. */
 export function countByPlace(comments: Comment[] | null) {
   const out = new Map<string, number>();
@@ -299,8 +308,12 @@ function CommentRow({
           헷갈립니다 — 이름이 두 글 사이에 끼어 있기 때문입니다.
         */}
         <Split>
+          {/* 고친 적이 있으면 그 말을 답니다. 날짜까지 적지는 않습니다 —
+              여기서 알아야 할 것은 「바뀐 적이 있다」 하나이고, 언제
+              바뀌었는지는 남긴 사람이 제 목록에서 봅니다. */}
           <Caption tone="secondary">
             {comment.authorName} · {comment.createdAt.slice(0, 10)}
+            {comment.editedAt ? ' · 고침' : ''}
           </Caption>
           {action}
         </Split>

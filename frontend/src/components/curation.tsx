@@ -39,21 +39,32 @@ import { Body, Button, Caption, Press, Split } from '@/ui';
  * 둘러보기의 큐레이션 줄들 — 이번 주 많이 가져간 · 새로 올라온 · 많이 쓴 태그 둘.
  *
  * <p>줄마다 몇 장만 받습니다(size). 줄 하나가 비면 그 줄은 안 그립니다.
+ *
+ * <h3>태그 목록은 받아 쓰기만 합니다</h3>
+ *
+ * <p>여기서 {@code /api/posts/tags} 를 직접 불렀습니다. 그런데 이 줄들을
+ * 세우는 둘러보기 화면도 <b>조건 고르는 판을 위해 같은 길을 부릅니다</b>
+ * ({@code community/index.tsx}). 둘이 같이 뜨므로 한 화면이 같은 것을 두
+ * 번 물었습니다 — 서버는 글 전체의 태그를 세는 일을 두 번 했습니다.
+ *
+ * <p>그래서 값으로 받습니다. 받는 쪽을 <b>안 비워 둘 수 있게</b> 필수로
+ * 둡니다 — 없으면 여기서 다시 부르게 만들면, 안 넘기는 자리가 하나
+ * 생기는 순간 두 번 묻는 일이 조용히 돌아옵니다.
+ *
+ * @param tags 많이 쓰인 순서로 온 태그들. 아직 안 왔으면 {@code null}
  */
 export function Curation({
+  tags,
   onOpen,
   onTag,
 }: {
+  tags: { tag: string; posts: number }[] | null;
   onOpen: (id: string) => void;
   onTag: (tag: string) => void;
 }) {
-  const tags = useAsync<{ tags: { tag: string; posts: number }[] }>(
-    (signal) => api.get('/api/posts/tags', signal),
-    [],
-  );
   /* 가장 많이 쓴 태그 둘. 글이 적으면 같은 여행이 두 줄에 함께 서는데,
      여러 기준으로 다시 묶어 보여 주는 것이 이 줄들의 일이라 괜찮습니다. */
-  const shelfTags = (tags.data?.tags ?? []).slice(0, 2).map((t) => t.tag);
+  const shelfTags = (tags ?? []).slice(0, 2).map((t) => t.tag);
   return (
     <>
       <ShelfRow title="이번 주 많이 가져간 여행" path="/api/posts?sort=copied&size=6" onOpen={onOpen} />

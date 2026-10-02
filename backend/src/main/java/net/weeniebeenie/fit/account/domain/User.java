@@ -84,6 +84,23 @@ public class User {
     @Column(length = 80)
     private String bio;
 
+    /**
+     * 프로필 얼굴 사진.
+     *
+     * <p>비어 있으면 {@link #mark} 가, 그것도 없으면 로고가 섭니다.
+     *
+     * <p><b>{@link #mark} 를 대신하지 않습니다.</b> 그 칸은 원래 지도에서
+     * 사람을 가리키는 그림이고, 16픽셀로 줄인 얼굴 사진은 누구인지 안
+     * 보입니다. 그래서 지도는 계속 표식을 쓰고, 사진은 프로필에서만 섭니다.
+     *
+     * <p>사진이 지워지면 이 칸만 비워집니다(V55 의 {@code ON DELETE SET
+     * NULL}). 바꿔 끼울 때 옛 장을 지우는 일은
+     * {@code ProfileService.edit} 이 합니다 — 얼굴 사진도 사람당 1000장을
+     * 함께 먹으므로 바꾼 횟수만큼 쌓이면 안 됩니다.
+     */
+    @Column(name = "photo_id", length = 16)
+    private String photoId;
+
     @Builder
     public User(String email, String name, String passwordHash, Role role) {
         this.id = Ids.next();

@@ -636,7 +636,13 @@ export default function Community() {
         열 개뿐이어도 고를 맛이 납니다.
       */}
       {view === 'all' && !filtered && page === 0 ? (
-        <Curation onOpen={(id) => router.push(`/community/${id}`)} onTag={(t) => refilter(() => setTag(t))} />
+        <Curation
+          /* 조건 고르는 판이 쓰는 것과 같은 목록입니다. 넘겨 주지 않으면
+             한 화면이 같은 길을 두 번 묻습니다({@link Curation}). */
+          tags={tagList?.tags ?? null}
+          onOpen={(id) => router.push(`/community/${id}`)}
+          onTag={(t) => refilter(() => setTag(t))}
+        />
       ) : null}
 
       {/* 넓은 화면에서는 글 카드를 두세 칸으로 늘어놓습니다. 폰에서는

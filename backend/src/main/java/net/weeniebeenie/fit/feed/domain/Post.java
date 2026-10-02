@@ -61,6 +61,35 @@ public class Post {
     @Column(name = "trip_id", length = 16)
     private String tripId;
 
+    /**
+     * 그 여행의 어느 장소에서인지. 안 골라도 됩니다.
+     *
+     * <h3>이 번호는 일정의 줄입니다</h3>
+     *
+     * <p>{@code places.id} 입니다 — 구글이 아는 번호가 아닙니다. 이름이 겹치는
+     * 자리가 하나 있습니다: {@code Place.placeId} 는 <b>구글의</b> 장소 번호고
+     * ({@code place_photos.place_id} 와 이 칸은 둘 다 {@code places.id}),
+     * 그쪽이 예외입니다.
+     *
+     * <h3>날은 안 들고 있습니다</h3>
+     *
+     * <p>장소가 이미 날에 달려 있어서({@code places.day_id}) 날을 또 적어 두면
+     * 같은 사실이 두 군데에 있고 <b>둘은 어긋날 수 있습니다</b> — 장소를 끌어서
+     * 다른 날로 옮기면 저쪽은 따라 바뀌는데 여기 적어 둔 날은 그대로 남습니다.
+     * 그러면 사진이 가 본 적 없는 날에 놓입니다. 날이 필요한 자리에서는 장소에서
+     * 거슬러 올라갑니다({@code FeedService.placeOf}).
+     *
+     * <h3>장소를 지우면 묶임만 끊깁니다</h3>
+     *
+     * <p>ON DELETE SET NULL 입니다. 글은 글자와 사진을 그대로 들고 남습니다 —
+     * {@link #tripId} 와 같은 규칙입니다. CASCADE 로 두면 일정에서 장소 한 줄을
+     * 빼는 일이 남의 글을 지우는 일이 되는데, 그 줄은 끌어서 옮기고 다시 넣는
+     * 것이 흔한 줄이고 모임 여행이면 그 일을 하는 사람과 글을 쓴 사람이
+     * 다릅니다.
+     */
+    @Column(name = "place_id", length = 16)
+    private String placeId;
+
     /** 사진만 올려도 됩니다. 그때는 비어 있습니다. */
     @Column(length = 2000)
     private String text;
@@ -97,12 +126,13 @@ public class Post {
     private Instant updatedAt;
 
     @Builder
-    public Post(String authorId, String groupId, String tripId, String text, String[] tags,
-                Audience audience) {
+    public Post(String authorId, String groupId, String tripId, String placeId,
+                String text, String[] tags, Audience audience) {
         this.id = Ids.next();
         this.authorId = authorId;
         this.groupId = groupId;
         this.tripId = tripId;
+        this.placeId = placeId;
         this.text = text;
         this.tags = tags == null ? new String[0] : tags;
         /* 안 고르면 올린 자리가 정합니다 — 공개 범위가 없던 때의 동작

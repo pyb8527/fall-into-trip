@@ -62,13 +62,22 @@ public final class AuthDtos {
     public record TokenResponse(String accessToken, long expiresIn, UserView user) {
     }
 
+    /**
+     * @param mark    지도에서 나를 가리킬 그림의 짧은 이름("rabbit")
+     * @param photoId 프로필 얼굴 사진. 비어 있으면 {@code mark} 가 그 자리에
+     *                섭니다. <b>{@code mark} 와 함께 옵니다</b> — 사진은
+     *                프로필에, 표식은 지도 핀에 쓰이는 다른 값입니다
+     *                (16픽셀로 줄인 얼굴 사진은 누구인지 안 보입니다).
+     *                고치는 자리는 {@code PATCH /api/me/profile} 하나입니다
+     */
     public record UserView(String id, String email, String name, String role,
-                           String mark, boolean disabled, Instant createdAt,
+                           String mark, String photoId, boolean disabled, Instant createdAt,
                            Instant lastLoginAt) {
 
         public static UserView of(User u) {
             return new UserView(u.getId(), u.getEmail(), u.getName(), u.getRole().name(),
-                    u.getMark(), u.isDisabled(), u.getCreatedAt(), u.getLastLoginAt());
+                    u.getMark(), u.getPhotoId(), u.isDisabled(), u.getCreatedAt(),
+                    u.getLastLoginAt());
         }
     }
 

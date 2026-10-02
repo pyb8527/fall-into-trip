@@ -24,6 +24,7 @@ import { NoticeBox } from '@/components/notice-box';
 import { ViewLinkSheet } from '@/components/view-link-sheet';
 import { PeopleSheet } from '@/components/people-sheet';
 import type { RouteLine } from '@/components/map-types';
+import { FeedForm } from '@/components/feed-form';
 import { PlaceForm } from '@/components/place-form';
 import { SavedPicker } from '@/components/saved-picker';
 import { PublishForm } from '@/components/publish-form';
@@ -549,6 +550,18 @@ export default function TripScreen() {
   const [looking, setLooking] = useState<{ place: Place; mode: TravelMode | null } | null>(null);
   /* 다니면서 볼 사진을 넣어 두는 판. */
   const [stashing, setStashing] = useState<Place | null>(null);
+  /*
+    이 장소에서 피드를 올리는 판.
+
+    <p>장소를 들고 있습니다 — 올리는 판에 넘기면 그 글이 <b>그 장소에</b>
+    묶이고({@code Post.placeId}), 나중에 둘러보기에 내놓을 때 그 사진이 그 장소
+    자리에 따라 올라갑니다.
+
+    <p>이 길이 없을 때는 글을 올린 다음에 내놓기 판에서 장소마다 사진을
+    하나하나 다시 골랐습니다. 보고 있던 것이 곧 답인데 그것을 두 번 고르게
+    하는 셈이었습니다.
+  */
+  const [storyAt, setStoryAt] = useState<Place | null>(null);
   const [cloning, setCloning] = useState(false);
   const [planted, setPlanted] = useState(0);
   /** 꽂은 자리에 이미 깃발을 꽂아 두고 있던 동행자. 없으면 null. */
@@ -1606,6 +1619,7 @@ export default function TripScreen() {
               tipCounts={tipCounts}
               refsOf={refsOf}
               onRefs={(place) => setStashing(place)}
+              onStory={(place) => setStoryAt(place)}
               spent={spentByDay.get(day.id) ?? null}
               spentAt={spentByPlace}
               touchedOf={touchedOf}
@@ -1671,6 +1685,32 @@ export default function TripScreen() {
         onClose={() => setStashing(null)}
         onSaved={() => {
           setStashing(null);
+          refresh();
+        }}
+      />
+
+      {/*
+        이 장소에서 올리는 피드.
+
+        <p>여행과 장소를 미리 묶어 넘깁니다. 판 안에서 여행·날·장소를 다시
+        고르는 길은 그대로 있는데(바꿀 수도 있어야 합니다), 여기서 열었으면
+        고를 것이 없습니다 — 보고 있던 것이 곧 답입니다.
+
+        <p>모임 여행이면 그 모임에 올립니다. 그러면 공개 범위도 「이 모임
+        사람만」으로 미리 잡히는데({@code Post.audienceFor}), 같이 간 사람들이
+        보는 것이 이 자리에서 올리는 글이 바라는 것입니다.
+
+        <p>올린 뒤에 일정을 다시 읽습니다. 「이 여행의 사진」 칸이 방금 올린
+        것을 바로 들어야 합니다 — 안 그러면 올렸는데 아무 일도 안 일어난
+        것처럼 보입니다.
+      */}
+      <FeedForm
+        visible={storyAt != null}
+        groupId={data.trip.groupId ?? null}
+        at={storyAt ? { tripId: id, placeId: storyAt.id } : null}
+        onClose={() => setStoryAt(null)}
+        onDone={() => {
+          setStoryAt(null);
           refresh();
         }}
       />
@@ -2319,6 +2359,7 @@ function DayCard({
   tipCounts,
   refsOf,
   onRefs,
+  onStory,
   spent,
   spentAt,
   touchedOf,
@@ -2365,6 +2406,8 @@ function DayCard({
   /** 다니면서 볼 사진. 장소 칸마다. */
   refsOf: Map<string, string[]>;
   onRefs: (place: Place) => void;
+  /** 이 장소에서 피드를 올리는 판을 엽니다. */
+  onStory: (place: Place) => void;
   /** 이 날 실제로 쓴 돈. 통화마다 하나씩. 아직 안 적었으면 비어 있습니다. */
   spent: Map<string, { sum: number; decimals: number }> | null;
   /** 장소마다 거기서 쓴 돈. 여행 전체 것이라 줄마다 꺼내 씁니다. */
@@ -2763,6 +2806,7 @@ function DayCard({
                     tipCount={place.placeId ? (tipCounts[place.placeId] ?? 0) : 0}
                     refs={refsOf.get(place.id)}
                     onRefs={() => onRefs(place)}
+                    onStory={() => onStory(place)}
                     last={i === order.length - 1}
                     dragging={from === i}
                     index={i}
@@ -2967,6 +3011,7 @@ function PlaceRow({
   tipCount,
   refs,
   onRefs,
+  onStory,
   last,
   dragging,
   index,
@@ -3001,6 +3046,8 @@ function PlaceRow({
   refs?: string[];
   /** 챙겨 두기 판을 엽니다. */
   onRefs: () => void;
+  /** 이 장소에서 피드를 올리는 판을 엽니다. */
+  onStory: () => void;
   /** 이 날의 마지막 줄인지. 세로선을 여기서 끊습니다. */
   last: boolean;
   /** 지금 이 줄을 끌고 있는지. 끌고 있는 동안에는 조금 들어 올립니다. */
@@ -3305,6 +3352,30 @@ function PlaceRow({
                     : `${place.name} 자세히 보기`,
                 dot: tipCount > 0,
                 onPress: () => onLook(place, chosen?.mode ?? null),
+              },
+              /*
+                여기서 올리기 — <b>다녀와서</b> 하는 하나입니다.
+
+                <p>셋만 남긴 줄에 셋째로 섭니다. 올리는 길이 피드와 모임 화면에만
+                있어서, 이 가게 앞에서 찍은 사진을 올리려면 화면을 옮기고 거기서
+                여행을 다시 고르고 그래도 <b>어느 장소였는지는 적을 데가 없었습니다.</b>
+                그러고는 둘러보기에 내놓을 때 장소마다 사진을 하나하나 다시
+                골랐습니다.
+
+                <p>여기서 열면 그 장소가 미리 묶입니다. 보고 있던 것이 곧
+                답입니다.
+
+                <p>점 세 개 안으로 접지 않습니다. 그 안은 <b>일정을 짜는 동안</b>
+                쓰는 것들이고(고치기·챙겨 두기·다음에 넣기), 이것은 다 짠 뒤에
+                쓰는 것이라 짜기가 끝나면 접힌 쪽이 안 쓰이게 됩니다. 고칠 수
+                없는 사람에게도 냅니다 — 글을 올리는 일은 일정을 고치는 일이
+                아닙니다.
+              */
+              {
+                key: 'story',
+                name: 'camera' as IconName,
+                label: `${place.name}에서 글 올리기`,
+                onPress: onStory,
               },
               /* 고칠 수 없는 사람에게는 접을 것이 없습니다. */
               canEdit

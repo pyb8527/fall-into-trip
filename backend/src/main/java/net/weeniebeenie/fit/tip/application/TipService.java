@@ -159,6 +159,58 @@ public class TipService {
         return tip;
     }
 
+    /**
+     * 남긴 별점과 한 줄을 고칩니다.
+     *
+     * <h3>남긴 사람만입니다 — 운영자도 못 고칩니다</h3>
+     *
+     * <p>{@link #remove} 는 운영자도 할 수 있습니다. 고치기는 아닙니다 —
+     * 문제되는 글에 운영자가 할 수 있는 일은 감추는 것({@link #setHidden})이고,
+     * 말을 바꿔 두면 신고한 사람이 본 글과 확인하는 사람이 보는 글이
+     * 달라집니다.
+     *
+     * <h3>처음 쓴 때는 안 건드립니다</h3>
+     *
+     * <p>{@code createdAt} 에 두 가지가 매여 있습니다 — 보여 줄지 말지를
+     * 가리는 이레 기한({@link #FRESH})과 줄 순서입니다. 고칠 때마다 그 값을
+     * 새로 찍으면 같은 한 줄을 다시 저장하는 것만으로 장소 맨 위에 영원히
+     * 세워 둘 수 있고, 그것은 {@link #MAX_PER_DAY} 로 막아 둔 도배와 같은
+     * 일입니다.
+     *
+     * <p>그래서 고친 때를 따로 남깁니다. 「지금 대기 40분」이 언제 적힌
+     * 것인지는 내용만큼 중요하고, 읽는 쪽이 그 둘을 다 보게 둡니다.
+     *
+     * <p>하루 세 번은 안 봅니다. 고치는 것은 수를 늘리지 않습니다 — 거기서
+     * 막으면 세 번을 채운 사람이 제 오타를 다음 날까지 못 고칩니다.
+     */
+    @Transactional
+    public PlaceTip edit(AuthPrincipal me, String tipId, String text, Integer stars) {
+        PlaceTip tip = tips.findById(tipId)
+                .orElseThrow(() -> ApiException.notFound("팁을 찾을 수 없어요."));
+        if (!tip.getUserId().equals(me.id())) {
+            throw ApiException.forbidden("내가 남긴 것만 고칠 수 있어요.");
+        }
+        if (stars != null && (stars < 1 || stars > 5)) {
+            throw ApiException.badRequest("별점은 1에서 5까지예요.");
+        }
+        String clean = text == null ? "" : text.trim();
+        if (clean.isEmpty() && stars == null) {
+            throw ApiException.badRequest("별점을 주거나 한 줄을 남겨 주세요.");
+        }
+        if (clean.length() > MAX_LENGTH) {
+            throw ApiException.badRequest("한 줄 팁은 " + MAX_LENGTH + "자까지예요.");
+        }
+
+        tip.setText(clean);
+        /* 별을 떼는 것도 고치는 일입니다. 보낸 대로 넣습니다 — 비어 있으면
+           「안 준 것」이고, 그래야 잘못 누른 별 하나를 거둘 수 있습니다.
+           평균에서도 빠집니다(starsOf 가 stars IS NOT NULL 만 셉니다). */
+        tip.setStars(stars);
+        tip.setEditedAt(Instant.now());
+        audit.log(me.id(), "tip.edit", tipId);
+        return tip;
+    }
+
     @Transactional
     public void remove(AuthPrincipal me, String tipId) {
         PlaceTip tip = tips.findById(tipId)
@@ -218,7 +270,7 @@ public class TipService {
 
     public Card cardOf(PlaceTip tip, String meId) {
         return new Card(tip.getId(), tip.getText(), tip.getStars(), nameOf(tip.getUserId()),
-                tip.getUserId().equals(meId), tip.getCreatedAt());
+                tip.getUserId().equals(meId), tip.getCreatedAt(), tip.getEditedAt());
     }
 
     public String nameOf(String userId) {
@@ -228,9 +280,12 @@ public class TipService {
     /**
      * @param mine  내가 남긴 것인지. 지울 수 있는지를 이걸로 정합니다
      * @param stars 별 1~5. 안 준 것은 비어 있습니다 — 0 이 아닙니다
+     * @param editedAt 고친 때. <b>비어 있으면 안 고친 것입니다.</b> 「지금 대기
+     *                 40분」은 언제 적힌 것인지가 내용만큼 중요해서, 처음 쓴
+     *                 때와 함께 냅니다
      */
     public record Card(String id, String text, Integer stars, String authorName,
-                       boolean mine, Instant createdAt) {
+                       boolean mine, Instant createdAt, Instant editedAt) {
     }
 
     /**

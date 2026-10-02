@@ -26,6 +26,14 @@ export type User = {
    * (constants/user-marks.ts). 안 골랐으면 비어 있습니다.
    */
   mark: Maybe<string>;
+  /**
+   * 올려 둔 얼굴 사진. 안 올렸으면 비어 있습니다.
+   *
+   * <p>{@code mark} 와 <b>함께</b> 옵니다 — 하나가 다른 하나를 대신하는 값이
+   * 아닙니다. 사진은 프로필에 서고 표식은 지도 핀에 섭니다. 얼굴 사진을
+   * 16픽셀로 줄이면 누구인지 안 보이므로 핀은 계속 그림을 씁니다.
+   */
+  photoId: Maybe<string>;
   role: Role;
   disabled: boolean;
   createdAt: string;
@@ -338,6 +346,20 @@ export type FeedPost = {
   /** 어느 여행 이야기인지. 지워진 여행이면 비어 있습니다. */
   tripId: Maybe<string>;
   tripTitle: Maybe<string>;
+  /**
+   * 그 여행의 어느 장소에서 올린 글인지.
+   *
+   * <p>안 고른 글과, <b>일정에서 장소가 빠진 글</b>은 비어 있습니다 — 뒤쪽은
+   * 글이 남고 묶임만 끊긴 자리입니다({@code posts.place_id} 가 ON DELETE SET
+   * NULL). 일정에서 장소 한 줄을 빼는 일이 남의 글을 지우는 일이면 안 됩니다.
+   *
+   * <p>날은 안 옵니다. 장소가 이미 날을 말하고({@code places.day_id}), 둘을
+   * 따로 두면 장소를 다른 날로 끌어 옮길 때 어긋납니다 — 그러면 사진이 가 본
+   * 적 없는 날에 놓입니다.
+   */
+  placeId: Maybe<string>;
+  /** 그 장소의 이름. 장소가 지워진 글은 비어 있습니다. */
+  placeName: Maybe<string>;
   text: Maybe<string>;
   tags: string[];
   photoIds: string[];
@@ -696,6 +718,14 @@ export type Comment = {
   dayIndex: Maybe<number>;
   placeIndex: Maybe<number>;
   createdAt: string;
+  /**
+   * 고친 적이 있으면 그때. 한 번도 안 고쳤으면 비어 있습니다.
+   *
+   * <p>{@code createdAt} 과 같은 값을 넣지 않습니다 — 그러면 방금 남긴 것도
+   * 밀리초 차이로 「고침」으로 읽힐 수 있습니다. 안 고친 것은 <b>없는
+   * 것</b>입니다.
+   */
+  editedAt?: Maybe<string>;
 };
 
 /**
@@ -838,6 +868,14 @@ export type Tip = {
   /** 내가 남긴 것인지. 지울 수 있는지를 이걸로 정합니다. */
   mine: boolean;
   createdAt: string;
+  /**
+   * 고친 적이 있으면 그때. {@link Comment} 의 것과 같은 규칙입니다.
+   *
+   * <p>고쳐도 {@code createdAt} 은 안 움직입니다 — 그 값에 「새로 올라온
+   * 것」(이레)과 줄 순서가 걸려 있어서, 고칠 때마다 올라가면 같은 한 줄을
+   * 다시 저장해 맨 위에 눌러앉힐 수 있습니다.
+   */
+  editedAt?: Maybe<string>;
 };
 
 /**
@@ -919,6 +957,15 @@ export type Profile = {
   name: string;
   /** 골라 둔 표식. 안 골랐으면 없고, 화면이 로고를 세웁니다 */
   mark?: string | null;
+  /**
+   * 올려 둔 얼굴 사진. 안 올렸으면 없습니다.
+   *
+   * <p>표식보다 앞섭니다 — 사진 · 표식 · 로고 차례입니다
+   * ({@code components/profile-face}). 둘을 같이 두는 까닭은 표식이 <b>지도에서
+   * 나를 가리키는 그림</b>이기도 해서입니다. 사진을 올려도 지도의 그 그림은
+   * 그대로 두어야 하니, 사진이 표식을 지우지 않습니다.
+   */
+  photoId?: string | null;
   /** 한 줄 소개. 안 적었으면 없습니다 */
   bio?: string | null;
   /** 우리 사이 — 남의 페이지에만. 함께 속한 모임과 그 모임의 여행 */

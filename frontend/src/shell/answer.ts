@@ -4,7 +4,9 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { Share } from 'react-native';
 
+import { addTripToCalendar } from '@/shell/calendar';
 import { kakaoReturn } from '@/shell/kakao';
+import { pickSquare } from '@/shell/pick-square';
 import { googleIdToken } from '@/shell/sign-in';
 import { expoPushToken, stopPush } from '@/shell/push';
 import type { Ask } from '@/shell/talk';
@@ -54,6 +56,20 @@ export async function answer(ask: Ask): Promise<unknown> {
       return null;
 
     /*
+      사진 한 장을 골라 네모로 자르기.
+
+      <p>고르는 것은 웹뷰에서도 됩니다 — input 하나가 폰의 보관함을 엽니다.
+      없는 것은 <b>자르는 판</b>입니다. 폰에는 그것이 이미 있어서
+      {@code aspect: [1, 1]} 한 줄로 끝나고, 브라우저에서는 끌기·확대까지
+      손수 그려야 합니다.
+
+      <p>그래서 이 한 가지만 넘깁니다. 옛 껍데기는 이 말을 몰라 아무 답도
+      안 하는데, 그때 웹이 제 길로 갑니다(lib/pick-square.web.ts).
+    */
+    case 'pickSquare':
+      return pickSquare();
+
+    /*
       인쇄.
 
       <p>웹뷰에는 window.print 가 없습니다. 웹이 만든 HTML 을 그대로 받아
@@ -73,6 +89,20 @@ export async function answer(ask: Ask): Promise<unknown> {
       const out = await Share.share({ message: `${ask.title}\n${ask.url}`, url: ask.url });
       return out.action === Share.sharedAction ? 'sent' : 'failed';
     }
+
+    /*
+      여행 하나를 폰 캘린더에 꽂기.
+
+      <p>구독 주소가 이미 있습니다. 그쪽은 일정이 바뀌면 따라 바뀌고,
+      이쪽은 그 자리에서 들어가는 대신 한 번뿐입니다 — 쓰는 자리가 달라
+      둘 다 둡니다.
+
+      <p>우리가 쓰지 않고 폰의 「일정 추가」 판에 넘깁니다. 어느 캘린더에
+      넣을지를 우리가 고르면 회사 캘린더에 개인 여행이 꽂힙니다. 넘기는
+      쪽이면 캘린더 허락도 물을 일이 없습니다.
+    */
+    case 'addToCalendar':
+      return addTripToCalendar(ask);
 
     /*
       위치 권한.

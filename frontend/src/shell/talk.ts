@@ -35,12 +35,57 @@ export type Ask =
   | { kind: 'kakaoSignIn'; url: string }
   /** 알림을 켜 주세요. 답: 서버에 등록할 열쇠 또는 null */
   | { kind: 'notifyOn' }
+  /**
+   * 사진 한 장을 고르고 <b>네모로 잘라</b> 주세요.
+   *
+   * <h3>왜 껍데기가 하나</h3>
+   *
+   * <p>고르는 것 자체는 웹뷰에서도 됩니다 — {@code <input type="file">} 이
+   * 폰의 사진 보관함을 엽니다. 없는 것은 <b>자르는 판</b>입니다. 브라우저에
+   * 그런 것이 없어서 손수 그려야 하는데, 폰에는 이미 있습니다.
+   *
+   * <p>그래서 이것만 넘깁니다. 껍데기가 없거나 이 말을 모르는 옛 껍데기면
+   * 웹이 제 길로 갑니다({@code lib/pick-square.web.ts}).
+   *
+   * <h3>값: 다리로 사진이 지나갑니다</h3>
+   *
+   * <p>답이 base64 글자입니다. 껍데기와 웹 사이는 글자만 오가고, 잘라 낸
+   * 조각은 원본 크기 그대로 나옵니다 — 1200만 화소 사진의 네모 조각이면
+   * 3000픽셀짜리입니다. 그래서 {@code quality} 를 낮춰 받고, <b>웹이 받아서
+   * 512로 줄인 뒤에</b> 올립니다. 얼굴 자리에 3000픽셀을 둘 이유가 없습니다.
+   *
+   * @return 잘라 낸 JPEG 의 base64. 고르다 말았으면 null
+   */
+  | { kind: 'pickSquare' }
   /** 알림을 꺼 주세요. */
   | { kind: 'notifyOff' }
   /** 이 HTML 을 인쇄해 주세요. */
   | { kind: 'print'; html: string }
   /** 이 주소를 나눠 주세요. 답: 'sent' | 'copied' | 'failed' */
   | { kind: 'share'; url: string; title: string }
+  /**
+   * 이 여행을 폰 캘린더에 꽂아 주세요.
+   *
+   * <p>구독 주소({@code /api/cal/…ics})와 다른 것을 줍니다 — 그쪽은 일정이
+   * 바뀌면 따라 바뀌고, 이쪽은 그 자리에서 들어가는 대신 한 번뿐입니다.
+   * 쓰는 자리가 달라 둘 다 둡니다.
+   *
+   * <p>답: {@code 'added' | 'cancelled' | 'handed'}.
+   * <b>handed</b> 는 캘린더 앱에 넘겼고 그 뒤는 모른다는 뜻입니다 —
+   * 안드로이드가 저장했는지 닫았는지를 알려 주지 않습니다. 그때 화면이
+   * 「넣었어요」라고 말하면 거짓말이 됩니다.
+   *
+   * @param startIso 첫날 (YYYY-MM-DD)
+   * @param endIso   마지막 날. 하루짜리면 첫날과 같습니다
+   */
+  | {
+      kind: 'addToCalendar';
+      title: string;
+      startIso: string;
+      endIso: string;
+      notes: string;
+      url: string;
+    }
   /** 위치를 쓸 수 있게 해 주세요. 답: 허락받았는지 */
   | { kind: 'letMeLocate' }
   /**

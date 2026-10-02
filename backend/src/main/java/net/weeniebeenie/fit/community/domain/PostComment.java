@@ -60,6 +60,21 @@ public class PostComment {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
+    /**
+     * 고친 때. <b>비어 있으면 한 번도 안 고친 것입니다.</b>
+     *
+     * <p>댓글은 위아래가 서로 받는 글이라, 자취 없이 바뀌면 아래의 대답이 위의
+     * 물음에 안 맞게 됩니다 — 「그 집 말고 옆집」에 「저도 그렇게 생각해요」가
+     * 달린 뒤 위를 「여기가 제일 낫다」로 고치면 동의한 사람이 반대한 것처럼
+     * 됩니다. 그래서 읽는 쪽에 「고침」을 띄웁니다.
+     *
+     * <p>{@code createdAt} 과 같은 값을 넣어 두는 쪽은 안 씁니다. 그러면
+     * 「고침」을 띄울지를 두 값이 같은지로 가려야 하고, 밀리초 하나가 어긋나는
+     * 날 처음 쓴 글이 고친 글로 보입니다.
+     */
+    @Column(name = "edited_at")
+    private Instant editedAt;
+
     @Builder
     public PostComment(String postId, CommentKind kind, String userId, String text,
                        Integer dayIndex, Integer placeIndex) {

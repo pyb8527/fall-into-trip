@@ -56,6 +56,17 @@ export function TipSheet({
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
   const [reporting, setReporting] = useState<Tip | null>(null);
+  /**
+   * 고치는 중인 내 한 줄. 비어 있으면 새로 남기는 것입니다.
+   *
+   * <h3>칸을 하나만 둡니다</h3>
+   *
+   * <p>고치는 칸을 줄마다 따로 펼치는 길도 있었습니다. 그런데 남기는 칸이
+   * 이미 아래에 있고 모양이 똑같습니다 — 별 다섯과 한 줄. 칸이 둘이면 같은
+   * 일을 두 군데서 그리게 되고, 글자 수 한도나 안내 문구를 고칠 때 한쪽이
+   * 남습니다. <b>아래 칸을 그대로 쓰고</b> 무엇을 하는 칸인지만 바꿉니다.
+   */
+  const [editing, setEditing] = useState<Tip | null>(null);
   /* 이 장소의 우리 평균. 아직 아무도 안 줬으면 없습니다. */
   const [ours, setOurs] = useState<OurStars | null>(null);
 
@@ -151,18 +162,38 @@ export function TipSheet({
               않습니다. */}
           {tip.text ? <Body small>{tip.text}</Body> : null}
           <Split>
+            {/* 고친 적이 있으면 그 말을 답니다. 언제 고쳤는지는 안 적습니다 —
+                여기서 알아야 할 것은 「바뀐 적이 있다」 하나입니다(댓글 목록과
+                같은 규칙). */}
             <Caption tone="secondary">
               {tip.authorName} · {sinceOf(tip.createdAt)}
+              {tip.editedAt ? ' · 고침' : ''}
             </Caption>
             {tip.mine ? (
-              <IconButton
-                name="trash-2"
-                label="내가 남긴 것 지우기"
-                tone="danger"
-                bare
-                disabled={busy}
-                onPress={() => run(() => api.delete(`/api/tips/${tip.id}`))}
-              />
+              <Row gap={Spacing.s1}>
+                {/* 고치기가 지우기 왼쪽입니다. 되돌릴 수 있는 것을 먼저 두고
+                    되돌릴 수 없는 것을 끝에 둡니다 — 손가락이 먼저 닿는
+                    자리에 지우기가 있으면 안 됩니다. */}
+                <IconButton
+                  name="edit-2"
+                  label="내가 남긴 것 고치기"
+                  bare
+                  disabled={busy}
+                  onPress={() => {
+                    setEditing(tip);
+                    setText(tip.text ?? '');
+                    setMine(tip.stars ?? 0);
+                  }}
+                />
+                <IconButton
+                  name="trash-2"
+                  label="내가 남긴 것 지우기"
+                  tone="danger"
+                  bare
+                  disabled={busy}
+                  onPress={() => run(() => api.delete(`/api/tips/${tip.id}`))}
+                />
+              </Row>
             ) : user ? (
               /* 댓글 목록과 같은 모양입니다. 한쪽은 글자 단추, 한쪽은
                  깃발이면 같은 일을 두 모양으로 하는 셈입니다. */
@@ -188,38 +219,63 @@ export function TipSheet({
             적을 말이 없는 사람은 아무것도 안 남기고 닫습니다 — 별 다섯은
             한 번 누르면 끝이라 문턱이 가장 낮습니다.
           */}
-          <Caption tone="secondary">여기 어땠어요?</Caption>
+          <Caption tone="secondary">{editing ? '고쳐 쓸까요?' : '여기 어땠어요?'}</Caption>
           <Stars value={mine} onChange={setMine} size={32} label="별점" />
 
           <Field
-            label="한 줄 남기기"
+            label={editing ? '고쳐 쓰기' : '한 줄 남기기'}
             value={text}
             onChangeText={setText}
             placeholder="지금 대기 40분, 2번 출구로 나와야 함"
-            hint="200자까지. 같은 곳에는 하루 세 번까지 남길 수 있어요."
+            /* 하루 세 번은 <b>새로 남기는</b> 쪽의 한도입니다. 고치는 데에
+               걸지 않으므로 고칠 때는 그 말을 안 합니다 — 한도를 채운 사람이
+               오타를 못 고치면 안 됩니다. */
+            hint={editing ? '200자까지.' : '200자까지. 같은 곳에는 하루 세 번까지 남길 수 있어요.'}
             limit={200}
             returnKeyType="done"
           />
-          <Button
-            label="남기기"
-            busy={busy}
-            /* 둘 중 하나만 있어도 남깁니다(G-11). 별만 준 사람도 있고
-               할 말만 있는 사람도 있습니다. */
-            disabled={!text.trim() && mine === 0}
-            onPress={() =>
-              run(() =>
-                api.post(`/api/places/${encodeURIComponent(placeId)}/tips`, {
-                  text: text.trim(),
-                  stars: mine === 0 ? null : mine,
-                }),
-              ).then((done) => {
-                if (done) {
+          <Row gap={Spacing.s2}>
+            <Button
+              label={editing ? '고치기' : '남기기'}
+              busy={busy}
+              /* 둘 중 하나만 있어도 남깁니다(G-11). 별만 준 사람도 있고
+                 할 말만 있는 사람도 있습니다. */
+              disabled={!text.trim() && mine === 0}
+              onPress={() =>
+                run(() =>
+                  editing
+                    ? api.patch(`/api/tips/${encodeURIComponent(editing.id)}`, {
+                        text: text.trim(),
+                        stars: mine === 0 ? null : mine,
+                      })
+                    : api.post(`/api/places/${encodeURIComponent(placeId)}/tips`, {
+                        text: text.trim(),
+                        stars: mine === 0 ? null : mine,
+                      }),
+                ).then((done) => {
+                  if (done) {
+                    setText('');
+                    setMine(0);
+                    setEditing(null);
+                  }
+                })
+              }
+            />
+            {/* 고치다 그만둘 길. 없으면 칸을 비우고 닫는 수밖에 없고, 그러면
+                고치려던 것이 지워진 것처럼 보입니다. */}
+            {editing ? (
+              <Button
+                label="그만두기"
+                variant="secondary"
+                disabled={busy}
+                onPress={() => {
+                  setEditing(null);
                   setText('');
                   setMine(0);
-                }
-              })
-            }
-          />
+                }}
+              />
+            ) : null}
+          </Row>
         </>
       ) : (
         <Caption tone="secondary">로그인하면 한 줄 남길 수 있어요.</Caption>

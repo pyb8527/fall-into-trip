@@ -15,6 +15,8 @@ import { glyphOf } from '@/constants/place-icons';
 import { formatNights, formatSpan, todayIso } from '@/lib/countdown';
 import { money } from '@/lib/money';
 import { Colors, Radius, Spacing, Tap, Type } from '@/constants/theme';
+import { FacePicker } from '@/components/face-picker';
+import { ProfileFace } from '@/components/profile-face';
 import { markOf } from '@/constants/user-marks';
 import {
   Band,
@@ -22,18 +24,22 @@ import {
   BottomSheet,
   Button,
   Caption,
+  ConfirmDialog,
   ErrorNote,
   Field,
   Grow,
   Icon,
+  IconButton,
   ListRow,
   Mark,
+  Pager,
   Press,
   Row,
   Screen,
   SectionHeader,
   Skeleton,
   Split,
+  Stars,
   Tabs,
   Title,
 } from '@/ui';
@@ -41,13 +47,32 @@ import { LogoSymbol } from '@/ui/logo';
 
 /** 어느 묶음을 보고 있나. */
 /*
-  여행기 · 피드 · 리뷰 · 달력.
+  여행기 · 피드 · 남긴 것 · 달력.
 
   <p>내 피드 · 달력 · 리뷰였습니다. 「무엇을 다녀왔나」가 어디에도 없어서,
   여행을 다섯 번 다녀온 사람의 마이페이지도 피드가 비면 빈 화면이었습니다.
   내놓은 여행기와 다녀온 여행을 맨 앞 칸에 둡니다.
+
+  <h3>「리뷰」 칸이 「남긴 것」으로 넓어졌습니다</h3>
+
+  <p>댓글을 모아 볼 자리가 없었습니다(docs/feedback-2026-10-02.md 5번).
+  <b>다섯째 칸을 세우지 않습니다.</b> 까닭 셋입니다.
+
+  <ul>
+    <li>넷이 이미 폭을 꽉 씁니다. 폰에서 360 남짓한 화면에 좌우 여백을 빼면
+        칸마다 여든 안짝이고, 다섯이면 예순입니다 — 「남긴 것」 넉 자가 거기서
+        줄어듭니다</li>
+    <li>리뷰 칸의 머리글이 <b>이미 「내가 남긴 것」</b>이었습니다. 칸 이름만
+        좁았던 것입니다</li>
+    <li>남긴 사람에게 댓글과 리뷰는 같은 일입니다 — 「내가 어디다 뭐라고
+        했지」. 칸을 둘로 가르면 찾는 사람이 어느 칸인지 먼저 맞혀야 합니다</li>
+  </ul>
+
+  <p>피드 글과 여행기는 여기 안 모읍니다. 내놓은 여행기는 「여행기」 칸이,
+  피드 글은 「피드」 칸과 둘러보기 「내 글」 탭이 이미 냅니다. 셋째 목록을
+  만들면 같은 것을 두 군데서 그리게 되고, 한쪽을 고칠 때 다른 쪽이 남습니다.
 */
-type Lane = 'trips' | 'feed' | 'reviews' | 'calendar';
+type Lane = 'trips' | 'feed' | 'left' | 'calendar';
 
 /**
  * 마이페이지 (G-10).
@@ -123,18 +148,22 @@ export default function Me() {
           {/*
             누구인지.
 
-            <p>표식을 골라 둔 사람은 그 이모지가, 안 고른 사람은 로고가
-            섭니다. 이름의 첫 글자는 쓰지 않습니다 — 「박」이 든 동그라미는
-            남의 얼굴과 구별이 안 됩니다.
+            <p>올려 둔 사진이 있으면 그 사진이, 표식을 골라 둔 사람은 그
+            이모지가, 둘 다 없으면 로고가 섭니다. 이름의 첫 글자는 쓰지
+            않습니다 — 「박」이 든 동그라미는 남의 얼굴과 구별이 안 됩니다.
+
+            <p>세 갈래를 화면마다 적어 두면 자리마다 조금씩 다르게 생깁니다.
+            설정 화면이 같은 것을 또 그리고 있었고 둘의 크기가 이미
+            달랐습니다. 한 칸으로 묶었습니다({@link ProfileFace}).
           */}
           <Row gap={Spacing.s4} style={styles.who}>
-            <View style={styles.face}>
-              {me.mark ? (
-                <Text style={styles.faceEmoji}>{markOf(me.mark)}</Text>
-              ) : (
-                <LogoSymbol size={34} />
-              )}
-            </View>
+            <ProfileFace
+              photoId={me.photoId}
+              mark={me.mark ? markOf(me.mark) : null}
+              fallback={<LogoSymbol size={34} />}
+              size={64}
+              label={`${me.name}의 얼굴`}
+            />
             <Grow gap={Spacing.s1}>
               <Title>{me.name}</Title>
               {/* 한 줄 소개. 내 것인데 비어 있으면 적을 자리라고 알립니다. */}
@@ -170,7 +199,7 @@ export default function Me() {
           <Row style={styles.counts}>
             <Tally n={me.counts.trips} what="여행" onPress={() => setLane('trips')} />
             <Tally n={me.counts.posts} what="글" onPress={() => setLane('feed')} />
-            <Tally n={me.counts.reviews} what="리뷰" onPress={() => setLane('reviews')} />
+            <Tally n={me.counts.reviews} what="리뷰" onPress={() => setLane('left')} />
             <Tally
               n={me.counts.groups}
               what="모임"
@@ -186,7 +215,7 @@ export default function Me() {
             items={[
               { value: 'trips' as Lane, label: '여행기' },
               { value: 'feed' as Lane, label: '피드' },
-              { value: 'reviews' as Lane, label: '리뷰' },
+              { value: 'left' as Lane, label: '남긴 것' },
               ...(me.mine ? [{ value: 'calendar' as Lane, label: '달력' }] : []),
             ]}
             value={lane}
@@ -238,7 +267,7 @@ export default function Me() {
             /* 남의 피드는 나와 함께 속한 모임에 올린 글만입니다(서버가 거릅니다). */
             me.mine ? <FeedList compact /> : <FeedList authorId={me.id} />
           ) : (
-            <MyReviews whose={whose} count={me.counts.reviews} />
+            <MyLeft whose={whose} reviewCount={me.counts.reviews} />
           )}
 
           {/* 내 것에만 붙습니다. 남의 계정 설정을 열 수는 없습니다. */}
@@ -327,72 +356,178 @@ function Tally({ n, what, onPress }: { n: number; what: string; onPress?: () => 
   );
 }
 
+/**
+ * 내가 남긴 별점과 한 줄 — {@code /api/me/reviews}.
+ *
+ * <p>{@code id} 는 그 한 줄의 번호입니다. 고치고 지울 때 가리킵니다
+ * ({@code /api/tips/{tipId}}). 장소 번호로는 안 됩니다 — 같은 곳에 하루 세
+ * 번까지 남길 수 있어 한 장소에 여러 줄이 있을 수 있습니다.
+ *
+ * <p>{@code api/types.ts} 에 두지 않았습니다. 이 화면 하나만 쓰는 꼴이고,
+ * 그 파일은 여러 화면이 함께 보는 약속이 모이는 자리입니다.
+ */
+type Review = {
+  id: string;
+  placeId: string;
+  name?: string | null;
+  stars?: number | null;
+  text?: string | null;
+  at: string;
+  /** 고친 때. 비어 있으면 안 고친 것입니다. */
+  editedAt?: string | null;
+};
+
 type Reviews = {
-  reviews: { placeId: string; name?: string | null; stars?: number | null; text?: string | null; at: string }[];
+  reviews: Review[];
   unreviewed: { placeId: string; name: string; icon?: string | null }[];
 };
 
 /**
- * 남긴 리뷰들 — 장소 이름 · 별 · 한 줄.
+ * 내가 남긴 댓글 한 줄 — {@code /api/comments/mine}.
  *
- * <p>이름은 서버가 내 일정의 장소에서 같은 구글 번호로 이어 붙여 줍니다.
- * 구글에 묻지 않습니다(MyRecordService). 일정에도 보석함에도 없는 곳이면
- * 「이름 모르는 곳」입니다.
- *
- * <p>아래에 <b>다녀온 곳 중 아직 안 남긴 곳</b>. 누르면 그 자리에서 별을
- * 남깁니다 — 빈 탭을 채우는 길이 그대로 리뷰를 늘리는 길입니다.
+ * <p>여행기에 달린 것과 피드 글에 달린 것이 한 목록에 섞여 옵니다. 누를 때
+ * 갈 자리가 {@code kind} 로 갈립니다.
  */
-function MyReviews({ whose, count }: { whose: string | null; count: number }) {
-  const { data, loading, reload } = useAsync<Reviews>(
+type MyComment = {
+  id: string;
+  kind: 'JOURNAL' | 'FEED';
+  postId: string;
+  text: string;
+  createdAt: string;
+  editedAt?: string | null;
+  /** 여행기는 제목, 피드 글은 앞머리. 사진만 올린 글은 비어 있습니다. */
+  postTitle?: string | null;
+  /** 가리킨 장소 — 「둘쨋날 · 이치란」. 일정 전체에 대한 말이면 비어 있습니다. */
+  where?: string | null;
+  /** 가리킬 글이 없어진 것인지. 고치기를 안 열고 지우기만 엽니다. */
+  gone: boolean;
+};
+
+type MyComments = { comments: MyComment[]; page: number; totalPages: number; total: number };
+
+/**
+ * 내가 남긴 것 — 별점과 한 줄, 그리고 댓글.
+ *
+ * <h3>두 갈래가 한 칸에 모입니다</h3>
+ *
+ * <p>리뷰만 있었습니다. 댓글은 서버에 지우기까지 다 있는데 모아 볼 자리가
+ * 없어서, 둘러보기 글 하나하나를 다시 찾아 들어가야 제가 뭐라고 했는지
+ * 보였습니다(docs/feedback-2026-10-02.md 5번).
+ *
+ * <p>장소 이름은 서버가 내 일정의 장소에서 같은 구글 번호로 이어 붙여
+ * 줍니다. 구글에 묻지 않습니다({@code MyRecordService}). 일정에도 보석함에도
+ * 없는 곳이면 「이름 모르는 곳」입니다.
+ *
+ * <p>맨 아래에 <b>다녀온 곳 중 아직 안 남긴 곳</b>. 누르면 그 자리에서 별을
+ * 남깁니다 — 빈 칸을 채우는 길이 그대로 리뷰를 늘리는 길입니다. 위의 두
+ * 목록보다 아래에 둡니다: 그것은 <b>해 온 것</b>이고 이것은 <b>권하는
+ * 것</b>이라, 권하는 말이 해 온 것 위에 서면 목록이 숙제처럼 읽힙니다.
+ *
+ * <h3>받기 전에 「없어요」라고 적지 않습니다</h3>
+ *
+ * <p>이 화면이 방금 네 자리에서 고친 잘못입니다. 이 부품은 띠를 옮길 때마다
+ * <b>통째로 새로 섭니다</b> — 그래서 「남긴 것」을 누른 직후에는 늘
+ * {@code data} 가 없고, 그때 길이는 0 입니다. 길이 0 하나로 가리면 열 개를
+ * 남긴 사람에게 「여기 모여요」를 한 박자 보여 줍니다.
+ *
+ * <p>그래서 두 목록 다 <b>다 받아 보고</b> 비었을 때만 비었다고 적습니다.
+ * 기다리는 자리에는 회색 칸을 세우고, {@code loading} 을 함께 봅니다 — 안
+ * 그러면 못 받아 온 날에 회색 칸이 영원히 숨을 쉽니다. 못 받아 왔으면
+ * {@link ErrorNote} 가 서고 다시 받을 수 있습니다.
+ */
+function MyLeft({ whose, reviewCount }: { whose: string | null; reviewCount: number }) {
+  const router = useRouter();
+
+  const reviews = useAsync<Reviews>(
     (signal) => (whose ? Promise.resolve({ reviews: [], unreviewed: [] }) : api.get('/api/me/reviews', signal)),
     [whose],
   );
+
+  /*
+    댓글은 쪽으로 끊어 옵니다.
+
+    <p>리뷰는 전부 한 번에 옵니다 — 한 사람이 남기는 수가 많지 않습니다
+    (같은 곳에 하루 세 번). 댓글은 글마다 스무 개까지라 몇 해 쓰면 몇백
+    개가 되므로 서버가 스무 개씩 냅니다.
+
+    <p>이어 붙이지 않고 갈아 끼웁니다({@link Pager}). 이 칸은 읽어 내려가는
+    자리가 아니라 <b>고치고 지우는 자리</b>라, 어디까지 봤나보다 몇 쪽인지가
+    쓸모 있습니다.
+  */
+  const [page, setPage] = useState(0);
+  const comments = useAsync<MyComments>(
+    (signal) => (whose ? Promise.resolve(null as unknown as MyComments) : api.get(`/api/comments/mine?page=${page}`, signal)),
+    [whose, page],
+  );
+
+  /** 고치는 중인 것. 갈래마다 받을 것이 달라서 판을 둘로 둡니다. */
+  const [editing, setEditing] = useState<
+    { kind: 'review'; review: Review } | { kind: 'comment'; comment: MyComment } | null
+  >(null);
+  /**
+   * 지우려는 것.
+   *
+   * <p>묻고 지웁니다. 되돌릴 길이 없는 일이고, 줄마다 서는 작은 그림 단추는
+   * 옆의 「고치기」를 누르려다 잘못 닿기 쉬운 크기입니다.
+   */
+  const [removing, setRemoving] = useState<
+    { title: string; message: string; path: string; done: () => void } | null
+  >(null);
+  const [erasing, setErasing] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
+
   const [tipFor, setTipFor] = useState<{ placeId: string; name: string } | null>(null);
+
   if (whose) {
-    return <Caption tone="secondary">남이 남긴 리뷰는 장소에서 볼 수 있어요.</Caption>;
+    return <Caption tone="secondary">남이 남긴 것은 그 글과 장소에서 볼 수 있어요.</Caption>;
   }
-  const reviews = data?.reviews ?? [];
-  const rest = data?.unreviewed ?? [];
+
+  async function erase() {
+    const target = removing;
+    if (!target) {
+      return;
+    }
+    setErasing(true);
+    setFailed(null);
+    try {
+      await api.delete(target.path);
+      setRemoving(null);
+      target.done();
+    } catch (e) {
+      setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
+    } finally {
+      setErasing(false);
+    }
+  }
+
+  const left = reviews.data?.reviews ?? [];
+  const rest = reviews.data?.unreviewed ?? [];
+  const said = comments.data?.comments ?? [];
+
   return (
     <>
-      <SectionHeader title="내가 남긴 것" tight note={`별점을 준 것 ${count}개`} />
+      {failed ? <ErrorNote message={failed} /> : null}
+
+      {/* ------------------------------------------------- 별점과 한 줄 */}
+
+      <SectionHeader title="별점과 한 줄" tight note={`별점을 준 것 ${reviewCount}개`} />
 
       {/*
-        받기 전에 「없어요」라고 적고 있었습니다.
-
-        <h3>길이 0 은 두 가지입니다</h3>
-
-        <p>{@code reviews.length === 0} 하나로 가렸습니다. 그런데 이 부품은 띠를
-        옮길 때마다 <b>통째로 새로 섭니다</b> — 띠가 바뀌면 이 함수가 내려가고
-        {@link useAsync} 도 처음부터입니다. 그래서 「리뷰」를 누른 직후에는 늘
-        {@code data} 가 없고, 그때도 길이는 0 입니다.
-
-        <p>리뷰를 열 개 남긴 사람이 그 칸을 누르면 <b>「장소 상세에서 남긴
-        별점과 한 줄이 여기 모여요」</b>가 먼저 한 박자 떴습니다. 바로 위
-        머리글이 「별점을 준 것 10개」라고 적고 있는 채로입니다 — 한 화면이 제
-        안에서 서로 다른 말을 했습니다. 아직 안 온 것과 없는 것은 다릅니다.
-
-        <p>그래서 <b>받고 나서만</b> 적습니다. 비어 있다는 말은 다 받아 보고
-        비었을 때만 할 수 있는 말입니다.
-
-        <p>기다리는 자리에는 회색 칸을 세웁니다. 몇 줄인지는 <b>머리글이 이미
-        말한 개수</b>로 정합니다 — 늘 셋을 세우면 리뷰가 하나인 사람에게 셋을
-        약속하고, 그 약속이 틀리는 것이 이 화면이 방금 고친 그 잘못입니다.
-        하나도 없는 사람에게는 칸도 안 세웁니다.
+        몇 줄인지는 <b>머리글이 이미 말한 개수</b>로 정합니다. 늘 셋을 세우면
+        리뷰가 하나인 사람에게 셋을 약속하고, 그 약속이 틀리는 것이 이 화면이
+        방금 고친 그 잘못입니다. 하나도 없는 사람에게는 칸도 안 세웁니다.
 
         <p>리뷰 줄에는 앞에 그림이 없으니 그림 칸은 끕니다.
-
-        <p>못 받아 왔으면 걷힙니다({@code loading} 을 같이 봅니다) — 안 그러면
-        회색 칸이 영원히 숨을 쉽니다.
       */}
-      {loading && !data && count > 0 ? (
-        <Skeleton rows={Math.min(3, count)} thumb={false} />
+      {reviews.loading && !reviews.data && reviewCount > 0 ? (
+        <Skeleton rows={Math.min(3, reviewCount)} thumb={false} />
       ) : null}
-      {data && reviews.length === 0 ? (
+      {reviews.error ? <ErrorNote message={reviews.error} onRetry={reviews.reload} /> : null}
+      {reviews.data && left.length === 0 ? (
         <Caption tone="secondary">장소 상세에서 남긴 별점과 한 줄이 여기 모여요.</Caption>
       ) : null}
-      {reviews.map((rv, i) => (
-        <View key={`${rv.placeId}-${i}`} style={styles.review}>
+      {left.map((rv) => (
+        <View key={rv.id} style={styles.review}>
           <Split>
             <Body strong numberOfLines={1}>
               {rv.name ?? '이름 모르는 곳'}
@@ -400,9 +535,144 @@ function MyReviews({ whose, count }: { whose: string | null; count: number }) {
             {rv.stars ? <Caption tone="brand">{'★'.repeat(rv.stars)}</Caption> : null}
           </Split>
           {rv.text ? <Body small tone="secondary">{rv.text}</Body> : null}
+          <Split>
+            <Caption tone="muted">{whenOf(rv.at, rv.editedAt)}</Caption>
+            <Row gap={0}>
+              <IconButton
+                name="edit-2"
+                label={`${rv.name ?? '이 곳'}에 남긴 것 고치기`}
+                bare
+                onPress={() => setEditing({ kind: 'review', review: rv })}
+              />
+              <IconButton
+                name="trash-2"
+                label={`${rv.name ?? '이 곳'}에 남긴 것 지우기`}
+                tone="danger"
+                bare
+                onPress={() =>
+                  setRemoving({
+                    title: '이 별점과 한 줄을 지울까요?',
+                    message: '지우면 되돌릴 수 없어요. 그 장소의 우리 평점에서도 빠져요.',
+                    path: `/api/tips/${rv.id}`,
+                    done: reviews.reload,
+                  })
+                }
+              />
+            </Row>
+          </Split>
         </View>
       ))}
       <TipReach />
+
+      {/* ----------------------------------------------------- 남긴 댓글 */}
+
+      {/*
+        개수는 다 받아 보고 적습니다. 머리글에 「0개」가 한 박자 떴다가 스물로
+        바뀌면, 그 머리글은 두 번 다 안 믿게 됩니다.
+      */}
+      <SectionHeader
+        title="남긴 댓글"
+        tight
+        note={comments.data ? `${comments.data.total}개` : undefined}
+      />
+
+      {/*
+        여기는 개수를 미리 모릅니다.
+
+        <p>리뷰 쪽은 머리글의 개수가 프로필과 함께 먼저 와 있어서 회색 칸을 그
+        수만큼 세울 수 있었습니다. 댓글 수는 <b>이 요청이 가져오는 것</b>이라
+        기다리는 동안 알 길이 없습니다 — 그래서 둘을 세웁니다. 하나면 적게
+        약속하고, 넷이면 두 줄이 아래에서 밀려 들어옵니다. 둘이 그 둘 사이에서
+        가장 덜 틀립니다.
+
+        <p>쪽을 넘기는 중에는 안 세웁니다({@code !comments.data}). 그때는 앞
+        쪽 줄들이 아직 서 있고, 그 아래에 회색 칸을 더 세우면 목록이 자랐다
+        줄어듭니다.
+      */}
+      {comments.loading && !comments.data ? <Skeleton rows={2} thumb={false} /> : null}
+      {comments.error ? <ErrorNote message={comments.error} onRetry={comments.reload} /> : null}
+      {comments.data && said.length === 0 ? (
+        <Caption tone="secondary">여행기와 피드 글에 남긴 댓글이 여기 모여요.</Caption>
+      ) : null}
+      {said.map((c) => (
+        <View key={c.id} style={styles.review}>
+          {/*
+            어디에 남긴 것인지가 먼저입니다.
+
+            <p>댓글만 늘어놓으면 못 씁니다 — 「여기 말고 옆집이 나아요」가 어느
+            글의 어느 집에 대한 말인지 없으면, 제가 쓴 것을 읽고도 무엇에 대한
+            말인지 모릅니다.
+
+            <p>누르면 그 글로 갑니다. 없어진 글은 안 누릅니다 — 눌러서 「글을
+            찾을 수 없어요」로 떨어지는 길을 내놓는 셈입니다.
+          */}
+          {c.gone ? (
+            <Caption tone="muted">없어진 글</Caption>
+          ) : (
+            <Press
+              onPress={() =>
+                router.push(
+                  c.kind === 'FEED'
+                    ? { pathname: '/feed/[id]', params: { id: c.postId } }
+                    : { pathname: '/community/[id]', params: { id: c.postId } },
+                )
+              }
+              scale={0.99}
+              accessibilityLabel={`${c.postTitle ?? '피드 글'} 열기`}>
+              <Row gap={Spacing.s1}>
+                <Icon
+                  name={c.kind === 'FEED' ? 'image' : 'book-open'}
+                  size={14}
+                  tone="secondary"
+                />
+                <Grow>
+                  <Caption tone="secondary" numberOfLines={1}>
+                    {[c.postTitle ?? '피드 글', c.where].filter(Boolean).join(' · ')}
+                  </Caption>
+                </Grow>
+              </Row>
+            </Press>
+          )}
+          <Body small>{c.text}</Body>
+          <Split>
+            <Caption tone="muted">{whenOf(c.createdAt, c.editedAt)}</Caption>
+            <Row gap={0}>
+              {/* 없어진 글의 댓글은 고칠 뜻이 없습니다 — 읽을 사람이 없습니다.
+                  지우기만 엽니다. 목록에서 아예 빼 버리면 지울 길도 같이
+                  사라집니다. */}
+              {c.gone ? null : (
+                <IconButton
+                  name="edit-2"
+                  label="내가 남긴 댓글 고치기"
+                  bare
+                  onPress={() => setEditing({ kind: 'comment', comment: c })}
+                />
+              )}
+              <IconButton
+                name="trash-2"
+                label="내가 남긴 댓글 지우기"
+                tone="danger"
+                bare
+                onPress={() =>
+                  setRemoving({
+                    title: '이 댓글을 지울까요?',
+                    message: '지우면 되돌릴 수 없어요.',
+                    path: `/api/comments/${c.id}`,
+                    done: comments.reload,
+                  })
+                }
+              />
+            </Row>
+          </Split>
+        </View>
+      ))}
+      <Pager
+        page={comments.data?.page ?? 0}
+        totalPages={comments.data?.totalPages ?? 0}
+        onPage={setPage}
+      />
+
+      {/* --------------------------------------- 아직 안 남긴 곳 (권하기) */}
 
       {rest.length > 0 ? (
         <>
@@ -427,12 +697,195 @@ function MyReviews({ whose, count }: { whose: string | null; count: number }) {
           placeName={tipFor.name}
           onClose={() => {
             setTipFor(null);
-            reload();
+            reviews.reload();
           }}
-          onChanged={reload}
+          onChanged={reviews.reload}
         />
       ) : null}
+
+      {editing?.kind === 'review' ? (
+        <ReviewEditSheet
+          review={editing.review}
+          onClose={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null);
+            reviews.reload();
+          }}
+        />
+      ) : null}
+      {editing?.kind === 'comment' ? (
+        <CommentEditSheet
+          comment={editing.comment}
+          onClose={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null);
+            comments.reload();
+          }}
+        />
+      ) : null}
+
+      <ConfirmDialog
+        visible={removing !== null}
+        title={removing?.title ?? ''}
+        message={removing?.message}
+        confirmLabel="지우기"
+        danger
+        busy={erasing}
+        onCancel={() => setRemoving(null)}
+        onConfirm={erase}
+      />
     </>
+  );
+}
+
+/**
+ * 언제 남겼고 고쳤는지 한 줄로.
+ *
+ * <p>고친 때만 적으면 처음 쓴 때가 사라집니다. 「지금 대기 40분」은 <b>언제
+ * 적힌 것인지</b>가 내용만큼 중요하고, 댓글도 위아래가 서로 받는 글이라
+ * 처음 쓴 순서가 뜻을 가집니다.
+ *
+ * <p>그래서 처음 쓴 날을 적고, 고친 적이 있으면 뒤에 붙입니다. 안 고친 것에는
+ * 아무것도 안 붙습니다 — 「고침 없음」을 적으면 모든 줄이 한 마디 길어지면서
+ * 고친 줄이 안 눈에 띕니다.
+ */
+function whenOf(at: string, editedAt?: string | null) {
+  const wrote = at.slice(0, 10);
+  return editedAt ? `${wrote} · ${editedAt.slice(0, 10)} 고침` : wrote;
+}
+
+/**
+ * 남긴 별점과 한 줄 고치기.
+ *
+ * <p>남기는 판({@code tip-sheet})과 모양을 맞춥니다 — 별이 먼저고 글이
+ * 아래입니다. 적을 말은 없어도 「좋았다」는 있습니다.
+ *
+ * <p><b>별을 떼어 낼 수 있습니다.</b> 0 으로 두고 저장하면 별이 없는 것이
+ * 됩니다 — 잘못 누른 별 하나를 거둘 길이 없으면 안 됩니다. 서버가 빈 별을
+ * 「안 준 것」으로 받고, 그 장소의 평균에서도 빠집니다.
+ *
+ * <p>장소는 못 바꿉니다. 다른 곳에 대한 말이면 그것은 고치는 일이 아니라
+ * 그 곳에서 새로 남기는 일입니다.
+ */
+function ReviewEditSheet({
+  review,
+  onClose,
+  onSaved,
+}: {
+  review: Review;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [text, setText] = useState(review.text ?? '');
+  /* 0 은 아직 안 고른 것입니다 — 서버에는 1~5 나 빈 값만 보냅니다. */
+  const [stars, setStars] = useState(review.stars ?? 0);
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
+
+  async function save() {
+    setBusy(true);
+    setFailed(null);
+    try {
+      await api.patch(`/api/tips/${review.id}`, {
+        text: text.trim(),
+        stars: stars === 0 ? null : stars,
+      });
+      onSaved();
+    } catch (e) {
+      setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <BottomSheet
+      visible
+      title={`${review.name ?? '이름 모르는 곳'} 고치기`}
+      onClose={onClose}
+      footer={
+        <Button
+          label="저장"
+          busy={busy}
+          /* 둘 중 하나만 있어도 됩니다. 둘 다 비면 남길 것이 없고, 그것은
+             지우는 일입니다. */
+          disabled={!text.trim() && stars === 0}
+          onPress={save}
+        />
+      }>
+      <Caption tone="secondary">여기 어땠어요?</Caption>
+      <Stars value={stars} onChange={setStars} size={32} label="별점" />
+      {stars > 0 ? (
+        <Button label="별점 떼기" variant="text" size="xs" onPress={() => setStars(0)} />
+      ) : null}
+      <Field
+        label="한 줄"
+        value={text}
+        onChangeText={setText}
+        placeholder="지금 대기 40분, 2번 출구로 나와야 함"
+        hint="200자까지"
+        limit={200}
+        returnKeyType="done"
+      />
+      {failed ? <ErrorNote message={failed} /> : null}
+    </BottomSheet>
+  );
+}
+
+/**
+ * 남긴 댓글 고치기.
+ *
+ * <p>어디에 남긴 것인지를 판 제목에 답니다. 「여기 말고 옆집」은 어느 집인지가
+ * 붙어야 뜻이 통하고, 고치는 동안에도 그렇습니다.
+ *
+ * <p>가리킨 장소는 못 바꿉니다. 다른 집에 대한 말로 옮기면 뜻이 통째로
+ * 달라지므로 그것은 고치는 일이 아니라 새로 남기는 일입니다.
+ */
+function CommentEditSheet({
+  comment,
+  onClose,
+  onSaved,
+}: {
+  comment: MyComment;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [text, setText] = useState(comment.text);
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
+
+  async function save() {
+    setBusy(true);
+    setFailed(null);
+    try {
+      await api.patch(`/api/comments/${comment.id}`, { text: text.trim() });
+      onSaved();
+    } catch (e) {
+      setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <BottomSheet
+      visible
+      title="댓글 고치기"
+      onClose={onClose}
+      footer={<Button label="저장" busy={busy} disabled={!text.trim()} onPress={save} />}>
+      <Caption tone="secondary">
+        {[comment.postTitle ?? '피드 글', comment.where].filter(Boolean).join(' · ')}
+      </Caption>
+      <Field
+        label="남긴 말"
+        value={text}
+        onChangeText={setText}
+        multiline
+        hint="500자까지. 고치면 「고침」으로 표시돼요."
+        limit={500}
+      />
+      {failed ? <ErrorNote message={failed} /> : null}
+    </BottomSheet>
   );
 }
 
@@ -729,7 +1182,26 @@ function TripDay({ iso, trip }: { iso: string; trip: TripSummary }) {
   );
 }
 
-/** 이름과 한 줄 소개 고치기. 얼굴(표식)은 내 계정 화면에서 고릅니다. */
+/**
+ * 이름·한 줄 소개·얼굴 사진 고치기.
+ *
+ * <h3>표식은 여기서 안 고릅니다</h3>
+ *
+ * <p>{@code marks} 를 비워 표식 칸을 안 냅니다. 사람 표식은 원래 <b>지도에서
+ * 나를 가리키는 그림</b>이고, 그 뜻을 적어 둔 자리가 내 계정 화면입니다 —
+ * 여기서도 고르게 두면 같은 값을 두 자리에서 바꾸게 되고, 그러면 한쪽만
+ * 고치는 날이 옵니다. 아래 「지도에 쓰는 얼굴 고르기」가 그 자리로 보냅니다.
+ *
+ * <p>그래도 <b>보여 줄 때는</b> 위 얼굴 칸이 표식을 세웁니다. 사진이 없는
+ * 사람의 얼굴이 그것입니다.
+ *
+ * <h3>옛 장은 서버가 지웁니다</h3>
+ *
+ * <p>얼굴 사진도 사람당 1000장을 함께 먹으므로 바꾼 횟수만큼 쌓이면 안
+ * 됩니다. 그 일을 화면이 하지 않습니다 — {@code ProfileService.edit} 이 바꿔
+ * 끼운 뒤 <b>같은 트랜잭션에서</b> 지웁니다. 화면이 지우면 저장이 실패한
+ * 뒤에 사진만 사라지는 순서가 생깁니다.
+ */
 function ProfileSheet({
   visible,
   profile,
@@ -744,6 +1216,7 @@ function ProfileSheet({
   const router = useRouter();
   const [name, setName] = useState(profile.name);
   const [bio, setBio] = useState(profile.bio ?? '');
+  const [photoId, setPhotoId] = useState<string | null>(profile.photoId ?? null);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
 
@@ -751,7 +1224,9 @@ function ProfileSheet({
     setBusy(true);
     setFailed(null);
     try {
-      await api.patch('/api/me/profile', { name, bio });
+      /* 비우는 것은 빈 글입니다. null 을 보내면 서버가 「손대지 않음」으로
+         읽어, 한 번 올린 사진을 뺄 길이 없습니다. */
+      await api.patch('/api/me/profile', { name, bio, photoId: photoId ?? '' });
       onSaved();
     } catch (e) {
       setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
@@ -766,6 +1241,25 @@ function ProfileSheet({
       title="프로필 편집"
       onClose={onClose}
       footer={<Button label="저장" busy={busy} onPress={save} />}>
+      {/*
+        얼굴 고르기.
+
+        <p>{@code marks} 가 비어 표식 칸은 안 섭니다(머리글 참고). 그래도
+        <b>그릴 것</b>은 넘깁니다 — 토끼를 골라 둔 사람이 판을 열었을 때
+        빈 동그라미를 보면 「내 얼굴이 비었다」고 읽습니다. 위 머리의 얼굴과
+        같은 것이 서야 합니다.
+      */}
+      <FacePicker
+        photoId={photoId}
+        onPhoto={setPhotoId}
+        mark={null}
+        onMark={() => {}}
+        marks={[]}
+        glyph={profile.mark ? markOf(profile.mark) : null}
+        fallback={<LogoSymbol size={34} />}
+        what="내 얼굴"
+      />
+
       <Field label="이름" value={name} onChangeText={setName} maxLength={80} />
       <Field
         label="한 줄 소개"
@@ -862,19 +1356,6 @@ const styles = StyleSheet.create({
   who: {
     minHeight: 88,
     alignItems: 'center',
-  },
-  face: {
-    width: 64,
-    height: 64,
-    borderRadius: Radius.full,
-    backgroundColor: Colors.fill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  faceEmoji: {
-    fontSize: 30,
-    /* 이모지는 글꼴이 제 높이를 갖고 있어, 줄 높이를 두면 아래로 처집니다. */
-    lineHeight: undefined,
   },
   counts: {
     paddingVertical: Spacing.s3,

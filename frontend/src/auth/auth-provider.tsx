@@ -82,6 +82,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    * 액세스 토큰은 메모리에만 있으므로 껐다 켜면 없습니다. 대신 리프레시
    * 쿠키가 남아 있으면 조용히 다시 받아 옵니다. 없으면 로그인 화면으로
    * 가되, 운영자가 아직 없는 서버라면 설치 화면을 먼저 띄웁니다.
+   *
+   * <h3>둘을 나란히 부릅니다</h3>
+   *
+   * <p>재발급을 기다린 뒤에 {@code /api/auth/state} 를 불렀습니다. 그런데
+   * 뒤쪽은 {@code anonymous} 요청이라 <b>앞쪽이 받아 온 토큰을 쓰지
+   * 않습니다</b> — 기다릴 까닭이 없는데 기다리고 있었습니다.
+   *
+   * <p>그 둘이 끝나야 {@code ready} 가 서고, {@code ready} 가 설 때까지
+   * 모든 화면은 「확인하는 중…」입니다({@code (app)/_layout.tsx}). 그러니까
+   * 이 한 번의 기다림은 <b>어느 화면을 열어도 그 화면이 제 것을 부르기
+   * 전에</b> 얹혀 있었습니다. 나란히 부르면 왕복 하나가 통째로 빠집니다.
+   *
+   * <p>{@code revived} 를 뒤에서 씁니다({@code setupNeeded}). 값이 둘 다
+   * 온 뒤에 보므로 순서를 바꿔도 뜻이 같습니다.
    */
   useEffect(() => {
     let alive = true;
@@ -90,10 +104,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       /* 재발급은 client 가 하나만 돌립니다. 여기서 직접 부르면 개발 모드에서
          효과가 두 번 실행될 때 같은 리프레시 토큰이 두 번 나가고, 서버가
          그것을 탈취로 보고 로그인을 끊어 버립니다. */
-      const revived = await refreshSession();
-      if (revived && alive) {
-        accept(revived as unknown as TokenResponse);
-      }
+      const reviving = refreshSession();
 
       /*
         로그인이 됐든 안 됐든 부릅니다.
@@ -105,18 +116,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         setupNeeded 는 로그인 전에만 뜻이 있습니다. 되살아난 사람에게 다시
         켜면 멀쩡히 쓰던 사람에게 설치 화면이 뜹니다.
+
+        서버가 아직 안 떴을 수 있어 실패를 삼킵니다 — 로그인 화면에서 다시
+        시도하게 둡니다. 재발급 쪽은 제가 null 로 답하므로 따로 안 감쌉니다.
       */
-      try {
-        const state = await request<AuthState>('/api/auth/state', { anonymous: true });
-        if (alive) {
-          setGoogleClientId(state.googleClientId ?? '');
-          setKakaoEnabled(!!state.kakao);
-          if (!revived) {
-            setSetupNeeded(state.setupNeeded);
-          }
+      const asking = request<AuthState>('/api/auth/state', { anonymous: true }).catch(
+        () => null,
+      );
+
+      const [revived, state] = await Promise.all([reviving, asking]);
+
+      if (!alive) {
+        return;
+      }
+      if (revived) {
+        accept(revived as unknown as TokenResponse);
+      }
+      if (state) {
+        setGoogleClientId(state.googleClientId ?? '');
+        setKakaoEnabled(!!state.kakao);
+        if (!revived) {
+          setSetupNeeded(state.setupNeeded);
         }
-      } catch {
-        /* 서버가 아직 안 떴을 수 있습니다. 로그인 화면에서 다시 시도하게 둡니다. */
       }
     })().finally(() => {
       if (alive) {

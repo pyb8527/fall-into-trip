@@ -20,6 +20,24 @@ public interface PostCommentRepository extends JpaRepository<PostComment, String
      */
     List<PostComment> findAllByPostId(String postId);
 
+    /**
+     * 내가 남긴 댓글 — 최근 것부터, 갈래를 안 가립니다.
+     *
+     * <p>여행기에 달린 것과 피드 글에 달린 것이 한 목록에 섞입니다. 남긴
+     * 사람에게는 둘이 같은 일입니다 — 「내가 어디다 뭐라고 했지」를 찾을
+     * 때 어느 표에 들어 있는지는 알 바가 아닙니다.
+     *
+     * <p>감춰진 것은 뺍니다. 신고가 쌓여 내려간 글을 제 목록에서만 그대로
+     * 보여 주면, 남에게는 안 보이는 것을 저만 보는 셈이라 「왜 아무 반응이
+     * 없나」가 됩니다. 내 리뷰 목록도 같은 규칙입니다
+     * ({@code MyRecordService.reviewsOf}).
+     *
+     * <p>쪽으로 끊습니다. 몇 해 쓴 사람의 댓글은 몇백 개가 되고, 그것을 한
+     * 번에 내려보내면 화면이 그 전부를 들고 있어야 합니다.
+     */
+    Page<PostComment> findAllByUserIdAndHiddenFalseOrderByCreatedAtDesc(
+            String userId, Pageable pageable);
+
     long countByPostIdAndKindAndHiddenFalse(String postId, CommentKind kind);
 
     long countByUserIdAndPostId(String userId, String postId);

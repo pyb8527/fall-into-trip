@@ -155,7 +155,7 @@ public class PostService {
                 */
                 .snapshot(snapshotOf(clean, dayList, placeList,
                         storiesOf(me, trip, dayList, storyIds),
-                        shownPhotos(placeList, placePhotoIds)))
+                        shownPhotos(me, trip, placeList, placePhotoIds)))
                 .dayCount(dayList.size())
                 .placeCount(placeList.size())
                 .feedback(feedback)
@@ -375,27 +375,99 @@ public class PostService {
      * 안 보면 남의 사진 번호를 넣어 공개 글에 실을 수 있습니다 — 번호는
      * 난수라 찍어서 맞히기 어렵지만, 어렵다는 것이 막았다는 뜻은 아닙니다.
      *
-     * <p>차례는 장소에 붙어 있던 차례 그대로입니다. 고른 차례는 화면이
-     * 어떻게 늘어놓았느냐에 달렸는데, 읽는 사람에게 뜻이 있는 것은 그 장소에
-     * 놓인 차례입니다.
+     * <h3>붙어 있는 길이 둘입니다</h3>
+     *
+     * <p>{@code place_photos} 는 「다니면서 볼 사진」입니다 — 메뉴판, 예매 화면,
+     * 가는 길 지도. 여기에 <b>피드 글이 장소에 묶여 들고 온 사진</b>이 더해집니다
+     * ({@code feed.Post.placeId}). 그 장소를 보면서 올린 사진이라 읽는 사람이
+     * 가장 보고 싶은 쪽인데, 붙는 표가 다르다는 이유로 걸러 내면 화면이 미리
+     * 골라 둔 것이 <b>조용히 사라집니다</b>({@code publish-form}).
+     *
+     * <p>피드 쪽도 <b>올린 사람 것만</b> 봅니다({@code authorId} 를 봅니다).
+     * 모임에서 남이 찍은 사진을 내 여행기로 공개하는 결정은 찍은 사람이
+     * 합니다 — {@link #storiesOf} 와 같은 규칙입니다. 여행기는 <b>아무나 보는
+     * 글</b>이라, 이 한 줄이 빠지면 같이 간 사람의 사진이 남의 공개 글에
+     * 실립니다.
+     *
+     * <h3>차례</h3>
+     *
+     * <p>피드에서 온 것이 앞에 섭니다. 그것이 「다녀와서 남긴 것」이고 챙겨 둔
+     * 것은 「가기 전에 넣어 둔 것」이라, 읽는 사람이 보고 싶은 쪽이 먼저입니다.
+     * 피드 안에서는 글이 올라온 차례, 챙겨 둔 것은 장소에 붙어 있던 차례
+     * 그대로입니다 — 고른 차례는 화면이 어떻게 늘어놓았느냐에 달렸는데, 읽는
+     * 사람에게 뜻이 있는 것은 시간과 그 장소에 놓인 차례입니다.
      *
      * @return 장소 번호 → 그 장소에 실을 사진들
      */
-    private Map<String, List<String>> shownPhotos(List<Place> placeList, List<String> want) {
+    private Map<String, List<String>> shownPhotos(AuthPrincipal me, Trip trip,
+                                                  List<Place> placeList, List<String> want) {
         if (want == null || want.isEmpty()) {
             return Map.of();
         }
         Set<String> wanted = Set.copyOf(want);
         List<String> placeIds = placeList.stream().map(Place::getId).toList();
+        /* 고른 날에 든 장소만. 안 거르면 안 올리는 날의 장소에 사진이 붙습니다. */
+        Set<String> inTrip = Set.copyOf(placeIds);
 
         Map<String, List<String>> out = new java.util.HashMap<>();
+
+        /*
+          피드 글이 장소에 묶어 들고 온 사진.
+
+          <p>질의 둘입니다 — 이 여행의 글 한 번, 그 글들의 사진 한 번. 글마다
+          묻게 두면 글 수만큼 왕복이 생깁니다.
+        */
+        List<net.weeniebeenie.fit.feed.domain.Post> bound = stories
+                .findAllByTripIdAndHiddenFalseOrderByCreatedAtDesc(trip.getId()).stream()
+                .filter(p -> p.getAuthorId().equals(me.id()))
+                .filter(p -> p.getPlaceId() != null && inTrip.contains(p.getPlaceId()))
+                .sorted(java.util.Comparator.comparing(
+                        net.weeniebeenie.fit.feed.domain.Post::getCreatedAt))
+                .toList();
+        if (!bound.isEmpty()) {
+            /*
+              글마다 묶어 둡니다. 질의가 sort 로만 차례를 매기므로 그대로 훑으면
+              글 셋의 사진이 번호끼리 섞입니다 — 한 글의 사진은 붙어 있어야
+              합니다.
+            */
+            Map<String, List<String>> byPost = new java.util.HashMap<>();
+            for (net.weeniebeenie.fit.feed.domain.PostPhoto pp : storyPhotos
+                    .findAllByPostIdInOrderBySortAsc(bound.stream()
+                            .map(net.weeniebeenie.fit.feed.domain.Post::getId).toList())) {
+                if (wanted.contains(pp.getPhotoId())) {
+                    byPost.computeIfAbsent(pp.getPostId(), k -> new ArrayList<>())
+                            .add(pp.getPhotoId());
+                }
+            }
+            for (net.weeniebeenie.fit.feed.domain.Post p : bound) {
+                for (String id : byPost.getOrDefault(p.getId(), List.of())) {
+                    addOnce(out, p.getPlaceId(), id);
+                }
+            }
+        }
+
         for (net.weeniebeenie.fit.trip.domain.PlacePhoto pp :
                 placePhotos.findAllByPlaceIdInOrderByPlaceIdAscSortAsc(placeIds)) {
             if (wanted.contains(pp.getPhotoId())) {
-                out.computeIfAbsent(pp.getPlaceId(), k -> new ArrayList<>()).add(pp.getPhotoId());
+                addOnce(out, pp.getPlaceId(), pp.getPhotoId());
             }
         }
         return out;
+    }
+
+    /**
+     * 한 장소에 사진 하나를 <b>한 번만</b> 붙입니다.
+     *
+     * <p>같은 번호가 두 번 들어올 수 있습니다 — 사진 한 장이 내 글 둘에 다
+     * 실려 있고 그 둘이 같은 장소에 묶여 있으면 그렇습니다
+     * ({@code post_photos} 의 열쇠가 (글, 사진)이라 막아 주지 않습니다).
+     * 그대로 담으면 여행기의 그 장소에 같은 사진이 두 칸 섭니다.
+     */
+    private static void addOnce(Map<String, List<String>> out, String placeId, String photoId) {
+        List<String> at = out.computeIfAbsent(placeId, k -> new ArrayList<>());
+        if (!at.contains(photoId)) {
+            at.add(photoId);
+        }
     }
 
     /**

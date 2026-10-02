@@ -73,11 +73,18 @@ export default function FeedPostScreen() {
           이름을 들고 온 셈이고, 여행이 지워졌거나 안 묶인 글이면 올린 사람이
           그 자리에 섭니다. 「피드 글」만 크게 적어 두면 어느 글인지는 한 줄도
           안 말해 줍니다. */}
+      {/* 장소에 묶인 글이면 <b>그 장소</b>가 큰 줄입니다. 여행 이름보다 좁은
+          말이고, 앨범에서 사진을 누르는 사람이 알고 싶은 것도 「어느 여행」보다
+          「어디서 찍은 것」입니다. 일정에서 장소가 빠진 글은 이름이 안 와서
+          (ON DELETE SET NULL) 여행 이름으로 내려갑니다. */}
       <Stack.Screen
         options={{
           title: '피드 글',
           headerTitle: () => (
-            <PathTitle parent={post.tripTitle ?? post.authorName} title="피드 글" />
+            <PathTitle
+              parent={post.placeName ?? post.tripTitle ?? post.authorName}
+              title="피드 글"
+            />
           ),
         }}
       />

@@ -1,87 +1,161 @@
-import * as AuthSession from 'expo-auth-session';
-import * as Google from 'expo-auth-session/providers/google';
-import * as WebBrowser from 'expo-web-browser';
+import {
+  GoogleSignin,
+  isSuccessResponse,
+  statusCodes,
+} from '@react-native-google-signin/google-signin';
+import { Platform } from 'react-native';
 
 /**
  * 구글 로그인 (껍데기).
  *
- * <h3>왜 웹뷰 안에서 못 하나</h3>
+ * <h3>브라우저를 띄우던 것을 폰 계정으로 바꿨습니다</h3>
  *
- * <p>구글이 막습니다. 로그인 창이 앱 안에 박혀 있으면 주소창이 없어서, 쓰는
- * 사람이 지금 진짜 구글에 비밀번호를 넣는 것인지 확인할 수가 없습니다.
- * 앱을 만든 쪽이 그 창을 들여다볼 수도 있고요. 그래서 구글은 웹뷰에서 온
- * 요청을 {@code disallowed_useragent} 로 돌려보냅니다.
+ * <p>{@code expo-auth-session} 으로 폰의 브라우저를 앱 위에 띄웠습니다.
+ * 웹뷰 안에서는 구글이 막으므로({@code disallowed_useragent}) 그것이 유일한
+ * 길이었는데, 쓰는 사람에게는 <b>앱이 아니라 웹</b>으로 보였습니다 — 창이
+ * 뜨고 주소가 보이고 로그인한 뒤 돌아오는 그 세 박자가 전부입니다.
  *
- * <p>대신 폰의 브라우저를 앱 위에 띄웁니다. 주소창이 보이고, 브라우저에
- * 이미 로그인해 둔 계정을 그대로 씁니다.
+ * <p>폰에는 이미 로그인해 둔 구글 계정이 있습니다. 네이티브 쪽은 그것을
+ * 그대로 씁니다 — 계정을 고르는 판 하나가 뜨고 끝납니다. 창이 안 뜨므로
+ * 거기서 돌아오지 못해 끊기는 자리도 없어집니다.
  *
- * <h3>코드를 받아서 우리가 바꿉니다</h3>
+ * <p>{@code docs/plan-social-login.md} §9 가 「앱은 이번에 안 합니다 —
+ * 네이티브 로그인은 EAS 재빌드가 필요하고, 그건 앱 작업 때 묶기로 한
+ * 것입니다」로 미뤄 두었던 그 자리입니다.
  *
- * <p>설치형 앱에는 비밀키가 없어서 id_token 을 곧바로 못 받습니다. 코드를
- * 받아 와 토큰으로 바꾸는데, "이 코드를 받아 간 것이 나다" 는 증명은
- * PKCE 의 {@code code_verifier} 가 합니다.
+ * <h3>부르는 자리는 그대로입니다</h3>
  *
- * <p>훅(useAuthRequest)이 아니라 그냥 함수로 씁니다 — 껍데기에는 이 일을
- * 걸어 둘 화면이 없고, 웹이 부탁할 때 한 번 돌면 되기 때문입니다.
+ * <p>{@link googleIdToken} 과 {@link canSignIn} 의 생김새를 안 바꿨습니다.
+ * 웹은 {@code askShell({ kind: 'signIn' })} 로 부탁하고 id_token 한 줄을
+ * 받습니다 — 그 아래가 브라우저인지 폰 계정인지 웹은 몰라도 됩니다. 그래서
+ * 이 바꿈은 <b>웹 쪽 코드를 한 줄도 건드리지 않습니다.</b>
+ *
+ * <h3>PKCE 로 코드를 바꾸던 일이 없어졌습니다</h3>
+ *
+ * <p>브라우저 길은 코드를 받아 와 우리가 토큰으로 바꿨습니다(설치형 앱에는
+ * 비밀키가 없어서 id_token 을 곧바로 못 받습니다). 네이티브 쪽은 구글의
+ * SDK 가 그 일을 폰 안에서 하고 id_token 을 바로 줍니다.
+ *
+ * <h3>서버가 받아 줄 aud 를 늘려야 합니다</h3>
+ *
+ * <p>구글은 쪽마다 다른 클라이언트 ID 를 내주고, id_token 의 {@code aud} 에는
+ * 받아 간 쪽의 ID 가 박혀 옵니다. 서버는 그것을
+ * {@code fit.social.google.audiences} (환경 변수 {@code GOOGLE_AUDIENCES})
+ * 로 이미 여럿 받게 되어 있습니다({@code SocialTokens}) — <b>거기에 iOS·
+ * 안드로이드 클라이언트 ID 를 넣어야</b> 앱에서 온 토큰이 통과합니다. 안
+ * 넣으면 로그인 판은 뜨고 서버가 400 으로 거절합니다.
  */
 
-/* 창이 닫힌 뒤 앱으로 제대로 돌아오게 합니다. */
-WebBrowser.maybeCompleteAuthSession();
+/*
+  클라이언트 ID.
 
+  <p>웹 것은 {@code webClientId} 로 넘깁니다 — 이것이 있으면 안드로이드가
+  id_token 을 내줍니다(없으면 토큰이 없는 로그인이 됩니다).
+
+  <p>{@code docs/plan-social-login.md} §10.1 은 웹에서 클라이언트 ID 를
+  빌드에 안 박고 서버가 내려보내게 했습니다. 껍데기는 그렇게 못 합니다 —
+  로그인은 웹이 뜨기 전에도 눌릴 수 있고, 무엇보다 이 값들은 <b>빌드할 때
+  네이티브 쪽에 박히는</b> 것이라(iOS 의 돌아올 주소) 어차피 빌드가 알아야
+  합니다. 그래서 여기만 환경 변수입니다.
+*/
 const IOS = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ?? '';
 const ANDROID = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ?? '';
+const WEB = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ?? '';
 
 /**
- * 돌아올 주소.
+ * 이 빌드가 구글 로그인을 할 수 있는지.
  *
- * <p>패키지 이름이 그대로 scheme 입니다. 구글의 안드로이드·iOS 클라이언트는
- * 이 모양을 받아 줍니다. app.json 의 scheme 에도 같은 것이 적혀 있어야
- * 폰이 이 주소를 우리 앱에게 줍니다 — 매니페스트에 박히는 값이라 그 한
- * 줄만은 빌드해야 들어갑니다.
+ * <p>쪽마다 보는 값이 다릅니다. iOS 는 제 클라이언트 ID 가 있어야 하고,
+ * 안드로이드는 앱에 적을 값이 없는 대신(구글이 패키지 이름과 서명 지문으로
+ * 알아봅니다) <b>웹 것</b>이 있어야 id_token 이 나옵니다.
  */
-const BACK = AuthSession.makeRedirectUri({ native: 'net.weeniebeenie.fit:/oauthredirect' });
+export const canSignIn = Platform.OS === 'ios' ? !!IOS : !!WEB || !!ANDROID;
 
-/** 이 빌드가 구글 로그인을 할 수 있는지. */
-export const canSignIn = !!(IOS || ANDROID);
+/*
+  설정은 한 번만 합니다.
+
+  <p>{@code configure} 는 값만 적어 두는 일이라 싸고, 로그인을 누를 때마다
+  부르면 그 값이 어디서 왔는지가 흩어집니다.
+
+  <p>{@code webClientId} 를 iOS 에도 넘깁니다. 그러면 id_token 의
+  {@code aud} 가 웹 것으로 와서 서버가 이미 보던 값과 같아집니다 — 다만
+  SDK 판에 따라 iOS 것이 박혀 오기도 해서, 서버 쪽 {@code GOOGLE_AUDIENCES}
+  에는 <b>셋 다</b> 넣어 두는 것이 맞습니다.
+*/
+GoogleSignin.configure({
+  ...(IOS ? { iosClientId: IOS } : {}),
+  ...(WEB ? { webClientId: WEB } : {}),
+  /* 이름과 메일 주소입니다 — 서버가 계정을 만들 때 씁니다. */
+  scopes: ['profile', 'email'],
+  /*
+    서버가 사람 대신 구글 API 를 부를 일이 없습니다. 켜면 코드가 하나 더
+    따라오고 그것을 받아 둘 자리가 서버에 필요해집니다.
+  */
+  offlineAccess: false,
+});
 
 /**
- * 로그인 창을 띄우고 id_token 을 받아 옵니다.
+ * 폰 계정으로 로그인하고 id_token 을 받아 옵니다.
  *
- * @return 받은 id_token. 쓰는 사람이 창을 닫았으면 null
+ * @return 받은 id_token. 쓰는 사람이 계정 고르기를 닫았으면 null
  */
 export async function googleIdToken(): Promise<string | null> {
-  const clientId = (ANDROID || IOS)!;
-  if (!clientId) {
+  if (!canSignIn) {
     throw new Error('이 빌드에 구글 클라이언트 ID 가 없어요');
   }
 
-  const request = new AuthSession.AuthRequest({
-    clientId,
-    redirectUri: BACK,
-    responseType: AuthSession.ResponseType.Code,
-    /* openid 가 있어야 바꾼 결과에 id_token 이 들어옵니다. 나머지 둘은
-       이름과 메일 주소입니다 — 서버가 계정을 만들 때 씁니다. */
-    scopes: ['openid', 'profile', 'email'],
-    usePKCE: true,
-  });
+  /*
+    안드로이드는 구글 서비스가 있어야 합니다.
 
-  const result = await request.promptAsync(Google.discovery);
-  if (result.type !== 'success' || !result.params.code) {
-    /* 닫았거나 거절했습니다. 고장이 아니므로 아무 말도 안 합니다. */
-    return null;
+    <p>없는 기기가 있습니다(중국 판, 일부 태블릿). 그때 그냥 로그인을
+    부르면 알아보기 어려운 오류가 나므로 먼저 봅니다. 받을 수 있는 판을
+    권하는 창은 구글이 띄워 줍니다.
+  */
+  if (Platform.OS === 'android') {
+    await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
   }
 
-  const token = await AuthSession.exchangeCodeAsync(
-    {
-      clientId,
-      code: result.params.code,
-      /* 코드를 받을 때 댄 주소를 그대로 다시 댑니다. 구글이 둘을 맞춰 보고
-         다르면 바꿔 주지 않습니다. */
-      redirectUri: BACK,
-      extraParams: request.codeVerifier ? { code_verifier: request.codeVerifier } : undefined,
-    },
-    Google.discovery,
-  );
+  /*
+    먼저 끊고 시작합니다.
 
-  return token.idToken ?? null;
+    <p>한 번 로그인하면 SDK 가 그 계정을 들고 있어, 다음부터는 고르는 판이
+    뜨지 않고 <b>같은 계정으로 바로</b> 들어갑니다. 폰에 계정이 둘인 사람은
+    다른 쪽으로 들어갈 길이 없어집니다.
+  */
+  await GoogleSignin.signOut().catch(() => {
+    /* 들고 있는 것이 없었습니다. 그대로 갑니다. */
+  });
+
+  try {
+    const got = await GoogleSignin.signIn();
+    if (!isSuccessResponse(got)) {
+      /* 고르는 판을 닫았습니다. 고장이 아니므로 아무 말도 안 합니다. */
+      return null;
+    }
+    return got.data.idToken ?? null;
+  } catch (e) {
+    /*
+      판이 이미 떠 있는데 또 눌렀습니다. 두 번째 부름은 거절되는데, 그것은
+      고장이 아니라 첫 번째가 아직 진행 중이라는 뜻입니다.
+    */
+    if (codeOf(e) === statusCodes.IN_PROGRESS) {
+      return null;
+    }
+    throw e;
+  }
+}
+
+/**
+ * 구글 SDK 가 오류에 붙여 보내는 까닭.
+ *
+ * <p>꾸러미가 {@code isErrorWithCode} 를 주지만 여기서는 안 씁니다 —
+ * 그것은 타입을 좁히는 도우미여서, 이 파일이 <b>꾸러미를 아직 안 깐
+ * 상태에서도 읽히게</b> 두려면 자리 하나를 직접 들여다보는 쪽이 낫습니다.
+ */
+function codeOf(e: unknown): string | null {
+  if (e && typeof e === 'object' && 'code' in e) {
+    const code = (e as { code?: unknown }).code;
+    return typeof code === 'string' ? code : null;
+  }
+  return null;
 }

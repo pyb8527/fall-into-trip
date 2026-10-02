@@ -40,6 +40,34 @@ const IOS_MAPS = process.env.GOOGLE_MAPS_IOS_KEY;
 */
 const SERVICES = process.env.GOOGLE_SERVICES_JSON;
 
+/*
+  네이티브 구글 로그인이 iOS 에서 돌아올 주소.
+
+  <h3>왜 app.json 에 안 적나</h3>
+
+  <p>이 값은 비밀이 아닙니다 — 깔린 앱의 Info.plist 에 그대로 박혀 있어
+  누구나 꺼내 볼 수 있습니다. 그래도 <b>환경마다 다른 값</b>이라 저장소에
+  적으면 다른 프로젝트로 구울 때 조용히 틀린 것이 들어갑니다. 지도 키와
+  같은 자리입니다.
+
+  <h3>따로 받지 않고 만들어 씁니다</h3>
+
+  <p>구글이 말하는 "reversed client ID" 는 iOS 클라이언트 ID 를 점 단위로
+  뒤집은 것입니다. {@code 123-abc.apps.googleusercontent.com} 이면
+  {@code com.googleusercontent.apps.123-abc} 입니다.
+
+  <p>그 ID 는 로그인 코드가 이미 쓰고 있으므로(EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID)
+  환경 변수를 하나 더 두지 않고 여기서 만듭니다. 두 군데에 같은 값을 적어
+  두면 언젠가 한쪽만 고치게 됩니다 — 그러면 로그인 창은 뜨는데 앱으로
+  돌아오지 못합니다.
+*/
+const IOS_CLIENT = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
+
+function reversed(clientId) {
+  const bare = clientId.replace(/\.apps\.googleusercontent\.com$/, '');
+  return `com.googleusercontent.apps.${bare}`;
+}
+
 module.exports = ({ config }) => {
   /* 빌드 기록에 남습니다. 폰에 깔아 보고 나서야 아는 것보다 낫습니다. */
   if (!ANDROID_MAPS) {
@@ -51,9 +79,31 @@ module.exports = ({ config }) => {
   if (!SERVICES) {
     console.warn('[FIT] GOOGLE_SERVICES_JSON 이 없습니다 — 안드로이드 알림이 안 옵니다.');
   }
+  if (!IOS_CLIENT) {
+    console.warn(
+      '[FIT] EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID 가 없습니다 — iOS 에서 폰 계정으로 로그인하는 길이 안 들어갑니다.',
+    );
+  }
 
   return {
     ...config,
+    /*
+      폰 계정으로 하는 구글 로그인.
+
+      <p>이 꾸러미가 하는 일은 iOS 의 돌아올 주소 한 줄을 Info.plist 에
+      넣는 것뿐입니다. 안드로이드는 넣을 것이 없습니다 — 구글이 패키지
+      이름과 서명 지문(SHA-1)으로 알아보므로 앱에 적을 값이 없습니다.
+
+      <p>값이 없으면 <b>아예 안 넣습니다.</b> 이 꾸러미는 주소가 비었거나
+      모양이 틀리면 빌드를 터뜨립니다(validateOptions) — 로그인을 안 켠
+      환경에서 빌드가 통째로 안 되게 할 이유가 없습니다.
+    */
+    plugins: [
+      ...(config.plugins ?? []),
+      ...(IOS_CLIENT
+        ? [['@react-native-google-signin/google-signin', { iosUrlScheme: reversed(IOS_CLIENT) }]]
+        : []),
+    ],
     ios: {
       ...config.ios,
       config: {

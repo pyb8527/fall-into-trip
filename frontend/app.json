@@ -63,6 +63,22 @@
         }
       ],
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "프로필에 쓸 사진 한 장을 고르는 데만 씁니다. 고른 그 한 장만 앱에 들어옵니다.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-calendar",
+        {
+          "writeOnlyAccess": true,
+          "writeOnlyCalendarPermission": "고른 여행을 폰 캘린더에 일정으로 넣는 데 씁니다. 캘린더에 있는 일정을 읽지는 않습니다.",
+          "remindersPermission": false
+        }
+      ],
+      [
         "expo-build-properties",
         {
           "ios": {

@@ -113,20 +113,25 @@ public class FeedController {
     @PostMapping("/api/feed")
     public Map<String, Object> write(@CurrentUser AuthPrincipal me,
                                      @RequestBody WriteRequest req) {
-        WriteRequest r = req == null ? new WriteRequest(null, null, null, null, null, null) : req;
-        Post made = feed.write(me, r.groupId(), r.tripId(), r.text(), r.tags(), r.photoIds(),
-                r.audience());
+        WriteRequest r = req == null
+                ? new WriteRequest(null, null, null, null, null, null, null) : req;
+        Post made = feed.write(me, r.groupId(), r.tripId(), r.placeId(), r.text(), r.tags(),
+                r.photoIds(), r.audience());
         return Map.of("post", feed.read(me, made.getId()));
     }
 
     /**
      * @param groupId  모임에 올리면 그 모임. 안 주면 내 피드입니다
      * @param tripId   어느 여행 이야기인지. 안 골라도 됩니다
+     * @param placeId  그 여행의 어느 장소에서인지. 안 골라도 됩니다 — 숙소에서
+     *                 찍은 단체 사진은 장소에 설 자리가 없습니다. 주면 여행
+     *                 번호는 <b>장소에서 꺼냅니다</b>: {@code tripId} 를 함께
+     *                 보내도 맞는지 보는 데만 쓰고, 어긋나면 거절합니다
      * @param audience 누가 볼지. 안 주면 올린 자리가 정합니다 — 모임에 올리면
      *                 그 모임 사람, 내 피드면 나만입니다. 공개 범위가 없던
      *                 때의 동작이라 옛 화면이 보내던 몸체가 그대로 통합니다
      */
-    public record WriteRequest(String groupId, String tripId, String text,
+    public record WriteRequest(String groupId, String tripId, String placeId, String text,
                                List<String> tags, List<String> photoIds,
                                Audience audience) {
     }
@@ -136,14 +141,20 @@ public class FeedController {
     public Map<String, Object> edit(@CurrentUser AuthPrincipal me,
                                     @PathVariable String id,
                                     @RequestBody EditRequest req) {
-        EditRequest r = req == null ? new EditRequest(null, null, null, null, null) : req;
-        feed.edit(me, id, r.text(), r.tags(), r.photoIds(), r.tripId(), r.audience());
+        EditRequest r = req == null ? new EditRequest(null, null, null, null, null, null) : req;
+        feed.edit(me, id, r.text(), r.tags(), r.photoIds(), r.tripId(), r.placeId(),
+                r.audience());
         return Map.of("post", feed.read(me, id));
     }
 
-    /** @param audience 안 주면 그대로 둡니다. 비우는 뜻이 아닙니다 */
+    /**
+     * @param placeId  빈 글자면 장소 묶임을 끊습니다. 안 주면 그대로 둡니다 —
+     *                 <b>여행만 갈아 끼우면 장소는 저절로 끊깁니다</b>: 그
+     *                 장소는 이제 다른 여행의 줄입니다
+     * @param audience 안 주면 그대로 둡니다. 비우는 뜻이 아닙니다
+     */
     public record EditRequest(String text, List<String> tags, List<String> photoIds,
-                              String tripId, Audience audience) {
+                              String tripId, String placeId, Audience audience) {
     }
 
     @DeleteMapping("/api/feed/{id}")

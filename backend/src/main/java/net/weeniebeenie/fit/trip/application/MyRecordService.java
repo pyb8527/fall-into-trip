@@ -52,8 +52,13 @@ public class MyRecordService {
 
     @Transactional(readOnly = true)
     public Reviews reviewsOf(AuthPrincipal me) {
+        /* 번호를 함께 냅니다. 「내가 남긴 것」 칸에서 그 자리에서 고치고
+           지우려면 무엇을 고치는지 가리킬 것이 있어야 합니다 —
+           /api/tips/{tipId} 가 받는 것이 이 번호입니다. 장소 번호로는 안
+           됩니다: 같은 곳에 하루 세 번까지 남길 수 있어 한 장소에 여러
+           줄이 있을 수 있습니다(TipService.MAX_PER_DAY). */
         List<Object[]> rows = em.createQuery("""
-                        SELECT t.placeId, t.stars, t.text, t.createdAt
+                        SELECT t.placeId, t.stars, t.text, t.createdAt, t.id, t.editedAt
                         FROM PlaceTip t
                         WHERE t.userId = :me AND t.hidden = false
                         ORDER BY t.createdAt DESC
@@ -66,8 +71,8 @@ public class MyRecordService {
         Map<String, String> names = namesOf(placeIds);
 
         List<Review> reviews = rows.stream()
-                .map(r -> new Review((String) r[0], names.get((String) r[0]),
-                        (Integer) r[1], (String) r[2], (Instant) r[3]))
+                .map(r -> new Review((String) r[4], (String) r[0], names.get((String) r[0]),
+                        (Integer) r[1], (String) r[2], (Instant) r[3], (Instant) r[5]))
                 .toList();
 
         /* 다녀온 곳 중 리뷰 안 남긴 곳 — 최근 여행 것부터. */
@@ -178,8 +183,14 @@ public class MyRecordService {
         return out;
     }
 
-    /** @param name 일정·보석함 어디에도 없는 곳이면 비어 있습니다 */
-    public record Review(String placeId, String name, Integer stars, String text, Instant at) {
+    /**
+     * @param id       그 한 줄의 번호. 고치고 지울 때 가리킵니다
+     *                 ({@code /api/tips/{tipId}})
+     * @param name     일정·보석함 어디에도 없는 곳이면 비어 있습니다
+     * @param editedAt 고친 때. 비어 있으면 안 고친 것입니다
+     */
+    public record Review(String id, String placeId, String name, Integer stars, String text,
+                         Instant at, Instant editedAt) {
     }
 
     public record Visited(String placeId, String name, Double lat, Double lng, String icon) {

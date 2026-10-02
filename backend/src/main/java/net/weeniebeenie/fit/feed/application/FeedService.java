@@ -17,6 +17,10 @@ import net.weeniebeenie.fit.group.domain.GroupRole;
 import net.weeniebeenie.fit.photo.domain.PhotoRepository;
 import net.weeniebeenie.fit.shared.error.ApiException;
 import net.weeniebeenie.fit.support.audit.AuditService;
+import net.weeniebeenie.fit.trip.domain.Day;
+import net.weeniebeenie.fit.trip.domain.DayRepository;
+import net.weeniebeenie.fit.trip.domain.Place;
+import net.weeniebeenie.fit.trip.domain.PlaceRepository;
 import net.weeniebeenie.fit.trip.domain.Trip;
 import net.weeniebeenie.fit.trip.domain.TripAccessPolicy;
 import net.weeniebeenie.fit.trip.domain.TripRepository;
@@ -60,6 +64,19 @@ import java.util.function.Predicate;
  *
  * <p>스무 명짜리 모임에서 좋아요는 셈이 아니라 <b>눈치</b>가 됩니다. 누가
  * 안 눌렀는지가 보입니다. 댓글만 둡니다.
+ *
+ * <h3>어디서 올린 글인가</h3>
+ *
+ * <p>여행에 묶는 길은 {@code Post.tripId} 로 있었습니다. 거기에 <b>장소</b>가
+ * 붙습니다({@code Post.placeId}) — 닷새에 스무 곳짜리 여행에서 「이 여행
+ * 이야기」만으로는 사진이 설 자리를 못 집어 주고, 둘러보기에 내놓을 때 사람이
+ * 장소마다 사진을 하나하나 다시 골랐습니다. 이미 그 장소를 보면서 올린
+ * 사진인데 말입니다.
+ *
+ * <p>장소를 받으면 여행은 <b>받지 않고 거슬러 올라갑니다</b>
+ * ({@link #placeOf}) — 장소가 날에 달려 있고 날이 여행에 달려 있어서, 둘을
+ * 따로 받으면 어긋난 글을 저장할 수 있게 됩니다. 날은 아예 안 들고 있습니다:
+ * 장소를 다른 날로 끌어 옮기면 적어 둔 날이 거짓이 되고 고쳐 줄 자리가 없습니다.
  *
  * <h3>볼 수 있는가</h3>
  *
@@ -134,6 +151,10 @@ public class FeedService {
     private final PhotoRepository photos;
     private final GroupService groups;
     private final TripRepository trips;
+    /* 글이 묶인 장소의 이름을 내주고, 고른 장소가 어느 여행인지 거슬러
+       올라갑니다({@link #placeOf}). */
+    private final PlaceRepository places;
+    private final DayRepository days;
     private final TripAccessPolicy access;
     private final UserRepository users;
     private final AuditService audit;
@@ -335,12 +356,17 @@ public class FeedService {
     /**
      * 올립니다.
      *
+     * @param tripId   어느 여행 이야기인지. 안 골라도 됩니다. {@code placeId}
+     *                 를 함께 보내면 <b>둘이 맞아야</b> 합니다 — 장소가 이미
+     *                 여행을 말하므로 어긋나면 거절합니다({@link #placeOf})
+     * @param placeId  그 여행의 어느 장소에서인지. 안 골라도 됩니다 — 숙소에서
+     *                 찍은 단체 사진은 장소에 설 자리가 없습니다
      * @param audience 누가 볼지. 안 보내면 올린 자리가 정합니다
      *                 ({@code Post.audienceFor}) — 공개 범위가 없던 때의
      *                 동작이라 안 고른 사람에게 달라지는 것이 없습니다
      */
     @Transactional
-    public Post write(AuthPrincipal me, String groupId, String tripId,
+    public Post write(AuthPrincipal me, String groupId, String tripId, String placeId,
                       String text, List<String> tags, List<String> photoIds,
                       Audience audience) {
         String inGroup = blankToNull(groupId);
@@ -360,10 +386,14 @@ public class FeedService {
             throw ApiException.badRequest("올릴 수 있는 글 수를 넘었어요. 안 쓰는 것을 지우고 올려 주세요.");
         }
 
+        /* 장소와 여행을 한 번에 봅니다 — 따로 보면 어긋난 글이 저장됩니다. */
+        Bound at = placeOf(me, placeId, tripId, inGroup);
+
         Post post = posts.save(Post.builder()
                 .authorId(me.id())
                 .groupId(inGroup)
-                .tripId(tripOf(me, tripId, inGroup))
+                .tripId(at.tripId())
+                .placeId(at.placeId())
                 .text(clean)
                 .tags(cleanTags(tags))
                 .audience(audience)
@@ -372,7 +402,8 @@ public class FeedService {
 
         audit.log(me.id(), "feed.write", post.getId(),
                 Map.of("group", String.valueOf(inGroup), "photos", pics.size(),
-                        "audience", post.getAudience().name()));
+                        "audience", post.getAudience().name(),
+                        "place", String.valueOf(at.placeId())));
         return post;
     }
 
@@ -389,11 +420,21 @@ public class FeedService {
      * <p>공개 범위도 고칩니다. 올린 뒤에 좁히는 일이 넓히는 일보다 잦습니다 —
      * 모임 사람에게 보여 준 사진을 나중에 혼자 간직하려고 글을 지우게 할 이유가
      * 없습니다.
+     *
+     * <h3>장소와 여행은 함께 봅니다</h3>
+     *
+     * <p>따로 보면 어긋난 글이 남습니다. 장소를 보내면 그것이 정합니다 — 여행
+     * 번호는 장소에서 나옵니다. 거꾸로 <b>여행만 갈아 끼우면 전에 묶어 둔 장소를
+     * 끊습니다</b>: 그 장소는 이제 다른 여행의 줄이라, 그대로 두면 글이 제가
+     * 간 적 없는 일정의 자리를 가리킵니다.
+     *
+     * @param placeId {@code ""} 이면 묶임을 끊습니다. {@code null} 이면 그대로 —
+     *                가계부·보석함과 같은 약속입니다
      */
     @Transactional
     public Post edit(AuthPrincipal me, String postId, String text,
                      List<String> tags, List<String> photoIds, String tripId,
-                     Audience audience) {
+                     String placeId, Audience audience) {
         Post post = mine(postId, me.id());
         if (!post.getAuthorId().equals(me.id())) {
             throw ApiException.forbidden("내가 쓴 글만 고칠 수 있어요.");
@@ -409,8 +450,22 @@ public class FeedService {
         if (tags != null) {
             post.setTags(cleanTags(tags));
         }
-        if (tripId != null) {
-            post.setTripId(tripOf(me, tripId, post.getGroupId()));
+        if (placeId != null) {
+            /* 장소를 보냈으면 여행 번호는 거기서 나옵니다. 둘 다 보냈고 어긋나면
+               거절합니다 — 어느 쪽을 믿을지 고르는 자리를 두지 않습니다. */
+            Bound at = placeOf(me, placeId, tripId, post.getGroupId());
+            post.setPlaceId(at.placeId());
+            /* 장소를 비웠을 뿐이고 여행도 안 보냈으면 여행은 그대로 둡니다 —
+               장소 하나를 지우는 것이 여행까지 떼는 일이 되면 안 됩니다. */
+            if (at.placeId() != null || tripId != null) {
+                post.setTripId(at.tripId());
+            }
+        } else if (tripId != null) {
+            String moved = tripOf(me, tripId, post.getGroupId());
+            if (post.getPlaceId() != null && !Objects.equals(moved, post.getTripId())) {
+                post.setPlaceId(null);
+            }
+            post.setTripId(moved);
         }
         if (audience != null) {
             post.setAudience(audience);
@@ -618,6 +673,24 @@ public class FeedService {
         found.stream().map(Post::getTripId).filter(Objects::nonNull).distinct()
                 .forEach(id -> trips.findById(id).ifPresent(t -> where.put(id, t.getTitle())));
 
+        /*
+          묶인 장소의 이름.
+
+          <p>한 번에 받습니다 — 글마다 묻게 두면 스무 편짜리 목록에 왕복 스물이
+          더 붙습니다. 장소를 고른 글이 하나도 없으면 아예 안 묻습니다: 장소는
+          안 골라도 되는 칸이라 비어 있는 목록이 흔합니다.
+
+          <p>지워진 장소는 이름이 안 옵니다({@code ON DELETE SET NULL} 이라
+          번호부터 비어 있습니다). 그 글은 「여행만 묶인 글」로 보입니다 —
+          글자와 사진은 그대로입니다.
+        */
+        Map<String, String> spot = new HashMap<>();
+        List<String> spotIds = found.stream()
+                .map(Post::getPlaceId).filter(Objects::nonNull).distinct().toList();
+        if (!spotIds.isEmpty()) {
+            places.findAllById(spotIds).forEach(p -> spot.put(p.getId(), p.getName()));
+        }
+
         List<Card> out = new ArrayList<>();
         for (Post p : found) {
             User u = who.get(p.getAuthorId());
@@ -630,6 +703,8 @@ public class FeedService {
                     p.getAudience(),
                     p.getTripId(),
                     p.getTripId() == null ? null : where.get(p.getTripId()),
+                    p.getPlaceId(),
+                    p.getPlaceId() == null ? null : spot.get(p.getPlaceId()),
                     p.getText(),
                     List.of(p.getTags()),
                     pics.getOrDefault(p.getId(), List.of()),
@@ -716,6 +791,80 @@ public class FeedService {
         return trip.getId();
     }
 
+    /**
+     * 고른 장소가 쓸 수 있는 것인지, 그리고 그 장소가 어느 여행인지.
+     *
+     * <h3>여행을 안 믿고 거슬러 올라갑니다</h3>
+     *
+     * <p>장소와 여행을 각각 받아 각각 보면, 둘이 <b>어긋난 글</b>을 저장할 수
+     * 있습니다 — 오사카 여행에 묶인 글이 도쿄 일정의 장소를 가리키는 식입니다.
+     * 그런 글은 둘러보기 사본에서 갈 자리가 없고, 고쳐 줄 자리도 없습니다.
+     *
+     * <p>장소를 받으면 {@code places.day_id → days.trip_id} 로 여행을 꺼냅니다.
+     * 보낸 여행 번호는 <b>맞는지 보는 데만</b> 씁니다. 그래서 둘이 어긋날 수가
+     * 없습니다 — 저장되는 값은 한 곳에서만 나옵니다.
+     *
+     * <h3>못 쓸 장소는 한 가지 말로 거절합니다</h3>
+     *
+     * <p>없는 번호든, 볼 수 없는 여행의 장소든 {@link #noSuchPlace} 하나입니다.
+     * 갈라 답하면 번호를 바꿔 가며 <b>어느 장소가 있는지</b>를 가려낼 수 있고,
+     * 그러면 남의 일정이 몇 곳짜리인지가 새어 나갑니다 — 울타리를 404 로
+     * 두는 것과 같은 까닭입니다({@link #mine}).
+     *
+     * <h3>왜 여행을 두 번 묻나</h3>
+     *
+     * <p>{@link TripAccessPolicy#canRead} 로 한 번 보고, 그 다음에
+     * {@link #tripOf} 가 또 봅니다. 한 번으로 줄일 수는 있는데 그러려면 「모임
+     * 글이면 그 모임의 여행」 규칙을 여기에 한 벌 더 적어야 하고, 그 규칙이
+     * 두 군데 있으면 언젠가 한쪽만 고칩니다. 올릴 때 한 번 더 묻는 값이 그보다
+     * 쌉니다 — 목록이 아니라 쓰는 길입니다.
+     *
+     * @param tripId  화면이 함께 보낸 여행 번호. 장소를 안 골랐으면 이것이 그대로
+     *                쓰입니다
+     * @param groupId 모임 글이면 그 모임. 그 모임의 여행이어야 합니다
+     */
+    private Bound placeOf(AuthPrincipal me, String placeId, String tripId, String groupId) {
+        String spot = blankToNull(placeId);
+        if (spot == null) {
+            return new Bound(null, tripOf(me, tripId, groupId));
+        }
+
+        Place place = places.findById(spot).orElseThrow(FeedService::noSuchPlace);
+        Day day = days.findById(place.getDayId()).orElseThrow(FeedService::noSuchPlace);
+        if (!access.canRead(day.getTripId(), me.id())) {
+            throw noSuchPlace();
+        }
+
+        String sent = blankToNull(tripId);
+        if (sent != null && !sent.equals(day.getTripId())) {
+            throw ApiException.badRequest("이 여행의 장소가 아니에요.");
+        }
+        return new Bound(place.getId(), tripOf(me, day.getTripId(), groupId));
+    }
+
+    /**
+     * 못 쓸 장소에 대한 <b>한 가지</b> 대답.
+     *
+     * <p>없는 번호와 볼 수 없는 여행의 장소를 갈라 답하지 않습니다
+     * ({@link #placeOf} 의 설명). 사진 쪽과 같은 꼴입니다 — 남의 사진도
+     * 없는 사진도 "그런 사진이 없어요" 입니다({@link #minePhotos}).
+     */
+    private static ApiException noSuchPlace() {
+        return ApiException.badRequest("그런 장소가 없어요.");
+    }
+
+    /**
+     * 글이 묶이는 자리 — 장소와 그 장소의 여행.
+     *
+     * <p>둘을 함께 돌려주는 까닭은 <b>함께 저장되어야</b> 하기 때문입니다.
+     * 따로 돌려주면 부르는 쪽에서 하나만 넣는 날이 옵니다.
+     *
+     * @param placeId 안 골랐으면 비어 있습니다
+     * @param tripId  장소를 골랐으면 그 장소의 여행. 안 골랐으면 보낸 그대로
+     */
+    private record Bound(String placeId, String tripId) {
+    }
+
     private static String[] cleanTags(List<String> raw) {
         if (raw == null) {
             return new String[0];
@@ -759,10 +908,16 @@ public class FeedService {
      *                  고치는 판이 지금 값을 집어 두어야 하고, 제 글이면
      *                  카드가 한눈에 보여 줍니다
      * @param tripTitle 어느 여행 이야기인지. 지워진 여행이면 비어 있습니다
+     * @param placeId   그 여행의 어느 장소에서 올린 글인지. 안 고른 글과,
+     *                  <b>일정에서 장소가 빠진 글</b>은 비어 있습니다 — 뒤쪽은
+     *                  글이 남고 묶임만 끊긴 자리입니다
+     * @param placeName 그 장소의 이름. 내놓기 판이 장소마다 사진을 모을 때는
+     *                  번호로 묶고, 이름은 화면에 적을 때만 씁니다
      * @param mine      내가 쓴 것인지. 고치기·지우기 단추가 여기에 걸립니다
      */
     public record Card(String id, String authorId, String authorName, String authorMark,
                        String groupId, Audience audience, String tripId, String tripTitle,
+                       String placeId, String placeName,
                        String text, List<String> tags, List<String> photoIds,
                        int commentCount, boolean mine,
                        Instant createdAt, Instant updatedAt) {

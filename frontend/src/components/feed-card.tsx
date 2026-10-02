@@ -174,10 +174,24 @@ export function FeedCard({
       {post.tripId && post.tripTitle ? (
         <Press
           onPress={() => router.push({ pathname: '/trip/[id]', params: { id: post.tripId! } })}
-          accessibilityLabel={`${post.tripTitle} 여행 보기`}
+          accessibilityLabel={
+            post.placeName
+              ? `${post.placeName} · ${post.tripTitle} 여행 보기`
+              : `${post.tripTitle} 여행 보기`
+          }
           style={styles.where}>
           <Icon name="map-pin" size={14} tone="muted" />
-          <Caption tone="secondary">{post.tripTitle}</Caption>
+          {/* 장소까지 적습니다. 핀 그림이 이미 「어디」를 뜻하는데 여행 이름만
+              서 있으면, 그 글이 그 여행의 <b>어느 자리</b>인지는 한 줄도 안
+              말해 줍니다.
+
+              일정에서 장소가 빠진 글은 이름이 안 와서(ON DELETE SET NULL) 여행
+              이름만 남습니다. 그 글도 글자와 사진은 그대로입니다 — 장소 한 줄을
+              빼는 일이 남의 글을 지우는 일이면 안 됩니다. */}
+          <Caption tone="secondary">
+            {post.tripTitle}
+            {post.placeName ? ` · ${post.placeName}` : ''}
+          </Caption>
         </Press>
       ) : null}
 

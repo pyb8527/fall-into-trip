@@ -13,6 +13,8 @@ import net.weeniebeenie.fit.group.domain.GroupMemberRepository;
 import net.weeniebeenie.fit.photo.domain.PhotoRepository;
 import net.weeniebeenie.fit.shared.error.ApiException;
 import net.weeniebeenie.fit.support.audit.AuditService;
+import net.weeniebeenie.fit.trip.domain.DayRepository;
+import net.weeniebeenie.fit.trip.domain.PlaceRepository;
 import net.weeniebeenie.fit.trip.domain.TripAccessPolicy;
 import net.weeniebeenie.fit.trip.domain.TripRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -74,6 +76,8 @@ class FeedCalendarTest {
     @Mock private PhotoRepository photos;
     @Mock private GroupService groups;
     @Mock private TripRepository trips;
+    @Mock private PlaceRepository places;
+    @Mock private DayRepository days;
     @Mock private TripAccessPolicy access;
     @Mock private UserRepository users;
     @Mock private AuditService audit;

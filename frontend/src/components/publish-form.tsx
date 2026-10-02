@@ -1,5 +1,5 @@
 import { StyleSheet, View } from 'react-native';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { api, ApiError, UNEXPECTED } from '@/api/client';
 import type { FeedPost, TripDetail } from '@/api/types';
@@ -105,7 +105,7 @@ export function PublishForm({
   */
   const [pickedShots, setPickedShots] = useState<string[]>([]);
 
-  const { data: storyData } = useAsync<{ posts: FeedPost[] }>(
+  const { data: storyData, loading: storiesLoading } = useAsync<{ posts: FeedPost[] }>(
     (signal) =>
       visible
         ? api.get(`/api/feed?trip=${encodeURIComponent(tripId)}`, signal)
@@ -129,18 +129,69 @@ export function PublishForm({
   /** 장소 번호 → 그 장소에 챙겨 둔 사진들. */
   const shotsOf = new Map((trip?.refs ?? []).map((r) => [r.placeId, r.photoIds]));
 
-  /** 사진이 있는 장소만, 날짜 차례대로. */
+  /*
+    장소 번호 → 그 장소를 보면서 올린 <b>내 피드 사진</b>들.
+
+    <h3>챙겨 둔 것과 다른 더미입니다</h3>
+
+    <p>위의 {@code refs} 는 「다니면서 볼 사진」입니다 — 메뉴판, 예매 화면, 가는
+    길 지도. 사람이 남에게 보이려고 넣은 것이 아니라서 <b>하나도 미리 골라
+    두지 않습니다.</b>
+
+    <p>이쪽은 그 장소를 보면서 올린 사진입니다. 올린 사람이 이미 「이 사진은 이
+    장소의 것」이라고 고른 것이라, 미리 골라 두는 것이 그 뜻을 따르는
+    일입니다({@code seedShots}).
+
+    <p>차례는 글이 올라온 차례입니다 — 읽는 사람에게 뜻이 있는 것은 시간이고,
+    고른 차례는 화면이 어떻게 늘어놓았느냐에 달렸습니다.
+  */
+  const feedShotsOf = new Map<string, string[]>();
+  for (const s of [...stories].sort((a, b) => a.createdAt.localeCompare(b.createdAt))) {
+    if (!s.placeId || s.photoIds.length === 0) {
+      continue;
+    }
+    feedShotsOf.set(s.placeId, [...(feedShotsOf.get(s.placeId) ?? []), ...s.photoIds]);
+  }
+
+  /** 글쓴이가 「나만」으로 닫아 둔 사진. 미리 골라 두지 않습니다({@code seedShots}). */
+  const closedShots = new Set(
+    stories.filter((s) => s.audience === 'ONLY_ME').flatMap((s) => s.photoIds),
+  );
+
+  /**
+   * 사진이 있는 장소만, 날짜 차례대로.
+   *
+   * <p>피드에서 올린 것이 앞에 섭니다. 그것이 「다녀와서 남긴 것」이고 챙겨 둔
+   * 것은 「가기 전에 넣어 둔 것」이라, 읽는 사람이 보고 싶은 쪽이 먼저입니다.
+   *
+   * <p>같은 사진이 두 더미에 다 있을 수는 없습니다 — 피드 사진은
+   * {@code post_photos}, 챙겨 둔 것은 {@code place_photos} 로 붙는 길이
+   * 따로입니다. 그래도 겹쳐 들어오면 격자에 같은 칸이 둘 서므로 걸러 둡니다.
+   */
   const withShots = (trip?.days ?? []).flatMap((d) =>
     d.places
-      .filter((p) => (shotsOf.get(p.id)?.length ?? 0) > 0)
-      .map((p) => ({ day: d, place: p, shots: shotsOf.get(p.id) ?? [] })),
+      .map((p) => {
+        const fromFeed = feedShotsOf.get(p.id) ?? [];
+        const kept = (shotsOf.get(p.id) ?? []).filter((id) => !fromFeed.includes(id));
+        return { day: d, place: p, fromFeed, kept, shots: [...fromFeed, ...kept] };
+      })
+      .filter((x) => x.shots.length > 0),
   );
+
+  /**
+   * 미리 골라 둔 것을 이번에 심었는지.
+   *
+   * <p>한 번만 심어야 합니다. 그릴 때마다 심으면 <b>사람이 끈 사진이 되살아</b>
+   * 납니다 — 끄고, 다시 그려지고, 켜져 있습니다. 끌 수가 없습니다.
+   */
+  const seeded = useRef(false);
 
   /* 판은 닫혀도 화면에 남아 있어 처음 잡은 값이 다음에 열 때도 그대로입니다. */
   useEffect(() => {
     if (!visible) {
       return;
     }
+    seeded.current = false;
     setShape({
       title: tripTitle,
       summary: '',
@@ -157,6 +208,45 @@ export function PublishForm({
     setMore(false);
   }, [visible, tripTitle]);
 
+  /*
+    장소를 보면서 올린 사진을 미리 골라 둡니다.
+
+    <h3>왜 미리 고르나</h3>
+
+    <p>올린 사람이 <b>이미 골랐습니다.</b> 일정의 장소 줄에서 글을 올리면 그
+    사진이 그 장소에 묶이는데({@code Post.placeId}), 그러고 나서 내놓기 판에서
+    같은 사진을 장소마다 다시 찾아 누르게 하는 것은 같은 결정을 두 번 하라는
+    말입니다. 여행기에 사진이 안 실린다는 말이 나온 까닭의 절반이 이것입니다.
+
+    <h3>미리 안 고르는 둘</h3>
+
+    <p><b>챙겨 둔 사진</b>({@code refs})은 그대로 둡니다. 메뉴판과 예매 화면이
+    섞인 더미라, 통째로 켜면 남의 여행기에 내 예매 QR 이 올라갑니다 — 그 더미를
+    한 장씩 고르게 한 결정은 안 바뀝니다.
+
+    <p><b>「나만」으로 닫아 둔 글</b>의 사진도 그대로 둡니다. 공개 범위를 좁혀
+    둔 것은 명시적인 뜻이고, 그것을 기본값이 뒤집으면 안 됩니다 — 모르고 넓게
+    열리는 쪽이 모르고 좁게 닫히는 쪽보다 되돌리기 어렵습니다. 격자에는 섭니다:
+    고르고 싶으면 누를 수 있어야 합니다.
+
+    <h3>두 쪽이 다 도착한 뒤에 한 번</h3>
+
+    <p>일정({@code trip})과 피드({@code storyData}) 둘이 따로 옵니다. 하나만
+    왔을 때 심으면 반만 켜지고, 나머지가 와도 이미 심은 뒤라 영영 꺼진 채로
+    남습니다.
+  */
+  useEffect(() => {
+    if (!visible || seeded.current || storiesLoading || trip == null || storyData == null) {
+      return;
+    }
+    seeded.current = true;
+    setPickedShots(withShots.flatMap((x) => x.fromFeed.filter((id) => !closedShots.has(id))));
+    /* 심는 때를 정하는 것은 위의 넷입니다. 격자({@code withShots})는 그 넷에서
+       나온 것이라 넣으면 같은 말을 두 번 하는 셈이고, 그릴 때마다 새로 지어져
+       매번 다시 심게 됩니다. */
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, storiesLoading, trip, storyData]);
+
   async function submit() {
     if (busy) {
       return;
@@ -168,6 +258,20 @@ export function PublishForm({
     setFailed(null);
     setBusy(true);
     try {
+      /*
+        한 사진이 두 자리에 실리지 않게 합니다.
+
+        <p>장소에 묶인 글은 두 군데에서 고를 수 있습니다 — 「글을 같이 싣기」와
+        그 장소의 사진 격자. 둘 다 고르면 같은 사진이 여행기에 두 번 뜹니다.
+
+        <p><b>글 쪽이 이깁니다.</b> 격자에 켜져 있는 것은 우리가 미리 골라 둔
+        것이고(기본값), 글을 고른 것은 사람이 한 번 누른 것입니다 — 기본값이
+        사람이 한 일을 이기면 안 됩니다. 글을 고르면 사진이 글과 함께, 글을
+        안 고르면 장소 자리에 섭니다.
+      */
+      const inStories = new Set(
+        stories.filter((s) => pickedStories.includes(s.id)).flatMap((s) => s.photoIds),
+      );
       const res = await api.post<{ postId: string }>(`/api/trips/${tripId}/publish`, {
         title: shape.title.trim(),
         summary: shape.summary.trim(),
@@ -178,7 +282,7 @@ export function PublishForm({
         coverPhotoId: shape.coverPhotoId,
         visibility: shape.visibility,
         storyIds: pickedStories,
-        placePhotoIds: pickedShots,
+        placePhotoIds: pickedShots.filter((id) => !inStories.has(id)),
       });
       onDone(res.postId);
     } catch (e) {
@@ -284,8 +388,20 @@ export function PublishForm({
                         ) : null}
                         <Grow gap={1}>
                           <Caption numberOfLines={2}>{s.text ?? '사진만 올린 글'}</Caption>
+                          {/*
+                            어디서 올린 글인지 적습니다.
+
+                            <p>장소에 묶인 글은 사진이 아래 격자에도 서 있어서,
+                            여기서 고르면 같은 사진을 두 자리에서 고른 셈이
+                            됩니다. 어느 장소의 글인지가 보이면 그 격자에 켜져
+                            있는 것이 무엇인지도 읽힙니다 — 고르면 사진은 글과
+                            함께 가고 격자에서는 빠집니다({@code submit}).
+                          */}
                           {s.photoIds.length > 0 ? (
-                            <Caption tone="muted">사진 {s.photoIds.length}장</Caption>
+                            <Caption tone="muted">
+                              사진 {s.photoIds.length}장
+                              {s.placeName ? ` · ${s.placeName}에서` : ''}
+                            </Caption>
                           ) : null}
                         </Grow>
                       </Row>
@@ -305,13 +421,24 @@ export function PublishForm({
             읽는 사람이 가장 보고 싶은 것이 그것인데 말입니다.
 
             <p>한 장씩 고릅니다. 고른 것만 올라갑니다.
+
+            <h3>그 장소에서 올린 사진은 미리 골라 둡니다</h3>
+
+            <p>일정의 장소 줄에서 피드를 올리면 그 사진이 그 장소에 묶입니다
+            ({@code Post.placeId}). 올린 사람이 이미 「이 사진은 이 장소의 것」
+            이라고 고른 것이라, 여기서 같은 사진을 다시 찾아 누르게 하는 것은
+            같은 결정을 두 번 하라는 말입니다.
+
+            <p>챙겨 둔 사진은 그대로 꺼져 있습니다 — 그쪽은 예매 화면이 섞인
+            더미입니다. 「나만」으로 닫아 둔 글의 사진도 꺼져 있습니다.
           */}
           {withShots.length > 0 ? (
             <>
               <Caption tone="secondary">
-                장소에 챙겨 둔 사진을 같이 실을까요? 고른 것만 공개돼요.
+                장소마다 실을 사진이에요. 고른 것만 공개돼요. 그 장소에서 올린 사진은 미리
+                골라 뒀어요.
               </Caption>
-              {withShots.map(({ day, place, shots }) => {
+              {withShots.map(({ day, place, shots, fromFeed, kept }) => {
                 /* 이 장소 것이 다 골라져 있으면 끄는 쪽을 냅니다. 같은 자리에
                    켜기와 끄기를 나란히 두면 둘 중 무엇이 지금인지 안 보입니다. */
                 const allOn = shots.every((id) => pickedShots.includes(id));
@@ -321,6 +448,12 @@ export function PublishForm({
                       <Grow>
                         <Caption tone="muted" numberOfLines={1}>
                           {day.date || day.label} · {place.name}
+                          {/* 두 더미가 섞여 있을 때만 적습니다. 한 쪽뿐이면
+                              적어 줄 것이 없고, 줄마다 괄호가 붙으면 장소
+                              이름이 안 읽힙니다. */}
+                          {fromFeed.length > 0 && kept.length > 0
+                            ? ` · 올린 사진 ${fromFeed.length}장 · 챙겨 둔 것 ${kept.length}장`
+                            : ''}
                         </Caption>
                       </Grow>
                       {/*

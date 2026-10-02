@@ -2,6 +2,7 @@ import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
+import { forget, remember, remembered, stillOn } from '@/lib/notify-token';
 import type { ApiClient } from '@/lib/notify.web';
 
 export type { ApiClient } from '@/lib/notify.web';
@@ -31,6 +32,18 @@ export type { ApiClient } from '@/lib/notify.web';
  * <p>폰은 한 번 거절하면 시스템 설정까지 들어가야 되돌립니다. 무엇에 쓰는
  * 것인지 모르는 채로 물으면 대개 거절하고, 그러면 그 기기에서는 사실상
  * 못 켭니다. 웹이 같은 이유로 같은 규칙을 씁니다.
+ *
+ * <h3>지금 앱은 이 파일을 안 씁니다</h3>
+ *
+ * <p>앱은 웹을 띄우는 껍데기가 되었습니다(index.js). 화면이 전부 웹뷰 안에서
+ * 도므로 설정 화면이 부르는 것은 짝인 {@code notify.web.ts} 이고, 그쪽이
+ * 껍데기({@code shell/push.ts})에게 열쇠를 부탁합니다. 이 파일은 <b>앱이
+ * 화면을 직접 그리게 되는 날</b>을 위한 자리이고, 그때까지는 Metro 가 앱
+ * 묶음을 만들 때 짝으로 필요합니다({@code lib/pick-photo.ts} 와 같습니다).
+ *
+ * <p>그래서 켠 것을 기억하는 규칙을 양쪽이 <b>같은 것</b>으로 씁니다
+ * ({@code lib/notify-token.ts}). 한쪽만 고치면 앱이 화면을 직접 그리게 되는
+ * 날 같은 고장이 다시 납니다.
  */
 
 /*
@@ -51,13 +64,32 @@ Notifications.setNotificationHandler({
 
 export const canNotify = true;
 
-/** 이 기기에서 켜 둔 토큰. 껐다 켤 때 같은 것을 다시 씁니다. */
-let token: string | null = null;
+/**
+ * 막혔을 때 어디서 푸는지.
+ *
+ * <p>웹 쪽 짝은 주소창의 자물쇠를 가리킵니다. 폰에는 주소창이 없습니다.
+ */
+export const unblockHint = '폰 설정의 이 앱 알림이 꺼져 있어요. 거기서 켜면 받을 수 있어요.';
 
-export async function notifyState(): Promise<'off' | 'on' | 'blocked'> {
+/**
+ * 지금 어떤 상태인지.
+ *
+ * <h3>켠 것을 기억하지 않았습니다</h3>
+ *
+ * <p>켠 열쇠를 모듈 변수 한 줄에 들고 있었습니다. 앱을 닫고 다시 열면 그
+ * 줄이 비므로, 폰이 허락해 둔 상태여도 여기가 'off' 를 돌려줬습니다 —
+ * 서버에는 등록이 멀쩡히 남아 있는데 스위치만 꺼져 보였습니다.
+ *
+ * <p>기기에 남기고, 서버가 그것을 아직 들고 있는지 되묻습니다. 둘을 같이
+ * 보는 까닭은 {@link import('./notify-token')} 에 적어 두었습니다.
+ *
+ * @param api 서버에 되물을 자리
+ */
+export async function notifyState(api: ApiClient): Promise<'off' | 'on' | 'blocked'> {
   const { status, canAskAgain } = await Notifications.getPermissionsAsync();
   if (status === 'granted') {
-    return token ? 'on' : 'off';
+    const token = remembered();
+    return token && (await stillOn(api, token)) ? 'on' : 'off';
   }
   /*
     다시 물을 수 없으면 막힌 것입니다.
@@ -68,7 +100,15 @@ export async function notifyState(): Promise<'off' | 'on' | 'blocked'> {
   return canAskAgain ? 'off' : 'blocked';
 }
 
-export async function turnOn(api: ApiClient): Promise<'on' | 'blocked' | 'failed'> {
+/**
+ * 알림을 켭니다.
+ *
+ * <p>{@code 'tooOld'} 는 웹 쪽 짝과 생김새를 맞추려고 둡니다 — 거기서는
+ * 「앱 껍데기가 이 일을 모른다」는 뜻이고, 화면이 그 경우에 「앱을 새로
+ * 받아 주세요」라고 말합니다. 앱이 화면을 직접 그리는 길에서는 껍데기가
+ * 없으니 여기서는 안 나옵니다.
+ */
+export async function turnOn(api: ApiClient): Promise<'on' | 'blocked' | 'failed' | 'tooOld'> {
   try {
     const asked = await Notifications.requestPermissionsAsync();
     if (asked.status !== 'granted') {
@@ -97,11 +137,13 @@ export async function turnOn(api: ApiClient): Promise<'on' | 'blocked' | 'failed
     const got = await Notifications.getExpoPushTokenAsync(
       projectId ? { projectId } : undefined,
     );
-    token = got.data;
 
     /* 서버는 생김새로 갈래를 알아봅니다 — ExponentPushToken[...] 이면 앱.
        브라우저 열쇠 자리는 비워 둡니다. */
-    await api.post('/api/push/subscribe', { endpoint: token, p256dh: null, auth: null });
+    await api.post('/api/push/subscribe', { endpoint: got.data, p256dh: null, auth: null });
+    /* 등록이 된 뒤에 남깁니다. 먼저 남기면 등록이 실패한 열쇠를 들고
+       「켜져 있어요」를 말하게 됩니다. */
+    remember(got.data);
     return 'on';
   } catch {
     return 'failed';
@@ -109,6 +151,7 @@ export async function turnOn(api: ApiClient): Promise<'on' | 'blocked' | 'failed
 }
 
 export async function turnOff(api: ApiClient): Promise<void> {
+  const token = remembered();
   if (!token) {
     return;
   }
@@ -118,5 +161,7 @@ export async function turnOff(api: ApiClient): Promise<void> {
     /* 못 껐으면 서버는 계속 보냅니다. 다만 기기가 안 받게 하는 길은 설정
        쪽이라, 여기서 더 할 수 있는 것이 없습니다. */
   }
-  token = null;
+  /* 서버에서 빼지 못했어도 기기에서는 지웁니다. 끈 사람에게 켜진 스위치를
+     다시 보여 주지 않는 것이 먼저입니다. */
+  forget();
 }

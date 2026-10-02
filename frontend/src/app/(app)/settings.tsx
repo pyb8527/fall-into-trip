@@ -4,16 +4,20 @@ import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { api, API_BASE, ApiError, UNEXPECTED } from '@/api/client';
+import type { TripSummary } from '@/api/types';
 import { GoogleButton } from '@/components/google-button';
 import { canSignInWithKakao, KakaoButton } from '@/components/kakao-button';
+import { ProfileFace } from '@/components/profile-face';
+import { addToCalendar, canAddToCalendar } from '@/lib/calendar';
+import { formatSpan, todayIso } from '@/lib/countdown';
 import { canParseHere, dropModel, fetchModel, intentState, modelNote } from '@/lib/intent';
 import type { IntentState } from '@/lib/intent-types';
 import { canLinkKakao } from '@/lib/kakao-signin';
-import { canNotify, notifyState, turnOff, turnOn } from '@/lib/notify';
+import { canNotify, notifyState, turnOff, turnOn, unblockHint } from '@/lib/notify';
 import { shareLink } from '@/lib/share';
 import { useAuth } from '@/auth/auth-provider';
 import { USER_MARKS, markOf } from '@/constants/user-marks';
-import { Colors, Radius, Spacing, Tap, Type } from '@/constants/theme';
+import { Colors, Spacing, Tap, Type } from '@/constants/theme';
 import {
   Badge,
   Band,
@@ -80,13 +84,21 @@ export default function Settings() {
         합니다 — 「계정」 묶음으로 내려보냅니다.
       */}
       <Row gap={Spacing.s4} style={styles.me}>
-        <View style={styles.face}>
-          {user?.mark ? (
-            <Text style={styles.faceEmoji}>{markOf(user.mark)}</Text>
-          ) : (
-            <LogoSymbol size={34} />
-          )}
-        </View>
+        {/*
+          얼굴.
+
+          <p>동그라미와 이모지 크기를 이 화면이 직접 그리고 있었습니다.
+          마이페이지가 같은 것을 또 그리고 있어 둘이 조금씩 달랐고, <b>사진을
+          받게 되면 세 갈래가 자리마다 따로</b> 생깁니다. 한 칸으로 묶었습니다
+          ({@link ProfileFace}).
+        */}
+        <ProfileFace
+          photoId={user?.photoId}
+          mark={user?.mark ? markOf(user.mark) : null}
+          fallback={<LogoSymbol size={34} />}
+          size={64}
+          label={user?.name ? `${user.name}의 얼굴` : '내 얼굴'}
+        />
         <Grow gap={Spacing.s1}>
           <Row gap={Spacing.s2}>
             <Body strong numberOfLines={1}>
@@ -258,9 +270,16 @@ function NotifyGroup() {
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
 
+  /*
+    스위치가 지금 어떤지.
+
+    <p>기기에 남겨 둔 열쇠만 보면 서버가 지운 것을 모릅니다. 그래서 서버에
+    되묻고, 그 자리를 여기서 넘겨 줍니다 — {@code lib/notify} 가 화면의 api
+    를 그대로 받아 쓰게 두면 그쪽이 로그인·토큰 되살리기를 또 알아야 합니다.
+  */
   useEffect(() => {
     let alive = true;
-    notifyState().then((got) => {
+    notifyState(api).then((got) => {
       if (alive) {
         setState(got);
       }
@@ -287,9 +306,18 @@ function NotifyGroup() {
         return;
       }
       const got = await turnOn(api);
-      setState(got === 'failed' ? 'off' : got);
+      setState(got === 'on' || got === 'blocked' ? got : 'off');
       if (got === 'failed') {
         setFailed('알림을 켜지 못했어요. 잠시 뒤 다시 눌러 주세요.');
+      } else if (got === 'tooOld') {
+        /*
+          고칠 자리가 폰이 아니라 앱 판입니다.
+
+          <p>알림은 네이티브 권한이라 OTA 로 안 들어갑니다. 이 코드보다
+          먼저 구워진 앱에서는 켤 길이 없는데, 거기서 「폰 설정에서 켜
+          주세요」라고 말하면 멀쩡한 설정을 한참 뒤지게 합니다.
+        */
+        setFailed('앱을 새로 받으면 켤 수 있어요. 지금 깔린 판에는 이 길이 아직 없어요.');
       }
     } finally {
       setBusy(false);
@@ -302,12 +330,16 @@ function NotifyGroup() {
       <SectionHeader title="알림" tight />
 
       {state === 'blocked' ? (
-        /* 우리가 할 수 있는 것이 없습니다. 어디서 푸는지만 알려 줍니다. */
+        /*
+          우리가 할 수 있는 것이 없습니다. 어디서 푸는지만 알려 줍니다.
+
+          <p>문구를 여기 적어 두고 있었습니다 — 「주소창 왼쪽의 자물쇠」.
+          앱에는 주소창이 없으므로 <b>앱에서 막힌 사람에게 없는 것을
+          누르라고</b> 말하고 있었습니다. 어디서 푸는지는 쪽마다 다르니
+          쪽을 아는 {@code lib/notify} 가 적습니다.
+        */
         <View style={styles.fact}>
-          <Caption tone="danger">
-            이 브라우저에서 알림을 막아 뒀어요. 주소창 왼쪽의 자물쇠를 눌러 알림을 허용으로
-            바꾸면 켤 수 있어요.
-          </Caption>
+          <Caption tone="danger">{unblockHint}</Caption>
         </View>
       ) : (
         <Switch
@@ -452,10 +484,28 @@ function DeviceGroup() {
 }
 
 /**
- * 내 폰 캘린더에 넣기 — 캘린더 구독(.ics).
+ * 내 폰 캘린더에 넣기 — 길이 둘입니다.
  *
  * <p>앱 안 달력은 앱을 열어야 보이고, 이것은 폰 캘린더에 뜹니다. 회사 일정
  * 옆에 「제주 2박 3일」이 보여야 그 주에 다른 약속을 안 잡습니다.
+ *
+ * <h3>구독과 꽂기</h3>
+ *
+ * <p>구독만 있었습니다. 주소 하나를 내주고 사람이 그것을 캘린더 앱에
+ * 등록합니다 — 그 과정이 폰에서 자연스럽지 않다는 말이 맞습니다. 그래서
+ * <b>그 자리에서 꽂는 길</b>을 함께 둡니다({@code lib/calendar}).
+ *
+ * <table>
+ *   <tr><td>구독</td><td>일정이 바뀌면 캘린더도 <b>따라 바뀜</b>.
+ *       등록이 한 번 번거롭고, 구글 캘린더는 몇 시간에 한 번만 읽어
+ *       갑니다</td></tr>
+ *   <tr><td>꽂기</td><td><b>그 자리에서</b> 들어감. 대신 한 번뿐 — 그 뒤에
+ *       날짜가 바뀌어도 캘린더는 모릅니다. 앱에서만 됩니다</td></tr>
+ * </table>
+ *
+ * <p>하나를 고르는 것이 아니라 쓰는 자리가 다릅니다. 둘을 나란히 두고
+ * <b>그 차이를 글로 적습니다</b> — 안 적으면 같은 일을 하는 단추 두 개로
+ * 보이고, 그러면 먼저 보이는 쪽을 누릅니다.
  *
  * <p>주소는 만들 때 한 번만 보여 줍니다. 서버에는 해시만 있어서 다시 꺼낼
  * 수가 없습니다 — 잃어버렸으면 새로 만들고, 그러면 옛 주소는 죽습니다.
@@ -522,9 +572,21 @@ function CalendarGroup() {
       />
 
       <BottomSheet visible={open} title="내 폰 캘린더에 넣기" onClose={() => setOpen(false)}>
+        {/*
+          꽂기를 먼저 둡니다.
+
+          <p>지금 폰에서 여행 하나를 캘린더에 보이게 하려는 사람이 대부분이고,
+          그 사람에게는 이쪽이 세 번 누르면 끝입니다. 구독은 주소를 받아 캘린더
+          앱의 「URL로 구독」을 찾아 들어가야 합니다 — 할 수 있는 사람은 그
+          아래에서 찾습니다.
+        */}
+        {canAddToCalendar ? <PutInCalendar /> : null}
+
+        <SectionHeader title="주소로 구독하기" tight />
         <Body small tone="secondary">
-          내가 가는 여행이 폰 캘린더에 하루 종일 일정으로 떠요. 「못 가요」라고 한 여행은 빠지고,
-          가계부·위치·메모는 안 들어가요.
+          주소 하나를 캘린더 앱에 등록해 두면, 나중에 일정이 바뀌어도 캘린더가 따라 바뀌어요. 내가
+          가는 여행이 하루 종일 일정으로 떠요. 「못 가요」라고 한 여행은 빠지고, 가계부·위치·메모는
+          안 들어가요.
         </Body>
         {url ? (
           <>
@@ -570,6 +632,124 @@ function CalendarGroup() {
         {error ? <ErrorNote message={error} /> : null}
         {on ? <Button label="끄기" variant="dangerText" busy={busy} onPress={revoke} /> : null}
       </BottomSheet>
+    </>
+  );
+}
+
+/**
+ * 여행 하나를 그 자리에서 꽂기.
+ *
+ * <h3>앞으로 갈 것만 냅니다</h3>
+ *
+ * <p>지난 여행을 캘린더에 꽂을 일이 없습니다. 날짜를 안 정한 여행도 못
+ * 꽂습니다 — 넣을 날이 없습니다. 둘을 걸러 내면 대개 두세 줄이 남습니다.
+ *
+ * <h3>꽂았다고 함부로 말하지 않습니다</h3>
+ *
+ * <p>꽂는 일은 폰의 「일정 추가」 판이 합니다. iOS 는 저장했는지를
+ * 알려 주지만 <b>안드로이드는 알려 주지 않습니다</b> — 저장했는지 닫았는지
+ * 구별이 안 됩니다({@code lib/calendar} 의 'handed'). 그때 「넣었어요」라고
+ * 적으면, 판을 닫은 사람에게 안 들어간 것을 들어갔다고 말하는 것입니다.
+ *
+ * <h3>같은 여행을 두 번 꽂는 것은 막지 않습니다</h3>
+ *
+ * <p>막으려면 무엇을 꽂았는지 기기에 적어 둬야 하는데, 사람이 캘린더에서
+ * 지웠는지는 우리가 알 수 없습니다. 그러면 「이미 넣었어요」라고 적힌 채로
+ * 캘린더에는 없는 자리가 생깁니다. 두 번 꽂히면 캘린더 앱에서 하나 지우는
+ * 것이 그보다 쉽습니다.
+ */
+function PutInCalendar() {
+  const [trips, setTrips] = useState<TripSummary[] | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+  const [failed, setFailed] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    api
+      .get<{ trips: TripSummary[] }>('/api/trips')
+      .then((got) => {
+        if (alive) {
+          setTrips(got.trips);
+        }
+      })
+      .catch(() => {
+        /* 못 받아 왔으면 이 칸만 안 그립니다. 아래 구독은 멀쩡합니다. */
+        if (alive) {
+          setTrips([]);
+        }
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  async function put(trip: TripSummary) {
+    if (busy || !trip.startIso) {
+      return;
+    }
+    setNote(null);
+    setFailed(null);
+    setBusy(trip.id);
+    try {
+      const done = await addToCalendar({
+        /* 표식을 앞에 붙입니다 — ICS 쪽이 하는 것과 같습니다
+           (CalendarService 의 SUMMARY). */
+        title: trip.emoji ? `${trip.emoji} ${trip.title}` : trip.title,
+        startIso: trip.startIso,
+        /* 날짜를 하나만 정한 여행은 하루짜리입니다. */
+        endIso: trip.endIso ?? trip.startIso,
+        notes: 'FIT 에서 짠 일정이에요. 바뀐 것은 앱에서 보세요.',
+        url: `${API_BASE}/trip/${trip.id}`,
+      });
+
+      if (done === 'added') {
+        setNote('캘린더에 넣었어요.');
+      } else if (done === 'handed') {
+        /* 저장했는지 모릅니다. 모르는 것을 아는 척하지 않습니다. */
+        setNote('캘린더 앱으로 넘겼어요. 거기서 저장하면 들어가요.');
+      } else if (done === 'tooOld') {
+        setFailed('앱을 새로 받아야 이 길이 열려요. 그때까지는 아래 주소로 구독해 주세요.');
+      } else if (done === 'failed') {
+        setFailed('캘린더를 열지 못했어요. 잠시 뒤 다시 눌러 주세요.');
+      }
+      /* 'cancelled' 는 아무 말도 안 합니다. 닫은 것은 고장이 아닙니다. */
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const soon = (trips ?? []).filter((t) => t.startIso && (t.endIso ?? t.startIso) >= todayIso());
+
+  if (trips === null) {
+    return null;
+  }
+
+  return (
+    <>
+      <SectionHeader title="여행 하나 꽂기" tight />
+      <Body small tone="secondary">
+        누르면 폰의 일정 추가 판이 떠요. 어느 캘린더에 넣을지는 거기서 고르면 돼요. 한 번 꽂는
+        것이라 나중에 일정이 바뀌어도 캘린더는 그대로예요.
+      </Body>
+
+      {soon.length === 0 ? (
+        <Caption tone="muted">날짜를 정한 다가오는 여행이 없어요.</Caption>
+      ) : (
+        soon.map((trip, i) => (
+          <Line
+            key={trip.id}
+            label={trip.title}
+            value={formatSpan(trip.startIso, trip.endIso)}
+            last={i === soon.length - 1}
+            onPress={() => put(trip)}
+          />
+        ))
+      )}
+
+      {busy ? <Caption tone="secondary">캘린더를 여는 중이에요.</Caption> : null}
+      {note ? <Caption tone="success">{note}</Caption> : null}
+      {failed ? <ErrorNote message={failed} /> : null}
     </>
   );
 }
@@ -860,19 +1040,6 @@ const styles = StyleSheet.create({
   me: {
     minHeight: 88,
     alignItems: 'center',
-  },
-  face: {
-    width: 64,
-    height: 64,
-    borderRadius: Radius.full,
-    backgroundColor: Colors.fill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  faceEmoji: {
-    fontSize: 30,
-    /* 이모지는 글꼴이 제 높이를 갖고 있어, 줄 높이를 두면 아래로 처집니다. */
-    lineHeight: undefined,
   },
   /*
     값만 적는 줄.

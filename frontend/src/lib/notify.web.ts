@@ -1,3 +1,4 @@
+import { forget, remember, remembered, stillOn } from '@/lib/notify-token';
 import { askShell, inShell } from '@/lib/shell-bridge.web';
 
 /**
@@ -30,8 +31,18 @@ export type ApiClient = {
 
   <p>서버는 이미 둘 다 받습니다 — 열쇠 생김새로 가립니다.
 */
-/** 앱 껍데기에서 받아 둔 열쇠. 껐다 켤 때 같은 것을 서버에서 뺍니다. */
-let shellToken: string | null = null;
+/*
+  받아 둔 열쇠는 기기에 남깁니다.
+
+  <p>모듈 변수 한 줄({@code let shellToken})에 들고 있었습니다. 그런데 앱은
+  이 웹을 띄우는 껍데기라 <b>앱을 켤 때마다 웹이 처음부터 다시 뜹니다.</b>
+  그러면 그 줄이 비고, 폰이 허락해 둔 상태여도 스위치가 꺼진 채로 보였습니다 —
+  서버에는 등록이 멀쩡히 남아 있는데 말입니다. 「안 켜짐」으로 올라온 바로
+  그 모습입니다.
+
+  <p>남기는 자리와 서버에 되묻는 규칙은 {@link import('./notify-token')} 에
+  있습니다. 앱 쪽(notify.ts)과 같은 것을 써야 하므로 따로 두었습니다.
+*/
 
 export const canNotify =
   inShell ||
@@ -39,6 +50,16 @@ export const canNotify =
     'serviceWorker' in navigator &&
     'PushManager' in window &&
     'Notification' in window);
+
+/**
+ * 막혔을 때 어디서 푸는지.
+ *
+ * <p>「주소창 옆 자물쇠」라고만 적어 두었습니다. 앱에는 주소창이 없습니다 —
+ * 앱에서 막힌 사람에게 없는 것을 누르라고 말하고 있었습니다.
+ */
+export const unblockHint = inShell
+  ? '폰 설정의 이 앱 알림이 꺼져 있어요. 거기서 켜면 받을 수 있어요.'
+  : '이 브라우저에서 알림을 막아 뒀어요. 주소창 왼쪽의 자물쇠를 눌러 알림을 허용으로 바꾸면 켤 수 있어요.';
 
 /**
  * 지금 어떤 상태인지.
@@ -49,12 +70,23 @@ export const canNotify =
  *       없고, 주소창 옆 자물쇠에서 사람이 직접 풀어야 합니다.</li>
  *   <li><b>off</b> — 아직 안 켰습니다.</li>
  * </ul>
+ *
+ * @param api 서버에 되물을 자리. 기기에 남은 열쇠만 보면 서버가 지운 것을
+ *            모릅니다 — {@link import('./notify-token').stillOn} 을 보세요
  */
-export async function notifyState(): Promise<'off' | 'on' | 'blocked'> {
+export async function notifyState(api: ApiClient): Promise<'off' | 'on' | 'blocked'> {
   if (inShell) {
-    /* 폰의 허락 상태는 껍데기만 압니다. 스위치를 눌러 봐야 알 수 있어서,
-       여기서는 이 기기에 등록해 둔 열쇠가 있는지로 답합니다. */
-    return shellToken ? 'on' : 'off';
+    /*
+      폰의 허락 상태는 껍데기만 압니다. 스위치를 눌러 봐야 알 수 있어서,
+      여기서는 이 기기에 등록해 둔 열쇠로 답합니다.
+
+      <p>그래서 앱에서는 'blocked' 가 안 나옵니다. 폰에서 거절해 둔 사람은
+      꺼진 스위치를 보고, 눌렀을 때 비로소 막혔다는 말을 듣습니다. 이미
+      거절한 기기에서는 다시 눌러도 창이 안 뜨므로(폰이 바로 거절로
+      답합니다) 그 한 번이 사람을 더 몰아세우지는 않습니다.
+    */
+    const token = remembered();
+    return token && (await stillOn(api, token)) ? 'on' : 'off';
   }
   if (!canNotify) {
     return 'off';
@@ -67,19 +99,33 @@ export async function notifyState(): Promise<'off' | 'on' | 'blocked'> {
   return sub ? 'on' : 'off';
 }
 
-/** 알림을 켭니다. */
-export async function turnOn(api: ApiClient): Promise<'on' | 'blocked' | 'failed'> {
+/**
+ * 알림을 켭니다.
+ *
+ * <p><b>tooOld</b> 는 앱 껍데기가 이 일을 모른다는 뜻입니다. 알림은 네이티브
+ * 권한이라 OTA 로 안 들어가므로, 이 코드보다 먼저 구워진 앱에서는 켤 길이
+ * 없습니다 — 그때 「폰 설정에서 켜 주세요」(blocked)라고 말하면 멀쩡한
+ * 설정을 뒤지게 합니다. 고칠 자리가 폰이 아니라 <b>앱 판</b>입니다.
+ */
+export async function turnOn(api: ApiClient): Promise<'on' | 'blocked' | 'failed' | 'tooOld'> {
   if (inShell) {
     try {
-      const token = (await askShell({ kind: 'notifyOn' })) as string | null;
-      if (!token) {
+      const said = await askShell({ kind: 'notifyOn' });
+      if (said === null) {
         /* 폰에서 거절했습니다. 한 번 거절하면 설정까지 들어가야 되돌립니다. */
         return 'blocked';
       }
+      if (typeof said !== 'string' || !said) {
+        /* 답이 비어서 옵니다 — 이 말을 모르는 옛 껍데기입니다. */
+        return 'tooOld';
+      }
+      const token = said;
       /* 서버에 등록하는 것은 웹이 합니다 — 로그인 상태를 들고 있는 쪽이
          여기입니다. 껍데기는 열쇠만 만들어 줍니다. */
       await api.post('/api/push/subscribe', { endpoint: token, p256dh: null, auth: null });
-      shellToken = token;
+      /* 등록이 된 뒤에 남깁니다. 먼저 남기면 등록이 실패한 열쇠를 들고
+         「켜져 있어요」를 말하게 됩니다. */
+      remember(token);
       return 'on';
     } catch {
       return 'failed';
@@ -149,9 +195,13 @@ export async function turnOn(api: ApiClient): Promise<'on' | 'blocked' | 'failed
 /** 이 기기에서는 그만 받습니다. */
 export async function turnOff(api: ApiClient): Promise<void> {
   if (inShell) {
-    if (shellToken) {
-      await api.post('/api/push/unsubscribe', { endpoint: shellToken }).catch(() => {});
-      shellToken = null;
+    const token = remembered();
+    if (token) {
+      await api.post('/api/push/unsubscribe', { endpoint: token }).catch(() => {});
+      /* 서버에서 빼지 못했어도 기기에서는 지웁니다. 끈 사람에게 켜진
+         스위치를 다시 보여 주지 않는 것이 먼저입니다 — 서버 쪽은 다시
+         켤 때 같은 열쇠로 덮어씁니다(PushService 가 endpoint 로 찾습니다). */
+      forget();
     }
     await askShell({ kind: 'notifyOff' }).catch(() => {});
     return;
