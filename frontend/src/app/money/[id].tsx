@@ -1132,7 +1132,6 @@ function byDay(list: Spend[], days: TripDetail['days']) {
   한 번 풀어 주고 금액 글자들이 같은 것을 씁니다 — 1 과 8 의 폭이 같아야
   위아래로 견줄 때 자리가 맞습니다.
 */
-const tabular: TextStyle = { fontVariant: [...Tabular.fontVariant] };
 
 const styles = StyleSheet.create({
 
@@ -1150,7 +1149,7 @@ const styles = StyleSheet.create({
   },
   total: {
     ...Type.title1,
-    ...tabular,
+    ...Tabular,
     fontWeight: Weight.bold,
     color: Colors.text,
   },
@@ -1160,7 +1159,7 @@ const styles = StyleSheet.create({
   },
   myAmount: {
     ...Type.headline,
-    ...tabular,
+    ...Tabular,
     fontWeight: Weight.semibold,
   },
   /** 받을 돈. 완료·정해짐과 같은 초록입니다. */
@@ -1218,7 +1217,7 @@ const styles = StyleSheet.create({
      한눈에 어느 것이 큰지 안 보입니다. */
   amount: {
     ...Type.headline,
-    ...tabular,
+    ...Tabular,
     fontWeight: Weight.semibold,
     color: Colors.text,
     textAlign: 'right',
@@ -1240,7 +1239,7 @@ const styles = StyleSheet.create({
   */
   amountInput: {
     ...Type.title1,
-    ...tabular,
+    ...Tabular,
     fontWeight: Weight.bold,
     color: Colors.text,
     paddingVertical: Spacing.s1,

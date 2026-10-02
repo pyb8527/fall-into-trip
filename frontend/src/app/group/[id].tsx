@@ -3,8 +3,9 @@ import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { api, ApiError, UNEXPECTED } from '@/api/client';
-import type { Group, Mate, Trip } from '@/api/types';
+import type { Group, Mate, Trip, TripSummary } from '@/api/types';
 import { useAsync } from '@/api/use-async';
+import { TripCalendar } from '@/components/trip-calendar';
 import { useAuth } from '@/auth/auth-provider';
 import { FeedList } from '@/components/feed-list';
 import { GroupForm } from '@/components/group-form';
@@ -70,10 +71,11 @@ import { stackHeader } from '@/ui/nav';
  * 사람 눈에는 안 걸립니다.
  */
 /** 모임 안에서 볼 것. 여행이 먼저입니다. */
-type Lane = 'trips' | 'feed';
+type Lane = 'trips' | 'calendar' | 'feed';
 
 const LANES: { value: Lane; label: string }[] = [
   { value: 'trips', label: '여행' },
+  { value: 'calendar', label: '달력' },
   { value: 'feed', label: '피드' },
 ];
 
@@ -95,6 +97,24 @@ export default function GroupScreen() {
   );
 
   const [lane, setLane] = useState<Lane>('trips');
+
+  /*
+    이 모임의 여행을 날짜와 함께.
+
+    <h3>왜 모임 응답을 안 쓰는가</h3>
+
+    <p>모임 상세가 돌려주는 여행에는 <b>번호와 이름만</b> 있습니다. 달력은
+    날짜가 있어야 그립니다.
+
+    <p>모임 응답에 날짜를 더하는 길도 있지만, {@code /api/trips} 가 이미
+    여행마다 날짜·모임 번호를 돌려줍니다. 그것을 모임으로 거르면 서버를
+    안 고치고 끝납니다 — 달력 칸 하나 때문에 길을 바꾸지 않습니다.
+  */
+  const all = useAsync<{ trips: TripSummary[] }>(
+    (signal) => api.get('/api/trips', signal),
+    [],
+  );
+  const ours = (all.data?.trips ?? []).filter((t) => t.groupId === id);
   const [editing, setEditing] = useState(false);
   const [mates, setMates] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -200,7 +220,14 @@ export default function GroupScreen() {
 
           <Tabs items={LANES} value={lane} onChange={setLane} />
 
-          {lane === 'trips' ? (
+          {lane === 'calendar' ? (
+            /* 우리 모임은 언제 뭐 하지. 모임 이름은 안 붙입니다 — 여기
+               있는 것이 전부 이 모임 것입니다. */
+            <TripCalendar
+              trips={ours}
+              onOpen={(t) => router.push({ pathname: '/trip/[id]', params: { id: t.id } })}
+            />
+          ) : lane === 'trips' ? (
             <>
               {data.trips.length === 0 ? (
                 <Empty

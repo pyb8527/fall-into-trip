@@ -1,4 +1,4 @@
-import { Platform } from 'react-native';
+import { Platform, type TextStyle } from 'react-native';
 
 /**
  * 디자인 토큰.
@@ -482,7 +482,21 @@ export const Type = {
 } as const;
 
 /** 숫자가 자릿수로 줄 맞춰야 하는 자리 — 금액, 시간, 개수. */
-export const Tabular = { fontVariant: ['tabular-nums'] as const };
+/*
+  숫자가 자릿수로 줄 맞춰야 하는 자리 — 금액, 시간, 개수.
+
+  <p>{@link TextStyle} 로 못 박습니다. {@code as const} 로 두었더니 배열이
+  {@code readonly} 가 되어 TextStyle 에 안 맞았고, 그러면 이것을
+  {@code StyleSheet.create} 안에서 펼칠 때 <b>그 묶음 전체</b>의 타입이
+  무너집니다 — create 가 갈래를 못 정해 모든 칸이
+  {@code ViewStyle | TextStyle | ImageStyle} 가 되고, 그 파일의 style 이
+  하나도 안 맞게 됩니다.
+
+  <p>두 화면이 이미 {@code { fontVariant: [...Tabular.fontVariant] }} 를
+  손으로 다시 만들어 쓰고 있었습니다. 같은 우회가 둘이면 고칠 곳은
+  우회가 아니라 여기입니다.
+*/
+export const Tabular: TextStyle = { fontVariant: ['tabular-nums'] };
 
 /* ---------------------------------------------------------------- 치수 */
 

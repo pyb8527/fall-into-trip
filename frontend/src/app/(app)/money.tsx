@@ -154,14 +154,13 @@ export default function MoneyList() {
   타입이 안 맞습니다. 한 번 풀어 주고 금액 글자들이 같은 것을 씁니다 —
   값은 토큰에 하나만 둡니다.
 */
-const tabular: TextStyle = { fontVariant: [...Tabular.fontVariant] };
 
 const styles = StyleSheet.create({
   /*
     금액은 오른쪽 끝에.
 
     <p>자릿수가 다른 숫자들이 왼쪽에서 시작하면 위아래로 견줄 수가 없습니다.
-    고정폭 숫자(tabular-nums)까지 함께 줘야 1 과 8 의 폭이 같아져 자리가
+    고정폭 숫자(Tabular-nums)까지 함께 줘야 1 과 8 의 폭이 같아져 자리가
     맞습니다.
   */
   sums: {
@@ -170,7 +169,7 @@ const styles = StyleSheet.create({
   },
   sum: {
     ...Type.headline,
-    ...tabular,
+    ...Tabular,
     fontWeight: Weight.semibold,
     color: Colors.text,
   },

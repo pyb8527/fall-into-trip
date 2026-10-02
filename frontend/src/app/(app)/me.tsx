@@ -3,10 +3,11 @@ import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { api } from '@/api/client';
-import type { Profile } from '@/api/types';
+import type { Profile, TripSummary } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
 import { FeedList } from '@/components/feed-list';
+import { TripCalendar } from '@/components/trip-calendar';
 import { Colors, Radius, Spacing, Type } from '@/constants/theme';
 import { markOf } from '@/constants/user-marks';
 import {
@@ -28,7 +29,7 @@ import { NavLeft } from '@/ui/nav';
 import { LogoMark } from '@/ui/logo';
 
 /** 어느 묶음을 보고 있나. */
-type Lane = 'feed' | 'reviews';
+type Lane = 'feed' | 'calendar' | 'reviews';
 
 /**
  * 마이페이지 (G-10).
@@ -64,6 +65,20 @@ export default function Me() {
 
   const [lane, setLane] = useState<Lane>('feed');
   const me = profile.data;
+
+  /*
+    내 여행 전부.
+
+    <p>달력 칸만 씁니다. 내 것일 때만 받아 옵니다 — 남의 여행 목록을 받는
+    길은 없고, 있어도 보여 줄 것이 아닙니다.
+
+    <p>{@code /api/trips} 가 여행마다 날짜와 모임 이름을 이미 돌려줍니다.
+    달력을 위해 새로 받는 것이 없습니다.
+  */
+  const trips = useAsync<{ trips: TripSummary[] }>(
+    (signal) => (whose ? Promise.resolve({ trips: [] }) : api.get('/api/trips', signal)),
+    [whose],
+  );
 
   return (
     <Screen
@@ -123,13 +138,27 @@ export default function Me() {
           <Tabs
             items={[
               { value: 'feed', label: me.mine ? '내 피드' : '피드' },
+              ...(me.mine ? [{ value: 'calendar' as Lane, label: '달력' }] : []),
               { value: 'reviews', label: '리뷰' },
             ]}
             value={lane}
             onChange={setLane}
           />
 
-          {lane === 'feed' ? (
+          {lane === 'calendar' ? (
+            /*
+              나는 언제 어디 가지.
+
+              <p>혼자 여행과 모든 모임 여행이 한 달력에 섞입니다. 그래서
+              모임 이름을 줄에 붙입니다 — 모임 캘린더와 달리 여기서는
+              어느 모임 것인지가 안 보이면 「이게 뭐였지」가 됩니다.
+            */
+            <TripCalendar
+              trips={trips.data?.trips ?? []}
+              showGroup
+              onOpen={(t) => router.push({ pathname: '/trip/[id]', params: { id: t.id } })}
+            />
+          ) : lane === 'feed' ? (
             /*
               내 것일 때만 FeedList 를 씁니다.
 
