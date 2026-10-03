@@ -22,6 +22,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 /**
  * 동행자가 고쳤을 때 알려 주기.
@@ -230,17 +231,35 @@ public class PushService {
         log.info("알림 보내는 중 — 받을 후보 {}명, 그중 구독한 기기 {}개 (trip={})",
                 targets.size(), subscribed.size(), tripId);
 
+        /*
+          사람 단위로 묶어서 10분 제한을 겁니다.
+
+          <h3>기기별로 걸었더니 한 사람의 둘째 기기를 막아 버렸습니다</h3>
+
+          <p>폰과 노트북처럼 한 사람이 기기를 둘 이상 켜 두면, 첫 기기를
+          보내면서 {@code lastSent} 에 "방금 보냈다" 를 찍고, 바로 다음
+          줄에서 <b>같은 사람의 둘째 기기</b>가 그 방금 찍힌 기록을 보고
+          "10분 안에 이미 보냈다" 며 자기 자신에게 막혔습니다. 기기 하나뿐인
+          사람은 이 일이 안 생겨서 여태 안 드러났습니다.
+
+          <p>이제 사람마다 한 번만 제한을 걸고, 막히지 않았으면 그 사람의
+          기기 전부에 보냅니다.
+        */
         Instant now = Instant.now();
-        for (PushSubscription sub : subscribed) {
-            String quietKey = tripId + ":" + sub.getUserId();
+        Map<String, List<PushSubscription>> byUser = subscribed.stream()
+                .collect(Collectors.groupingBy(PushSubscription::getUserId));
+        for (Map.Entry<String, List<PushSubscription>> e : byUser.entrySet()) {
+            String quietKey = tripId + ":" + e.getKey();
             Instant last = lastSent.get(quietKey);
             if (last != null && last.plusSeconds(QUIET_MINUTES * 60).isAfter(now)) {
                 log.info("알림 안 보냄 — {}분 안에 같은 여행으로 이미 보냄 (user={}, trip={})",
-                        QUIET_MINUTES, sub.getUserId(), tripId);
+                        QUIET_MINUTES, e.getKey(), tripId);
                 continue;
             }
             lastSent.put(quietKey, now);
-            send(sub, secret, json(title, body, url));
+            for (PushSubscription sub : e.getValue()) {
+                send(sub, secret, json(title, body, url));
+            }
         }
     }
 
