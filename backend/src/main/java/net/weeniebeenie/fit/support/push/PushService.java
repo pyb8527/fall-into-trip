@@ -203,6 +203,7 @@ public class PushService {
         String secret = privateKey();
         if (secret == null) {
             /* 아무도 켜지 않은 서버입니다. 열쇠도 없습니다. */
+            log.info("알림 안 보냄 — 아직 아무도 켠 적이 없어 열쇠가 없어요 ({})", tripId);
             return;
         }
 
@@ -212,14 +213,30 @@ public class PushService {
                 ? userIds
                 : userIds.stream().filter(id -> !id.equals(actorId)).toList();
         if (targets.isEmpty()) {
+            log.info("알림 안 보냄 — 받을 사람이 없어요 (고친 사람 {}명, 받을 후보 0명, trip={})",
+                    userIds.size(), tripId);
             return;
         }
 
+        /*
+          어디까지 왔는지 남깁니다.
+
+          <p>"안 왔다" 는 신고를 받아도, 받을 사람이 없었는지(그룹에 companion
+          이 없음) · 구독이 없었는지(그 사람이 알림을 안 켬) · 10분 안이라
+          씹었는지 · Expo 로 보냈는데 거절당했는지(sendExpo 쪽에서 남김) —
+          어느 단계인지 이 로그 없이는 가릴 수 없었습니다.
+        */
+        List<PushSubscription> subscribed = subs.findAllByUserIdIn(targets);
+        log.info("알림 보내는 중 — 받을 후보 {}명, 그중 구독한 기기 {}개 (trip={})",
+                targets.size(), subscribed.size(), tripId);
+
         Instant now = Instant.now();
-        for (PushSubscription sub : subs.findAllByUserIdIn(targets)) {
+        for (PushSubscription sub : subscribed) {
             String quietKey = tripId + ":" + sub.getUserId();
             Instant last = lastSent.get(quietKey);
             if (last != null && last.plusSeconds(QUIET_MINUTES * 60).isAfter(now)) {
+                log.info("알림 안 보냄 — {}분 안에 같은 여행으로 이미 보냄 (user={}, trip={})",
+                        QUIET_MINUTES, sub.getUserId(), tripId);
                 continue;
             }
             lastSent.put(quietKey, now);
@@ -379,6 +396,10 @@ public class PushService {
         try {
             JsonNode data = mapper.readTree(body).path("data");
             if (!"error".equals(data.path("status").asText())) {
+                /* 여기까지 왔다는 것 자체가 "Expo 한테까지는 보냈다" 는
+                   증거입니다. 그래도 안 왔다는 신고가 들어오면, 문제는 이
+                   서버 밖(Expo → FCM → 기기) 입니다. */
+                log.info("Expo 에 알림을 넘겼어요 (user={})", sub.getUserId());
                 return;
             }
             String why = data.path("details").path("error").asText(data.path("message").asText("알 수 없음"));
