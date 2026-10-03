@@ -7,6 +7,7 @@ import type {
   PopularKind,
   PopularPlace,
   PopularRegion,
+  SavedPlace,
   TripDetail,
   TripSummary,
 } from '@/api/types';
@@ -17,7 +18,7 @@ import { PlaceDetailSheet, type Looked } from '@/components/place-detail-sheet';
 import { SignUpGate } from '@/components/signup-gate';
 import { glyphOf, labelOf } from '@/constants/place-icons';
 import { Colors, Palette, Spacing, Type, Weight } from '@/constants/theme';
-import { KEEP, WANT } from '@/constants/words';
+import { KEEP, UNKEEP, WANT } from '@/constants/words';
 import type { Comeback } from '@/lib/comeback';
 import { todayIso } from '@/lib/countdown';
 import {
@@ -171,8 +172,38 @@ export default function Popular() {
     days: TripDetail['days'];
   } | null>(null);
 
-  /** 보석함에 담은 곳. 다시 누르면 또 담기지 않게 표만 해 둡니다. */
-  const [kept, setKept] = useState<Set<string>>(new Set());
+  /**
+   * 내가 보석함에 담아 둔 곳 — 번호(key) → 담긴 줄의 번호(savedId).
+   *
+   * <h3>이 화면만의 기억이었습니다</h3>
+   *
+   * <p>세션 동안만 사는 {@code Set} 하나로 「방금 담았다」만 표시했습니다.
+   * 그래서 전에 담아 둔 곳도 화면을 다시 열면 전부 <b>안 담긴 것처럼</b>
+   * 보였습니다 — 홈의 같은 자리에 있던 것과 같은 결함입니다.
+   *
+   * <p>서버가 진짜를 압니다({@code /api/saved}). 로그인했을 때만 받아 오고,
+   * 비로그인 방문자에게는 묻지 않습니다 — 401 만 돌아올 질문입니다.
+   */
+  const { data: saved, reload: reloadSaved } = useAsync<{ places: SavedPlace[] }>(
+    (signal) => (user ? api.get('/api/saved', signal) : Promise.resolve({ places: [] })),
+    [user?.id],
+  );
+
+  /*
+    PopularPlace.key 와 같은 규칙으로 맞춥니다.
+
+    <p>서버가 「지금 뜨는 곳」을 묶는 열쇠는 구글 번호가 있으면 그것, 없으면
+    이름입니다(PopularRepository). 보석함 줄도 같은 규칙으로 맞춰야 두 쪽이
+    같은 곳을 같은 열쇠로 가리킵니다.
+  */
+  const savedByKey = useMemo(() => {
+    const out = new Map<string, string>();
+    for (const p of saved?.places ?? []) {
+      out.set(p.placeId || p.name, p.id);
+    }
+    return out;
+  }, [saved]);
+
   /** 계정이 없어서 막은 일. */
   const [gate, setGate] = useState<Comeback | null>(null);
   /**
@@ -238,12 +269,17 @@ export default function Popular() {
   const lookedAt = looking ? lookedOf(looking) : null;
 
   /**
-   * 보석함에 담습니다. 담기만 합니다.
+   * 보석함에 담기 · 빼기를 한 단추가 함께 합니다.
    *
    * <p>여행을 묻지 않습니다. 「담아 두기」는 <b>아직 안 정한 것</b>을 챙기는
    * 일이라, 여기서 여행을 물으면 여행이 없는 사람은 담을 수가 없습니다.
+   *
+   * <p>이미 담긴 곳이면 {@code savedByKey} 의 줄 번호로 지웁니다
+   * ({@code DELETE /api/saved/{id}}) — 안 담긴 곳이면 새로 담습니다. 서버를
+   * 다녀온 뒤 {@code reloadSaved} 로 다시 받으므로, 다른 화면(보석함)에서
+   * 지운 것도 여기로 돌아오면 맞게 보입니다.
    */
-  async function keep(place: PopularPlace) {
+  async function toggleKeep(place: PopularPlace) {
     setSaid(null);
     setFailed(null);
     if (!user) {
@@ -260,12 +296,19 @@ export default function Popular() {
       setGate({ where, what: 'save' });
       return;
     }
-    if (kept.has(place.key)) {
-      setSaid({
-        text: `「${place.name}」 는 이미 보석함에 있어요.`,
-        label: '보석함으로',
-        go: () => router.push('/(app)/saved'),
-      });
+    const savedId = savedByKey.get(place.key);
+    if (savedId) {
+      try {
+        await api.delete(`/api/saved/${encodeURIComponent(savedId)}`);
+        await reloadSaved();
+        setSaid({
+          text: `「${place.name}」 를 보석함에서 뺐어요.`,
+          label: '보석함으로',
+          go: () => router.push('/(app)/saved'),
+        });
+      } catch (e) {
+        setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
+      }
       return;
     }
     /* 좌표 없이는 담아도 지도에 안 섭니다. 말없이 돌아서면 눌린 적이 없는
@@ -282,7 +325,7 @@ export default function Popular() {
         placeId: place.placeId,
         icon: place.icon,
       });
-      setKept((was) => new Set(was).add(place.key));
+      await reloadSaved();
       setSaid({
         text: `「${place.name}」 를 보석함에 담았어요.`,
         label: '보석함으로',
@@ -521,13 +564,15 @@ export default function Popular() {
               tail={
                 <IconButton
                   name="bookmark"
-                  label={`${place.name} ${KEEP}`}
-                  active={kept.has(place.key)}
+                  /* 담겼으면 「빼기」, 안 담겼으면 「담기」 — 눌렀을 때 무슨
+                     일이 일어날지가 이름에 그대로 적힙니다. */
+                  label={`${place.name} ${savedByKey.has(place.key) ? UNKEEP : KEEP}`}
+                  active={savedByKey.has(place.key)}
                   /* {@link IconButton} 의 문서가 적어 둔 그대로입니다 —
                      켜진 것이 보여야 하는 자리에서 {@code active} 만 주면
                      회색에서 검정으로만 바뀌어 아무 말도 안 합니다. */
-                  tone={kept.has(place.key) ? 'brand' : undefined}
-                  onPress={() => keep(place)}
+                  tone={savedByKey.has(place.key) ? 'brand' : undefined}
+                  onPress={() => toggleKeep(place)}
                 />
               }
               onPress={
@@ -576,7 +621,7 @@ export default function Popular() {
         place={lookedAt}
         scrap={
           looking
-            ? { kept: kept.has(looking.key), onPress: () => keep(looking) }
+            ? { kept: savedByKey.has(looking.key), onPress: () => toggleKeep(looking) }
             : null
         }
         actions={

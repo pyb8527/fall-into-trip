@@ -109,6 +109,18 @@ export async function notifyState(api: ApiClient): Promise<'off' | 'on' | 'block
  */
 export async function turnOn(api: ApiClient): Promise<'on' | 'blocked' | 'failed' | 'tooOld'> {
   if (inShell) {
+    /*
+      둘로 나눠 잡습니다.
+
+      <p>한 덩어리로 잡고 있었습니다. 그러면 「폰이 열쇠를 못 만들었다」와
+      「서버가 등록을 거절했다」가 똑같이 'failed' 하나로 뭉개져, 콘솔을
+      봐도 어느 쪽인지 알 수가 없습니다. 흔한 자리는 앞쪽입니다 — 안드로이드
+      에서 FCM 등록(GOOGLE_SERVICES_JSON)이 EAS 빌드에 안 실려 있으면
+      {@code getExpoPushTokenAsync} 가 그 자리에서 던집니다(app.config.js
+      의 경고를 보세요). 권한은 허락돼 있는데도 이 단계에서 막히므로,
+      사람이 보기에는 「설정은 멀쩡한데 안 켜진다」로 보입니다.
+    */
+    let token: string;
     try {
       const said = await askShell({ kind: 'notifyOn' });
       if (said === null) {
@@ -119,7 +131,14 @@ export async function turnOn(api: ApiClient): Promise<'on' | 'blocked' | 'failed
         /* 답이 비어서 옵니다 — 이 말을 모르는 옛 껍데기입니다. */
         return 'tooOld';
       }
-      const token = said;
+      token = said;
+    } catch (e) {
+      /* 폰에서 열쇠를 못 만들었습니다. 원격 디버거(Chrome 의
+         chrome://inspect, Safari 의 개발자 메뉴)로 보면 이 줄이 찍힙니다. */
+      console.error('[notify] 껍데기가 열쇠를 못 만들었어요', e);
+      return 'failed';
+    }
+    try {
       /* 서버에 등록하는 것은 웹이 합니다 — 로그인 상태를 들고 있는 쪽이
          여기입니다. 껍데기는 열쇠만 만들어 줍니다. */
       await api.post('/api/push/subscribe', { endpoint: token, p256dh: null, auth: null });
@@ -127,7 +146,8 @@ export async function turnOn(api: ApiClient): Promise<'on' | 'blocked' | 'failed
          「켜져 있어요」를 말하게 됩니다. */
       remember(token);
       return 'on';
-    } catch {
+    } catch (e) {
+      console.error('[notify] 서버 등록이 거절됐어요', e);
       return 'failed';
     }
   }
