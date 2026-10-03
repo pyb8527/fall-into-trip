@@ -340,22 +340,54 @@ public class PushService {
      * 정도이고, 무엇을 어떻게 고쳤는지는 앱을 열어야 보입니다. 브라우저
      * 쪽도 같은 것만 담고 있어 둘의 내용이 다르지 않습니다.
      *
-     * <p>죽은 토큰은 여기서 안 지웁니다. Expo 는 200 을 주면서 본문에
-     * DeviceNotRegistered 를 적어 보내는데, 그것까지 읽으려면 응답을 파야
-     * 합니다. 브라우저 쪽이 404·410 으로 지우는 것과 달리 이쪽은 다음
-     * 청소(오래된 것 지우기)에 맡깁니다.
+     * <h3>본문을 읽습니다</h3>
+     *
+     * <p>Expo 는 토큰이 죽었거나(DeviceNotRegistered), 이 프로젝트에
+     * FCM 자격 증명이 없거나(InvalidCredentials) 해도 <b>HTTP 는 200으로
+     * 주고 본문에만</b> 적어 보냅니다. 예전에는 {@code toBodilessEntity()}
+     * 로 본문을 아예 안 읽어서, 이런 실패가 로그 한 줄 없이 사라졌습니다 —
+     * "알림이 안 와요" 를 신고받아도 서버는 자기가 보냈다고 믿고 있는
+     * 상태였습니다. 이제 본문을 읽어 상태가 "error" 면 까닭을 남깁니다.
+     *
+     * <p>그래도 여기서 구독을 지우지는 않습니다. 브라우저 쪽이 404·410 으로
+     * 지우는 것과 달리, 이쪽은 실패 까닭이 토큰 문제인지 프로젝트 설정
+     * 문제인지부터 로그로 가려야 합니다 — 설정 문제인데 토큰부터 지우면
+     * 다음 사람도 똑같이 조용히 실패합니다.
      */
     private void sendExpo(PushSubscription sub, String payload) {
         try {
-            client.post()
+            String body = client.post()
                     .uri(URI.create("https://exp.host/--/api/v2/push/send"))
                     .header("Content-Type", "application/json")
                     .header("Accept", "application/json")
                     .body(expoBody(sub.getEndpoint(), payload))
                     .retrieve()
-                    .toBodilessEntity();
+                    .body(String.class);
+            checkExpoReceipt(sub, body);
         } catch (Exception e) {
             log.warn("앱 알림을 못 보냈어요: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Expo 가 돌려준 영수증을 살핍니다.
+     *
+     * <p>하나만 보냈으므로 {@code data} 는 객체 하나입니다(여럿을 한
+     * 요청에 담으면 배열이 되지만, 우리는 기기마다 따로 부릅니다).
+     */
+    private void checkExpoReceipt(PushSubscription sub, String body) {
+        try {
+            JsonNode data = mapper.readTree(body).path("data");
+            if (!"error".equals(data.path("status").asText())) {
+                return;
+            }
+            String why = data.path("details").path("error").asText(data.path("message").asText("알 수 없음"));
+            log.warn("앱 알림을 Expo 가 거절했어요 ({}): {}", why, data.path("message").asText());
+        } catch (Exception e) {
+            /* 영수증을 못 읽었다고 알림 자체가 실패한 것은 아닙니다 — 보낸
+               것은 보낸 것이고, 다음에 모양이 바뀌었을 때를 대비해 읽기만
+               관대하게 둡니다. */
+            log.warn("Expo 영수증을 읽지 못했어요: {}", body);
         }
     }
 
