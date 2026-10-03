@@ -19,6 +19,7 @@ import type { MapPlace } from '@/components/map-types';
 import { PhotoStrip } from '@/components/photo-strip';
 import { PlaceDetailSheet } from '@/components/place-detail-sheet';
 import { StoryBlock } from '@/components/story-block';
+import { StoryCarousel } from '@/components/story-carousel';
 import { PostFields, type PostShape } from '@/components/post-fields';
 import { formatNights } from '@/lib/countdown';
 import { PostMap } from '@/components/post-map';
@@ -610,6 +611,7 @@ export default function Post() {
           }
           mine={data.mine}
           onDrop={(placeIndex) => setDropping({ dayIndex: i, placeIndex })}
+          stories={data.itinerary.stories}
         />
         {storiesOn(data.itinerary.stories, i).map((s, at) => (
           <StoryBlock key={`story-${i}-${at}`} story={s} />
@@ -925,6 +927,7 @@ function DayBlock({
   onLook,
   mine,
   onDrop,
+  stories,
 }: {
   day: ItineraryDay;
   index: number;
@@ -949,6 +952,8 @@ function DayBlock({
   mine: boolean;
   /** 이 장소를 글에서 빼려고 합니다. */
   onDrop: (placeIndex: number) => void;
+  /** 이 여행기에 같이 실린 글 전부. 장소 밑에 걸 것은 여기서 골라 씁니다. */
+  stories: Maybe<Story[]>;
 }) {
   const color = day.color || dayColor(index);
 
@@ -1059,6 +1064,19 @@ function DayBlock({
               {place.stars ? <Caption tone="brand">{'★'.repeat(place.stars)}</Caption> : null}
               {place.review ? <Body small>{place.review}</Body> : null}
             </View>
+          ) : null}
+
+          {/*
+            이 장소를 보면서 올린 글.
+
+            <p>위의 별점·사진(place.photos)은 <b>옛 글</b>의 자리입니다 —
+            장소마다 기록을 남기던 시절, 사본에 그대로 박힌 모습이고 고쳐
+            쓰지 않습니다. 이것은 <b>새 글</b>의 자리입니다 — 글쓴이가
+            「어떤 글을 같이 실을까요」에서 고른 피드 글이 이 장소에
+            묶여 있으면 여기 섭니다({@code Story.placeIndex}).
+          */}
+          {placeStoriesOn(stories, index, i).length > 0 ? (
+            <StoryCarousel stories={placeStoriesOn(stories, index, i)} />
           ) : null}
 
           {/*
@@ -1380,10 +1398,22 @@ function today() {
  * <p>옛 글에는 stories 가 아예 없습니다. 사본은 그때의 모습이라 고쳐 쓰지
  * 않으므로, 없는 것을 빈 것으로 읽습니다.
  */
+/**
+ * 날짜에만 걸린 글 — 어느 장소인지는 안 걸린 것들.
+ *
+ * <p>장소까지 걸린 글은 {@link placeStoriesOn} 이 그 장소 밑에 바로
+ * 냅니다. 여기 남는 것은 좌표만 넣은 곳에서 올렸거나 날짜로만 어림한
+ * 글이라, 날이 끝난 뒤에 모아 둡니다 — 지금까지의 자리입니다.
+ */
 function storiesOn(stories: Maybe<Story[]>, at: number | null): Story[] {
   return (stories ?? []).filter((s) =>
-    at === null ? s.dayIndex == null : s.dayIndex === at,
+    at === null ? s.dayIndex == null : s.dayIndex === at && s.placeIndex == null,
   );
+}
+
+/** 그 장소 밑에 걸린 글들. 장소를 보면서 올린 것이라 그 자리에 바로 섭니다. */
+function placeStoriesOn(stories: Maybe<Story[]>, dayIndex: number, placeIndex: number): Story[] {
+  return (stories ?? []).filter((s) => s.dayIndex === dayIndex && s.placeIndex === placeIndex);
 }
 
 const styles = StyleSheet.create({

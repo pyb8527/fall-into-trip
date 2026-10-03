@@ -186,5 +186,64 @@ T("일정은 따라옴", r.data.days.length === 3, r.data.days?.length);
 r = await call("GET", `/api/feed?trip=${copied}`, { token: jun });
 T("남의 이야기는 안 따라옴", r.data.posts.length === 0, r.data.posts);
 
+console.log("\n[10] 장소 밑에 건다 — 날짜 어림보다 정확하다");
+r = await call("POST", "/api/trips", {
+  token: mina, body: { title: "장소별 이야기", startIso: isoAfter(0), nights: 1 },
+});
+const placeTripId = r.data.trip.id;
+r = await call("GET", "/api/trip?trip=" + placeTripId, { token: mina });
+const placeDays = r.data.days;
+
+r = await call("POST", "/api/places", { token: mina, body: { dayId: placeDays[0].id, name: "A", lat: 37.5, lng: 127.0 } });
+const placeA = r.data.place.id;
+r = await call("POST", "/api/places", { token: mina, body: { dayId: placeDays[0].id, name: "B", lat: 37.5, lng: 127.0 } });
+const placeB = r.data.place.id;
+r = await call("POST", "/api/places", { token: mina, body: { dayId: placeDays[1].id, name: "C", lat: 37.5, lng: 127.0 } });
+const placeC = r.data.place.id;
+
+/* B 에서 올린 글, C 에서 올린 글, 그리고 장소를 안 고르고 올린 글(날짜로
+   어림해 1일차에 걸립니다). */
+r = await call("POST", "/api/feed", { token: mina, body: { tripId: placeTripId, placeId: placeB, text: "B에서" } });
+const storyB = r.data.post.id;
+r = await call("POST", "/api/feed", { token: mina, body: { tripId: placeTripId, placeId: placeC, text: "C에서" } });
+const storyC = r.data.post.id;
+r = await call("POST", "/api/feed", { token: mina, body: { tripId: placeTripId, text: "장소 없이" } });
+const storyNone = r.data.post.id;
+
+r = await call("POST", `/api/trips/${placeTripId}/publish`,
+  { token: mina, body: { summary: "장소별 시험", storyIds: [storyB, storyC, storyNone] } });
+const placePostId = r.data.postId;
+T("올라감", r.status === 200, r.data);
+
+r = await call("GET", "/api/posts/" + placePostId);
+let st = r.data.itinerary.stories;
+T("B는 1일차 둘째 곳", st.find((s) => s.text === "B에서")?.dayIndex === 0
+  && st.find((s) => s.text === "B에서")?.placeIndex === 1, st);
+T("C는 2일차 첫째 곳", st.find((s) => s.text === "C에서")?.dayIndex === 1
+  && st.find((s) => s.text === "C에서")?.placeIndex === 0, st);
+T("장소 없는 글은 placeIndex 가 없음", st.find((s) => s.text === "장소 없이")?.dayIndex === 0
+  && st.find((s) => s.text === "장소 없이")?.placeIndex == null, st);
+
+/* A(1일차 첫째 곳)를 뺍니다. 날은 안 없어지고 B 가 첫째 곳으로 밀려
+   올라옵니다 — B에 걸린 글도 같이 밀려야 합니다. */
+r = await call("DELETE", `/api/posts/${placePostId}/days/0/places/0`, { token: mina });
+T("A를 뺌", r.status === 200, r.data);
+r = await call("GET", "/api/posts/" + placePostId);
+st = r.data.itinerary.stories;
+T("B가 밀려 첫째 곳이 됨", st.find((s) => s.text === "B에서")?.placeIndex === 0, st);
+T("장소 없는 글은 그대로 1일차", st.find((s) => s.text === "장소 없이")?.dayIndex === 0, st);
+
+/* 이제 1일차에는 B 하나뿐입니다. B를 빼면 1일차가 통째로 없어집니다 —
+   B에 걸린 글과 장소 없는 글 둘 다 날짜를 잃고 일정 뒤로 내려갑니다. */
+r = await call("DELETE", `/api/posts/${placePostId}/days/0/places/0`, { token: mina });
+T("1일차를 통째로 뺌", r.status === 200, r.data);
+r = await call("GET", "/api/posts/" + placePostId);
+st = r.data.itinerary.stories;
+T("B에 걸렸던 글은 일정 뒤로", st.find((s) => s.text === "B에서")?.dayIndex == null
+  && st.find((s) => s.text === "B에서")?.placeIndex == null, st);
+T("장소 없던 글도 일정 뒤로", st.find((s) => s.text === "장소 없이")?.dayIndex == null, st);
+T("C는 그대로 1일차(날이 하나 당겨짐) 첫째 곳", st.find((s) => s.text === "C에서")?.dayIndex === 0
+  && st.find((s) => s.text === "C에서")?.placeIndex === 0, st);
+
 console.log(`\n결과: ${pass} 통과 / ${fail} 실패`);
 process.exit(fail ? 1 : 0);

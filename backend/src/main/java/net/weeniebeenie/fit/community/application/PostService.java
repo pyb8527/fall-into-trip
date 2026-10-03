@@ -154,7 +154,7 @@ public class PostService {
                   그 사람 것이고, 남의 감상을 내 글에 실을 일이 아닙니다.
                 */
                 .snapshot(snapshotOf(clean, dayList, placeList,
-                        storiesOf(me, trip, dayList, storyIds),
+                        storiesOf(me, trip, dayList, placeList, storyIds),
                         shownPhotos(me, trip, placeList, placePhotoIds)))
                 .dayCount(dayList.size())
                 .placeCount(placeList.size())
@@ -199,6 +199,10 @@ public class PostService {
             /* 몇째 날 사이에 끼울지. 없으면 일정 뒤에 섭니다. */
             if (s.dayIndex() != null) {
                 n.put("dayIndex", s.dayIndex());
+            }
+            /* 그 날의 몇째 곳 밑에 설지. 없으면 날짜 뒤(또는 일정 뒤)입니다. */
+            if (s.placeIndex() != null) {
+                n.put("placeIndex", s.placeIndex());
             }
             ArrayNode tagNodes = n.putArray("tags");
             s.tags().forEach(tagNodes::add);
@@ -317,7 +321,7 @@ public class PostService {
      * 올리는 일이 길어지면 안 올립니다.
      */
     private List<Story> storiesOf(AuthPrincipal me, Trip trip, List<Day> dayList,
-                                  List<String> storyIds) {
+                                  List<Place> placeList, List<String> storyIds) {
         if (storyIds == null || storyIds.isEmpty()) {
             return List.of();
         }
@@ -341,6 +345,26 @@ public class PostService {
             }
         }
 
+        /*
+          장소 번호({@code places.id}) → (몇째 날, 그 날의 몇째 곳).
+
+          <p>{@link #snapshotOf} 가 사본에 쓰는 것과 같은 차례로 셉니다 —
+          {@code placeList} 를 날짜별로 걸러 가며 세므로, 여기서 매긴 번호가
+          사본에 실제로 찍히는 번호와 어긋나지 않습니다.
+        */
+        Map<String, int[]> placeAt = new java.util.HashMap<>();
+        for (int d = 0; d < dayList.size(); d++) {
+            String dayId = dayList.get(d).getId();
+            int p = 0;
+            for (Place pl : placeList) {
+                if (!pl.getDayId().equals(dayId)) {
+                    continue;
+                }
+                placeAt.put(pl.getId(), new int[]{d, p});
+                p++;
+            }
+        }
+
         String myName = users.findById(me.id()).map(User::getName).orElse("알 수 없음");
         List<Story> out = new ArrayList<>();
         for (String id : want) {
@@ -356,11 +380,29 @@ public class PostService {
             List<String> shots = storyPhotos.findAllByPostIdOrderBySortAsc(id).stream()
                     .map(net.weeniebeenie.fit.feed.domain.PostPhoto::getPhotoId)
                     .toList();
-            java.time.LocalDate on = story.getCreatedAt()
-                    .atZone(java.time.ZoneId.systemDefault()).toLocalDate();
+
+            /*
+              장소가 골라 올린 날 안에 있으면 그 장소 번호를 씁니다 — 날짜로
+              어림하는 것보다 정확합니다(글쓴이가 그 장소 줄에서 올린 글이라
+              {@code Post.placeId} 가 이미 가리키고 있습니다). 그 장소가 이
+              글에 없으면(다른 날에 있었거나 좌표만 넣은 곳이면) 올린 날짜로
+              어림합니다 — 지금까지의 동작입니다.
+            */
+            int[] at = story.getPlaceId() == null ? null : placeAt.get(story.getPlaceId());
+            Integer dayIndex;
+            Integer placeIndex;
+            if (at != null) {
+                dayIndex = at[0];
+                placeIndex = at[1];
+            } else {
+                java.time.LocalDate on = story.getCreatedAt()
+                        .atZone(java.time.ZoneId.systemDefault()).toLocalDate();
+                dayIndex = whichDay.get(on);
+                placeIndex = null;
+            }
 
             out.add(new Story(story.getText(), myName, story.getCreatedAt(),
-                    whichDay.get(on), List.of(story.getTags()), shots));
+                    dayIndex, placeIndex, List.of(story.getTags()), shots));
         }
         /* 올린 차례대로. 고른 차례는 화면이 어떻게 늘어놓았느냐에 달렸는데,
            읽는 사람에게 뜻이 있는 것은 시간입니다. */
@@ -473,10 +515,13 @@ public class PostService {
     /**
      * 사본에 담기 직전의 글 한 편.
      *
-     * @param dayIndex 몇째 날 뒤에 설지. 비어 있으면 일정 뒤입니다
+     * @param dayIndex   몇째 날 뒤에 설지. 비어 있으면 일정 뒤입니다
+     * @param placeIndex 그 날의 몇째 곳 밑에 설지. 비어 있으면 날짜 뒤
+     *                    (dayIndex 만 있을 때) 나 일정 뒤(둘 다 없을 때)입니다 —
+     *                    {@link PostComment} 와 같은 규칙입니다
      */
     private record Story(String text, String author, java.time.Instant at,
-                         Integer dayIndex, List<String> tags, List<String> photos) {
+                         Integer dayIndex, Integer placeIndex, List<String> tags, List<String> photos) {
     }
 
     /* ------------------------------------------------------------- 읽기 */
@@ -1025,8 +1070,10 @@ public class PostService {
                 ((ObjectNode) d).put("color", DayLabels.colorOf(at));
                 at++;
             }
-            shiftStories(root, dayAt);
         }
+        /* 날짜가 그대로 남아 있어도 그 안의 장소 번호는 밀립니다 — 날이
+           통째로 없어졌을 때만 옮기면 가운데 한 곳만 뺀 경우를 놓칩니다. */
+        shiftStories(root, dayAt, placeAt, dayGone);
 
         post.setSnapshot(write(root));
         post.setDayCount(dayNodes.size());
@@ -1048,17 +1095,23 @@ public class PostService {
      * 붙어 있으면 그것이 더 나쁩니다.
      */
     /**
-     * 날이 하나 빠졌을 때, 같이 실은 글이 가리키는 날을 옮깁니다.
+     * 장소 하나가 빠졌을 때, 같이 실은 글이 가리키는 날·장소를 옮깁니다.
      *
      * <p>댓글과 같은 일인데 사는 곳이 다릅니다 — 댓글은 표에 있고 이것은
-     * 사본 안에 있습니다. 안 옮기면 셋째 날에 끼워 둔 사진이 넷째 날 밑에
-     * 붙습니다.
+     * 사본 안에 있습니다. 안 옮기면 셋째 장소에 묶인 사진이 빠진 자리를
+     * 밀고 들어온 다음 장소 밑에 붙습니다.
      *
-     * <p>빠진 그 날에 붙어 있던 글은 <b>안 지웁니다.</b> 일정 뒤로 내립니다 —
-     * 장소를 하나 빼는 일 때문에 올린 사진이 통째로 사라지면 안 됩니다. 댓글은
-     * 그 장소에 대한 말이라 같이 가지만, 이쪽은 그날 있었던 일입니다.
+     * <p>빠진 그 장소에 붙어 있던 글은 <b>안 지웁니다.</b> 날짜 뒤로
+     * 내립니다({@code placeIndex} 만 지웁니다) — 장소를 하나 빼는 일
+     * 때문에 올린 사진이 통째로 사라지면 안 됩니다. 날까지 없어졌으면
+     * ({@code dayGone}) 날짜도 함께 지워 일정 뒤로 내립니다. 댓글은 그
+     * 장소에 대한 말이라 같이 가지만, 이쪽은 그날 있었던 일입니다.
+     *
+     * @param dayAt   장소를 뺀 날(0부터)
+     * @param placeAt 그 날에서 뺀 자리(0부터)
+     * @param dayGone 그 장소가 그 날의 마지막 곳이어서 날짜째 없어졌는지
      */
-    private static void shiftStories(JsonNode root, int dayAt) {
+    private static void shiftStories(JsonNode root, int dayAt, int placeAt, boolean dayGone) {
         if (!root.path("stories").isArray()) {
             return;
         }
@@ -1066,11 +1119,32 @@ public class PostService {
             if (!s.isObject() || !s.hasNonNull("dayIndex")) {
                 continue;
             }
-            int at = s.path("dayIndex").asInt();
-            if (at == dayAt) {
-                ((ObjectNode) s).remove("dayIndex");
-            } else if (at > dayAt) {
-                ((ObjectNode) s).put("dayIndex", at - 1);
+            ObjectNode n = (ObjectNode) s;
+            int at = n.path("dayIndex").asInt();
+            if (at != dayAt) {
+                /* 다른 날 것입니다. 날짜가 통째로 없어진 것은 날 번호에만
+                   영향을 줍니다 — 장소 번호는 그 날 안에서의 자리라 다른
+                   날 것과는 상관이 없습니다. */
+                if (dayGone && at > dayAt) {
+                    n.put("dayIndex", at - 1);
+                }
+                continue;
+            }
+            /* 이 날 것입니다. 날짜째 없어졌으면 장소 번호가 무엇이었든
+               가리킬 날이 없으므로 둘 다 지우고 일정 뒤로 내립니다. */
+            if (dayGone) {
+                n.remove("dayIndex");
+                n.remove("placeIndex");
+                continue;
+            }
+            if (!n.hasNonNull("placeIndex")) {
+                continue;
+            }
+            int p = n.path("placeIndex").asInt();
+            if (p == placeAt) {
+                n.remove("placeIndex");
+            } else if (p > placeAt) {
+                n.put("placeIndex", p - 1);
             }
         }
     }

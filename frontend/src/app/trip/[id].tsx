@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 
 import { api, ApiError, UNEXPECTED } from '@/api/client';
-import type { Day, Gap, GapOption, LivePin, LiveWhere, Money, OurStars, Person, Place, PlaceInfo, SavedPlace, Spend, TravelMode, Trip, TripDetail } from '@/api/types';
+import type { Day, FeedPost, Gap, GapOption, LivePin, LiveWhere, Money, OurStars, Person, Place, PlaceInfo, SavedPlace, Spend, Story, TravelMode, Trip, TripDetail } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
 import { DatePollSheet } from '@/components/date-poll-sheet';
@@ -42,6 +42,7 @@ import { PlaceDetailSheet } from '@/components/place-detail-sheet';
 import { RefSheet } from '@/components/ref-sheet';
 import { PlaceSearch } from '@/components/place-search';
 import { RecommendSheet } from '@/components/recommend-sheet';
+import { StoryCarousel } from '@/components/story-carousel';
 import {
   ago,
   countdownOf,
@@ -619,6 +620,46 @@ export default function TripScreen() {
     }
     return by;
   }, [data]);
+
+  /**
+   * 이 여행에 붙은 피드 글 — 장소마다 묶어 둡니다.
+   *
+   * <h3>짜는 자리에도 보여야 합니다</h3>
+   *
+   * <p>그 장소 줄에서 피드를 올리는 길은 이미 있었습니다({@code onStory}).
+   * 그런데 올린 글을 다시 보는 자리가 없어서, 짜는 동안에는 "올렸다" 는
+   * 사실만 남고 <b>무엇을 올렸는지</b>는 피드로 따로 가야 알 수 있었습니다.
+   *
+   * <p>여기서 보여 주는 것이 둘러보기 상세와 같은 이유로 맞습니다 — 그
+   * 화면에 내놓았을 때도 같은 자리(그 장소 밑)에 서야, 짜면서 보던 것과
+   * 남에게 보이는 것이 같은 모양으로 읽힙니다.
+   *
+   * <p>같이 간 사람 것도 옵니다 — {@code /api/feed?trip=} 은 이미 보는
+   * 사람이 볼 수 있는 것만 거릅니다(FeedService.ofTrip). 내 글만 추리지
+   * 않습니다: 같이 짜는 사람이 그 자리에서 무엇을 남겼는지도 이 화면이
+   * 보여 줘야 할 것입니다.
+   */
+  const { data: feed } = useAsync<{ posts: FeedPost[] }>(
+    (signal) => api.get(`/api/feed?trip=${encodeURIComponent(id)}`, signal),
+    [id],
+  );
+  const feedByPlace = useMemo(() => {
+    const by = new Map<string, Story[]>();
+    for (const p of [...(feed?.posts ?? [])].sort((a, b) => a.createdAt.localeCompare(b.createdAt))) {
+      if (!p.placeId) {
+        continue;
+      }
+      const story: Story = {
+        text: p.text,
+        author: p.authorName,
+        at: p.createdAt,
+        tags: p.tags,
+        photos: p.photoIds,
+      };
+      by.set(p.placeId, [...(by.get(p.placeId) ?? []), story]);
+    }
+    return by;
+  }, [feed]);
 
   /**
    * 지금 이 여행 위에 있는가.
@@ -1687,6 +1728,7 @@ export default function TripScreen() {
               onLook={(place, mode) => setLooking({ place, mode })}
               tipCounts={tipCounts}
               refsOf={refsOf}
+              feedByPlace={feedByPlace}
               onRefs={(place) => setStashing(place)}
               onStory={(place) => setStoryAt(place)}
               spent={spentByDay.get(day.id) ?? null}
@@ -2496,6 +2538,7 @@ function DayCard({
   onLook,
   tipCounts,
   refsOf,
+  feedByPlace,
   onRefs,
   onStory,
   spent,
@@ -2543,6 +2586,8 @@ function DayCard({
   /** 장소 번호 → 다녀와서 남긴 것들. 같이 간 사람 것까지 옵니다. */
   /** 다니면서 볼 사진. 장소 칸마다. */
   refsOf: Map<string, string[]>;
+  /** 이 장소를 보면서 올린 피드 글. 장소 칸마다. */
+  feedByPlace: Map<string, Story[]>;
   onRefs: (place: Place) => void;
   /** 이 장소에서 피드를 올리는 판을 엽니다. */
   onStory: (place: Place) => void;
@@ -2943,6 +2988,7 @@ function DayCard({
                     onLook={onLook}
                     tipCount={place.placeId ? (tipCounts[place.placeId] ?? 0) : 0}
                     refs={refsOf.get(place.id)}
+                    stories={feedByPlace.get(place.id) ?? []}
                     onRefs={() => onRefs(place)}
                     onStory={() => onStory(place)}
                     last={i === order.length - 1}
@@ -3148,6 +3194,7 @@ function PlaceRow({
   onLook,
   tipCount,
   refs,
+  stories,
   onRefs,
   onStory,
   last,
@@ -3182,6 +3229,8 @@ function PlaceRow({
   tipCount: number;
   /** 다녀와서 남긴 것들. 안 남겼으면 비어 있습니다. */
   refs?: string[];
+  /** 이 장소를 보면서 올린 피드 글. 안 올렸으면 비어 있습니다. */
+  stories: Story[];
   /** 챙겨 두기 판을 엽니다. */
   onRefs: () => void;
   /** 이 장소에서 피드를 올리는 판을 엽니다. */
@@ -3455,6 +3504,19 @@ function PlaceRow({
             <PhotoStrip ids={refs} height={120} />
           </View>
         ) : null}
+
+        {/*
+          이 장소에서 올린 피드 글.
+
+          <p>「피드에 올리기」 (onStory) 로 쓴 글이 사라지지 않고 그 장소
+          밑에 바로 보입니다 — 올렸다는 사실만 남고 무엇을 올렸는지는
+          피드로 따로 가야 알던 것을 고칩니다.
+
+          <p>둘러보기 상세와 같은 자리, 같은 모양입니다({@code StoryCarousel}).
+          이 여행을 내놓았을 때 남이 보는 자리와 짜면서 보는 자리가 같아야
+          "내놓으면 이렇게 보이는구나" 를 다시 확인할 필요가 없습니다.
+        */}
+        {stories.length > 0 ? <StoryCarousel stories={stories} /> : null}
 
         {/*
           손대는 단추는 고른 줄에서만 펼칩니다.

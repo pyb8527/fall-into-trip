@@ -691,6 +691,14 @@ export type Story = {
    * 나중에 빠진 글입니다.
    */
   dayIndex?: Maybe<number>;
+  /**
+   * 그 날의 몇째 곳 밑에 설지(0부터).
+   *
+   * <p>비어 있으면 그 장소가 아니라 날짜에만 걸린 글입니다 — 좌표만 넣은
+   * 곳에서 올렸거나, 올린 날짜로만 어림한 글입니다. {@code dayIndex} 도
+   * 없으면 장소를 아예 안 고른 글입니다.
+   */
+  placeIndex?: Maybe<number>;
   tags: string[];
   photos: string[];
 };
