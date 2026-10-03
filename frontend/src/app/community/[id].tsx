@@ -67,6 +67,20 @@ import { MapAside } from '@/ui/map-aside';
 import { KEEP, UNKEEP } from '@/constants/words';
 
 /**
+ * 보석함 대조 열쇠.
+ *
+ * <p>구글 번호가 있으면 그것을, 없으면 이름을 씁니다. 이름만으로 맞추면
+ * 글이 다르면 아무 관계도 없는 두 곳이 같은 이름(「스타벅스」, 「교토역」
+ * 같은)을 쓴다는 이유로 서로 담긴 것처럼 보입니다 — 보석함은 이 글만이
+ * 아니라 지금까지 담은 모든 글을 통틀어 보는 것이라 그런 겹침이 드물지
+ * 않습니다. {@code PopularRepository} 가 장소를 묶을 때 쓰는 열쇠와
+ * 같은 규칙입니다.
+ */
+function savedKeyOf(p: { placeId?: Maybe<string>; name: string }): string {
+  return p.placeId || p.name;
+}
+
+/**
  * 올라온 일정 한 편.
  *
  * <p>여기 보이는 것은 <b>올릴 때 떠 둔 사본</b>입니다. 글쓴이가 나중에 자기
@@ -113,9 +127,9 @@ export default function Post() {
     <p>번호까지 들고 있어야 빼는 것도 됩니다. 이름만으로는 무엇을 빼야
     하는지 서버에 말할 수 없습니다.
 
-    <p>이름으로 맞춰 봅니다. 사본의 장소에는 우리 보석함 번호가 없고,
-    구글 번호도 좌표만 찍어 넣은 곳에는 없습니다. 같은 글 안에서 이름이
-    겹치는 일은 드뭅니다.
+    <p>열쇠는 {@link savedKeyOf} 입니다 — 구글 번호가 있으면 그것, 없으면
+    이름입니다. 이름만 썼다가, 전혀 다른 글에서 같은 이름의 장소를 담아
+    두면 이 글의 장소도 담긴 것처럼 보이는 일이 있었습니다.
   */
   const [savedIds, setSavedIds] = useState<Map<string, string>>(new Map());
   /*
@@ -239,10 +253,10 @@ export default function Post() {
     }
     let alive = true;
     api
-      .get<{ places: { id: string; name: string }[] }>('/api/saved')
+      .get<{ places: { id: string; name: string; placeId: Maybe<string> }[] }>('/api/saved')
       .then((res) => {
         if (alive) {
-          setSavedIds(new Map(res.places.map((p) => [p.name, p.id])));
+          setSavedIds(new Map(res.places.map((p) => [savedKeyOf(p), p.id])));
         }
       })
       .catch(() => {
@@ -260,24 +274,24 @@ export default function Post() {
    * 그건 한 번 누른 것을 되돌리는 값으로는 너무 비쌉니다.
    */
   async function toggleSave(place: ItineraryPlace) {
-    const had = savedIds.get(place.name);
+    const had = savedIds.get(savedKeyOf(place));
     if (had) {
-      await unsave(place.name, had);
+      await unsave(place, had);
       return;
     }
     await save(place);
   }
 
-  async function unsave(name: string, savedId: string) {
+  async function unsave(place: ItineraryPlace, savedId: string) {
     setFailed(null);
     try {
       await api.delete(`/api/saved/${savedId}`);
       setSavedIds((prev) => {
         const next = new Map(prev);
-        next.delete(name);
+        next.delete(savedKeyOf(place));
         return next;
       });
-      setNotice(`「${name}」 를 보석함에서 뺐어요.`);
+      setNotice(`「${place.name}」 를 보석함에서 뺐어요.`);
     } catch (e) {
       setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
     }
@@ -298,7 +312,7 @@ export default function Post() {
         note: place.note,
         fromPost: id,
       });
-      setSavedIds((prev) => new Map(prev).set(place.name, res.place.id));
+      setSavedIds((prev) => new Map(prev).set(savedKeyOf(place), res.place.id));
       /*
         담은 다음이 더 중요합니다.
 
@@ -816,8 +830,8 @@ export default function Post() {
         actions={
           looking ? (
             <Button
-              label={savedIds.has(looking.place.name) ? UNKEEP : KEEP}
-              variant={savedIds.has(looking.place.name) ? 'secondary' : 'primary'}
+              label={savedIds.has(savedKeyOf(looking.place)) ? UNKEEP : KEEP}
+              variant={savedIds.has(savedKeyOf(looking.place)) ? 'secondary' : 'primary'}
               compact
               onPress={() => {
                 const target = looking.place;
@@ -919,8 +933,7 @@ function DayBlock({
   onToggle: () => void;
   /** @param at 이 날에서 몇 번째 장소인지. 가입하고 돌아왔을 때 그 자리를 다시 찾는 데 씁니다. */
   onSave: (place: ItineraryPlace, at: number) => void;
-  /** 이미 담은 곳. 별을 채워 두면 두 번 누르지 않습니다. */
-  /** 보석함에 이미 있는 것들. 이름 → 담아 둔 번호. */
+  /** 보석함에 이미 있는 것들. {@link savedKeyOf} → 담아 둔 번호. */
   savedIds: Map<string, string>;
   /** 댓글을 받는 글인지. 안 열었으면 달린 것이 있다는 점도 안 찍습니다. */
   feedback: boolean;
@@ -1101,7 +1114,7 @@ function DayBlock({
               {
                 key: 'keep',
                 name: 'bookmark' as IconName,
-                label: savedIds.has(place.name) ? UNKEEP : KEEP,
+                label: savedIds.has(savedKeyOf(place)) ? UNKEEP : KEEP,
                 /*
                   담긴 것은 그림에 색이 듭니다. 회색 네모가 돋아나는 것보다
                   담겼다는 말에 가깝습니다.
@@ -1113,7 +1126,7 @@ function DayBlock({
                   검정으로만 바뀌어, 담겼는지 안 담겼는지 알 수 없었습니다.
                   코랄을 그림 색으로 써야 하는 자리가 brand 입니다.
                 */
-                active: savedIds.has(place.name),
+                active: savedIds.has(savedKeyOf(place)),
                 tone: 'brand' as const,
                 onPress: () => onSave(place, i),
               },

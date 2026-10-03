@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 
 import { api, ApiError, UNEXPECTED } from '@/api/client';
-import type { Day, Gap, GapOption, LivePin, LiveWhere, Money, OurStars, Person, Place, PlaceInfo, Spend, TravelMode, Trip, TripDetail } from '@/api/types';
+import type { Day, Gap, GapOption, LivePin, LiveWhere, Money, OurStars, Person, Place, PlaceInfo, SavedPlace, Spend, TravelMode, Trip, TripDetail } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
 import { DatePollSheet } from '@/components/date-poll-sheet';
@@ -281,6 +281,35 @@ export default function TripScreen() {
   const { data: crew } = useAsync<{ people: Person[] }>(
     (signal) => api.get(`/api/trips/${encodeURIComponent(id)}/people`, signal),
     [id],
+  );
+
+  /**
+   * 보석함에 이미 있는 것들.
+   *
+   * <p>이 판에서 들여다보는 장소는 이미 일정에 들어 있는 곳입니다. 그런데
+   * 일정에 넣었다고 보석함에 담긴 것은 아닙니다 — 다음 여행에도 쓰려면
+   * 따로 담아야 합니다. {@link PlaceDetailSheet} 가 그 담는 단추를 받을
+   * 수 있게, 그리고 이미 담은 곳이면 단추가 「담겼어요」로 다시 서게
+   * 여기서 미리 받아 둡니다.
+   *
+   * <p>열쇠는 구글 번호 우선, 없으면 이름입니다({@code savedKeyOf} 와
+   * 같은 규칙, {@link PopularRepository}). 좌표만 찍어 넣은 곳은 구글
+   * 번호가 없어 이름으로만 맞춥니다.
+   */
+  const { data: saved, reload: reloadSaved } = useAsync<{ places: SavedPlace[] }>(
+    (signal) => (user ? api.get('/api/saved', signal) : Promise.resolve({ places: [] })),
+    [user?.id],
+  );
+  const savedByKey = useMemo(() => {
+    const out = new Map<string, string>();
+    for (const p of saved?.places ?? []) {
+      out.set(p.placeId || p.name, p.id);
+    }
+    return out;
+  }, [saved]);
+  const keyOfLooked = useCallback(
+    (place: { placeId?: string | null; name: string }) => place.placeId || place.name,
+    [],
   );
 
   /**
@@ -667,6 +696,41 @@ export default function TripScreen() {
       }
     },
     [refresh],
+  );
+
+  /**
+   * 들여다보고 있는 장소를 보석함에 담거나 뺍니다.
+   *
+   * <p>전에는 이 판에서 담는 길이 없었습니다 — {@link PlaceDetailSheet}
+   * 의 {@code scrap} 은 부르는 자리가 주는 것인데, 이 화면은 아무것도
+   * 주지 않고 있었습니다. 일정에 넣어 둔 곳을 다음 여행에도 쓰려고
+   * 담으려 해도 담을 자리가 없었던 것입니다.
+   */
+  const toggleSavedPlace = useCallback(
+    async (place: Place) => {
+      setActionError(null);
+      const key = keyOfLooked(place);
+      const had = savedByKey.get(key);
+      try {
+        if (had) {
+          await api.delete(`/api/saved/${had}`);
+        } else {
+          await api.post('/api/saved', {
+            name: place.name,
+            lat: place.lat,
+            lng: place.lng,
+            placeId: place.placeId,
+            cat: place.cat,
+            icon: place.icon,
+            note: place.note,
+          });
+        }
+        reloadSaved();
+      } catch (e) {
+        setActionError(e instanceof ApiError ? e.message : UNEXPECTED);
+      }
+    },
+    [savedByKey, keyOfLooked, reloadSaved],
   );
 
   /*
@@ -1757,6 +1821,16 @@ export default function TripScreen() {
                   setLooking(null);
                   setTipFor(target);
                 },
+              }
+            : null
+        }
+        /* 일정에 넣어 둔 곳도 보석함에 담을 수 있어야 합니다 — 담아 두면
+           다음 여행을 짤 때도 이 곳을 바로 꺼내 쓸 수 있습니다. */
+        scrap={
+          looking
+            ? {
+                kept: savedByKey.has(keyOfLooked(looking.place)),
+                onPress: () => toggleSavedPlace(looking.place),
               }
             : null
         }
