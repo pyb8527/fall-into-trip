@@ -436,6 +436,32 @@ public class TripService {
         return trip;
     }
 
+    /** 예산 상한. 한 여행에 10억 원이면 넉넉합니다 — 자릿수를 잘못 친 것을 막습니다. */
+    private static final long BUDGET_MAX = 1_000_000_000L;
+
+    /**
+     * 여행 예산을 정합니다. 원화, 여행 하나에 하나.
+     *
+     * <p>멤버 누구나 고칩니다 — 안내판과 같은 까닭입니다. 판(version)을 안
+     * 받습니다. 숫자 하나라 뒤에 적은 사람 것이 남아도 무엇이 사라졌는지가
+     * 바로 보입니다.
+     *
+     * @param amount 원. null 이나 0 이면 예산을 걷습니다
+     */
+    @Transactional
+    public Trip writeBudget(AuthPrincipal me, String tripId, Long amount) {
+        Trip trip = access.mine(tripId, me.id());
+        access.requireCanEdit(tripId, me.id());
+        if (amount != null && (amount < 0 || amount > BUDGET_MAX)) {
+            throw ApiException.badRequest("예산은 0원에서 10억 원 사이로 적어 주세요.");
+        }
+        trip.setBudget(amount == null || amount == 0 ? null : amount);
+        trips.saveAndFlush(trip);
+        audit.log(me.id(), "trip.budget", tripId,
+                Map.of("amount", trip.getBudget() == null ? 0 : trip.getBudget()));
+        return trip;
+    }
+
     /* ------------------------------------------------------- 참석 응답 */
 
     /**

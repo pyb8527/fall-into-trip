@@ -110,12 +110,17 @@ public final class TripDtos {
         }
     }
 
+    /**
+     * @param budget 예산(원). 안 정했으면 비어 있습니다
+     */
     public record TripView(String id, String title, String ownerId,
-                           String theme, String emoji, String groupId, Instant createdAt) {
+                           String theme, String emoji, String groupId, Instant createdAt,
+                           Long budget) {
 
         public static TripView of(Trip t) {
             return new TripView(t.getId(), t.getTitle(), t.getOwnerId(),
-                    t.getTheme(), t.getEmoji(), t.getGroupId(), t.getCreatedAt());
+                    t.getTheme(), t.getEmoji(), t.getGroupId(), t.getCreatedAt(),
+                    t.getBudget());
         }
     }
 

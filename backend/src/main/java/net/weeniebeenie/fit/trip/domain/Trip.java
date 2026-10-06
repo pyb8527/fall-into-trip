@@ -65,6 +65,9 @@ public class Trip {
     @Column(name = "notice_at")
     private Instant noticeAt;
 
+    /** 예산(원). 안 정했으면 비어 있습니다(V56). */
+    private Long budget;
+
     /**
      * 로그인 없이 보는 일정 링크의 열쇠 — SHA-256 만 둡니다.
      *

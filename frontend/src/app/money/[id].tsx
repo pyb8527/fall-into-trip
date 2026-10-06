@@ -43,6 +43,7 @@ import {
   useUndo,
 } from '@/ui';
 import { TripTabs } from '@/ui/tab-bar';
+import { BudgetLine, BudgetSheet } from '@/components/budget';
 
 /**
  * 가계부와 정산.
@@ -74,10 +75,13 @@ export default function Money() {
   const [tab, setTab] = useState<'list' | 'settle'>('list');
   const { user } = useAuth();
 
-  const { data: trip } = useAsync<TripDetail>(
+  const tripQ = useAsync<TripDetail>(
     (signal) => api.get(`/api/trip?trip=${encodeURIComponent(id)}`, signal),
     [id],
   );
+  const trip = tripQ.data;
+  /* 예산 판을 열어 두었는지. */
+  const [budgeting, setBudgeting] = useState(false);
   const { data: mates } = useAsync<{ people: Person[] }>(
     (signal) => api.get(`/api/trips/${encodeURIComponent(id)}/people`, signal),
     [id],
@@ -226,6 +230,21 @@ export default function Money() {
     return rows.reduce((sum, b) => sum + (b.krw ?? 0), 0);
   }, [books.data]);
 
+  /*
+    예산과 견줄 원화.
+
+    <p>원화로만 썼으면 그 합이 그대로이고, 여러 통화면 환율로 합친 것입니다.
+    하나도 안 썼으면 0 입니다 — 떠나기 전에 예산만 정해 둔 자리입니다.
+  */
+  const spentKrw =
+    totals.length === 0
+      ? 0
+      : krwTotal != null
+        ? krwTotal
+        : totals.length === 1 && totals[0][0] === 'KRW'
+          ? totals[0][1].sum
+          : null;
+
   /* 적어야 할 환율이 남았는지. 합계 자리에 무엇을 하라고 적을 때 씁니다. */
   const needed = rates.data?.needed ?? [];
 
@@ -279,9 +298,11 @@ export default function Money() {
         <b>면 카드</b>(회색 면)를 씁니다 — 눌러서 들어가는 물건이 아니라
         한 덩어리로 읽어야 하는 숫자 묶음입니다.
       */}
-      {totals.length > 0 ? (
+      {/* 쓴 것이 없어도 섭니다 — 떠나기 전에 예산을 정하는 자리가 여기입니다. */}
+      {totals.length > 0 || trip ? (
         <View style={styles.summary}>
           <Caption tone="secondary">총 쓴 돈</Caption>
+          {totals.length === 0 ? <Text style={styles.total}>{money(0, 'KRW', 0)}</Text> : null}
           {/*
             적어 둔 환율로 전부 원화로 합칠 수 있으면 <b>원화가 큰 글자</b>입니다.
 
@@ -387,8 +408,21 @@ export default function Money() {
               </Split>
             </>
           ) : null}
+
+          <BudgetLine budget={trip?.trip.budget} spentKrw={spentKrw} onEdit={() => setBudgeting(true)} />
         </View>
       ) : null}
+
+      <BudgetSheet
+        visible={budgeting}
+        tripId={id}
+        budget={trip?.trip.budget}
+        onClose={() => setBudgeting(false)}
+        onDone={() => {
+          setBudgeting(false);
+          tripQ.reload();
+        }}
+      />
 
       <SegmentedTabs
         items={[
@@ -406,7 +440,10 @@ export default function Money() {
       {tab === 'list' ? (
         <>
           {spent.data && list.length === 0 ? (
-            <Empty message="아직 적어 둔 것이 없어요. 쓴 김에 적어 두면 돌아와서 편해요." />
+            /* 떠나기 전에도 적을 것이 있습니다 — 항공권, 숙소 예약금. 그 돈이
+               제일 큰데 「쓴 김에 적어 두라」만 있으면 여행 중에 적는 것인 줄
+               압니다. */
+            <Empty message="아직 적어 둔 것이 없어요. 항공권·숙소처럼 미리 낸 돈부터 적어 두면 예산과 견줘 볼 수 있어요." />
           ) : null}
 
           {/* 날짜별로 묶습니다. 여행의 돈은 하루 단위로 기억됩니다 —
@@ -1117,7 +1154,9 @@ function SpendSheet({
           <Row gap={Spacing.s2} style={styles.chips}>
             <Picker
               label="날"
-              allLabel="아직 모름"
+              /* 날을 안 고른 것은 「미리 낸 돈」으로 묶입니다(byDay). 항공권과
+                 숙소 예약금이 대개 여기 옵니다. */
+              allLabel="미리 낸 돈"
               value={dayId}
               options={days.map((d) => ({ value: d.id, label: d.date || d.label }))}
               onChange={(next) => {
@@ -1223,7 +1262,9 @@ function byDay(list: Spend[], days: TripDetail['days']) {
       });
       return {
         key,
-        label: key === '' ? '날짜 없음' : (labels.get(key) ?? '날짜 없음'),
+        /* 날을 안 고른 것. 대개 떠나기 전에 낸 항공권·숙소라 그 이름으로
+           부릅니다(「날짜 없음」이었습니다 — 빠뜨린 것처럼 읽혔습니다). */
+        label: key === '' ? '미리 낸 돈 · 날짜 없음' : (labels.get(key) ?? '미리 낸 돈 · 날짜 없음'),
         /* 어느 날인지 모르는 것에는 색이 없습니다. */
         color: colors.get(key) ?? null,
         items,

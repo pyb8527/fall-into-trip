@@ -109,6 +109,19 @@ public class TripController {
     public record NoticeBody(String text, Long version) {
     }
 
+    /** 여행 예산(원). 비우거나 0 이면 걷습니다. */
+    @PutMapping("/trips/{id}/budget")
+    public Map<String, Object> budget(@CurrentUser AuthPrincipal me, @PathVariable String id,
+                                      @RequestBody BudgetBody body) {
+        Trip trip = trips.writeBudget(me, id, body == null ? null : body.amount());
+        Map<String, Object> out = new java.util.HashMap<>();
+        out.put("budget", trip.getBudget());
+        return out;
+    }
+
+    public record BudgetBody(Long amount) {
+    }
+
     /**
      * 안내판 한 장 — 글, 누가 언제 고쳤나, 다음에 고칠 때 보낼 판.
      *

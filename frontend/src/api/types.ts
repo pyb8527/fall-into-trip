@@ -113,6 +113,8 @@ export type Trip = {
   /** 어느 모임의 여행인지. 비어 있으면 혼자 여행입니다. */
   groupId: Maybe<string>;
   createdAt: string;
+  /** 여행 예산(원). 안 정했으면 비어 있습니다. 상세(/api/trip)에만 실립니다. */
+  budget?: Maybe<number>;
 };
 
 export type Move = {
