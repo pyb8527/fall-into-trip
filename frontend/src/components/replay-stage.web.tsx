@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 
 import { gmaps, loadMaps } from '@/lib/gmaps.web';
-import { cameraFor, easeFor, meshOf, type Vehicle, VEHICLE_PX, vehicleFor } from '@/lib/vehicles';
+import type { VehicleScene } from '@/lib/vehicle-scene.web';
+import { cameraFor, easeFor, type Vehicle, VEHICLE_PX, vehicleFor } from '@/lib/vehicles';
 
 /**
  * 동선 다시 보기 — 기울인 지도 위에서.
@@ -74,6 +75,8 @@ type Goal = {
   color: string;
   /** 이 구간에 타는 것. */
   vehicle: Vehicle;
+  /** 곳에 머무는 중인지. 걷는 사람은 이때 멈춰 섭니다. */
+  still: boolean;
 };
 
 type Cam = { lat: number; lng: number; heading: number; zoom: number; lift: number };
@@ -109,11 +112,11 @@ export function ReplayStage({
   /* 탈것 그림을 매 화면 새로 만들지 않으려고 — 각도 · 높이 · 색이 같으면 그대로. */
   const flierKey = useRef('');
   /*
-    3D 탈것을 그리는 deck.gl. 이 화면을 열 때만 받아 옵니다(수백 KB) — 다른
-    화면은 이것 때문에 느려지지 않습니다. 못 받으면 평평한 비행기 그림으로
+    3D 탈것(three.js · lib/vehicle-scene). 이 화면을 열 때만 받아 옵니다 —
+    다른 화면은 이것 때문에 느려지지 않습니다. 못 받으면 평평한 비행기 그림으로
     돕니다.
   */
-  const deck = useRef<{ overlay: any; Layer: any } | null>(null);
+  const scene = useRef<VehicleScene | null>(null);
 
   /* 지도를 한 번 세웁니다. */
   useEffect(() => {
@@ -141,14 +144,16 @@ export function ReplayStage({
           onReady();
         });
         /* 탈것 모양. 지도와 따로 받아, 늦게 와도 지도는 먼저 돕니다. */
-        Promise.all([import('@deck.gl/google-maps'), import('@deck.gl/mesh-layers')])
-          .then(([gm, mesh]) => {
-            if (!alive || !map.current) {
+        /* 한 번의 import() — three 가 처음 받는 조각(__common)에 끼지 않게
+           (lib/vehicle-scene 의 문서). */
+        import('@/lib/vehicle-scene.web')
+          .then(({ createVehicleScene }) => createVehicleScene(map.current))
+          .then((made) => {
+            if (!alive) {
+              made.dispose();
               return;
             }
-            const overlay = new gm.GoogleMapsOverlay({ interleaved: true, layers: [] });
-            overlay.setMap(map.current);
-            deck.current = { overlay, Layer: mesh.SimpleMeshLayer };
+            scene.current = made;
             /* 그려 둔 평평한 비행기는 걷습니다. */
             flier.current?.setMap(null);
             flier.current = null;
@@ -164,8 +169,8 @@ export function ReplayStage({
       });
     return () => {
       alive = false;
-      deck.current?.overlay.setMap(null);
-      deck.current = null;
+      scene.current?.dispose();
+      scene.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -277,7 +282,7 @@ export function ReplayStage({
       goal.current = null;
       flier.current?.setMap(null);
       flier.current = null;
-      deck.current?.overlay.setProps({ layers: [] });
+      scene.current?.hide();
       /* 다 봤으면 물러나 전부를 비스듬히. */
       const bounds = new g.LatLngBounds();
       places.forEach((p) => bounds.extend({ lat: p.lat, lng: p.lng }));
@@ -319,6 +324,7 @@ export function ReplayStage({
       lift,
       color,
       vehicle,
+      still: raw <= 0 || !next,
     };
   }, [places, step, gone, done, ready]);
 
@@ -363,8 +369,8 @@ export function ReplayStage({
       });
 
       /* 3D 탈것. 받아 왔으면 이것만 그립니다. */
-      if (deck.current) {
-        drawVehicle(deck.current, want, c, nowMs);
+      if (scene.current) {
+        drawVehicle(scene.current, want, c, dt);
         return;
       }
 
@@ -406,33 +412,20 @@ export function ReplayStage({
  * 사람이 손톱만 하고 나는 구간(배율 8)에서는 비행기가 점이 됩니다 — 배율이
  * 바뀔 때마다 그 자리의 1픽셀이 몇 미터인지로 나눠 늘 비슷한 크기로 둡니다.
  *
- * <p>높이도 픽셀로 셈합니다. 비행기는 구간 가운데에서 가장 높이 뜨고, 사람은
- * 걸음마다 살짝 튑니다.
+ * <p>비행기는 구간 가운데에서 가장 높이 뜹니다. 사람은 모델의 걷는 동작이
+ * 걸음을 대신합니다(머무는 동안은 서 있는 동작).
  */
-function drawVehicle(deck: { overlay: any; Layer: any }, want: Goal, c: Cam, nowMs: number) {
-  const mesh = meshOf(want.vehicle, want.color);
+function drawVehicle(scene: VehicleScene, want: Goal, c: Cam, dt: number) {
   const mpp = (156543.03392 * Math.cos((c.lat * Math.PI) / 180)) / Math.pow(2, c.zoom);
-  const scale = (mpp * VEHICLE_PX[want.vehicle]) / mesh.length;
-  let z = 0;
-  if (want.vehicle === 'plane') {
-    z = mpp * (8 + c.lift * 90);
-  } else if (want.vehicle === 'walk') {
-    z = mpp * 2.5 * Math.abs(Math.sin(nowMs / 140));
-  }
-  deck.overlay.setProps({
-    layers: [
-      new deck.Layer({
-        id: 'vehicle',
-        data: [{ at: [c.lng, c.lat, z] }],
-        mesh,
-        sizeScale: scale,
-        getPosition: (d: { at: number[] }) => d.at,
-        /* deck.gl 은 반시계로 돌립니다. 북쪽에서 시계 방향 각의 음수. */
-        getOrientation: () => [0, -want.legHeading, 0],
-        getColor: [255, 255, 255],
-        material: { ambient: 0.55, diffuse: 0.6, shininess: 24, specularColor: [255, 255, 255] },
-      }),
-    ],
+  scene.draw({
+    vehicle: want.vehicle,
+    lat: c.lat,
+    lng: c.lng,
+    altitude: want.vehicle === 'plane' ? mpp * (6 + c.lift * 90) : 0,
+    heading: want.legHeading,
+    meters: mpp * VEHICLE_PX[want.vehicle],
+    still: want.still,
+    dt,
   });
 }
 

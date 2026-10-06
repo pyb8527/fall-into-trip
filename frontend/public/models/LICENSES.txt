@@ -1,0 +1,14 @@
+동선 다시 보기(여행 요약 · 동선)의 탈것 모델.
+
+walk.glb   Kenney「Mini Characters」 character-female-a   CC0 1.0   https://kenney.nl/assets/mini-characters
+car.glb    Kenney「Car Kit」 sedan                        CC0 1.0   https://kenney.nl/assets/car-kit
+bus.glb    Kenney「Car Kit」 van                          CC0 1.0   https://kenney.nl/assets/car-kit
+train.glb  Kenney「Train Kit」 train-electric-bullet-a    CC0 1.0   https://kenney.nl/assets/train-kit
+boat.glb   Kenney「Watercraft Pack」 ship-small           CC0 1.0   https://kenney.nl/assets/watercraft-kit
+plane.glb  「Airplane」 by Poly by Google                  CC-BY 3.0 https://poly.pizza/m/8ciDd9k8wha
+           (https://creativecommons.org/licenses/by/3.0/)
+
+Kenney 모델은 묶음마다 텍스처(Textures/colormap.png)가 이름이 같은 다른 그림이라
+gltf-transform copy 로 파일 안에 묻었습니다. 모양은 손대지 않았습니다.
+
+CC-BY 인 비행기는 화면에 출처를 적습니다(app/card/[id].tsx 의 동선 아래 한 줄).

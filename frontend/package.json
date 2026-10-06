@@ -13,14 +13,9 @@
     "lint": "expo lint"
   },
   "dependencies": {
-    "@deck.gl/core": "~9.4.0",
-    "@deck.gl/google-maps": "~9.4.0",
-    "@deck.gl/mesh-layers": "~9.4.0",
     "@expo/vector-icons": "^15.1.1",
+    "@googlemaps/three": "^4.0.13",
     "@kesha-antonov/react-native-background-downloader": "^4.6.2",
-    "@luma.gl/core": "~9.4.0",
-    "@luma.gl/engine": "~9.4.0",
-    "@luma.gl/webgl": "~9.4.0",
     "@mlc-ai/web-llm": "^0.2.85",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-community/datetimepicker": "^9.1.0",
@@ -62,10 +57,12 @@
     "react-native-web": "~0.21.0",
     "react-native-webview": "^13.16.1",
     "react-native-worklets": "0.10.1",
+    "three": "^0.186.1",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
+    "@types/three": "^0.186.0",
     "eslint": "^9.0.0",
     "eslint-config-expo": "~57.0.2",
     "typescript": "~6.0.3"

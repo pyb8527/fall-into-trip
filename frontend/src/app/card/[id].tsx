@@ -628,6 +628,12 @@ function Replay({ trip }: { trip: TripDetail }) {
         )}
       </View>
 
+      {/* 비행기 모델은 CC-BY 라 출처를 적습니다(public/models/LICENSES.txt).
+          기울인 지도에서 3D 탈것이 설 때만 — 평평한 지도에는 이 모델이 없습니다. */}
+      {hasTiltMaps() ? (
+        <Caption tone="muted">비행기 모델: Poly by Google (CC-BY) · 탈것: Kenney (CC0)</Caption>
+      ) : null}
+
       <Row gap={Spacing.s2}>
         <Button
           label={playing ? '멈추기' : done ? '처음부터' : '이어서'}
