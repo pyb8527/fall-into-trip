@@ -6,6 +6,7 @@ import { useAsync } from '@/api/use-async';
 import { Spacing } from '@/constants/theme';
 import { BottomSheet, Button, Caption, Chip, ErrorNote, Field, Row, Stepper } from '@/ui';
 import { DateField } from '@/ui/date-field';
+import { formatDay } from '@/lib/countdown';
 
 /** 서버의 CreateTripRequest 가 받는 상한. */
 const MAX_NIGHTS = 30;
@@ -162,8 +163,6 @@ const pad = (n: number) => String(n).padStart(2, '0');
 const toIso = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const today = () => toIso(new Date());
 
-const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
-
 /** 며칠부터 며칠까지인지 미리 보여 줍니다. 숙박 수만으로는 잘 안 그려집니다. */
 function summary(startIso: string, nights: number) {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(startIso);
@@ -174,7 +173,8 @@ function summary(startIso: string, nights: number) {
   const end = new Date(start);
   end.setDate(end.getDate() + nights);
 
-  const fmt = (d: Date) => `${d.getMonth() + 1}.${d.getDate()} (${WEEKDAYS[d.getDay()]})`;
+  /* 다른 화면과 같은 모양으로(10.08(목)). 여기만 「10.8 (목)」이었습니다. */
+  const fmt = (d: Date) => formatDay(toIso(d));
   const days = nights + 1;
   return nights === 0
     ? `${fmt(start)} 당일치기`

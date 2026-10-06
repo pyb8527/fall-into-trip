@@ -12,7 +12,7 @@ import { TipSheet } from '@/components/tip-sheet';
 import { TripCalendar } from '@/components/trip-calendar';
 import { TripThumb } from '@/components/trip-thumb';
 import { glyphOf } from '@/constants/place-icons';
-import { formatNights, formatSpan, todayIso } from '@/lib/countdown';
+import { formatInstant, formatNights, formatSpan, todayIso } from '@/lib/countdown';
 import { money } from '@/lib/money';
 import { Colors, Radius, Spacing, Tap, Type } from '@/constants/theme';
 import { FacePicker } from '@/components/face-picker';
@@ -750,8 +750,8 @@ function MyLeft({ whose, reviewCount }: { whose: string | null; reviewCount: num
  * 고친 줄이 안 눈에 띕니다.
  */
 function whenOf(at: string, editedAt?: string | null) {
-  const wrote = at.slice(0, 10);
-  return editedAt ? `${wrote} · ${editedAt.slice(0, 10)} 고침` : wrote;
+  const wrote = formatInstant(at);
+  return editedAt ? `${wrote} · ${formatInstant(editedAt)} 고침` : wrote;
 }
 
 /**

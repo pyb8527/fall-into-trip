@@ -230,7 +230,7 @@ function Receipt({
       <View style={styles.center}>
         <Body strong>{trip.trip.title}</Body>
         <Caption tone="secondary">
-          {trip.days[0]?.date ?? ''} — {trip.days[trip.days.length - 1]?.date ?? ''}
+          {trip.days[0]?.date ?? ''} ~ {trip.days[trip.days.length - 1]?.date ?? ''}
         </Caption>
       </View>
 

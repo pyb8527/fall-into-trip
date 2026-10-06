@@ -32,6 +32,7 @@ import {
   Stepper,
   Subtitle,
 } from '@/ui';
+import { formatInstant } from '@/lib/countdown';
 
 /**
  * 모임의 사람들과, 부르는 링크.
@@ -531,7 +532,7 @@ function InviteRowView({
             {invite.usedCount}/{invite.maxUses}명
           </Caption>
           <Caption tone="secondary">
-            {invite.expiresAt ? `${invite.expiresAt.slice(0, 10)}까지` : '기한 없음'}
+            {invite.expiresAt ? `${formatInstant(invite.expiresAt)}까지` : '기한 없음'}
           </Caption>
         </View>
 

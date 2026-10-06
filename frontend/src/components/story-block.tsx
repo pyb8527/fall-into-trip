@@ -4,6 +4,7 @@ import type { Story } from '@/api/types';
 import { PhotoStrip } from '@/components/photo-strip';
 import { Colors, Radius, Spacing, Type, Weight } from '@/constants/theme';
 import { Body, Caption, Row } from '@/ui';
+import { formatInstant } from '@/lib/countdown';
 
 /**
  * 여행기에 같이 실린 글 한 편.
@@ -25,7 +26,7 @@ export function StoryBlock({ story }: { story: Story }) {
     <View style={styles.block}>
       <Row gap={Spacing.s2}>
         <Caption strong>{story.author}</Caption>
-        <Caption tone="muted">{story.at.slice(0, 10)}</Caption>
+        <Caption tone="muted">{formatInstant(story.at)}</Caption>
       </Row>
 
       {shots.length > 0 ? <PhotoStrip ids={shots} height={260} /> : null}

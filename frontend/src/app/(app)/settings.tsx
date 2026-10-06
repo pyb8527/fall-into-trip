@@ -9,7 +9,7 @@ import { GoogleButton } from '@/components/google-button';
 import { canSignInWithKakao, KakaoButton } from '@/components/kakao-button';
 import { ProfileFace } from '@/components/profile-face';
 import { addToCalendar, canAddToCalendar } from '@/lib/calendar';
-import { formatSpan, todayIso } from '@/lib/countdown';
+import { formatInstant, formatSpan, todayIso } from '@/lib/countdown';
 import { canParseHere, dropModel, fetchModel, intentState, modelNote } from '@/lib/intent';
 import type { IntentState } from '@/lib/intent-types';
 import { canLinkKakao } from '@/lib/kakao-signin';
@@ -1032,7 +1032,7 @@ function formatDate(iso?: string | null) {
   if (!iso) {
     return '없음';
   }
-  return iso.slice(0, 10);
+  return formatInstant(iso);
 }
 
 const styles = StyleSheet.create({

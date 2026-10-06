@@ -9,6 +9,7 @@ import { useAuth } from '@/auth/auth-provider';
 import { Spacing } from '@/constants/theme';
 import { Body, Button, Caption, Card, ErrorNote, Loading, Screen, Title } from '@/ui';
 import { LogoLockup } from '@/ui/logo';
+import { formatInstant } from '@/lib/countdown';
 
 /**
  * 초대 링크를 눌렀을 때.
@@ -94,7 +95,7 @@ export default function InviteScreen() {
             </Caption>
             <Caption tone="secondary">
               {invite.expiresAt
-                ? `${invite.expiresAt.slice(0, 10)}까지 쓸 수 있는 링크예요.`
+                ? `${formatInstant(invite.expiresAt)}까지 쓸 수 있는 링크예요.`
                 : '기한이 없는 링크예요.'}
             </Caption>
           </Card>

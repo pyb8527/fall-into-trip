@@ -21,6 +21,7 @@ import {
   Split,
   Subtitle,
 } from '@/ui';
+import { formatInstant } from '@/lib/countdown';
 
 /**
  * 일정에 달린 댓글.
@@ -312,7 +313,7 @@ function CommentRow({
               여기서 알아야 할 것은 「바뀐 적이 있다」 하나이고, 언제
               바뀌었는지는 남긴 사람이 제 목록에서 봅니다. */}
           <Caption tone="secondary">
-            {comment.authorName} · {comment.createdAt.slice(0, 10)}
+            {comment.authorName} · {formatInstant(comment.createdAt)}
             {comment.editedAt ? ' · 고침' : ''}
           </Caption>
           {action}

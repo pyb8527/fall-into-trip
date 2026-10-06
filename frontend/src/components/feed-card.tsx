@@ -29,6 +29,7 @@ import {
   Split,
   Tag,
 } from '@/ui';
+import { formatInstant } from '@/lib/countdown';
 
 /**
  * 피드 글 한 편.
@@ -415,7 +416,7 @@ function ago(iso: string) {
   if (sec < 86400 * 7) {
     return `${Math.floor(sec / 86400)}일 전`;
   }
-  return iso.slice(0, 10);
+  return formatInstant(iso);
 }
 
 const styles = StyleSheet.create({

@@ -36,7 +36,6 @@ import {
   Split,
   Tabs,
 } from '@/ui';
-import { stackHeader } from '@/ui/nav';
 
 /**
  * 모임 하나.
@@ -173,10 +172,14 @@ export default function GroupScreen() {
   return (
     <Screen>
       {/* 받아 온 뒤에는 모임 이름이 머리글입니다. 「모임」 이라고만 적혀
-          있으면 어느 모임인지 위에서 알 수 없습니다. */}
-      <Stack.Screen
-        options={stackHeader(group?.name ?? '모임', { up: '/(app)/groups' })}
-      />
+          있으면 어느 모임인지 위에서 알 수 없습니다.
+
+          <p>stackHeader(...) 를 그대로 넘기고 있었는데 그것은 <b>함수</b>를
+          돌려줍니다. 화면 안의 Stack.Screen 은 받은 것을 setOptions 에 넘기고,
+          setOptions 는 덩이만 받아서 이름이 한 번도 안 섰습니다 — 위 막대는
+          늘 _layout 이 정한 「모임」이었습니다. 돌아가기 단추는 _layout 이
+          이미 달아 두었으므로 여기서는 제목만 바꿉니다. */}
+      <Stack.Screen options={{ title: group?.name ?? '모임' }} />
 
       {loading && !data ? <Loading /> : null}
       {error ? <ErrorNote message={error} onRetry={reload} /> : null}

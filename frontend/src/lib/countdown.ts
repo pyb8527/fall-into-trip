@@ -158,6 +158,26 @@ export function formatDay(iso: string | null | undefined): string {
 }
 
 /**
+ * 서버가 준 시각(ISO 순간)을 그 기기의 날짜로. "10.02(금)".
+ *
+ * <p>댓글·리뷰·설정이 {@code iso.slice(0, 10)} 으로 「2026-10-02」를 그대로
+ * 내놓고 있었습니다 — 같은 앱의 다른 자리는 「10.02(금)」인데 여기만 저장된
+ * 값이었습니다. 게다가 UTC 날짜라 아침 9시 전에 쓴 것은 <b>하루 전</b>으로
+ * 찍혔습니다. 기기의 날짜로 바꾼 뒤 {@link formatDay} 를 씁니다.
+ */
+export function formatInstant(iso: string | null | undefined): string {
+  if (!iso) {
+    return '';
+  }
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) {
+    return '';
+  }
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return formatDay(`${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}`);
+}
+
+/**
  * 하루부터 하루까지. "09.14(월) ~ 09.18(금)".
  *
  * <p>가운데는 물결표입니다. 엔 대시를 쓰고 있었는데, 한국어에서 기간을 적는
