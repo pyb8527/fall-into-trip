@@ -64,6 +64,7 @@ import { CardGap, useCardColumns } from '@/ui/layout';
 import { ScreenTop } from '@/ui/nav';
 import { LogoInline, LogoSymbol } from '@/ui/logo';
 import { AppTabs } from '@/ui/tab-bar';
+import { quoted } from '@/lib/josa';
 
 /**
  * 첫 화면.
@@ -199,7 +200,7 @@ export default function Home() {
       try {
         await api.delete(`/api/saved/${encodeURIComponent(savedId)}`);
         await reloadSaved();
-        setKeepNote(`「${place.name}」 를 보석함에서 뺐어요.`);
+        setKeepNote(`${quoted(place.name, '을를')} 보석함에서 뺐어요.`);
       } catch (e) {
         setKeepFailed(e instanceof ApiError ? e.message : UNEXPECTED);
       }
@@ -208,7 +209,7 @@ export default function Home() {
     /* 좌표 없이는 담아도 지도에 안 섭니다. 말없이 넘어가면 눌린 적이 없는
        것처럼 보입니다. */
     if (place.lat == null || place.lng == null) {
-      setKeepFailed(`「${place.name}」 는 자리를 몰라서 담을 수 없어요.`);
+      setKeepFailed(`${quoted(place.name, '은는')} 자리를 몰라서 담을 수 없어요.`);
       return;
     }
     try {
@@ -220,7 +221,7 @@ export default function Home() {
         icon: place.icon,
       });
       await reloadSaved();
-      setKeepNote(`「${place.name}」 를 보석함에 담았어요.`);
+      setKeepNote(`${quoted(place.name, '을를')} 보석함에 담았어요.`);
     } catch (e) {
       /* 삼키지 않습니다. 서버가 보낸 말이 그대로 쓸모 있습니다 — 「보석함이
          가득 찼어요」 같은 것은 사람이 할 일을 알려 줍니다. */

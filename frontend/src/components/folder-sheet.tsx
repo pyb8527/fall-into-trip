@@ -16,6 +16,7 @@ import {
   IconButton,
   ListRow,
 } from '@/ui';
+import { quoted } from '@/lib/josa';
 
 /**
  * 여행을 폴더에 넣습니다.
@@ -101,7 +102,7 @@ export function FolderSheet({
   return (
     <BottomSheet visible={visible} title="폴더에 넣기" onClose={onClose}>
       <Caption tone="secondary">
-        「{tripTitle}」 를 어디에 둘까요? 폴더는 나에게만 보여요 — 같이 간 사람은 자기 식대로
+        {quoted(tripTitle, '을를')} 어디에 둘까요? 폴더는 나에게만 보여요 — 같이 간 사람은 자기 식대로
         정리해요.
       </Caption>
 

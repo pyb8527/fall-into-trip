@@ -53,19 +53,23 @@ export function countdownOf(startIso: string | null, endIso: string | null): Cou
   }
 
   const days = daysBetween(today, startIso);
-  return days === 0 ? { kind: 'tomorrow' } : { kind: 'left', days };
+  return days === 1 ? { kind: 'tomorrow' } : { kind: 'left', days };
 }
 
 /**
- * 두 날짜 사이의 날 수.
+ * 두 날짜 사이의 날 수. 오늘에서 내일까지가 1 입니다.
  *
- * <p>자정을 기준으로 세므로 시각은 보지 않습니다. 내일 떠나면 0 입니다 —
- * 그 자리에는 숫자 대신 "내일" 이 붙습니다.
+ * <p>자정을 기준으로 세므로 시각은 보지 않습니다.
+ *
+ * <p>여기서 1 을 빼고 있었습니다. 「사이에 낀 날」을 세는 셈이라, 모레
+ * 떠나는 여행이 「D-1」이 되고(D-day 는 날짜의 차이입니다) 여행 이틀째가
+ * 「1일째」, 그제 돌아온 여행이 「어제 돌아왔어요」가 됐습니다 — 부르는 세
+ * 자리가 모두 차이를 원했습니다.
  */
 export function daysBetween(from: string, to: string) {
   const a = new Date(`${from}T00:00:00`);
   const b = new Date(`${to}T00:00:00`);
-  return Math.max(0, Math.round((b.getTime() - a.getTime()) / 86_400_000) - 1);
+  return Math.max(0, Math.round((b.getTime() - a.getTime()) / 86_400_000));
 }
 
 /**

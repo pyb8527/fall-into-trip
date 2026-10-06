@@ -66,6 +66,7 @@ import { DateField } from '@/ui/date-field';
 import { SidePanelWidth, useWide } from '@/ui/layout';
 import { MapAside } from '@/ui/map-aside';
 import { KEEP, UNKEEP } from '@/constants/words';
+import { quoted } from '@/lib/josa';
 
 /**
  * 보석함 대조 열쇠.
@@ -292,7 +293,7 @@ export default function Post() {
         next.delete(savedKeyOf(place));
         return next;
       });
-      setNotice(`「${place.name}」 를 보석함에서 뺐어요.`);
+      setNotice(`${quoted(place.name, '을를')} 보석함에서 뺐어요.`);
     } catch (e) {
       setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
     }
@@ -326,7 +327,7 @@ export default function Post() {
         잠시 뒤 사라지므로 하던 일을 막지 않습니다.
       */
       showUndo({
-        message: `「${place.name}」 를 보석함에 담았어요. 일정에 추가하러 가실까요?`,
+        message: `${quoted(place.name, '을를')} 보석함에 담았어요. 일정에 추가하러 가실까요?`,
         label: '보석함으로',
         onUndo: () => router.push('/(app)/saved'),
       });

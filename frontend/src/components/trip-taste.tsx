@@ -114,7 +114,7 @@ export function TripTaste({
     <View style={styles.taste}>
       <Body strong>이렇게 짜요</Body>
       <Caption tone="secondary">
-        {`「${data.title}」 에서 가져온 일정이에요. 날을 눌러 보세요.`}
+        {`「${data.title}」에서 가져온 일정이에요. 날을 눌러 보세요.`}
       </Caption>
 
       {/*

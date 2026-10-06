@@ -41,6 +41,7 @@ import {
   Title,
 } from '@/ui';
 import { NavLeft, ScreenTop } from '@/ui/nav';
+import { quoted } from '@/lib/josa';
 
 type Tab = 'places' | 'regions';
 
@@ -302,7 +303,7 @@ export default function Popular() {
         await api.delete(`/api/saved/${encodeURIComponent(savedId)}`);
         await reloadSaved();
         setSaid({
-          text: `「${place.name}」 를 보석함에서 뺐어요.`,
+          text: `${quoted(place.name, '을를')} 보석함에서 뺐어요.`,
           label: '보석함으로',
           go: () => router.push('/(app)/saved'),
         });
@@ -314,7 +315,7 @@ export default function Popular() {
     /* 좌표 없이는 담아도 지도에 안 섭니다. 말없이 돌아서면 눌린 적이 없는
        것처럼 보입니다. */
     if (place.lat == null || place.lng == null) {
-      setFailed(`「${place.name}」 는 자리를 몰라서 담을 수 없어요.`);
+      setFailed(`${quoted(place.name, '은는')} 자리를 몰라서 담을 수 없어요.`);
       return;
     }
     try {
@@ -327,7 +328,7 @@ export default function Popular() {
       });
       await reloadSaved();
       setSaid({
-        text: `「${place.name}」 를 보석함에 담았어요.`,
+        text: `${quoted(place.name, '을를')} 보석함에 담았어요.`,
         label: '보석함으로',
         go: () => router.push('/(app)/saved'),
       });
@@ -386,7 +387,7 @@ export default function Popular() {
         await api.post(`/api/trips/${encodeURIComponent(trip.id)}/candidates`, body);
         setAiming(null);
         setSaid({
-          text: `「${place.name}」 를 「${trip.title}」 ${WANT}에 올렸어요. 모두 좋다고 하면 일정이 돼요.`,
+          text: `${quoted(place.name, '을를')} 「${trip.title}」 ${WANT}에 올렸어요. 모두 좋다고 하면 일정이 돼요.`,
           /* 투표장으로 밀어 넣지 않습니다. 순위를 훑던 중이라 화면이 바뀌면
              몇 번째를 보고 있었는지 잃습니다 — 줄로 가리키고 손에 맡깁니다. */
           label: '투표장 보기',
@@ -713,7 +714,7 @@ export default function Popular() {
       <DayPicker
         days={pouring?.days}
         visible={pouring != null}
-        note={`「${pouring?.place.name ?? ''}」 가 그 날 맨 뒤에 붙어요. 순서는 넣은 뒤 바꿀 수 있어요.`}
+        note={`${quoted(pouring?.place.name ?? '', '이가')} 그 날 맨 뒤에 붙어요. 순서는 넣은 뒤 바꿀 수 있어요.`}
         onPour={async (dayId) => {
           if (!pouring) {
             return;
@@ -732,7 +733,7 @@ export default function Popular() {
           const at = days.findIndex((d) => d.id === dayId);
           const day = days[at];
           setSaid({
-            text: `「${place.name}」 를 「${trip.title}」 ${day?.label || `${at + 1}일차`}에 넣었어요.`,
+            text: `${quoted(place.name, '을를')} 「${trip.title}」 ${day?.label || `${at + 1}일차`}에 넣었어요.`,
             label: '여행 보기',
             go: () => router.push({ pathname: '/trip/[id]', params: { id: trip.id } }),
           });

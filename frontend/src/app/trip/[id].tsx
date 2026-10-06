@@ -107,6 +107,7 @@ import { MapAside } from '@/ui/map-aside';
 import { TripTabs } from '@/ui/tab-bar';
 import { TripMark } from '@/components/trip-mark';
 import { CountdownBadge } from '@/components/countdown-badge';
+import { quoted } from '@/lib/josa';
 
 /** 전체를 보는 상태. 특정 날짜가 아니라는 뜻입니다. */
 const ALL = -1;
@@ -4497,7 +4498,7 @@ function BookingPaste({
         <Button label="읽기" variant="secondary" compact onPress={read} busy={busy} />
         {found?.stayName ? (
           <Caption tone="secondary" numberOfLines={1}>
-            숙소로 「{found.stayName}」 를 읽었어요 — 아래에서 찾아 골라 주세요
+            숙소로 {quoted(found.stayName, '을를')} 읽었어요 — 아래에서 찾아 골라 주세요
           </Caption>
         ) : null}
       </Row>

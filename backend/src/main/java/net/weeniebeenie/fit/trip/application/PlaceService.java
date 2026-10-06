@@ -6,6 +6,7 @@ import net.weeniebeenie.fit.shared.domain.Coordinates;
 import net.weeniebeenie.fit.shared.domain.Versioned;
 import net.weeniebeenie.fit.expense.domain.Currencies;
 import net.weeniebeenie.fit.shared.error.ApiException;
+import net.weeniebeenie.fit.shared.text.Josa;
 import net.weeniebeenie.fit.support.audit.AuditService;
 import net.weeniebeenie.fit.support.push.PushService;
 import net.weeniebeenie.fit.trip.domain.*;
@@ -82,7 +83,7 @@ public class PlaceService {
 
         resort(day.getId());
         audit.log(me.id(), "place.create", place.getId(), Map.of("name", name, "day", day.getLabel()));
-        announce(me, day.getTripId(), day.getLabel() + "에 「" + name + "」 를 넣었어요.");
+        announce(me, day.getTripId(), day.getLabel() + "에 " + Josa.quoted(name, "을", "를") + " 넣었어요.");
         return place;
     }
 
@@ -158,7 +159,7 @@ public class PlaceService {
         }
         audit.log(me.id(), "place.update", place.getId(), Map.of("name", place.getName()));
         days.findById(place.getDayId()).ifPresent(d ->
-                announce(me, d.getTripId(), "「" + place.getName() + "」 를 고쳤어요."));
+                announce(me, d.getTripId(), Josa.quoted(place.getName(), "을", "를") + " 고쳤어요."));
         return place;
     }
 
@@ -173,7 +174,7 @@ public class PlaceService {
         places.delete(place);
         resort(day.getId());
         audit.log(me.id(), "place.delete", place.getId(), Map.of("name", place.getName()));
-        announce(me, day.getTripId(), "「" + place.getName() + "」 를 뺐어요.");
+        announce(me, day.getTripId(), Josa.quoted(place.getName(), "을", "를") + " 뺐어요.");
     }
 
     /**

@@ -33,6 +33,7 @@ import {
   useUndo,
 } from '@/ui';
 import { ScreenTop } from '@/ui/nav';
+import { quoted } from '@/lib/josa';
 
 /**
  * 한 자리에서 찾기.
@@ -165,7 +166,7 @@ export default function Search() {
       });
       setKept((was) => new Set(was).add(found.name));
       showUndo({
-        message: `「${found.name}」 를 보석함에 주웠어요.`,
+        message: `${quoted(found.name, '을를')} 보석함에 주웠어요.`,
         label: '보석함으로',
         onUndo: () => router.push('/(app)/saved'),
       });

@@ -72,7 +72,7 @@ let got = await news(a);
 let added = find(got.items, (i) => i.kind === "place.add");
 T("가의 소식에 실림", added.length === 1, got.items);
 T("넣은 사람 이름이 붙음", added[0]?.actorName === "나", added[0]);
-T("넣었다고 적힘", added[0]?.text === `${dayLabel}에 「이치란」 를 넣었어요.`, added[0]);
+T("넣었다고 적힘", added[0]?.text === `${dayLabel}에 「이치란」을 넣었어요.`, added[0]);
 T("그 여행으로 가는 길", added[0]?.url === `/trip/${trip}` && added[0]?.tripTitle === "오사카 3박 4일", added[0]);
 
 console.log("\n[4] 넣은 것과 고친 것이 갈립니다");
@@ -81,7 +81,7 @@ T("나가 고침", r.status === 200, r.data);
 
 got = await news(a);
 T("이제 고쳤다고 적힘",
-  find(got.items, (i) => i.kind === "place.edit" && i.text === "「이치란 도톤보리」 를 고쳤어요.").length === 1,
+  find(got.items, (i) => i.kind === "place.edit" && i.text === "「이치란 도톤보리」를 고쳤어요.").length === 1,
   got.items);
 T("넣었다는 줄은 사라짐", find(got.items, (i) => i.kind === "place.add").length === 0, got.items);
 
@@ -135,11 +135,11 @@ T("다가 댓글을 남김", r.status === 200, r.data);
 
 got = await news(a);
 T("추천이 실림",
-  find(got.items, (i) => i.kind === "post.like" && i.text === "「오사카 3박 4일」 를 추천했어요.").length === 1,
+  find(got.items, (i) => i.kind === "post.like" && i.text === "「오사카 3박 4일」을 추천했어요.").length === 1,
   got.items);
 T("한 사람이면 이름이 붙음", find(got.items, (i) => i.kind === "post.like")[0]?.actorName === "다", got.items);
 T("댓글이 실림",
-  find(got.items, (i) => i.kind === "post.comment" && i.text === "「오사카 3박 4일」 에 댓글을 남겼어요.").length === 1,
+  find(got.items, (i) => i.kind === "post.comment" && i.text === "「오사카 3박 4일」에 댓글을 남겼어요.").length === 1,
   got.items);
 T("글로 가는 길", find(got.items, (i) => i.kind === "post.like")[0]?.url === `/community/${post}`, got.items);
 /* 글에서 벌어진 일에는 여행 번호가 안 붙습니다. 둘 중 하나만 찹니다. */
@@ -163,8 +163,8 @@ const likes = find(got.items, (i) => i.kind === "post.like");
 const said = find(got.items, (i) => i.kind === "post.comment");
 T("추천 13건이 한 줄", likes.length === 1, likes.length);
 T("댓글 13건이 한 줄", said.length === 1, said.length);
-T("몇 사람인지 적음", likes[0]?.text === "「오사카 3박 4일」 를 13명이 추천했어요.", likes[0]);
-T("댓글도 몇 사람인지 적음", said[0]?.text === "「오사카 3박 4일」 에 13명이 댓글을 남겼어요.", said[0]);
+T("몇 사람인지 적음", likes[0]?.text === "「오사카 3박 4일」을 13명이 추천했어요.", likes[0]);
+T("댓글도 몇 사람인지 적음", said[0]?.text === "「오사카 3박 4일」에 13명이 댓글을 남겼어요.", said[0]);
 T("여럿이면 이름을 안 붙임", !likes[0]?.actorName && !said[0]?.actorName, likes[0]);
 /* 접는 목적은 자리를 비우는 것입니다. 여행 쪽 소식이 그대로 남아 있어야
    접은 보람이 있습니다. */

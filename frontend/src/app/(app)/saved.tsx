@@ -49,6 +49,7 @@ import { CardGrid } from '@/ui/grid';
 import { ScreenTop } from '@/ui/nav';
 import { AppTabs } from '@/ui/tab-bar';
 import { KEEP, UNKEEP } from '@/constants/words';
+import { quoted } from '@/lib/josa';
 
 /**
  * 갈래를 안 고른 곳들의 묶음 이름.
@@ -326,7 +327,7 @@ export default function Saved() {
       showUndo({
         message:
           targets.length === 1
-            ? `「${targets[0].name}」 를 뺐어요.`
+            ? `${quoted(targets[0].name, '을를')} 뺐어요.`
             : `${targets.length}곳을 뺐어요.`,
         onUndo: () => restore(targets),
       });
@@ -380,7 +381,7 @@ export default function Saved() {
         return next;
       });
       reload();
-      showUndo({ message: `「${place.name}」 를 뺐어요.`, onUndo: () => restore([place]) });
+      showUndo({ message: `${quoted(place.name, '을를')} 뺐어요.`, onUndo: () => restore([place]) });
     } catch (e) {
       setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
     }
@@ -959,7 +960,7 @@ function StarterPicks({ onKept }: { onKept: () => void }) {
       return;
     }
     if (p.lat == null || p.lng == null) {
-      setFailed(`「${p.name}」 는 자리를 몰라서 담을 수 없어요.`);
+      setFailed(`${quoted(p.name, '은는')} 자리를 몰라서 담을 수 없어요.`);
       return;
     }
     try {
