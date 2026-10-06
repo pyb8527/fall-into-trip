@@ -13,8 +13,14 @@
     "lint": "expo lint"
   },
   "dependencies": {
+    "@deck.gl/core": "~9.4.0",
+    "@deck.gl/google-maps": "~9.4.0",
+    "@deck.gl/mesh-layers": "~9.4.0",
     "@expo/vector-icons": "^15.1.1",
     "@kesha-antonov/react-native-background-downloader": "^4.6.2",
+    "@luma.gl/core": "~9.4.0",
+    "@luma.gl/engine": "~9.4.0",
+    "@luma.gl/webgl": "~9.4.0",
     "@mlc-ai/web-llm": "^0.2.85",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-community/datetimepicker": "^9.1.0",

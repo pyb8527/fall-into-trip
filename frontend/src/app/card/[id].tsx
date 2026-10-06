@@ -418,6 +418,8 @@ function Replay({ trip }: { trip: TripDetail }) {
             emoji: iconOf(p.icon),
             dayIndex,
             color: day.color || dayColor(dayIndex),
+            /* 다음 곳까지 적어 둔 이동 — 동선에서 무엇을 타고 갈지 고릅니다. */
+            mode: p.move?.mode ?? null,
             fit: p.fit,
             radius: p.radius,
             detail: {
