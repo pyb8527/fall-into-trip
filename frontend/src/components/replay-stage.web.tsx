@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 
 import { gmaps, loadMaps } from '@/lib/gmaps.web';
-import { meshOf, type Vehicle, VEHICLE_PX, vehicleFor } from '@/lib/vehicles';
+import { cameraFor, easeFor, meshOf, type Vehicle, VEHICLE_PX, vehicleFor } from '@/lib/vehicles';
 
 /**
  * 동선 다시 보기 — 기울인 지도 위에서.
@@ -255,7 +255,10 @@ export function ReplayStage({
     const next = done ? null : (places[at0 + 1] ?? null);
     const after = done ? null : (places[at0 + 2] ?? null);
     const raw = Math.min(1, Math.max(0, gone));
-    const t = ease(raw);
+    /* 탈것마다 움직임이 다릅니다 — 사람은 고르게, 기차는 붙어 달리다 서고,
+       비행기는 밀어내고 내려앉습니다(lib/vehicles.easeFor). 박자표와 같은 탈것. */
+    const vehicle: Vehicle = next ? vehicleFor(now.mode, distanceKm(now, next)) : 'walk';
+    const t = easeFor(vehicle, raw);
     const pos = next
       ? { lat: now.lat + (next.lat - now.lat) * t, lng: now.lng + (next.lng - now.lng) * t }
       : { lat: now.lat, lng: now.lng };
@@ -292,9 +295,18 @@ export function ReplayStage({
     const mix = next && after ? smooth((raw - 0.7) / 0.3) : 0;
     const nextKm = next && after ? distanceKm(next, after) : km;
     const nextHeading = next && after ? bearing(next, after) : legHeading;
-    /* 가운데에서 가장 높이. 멀리 갈수록 더 올라가 앞뒤가 다 보입니다. */
-    const lift = Math.sin(raw * Math.PI) * (km > 50 ? 2.4 : km > 5 ? 1.3 : 0.5);
-    const zoom = zoomFor(km) * (1 - mix) + zoomFor(nextKm) * mix - lift;
+    /*
+      카메라 배율은 탈것이 정합니다(lib/vehicles.cameraFor). 걷기는 건물이 서는
+      배율에 붙어 물러나지 않고, 기차 · 비행기는 가운데에서 물러납니다. 다음
+      구간의 탈것 것과 마지막 3할 동안 섞습니다.
+    */
+    const here = cameraFor(vehicle, km);
+    const nextVehicle: Vehicle = next && after ? vehicleFor(next.mode, nextKm) : vehicle;
+    const there = cameraFor(nextVehicle, nextKm);
+    const arc = Math.sin(raw * Math.PI);
+    const zoom = here.zoom * (1 - mix) + there.zoom * mix - arc * here.lift;
+    /* 비행기가 뜬 몫(0~1). 높이와 크기에 씁니다. */
+    const lift = vehicle === 'plane' ? arc : 0;
 
     goal.current = {
       lat: pos.lat,
@@ -304,9 +316,9 @@ export function ReplayStage({
       heading: (blendAngle(legHeading, nextHeading, mix) + SIDE_VIEW) % 360,
       zoom,
       legHeading,
-      lift: lift / 2.4,
+      lift,
       color,
-      vehicle: vehicleFor(now.mode, km),
+      vehicle,
     };
   }, [places, step, gone, done, ready]);
 
@@ -426,10 +438,6 @@ function drawVehicle(deck: { overlay: any; Layer: any }, want: Goal, c: Cam, now
 
 /* ------------------------------------------------------------------ 셈 */
 
-function ease(t: number) {
-  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-}
-
 function distanceKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
   const r = 6371;
   const dLat = ((b.lat - a.lat) * Math.PI) / 180;
@@ -455,15 +463,6 @@ function bearing(a: { lat: number; lng: number }, b: { lat: number; lng: number 
 function turnToward(from: number, to: number, rate: number) {
   const diff = ((to - from + 540) % 360) - 180;
   return (from + diff * rate + 360) % 360;
-}
-
-/**
- * 구간 길이에 맞는 배율. 걷는 구간은 건물이 블록으로 서는 데까지(17 넘게 —
- * 16.5 로 막아 두었더니 3D 건물이 한 번도 안 섰습니다), 수백 km 나는 구간은
- * 두 도시가 한 화면에 들어오게.
- */
-function zoomFor(km: number) {
-  return Math.max(5, Math.min(17.8, 17.8 - Math.log2(Math.max(0.25, km) / 0.25)));
 }
 
 /**

@@ -38,6 +38,7 @@ import {
 } from '@/ui';
 import { TripTabs } from '@/ui/tab-bar';
 import { hasTiltMaps, ReplayStage } from '@/components/replay-stage';
+import { easeFor, legMs, type Vehicle, vehicleFor } from '@/lib/vehicles';
 
 /**
  * 다녀온 여행을 한 장으로.
@@ -337,6 +338,17 @@ const FLY_MS = 1250;
 /** 몇 번에 나눠 그릴지. 50 이면 1초에 스무 번입니다. */
 const TICK_MS = 50;
 
+/** 두 자리 사이 거리(km). 구간마다 무엇을 타는지 고를 때 씁니다. */
+function kmBetween(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
+  const r = 6371;
+  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+  const dLng = ((b.lng - a.lng) * Math.PI) / 180;
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((a.lat * Math.PI) / 180) * Math.cos((b.lat * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+  return 2 * r * Math.asin(Math.sqrt(h));
+}
+
 /**
  * 두 자리 사이 어느 쪽을 보고 나는지.
  *
@@ -355,15 +367,6 @@ function headingOf(from: { lat: number; lng: number }, to: { lat: number; lng: n
   return (Math.atan2(dx, dy) * 180) / Math.PI;
 }
 
-/**
- * 뜨고, 날고, 내린다.
- *
- * <p>같은 속도로 가면 <b>끌려가는 점</b>입니다. 뜰 때 밀어내고 내릴 때
- * 늦추면 그제야 오가는 것으로 보입니다. 가운데가 가장 빠른 곡선입니다.
- */
-function ease(t: number) {
-  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-}
 
 /**
  * 다녀온 길을 처음부터 다시.
@@ -440,6 +443,38 @@ function Replay({ trip }: { trip: TripDetail }) {
     [all, dayPick],
   );
 
+  /*
+    구간마다 무엇을 타고 얼마나 걸리는지.
+
+    <p>모든 구간이 같은 1.25초였습니다 — 400m 걷는 길과 400km 나는 길이 똑같이
+    걸려서, 탈것 모양이 바뀌어도 같은 점이 모양만 바꿔 미끄러졌습니다. 탈것과
+    거리로 시간을 정하고({@link legMs}), 움직임 곡선도 탈것 것을 씁니다
+    ({@link easeFor}). 지도 무대도 같은 표를 씁니다(replay-stage).
+  */
+  const legs = useMemo(
+    () =>
+      places.map((p, i) => {
+        const next = places[i + 1];
+        if (!next) {
+          return { vehicle: 'walk' as Vehicle, ms: FLY_MS };
+        }
+        const km = kmBetween(p, next);
+        const vehicle = vehicleFor(p.mode, km);
+        return { vehicle, ms: legMs(vehicle, km) };
+      }),
+    [places],
+  );
+  /* 타이머 안에서 지금 구간의 시간을 읽습니다 — 구간이 바뀔 때마다 타이머를
+     새로 세우면 머무는 박자가 흔들립니다. */
+  const legsRef = useRef(legs);
+  useEffect(() => {
+    legsRef.current = legs;
+  }, [legs]);
+  const stepRef = useRef(0);
+  useEffect(() => {
+    stepRef.current = step;
+  }, [step]);
+
   /** 찍을 곳이 있는 날만 냅니다. 빈 날을 고르면 아무 일도 안 일어납니다. */
   const days = useMemo(() => {
     const seen = new Map<number, string>();
@@ -471,16 +506,16 @@ function Replay({ trip }: { trip: TripDetail }) {
       묶음으로 셉니다. 머무는 동안에는 자리가 안 바뀌고 크기만 낮아졌다
       오르므로, 내려앉아 섰다가 다시 뜨는 것으로 보입니다.
     */
-    const span = STAY_MS + FLY_MS;
     let spent = 0;
     const timer = setInterval(() => {
       spent += TICK_MS;
+      const fly = legsRef.current[stepRef.current]?.ms ?? FLY_MS;
       if (spent < STAY_MS) {
         setGone(0);
         return;
       }
-      if (spent < span) {
-        setGone((spent - STAY_MS) / FLY_MS);
+      if (spent < STAY_MS + fly) {
+        setGone((spent - STAY_MS) / fly);
         return;
       }
       spent = 0;
@@ -518,7 +553,7 @@ function Replay({ trip }: { trip: TripDetail }) {
       return { lat: now.lat, lng: now.lng, heading: 0, lift: 0, color: now.color };
     }
     const held = Math.min(1, Math.max(0, gone));
-    const t = ease(held);
+    const t = easeFor(legs[step]?.vehicle ?? 'plane', held);
     return {
       lat: now.lat + (next.lat - now.lat) * t,
       lng: now.lng + (next.lng - now.lng) * t,
@@ -527,7 +562,7 @@ function Replay({ trip }: { trip: TripDetail }) {
       lift: Math.sin(held * Math.PI),
       color: now.color,
     };
-  }, [done, now, next, gone]);
+  }, [done, now, next, gone, legs, step]);
 
   return (
     <View style={styles.replay}>
