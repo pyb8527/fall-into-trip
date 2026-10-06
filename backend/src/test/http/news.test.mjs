@@ -111,14 +111,14 @@ const cand = r.data.id ?? r.data.candidate?.id;
 T("나가 후보를 올림", r.status === 200 && !!cand, r.data);
 got = await news(a);
 T("후보가 실림",
-  find(got.items, (i) => i.kind === "candidate.add" && i.text === "「우메다 공중정원」 를 후보로 올렸어요.").length === 1,
+  find(got.items, (i) => i.kind === "candidate.add" && i.text === "「우메다 공중정원」을 후보로 올렸어요.").length === 1,
   got.items);
 
 r = await call("PUT", `/api/candidates/${cand}/vote`, { token: b, body: { yes: true } });
 T("나가 표를 던짐", r.status === 200, r.data);
 got = await news(a);
 T("표가 실림",
-  find(got.items, (i) => i.kind === "candidate.vote" && i.text === "「우메다 공중정원」 에 좋다고 했어요.").length === 1,
+  find(got.items, (i) => i.kind === "candidate.vote" && i.text === "「우메다 공중정원」에 좋다고 했어요.").length === 1,
   got.items);
 T("한 사람이면 이름이 붙고 좋다·아니라를 그대로",
   find(got.items, (i) => i.kind === "candidate.vote")[0]?.actorName === "나", got.items);

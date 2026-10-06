@@ -40,7 +40,13 @@ await publish(`세는여행A-${stamp}`, "일본", [
   /* 한 글 안에서 같은 곳을 두 번. 두 번으로 세면 안 됩니다. */
   { ...ONSEN, time: "18:00" },
 ]);
-await publish(`세는여행B-${stamp}`, "일본", [ONSEN]);
+await publish(`세는여행B-${stamp}`, "일본", [
+  ONSEN,
+  /* 지나가는 곳 · 자는 곳 · 갈래 없는 곳. 남에게 권할 곳이 아닙니다. */
+  { name: `세는역-${stamp}`, lat: 34.13, lng: 135.13, icon: "move" },
+  { name: `세는숙소-${stamp}`, lat: 34.14, lng: 135.14, icon: "stay" },
+  { name: `세는건물-${stamp}`, lat: 34.15, lng: 135.15 },
+]);
 T("두 글 올림", true);
 
 console.log("\n[2] 로그인 없이 볼 수 있다");
@@ -68,6 +74,14 @@ T("면으로 거르면 온천은 빠짐", !r.data.places.some(p => p.name === ON
 /* 화면에서 넘어온 값을 그대로 쿼리에 넣지 않습니다. */
 r = await call("GET", "/api/popular/places?kind=없는갈래");
 T("모르는 갈래는 안 거른 것으로 봄", r.status === 200 && r.data.kind === "", r.data);
+
+console.log("\n[4-1] 역·숙소·갈래 없는 곳은 순위에 안 선다");
+r = await call("GET", "/api/popular/places");
+T("역이 빠짐", !r.data.places.some(p => p.name === `세는역-${stamp}`), r.data.places);
+T("숙소가 빠짐", !r.data.places.some(p => p.name === `세는숙소-${stamp}`), r.data.places);
+T("갈래 없는 곳이 빠짐", !r.data.places.some(p => p.name === `세는건물-${stamp}`), r.data.places);
+r = await call("GET", "/api/popular/places?kind=move");
+T("역을 골라 찾으면 나옴", r.data.places.some(p => p.name === `세는역-${stamp}`), r.data.places);
 
 console.log("\n[5] 갈래 목록에는 실제로 쓰인 것만");
 r = await call("GET", "/api/popular/kinds");

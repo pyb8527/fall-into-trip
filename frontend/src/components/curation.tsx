@@ -55,25 +55,69 @@ import { Body, Button, Caption, Press, Split } from '@/ui';
  */
 export function Curation({
   tags,
+  total,
   onOpen,
   onTag,
 }: {
   tags: { tag: string; posts: number }[] | null;
+  /** 걸러지지 않은 전체 글 수. 적으면 줄을 안 세웁니다. */
+  total: number;
   onOpen: (id: string) => void;
   onTag: (tag: string) => void;
 }) {
-  /* 가장 많이 쓴 태그 둘. 글이 적으면 같은 여행이 두 줄에 함께 서는데,
-     여러 기준으로 다시 묶어 보여 주는 것이 이 줄들의 일이라 괜찮습니다. */
   const shelfTags = (tags ?? []).slice(0, 2).map((t) => t.tag);
+  const paths = [
+    '/api/posts?sort=copied&size=6',
+    '/api/posts?sort=new&size=6',
+    ...shelfTags.map((tag) => `/api/posts?sort=hot&size=6&tag=${encodeURIComponent(tag)}`),
+  ];
+  const enough = total >= CURATION_MIN;
+  const { data } = useAsync<PostPage[]>(
+    (signal) => (enough ? Promise.all(paths.map((path) => api.get<PostPage>(path, signal))) : Promise.resolve([])),
+    [enough, paths.join('|')],
+  );
+  if (!enough || !data) {
+    return null;
+  }
+
+  /*
+    같은 글은 한 화면에 한 번만.
+
+    <p>「같은 여행이 여러 줄에 나와도 괜찮다 — 여러 기준으로 다시 묶어 보여
+    주면 열 개뿐이어도 고를 맛이 난다」고 적어 두고 있었습니다. 운영 서버에서
+    눌러 보니 반대였습니다 — 글이 셋일 때 같은 세 장이 「많이 가져간」 ·
+    「새로 올라온」 · #발리 · #우붓 · 아래 목록까지 다섯 번 섰고, 화면은
+    고를 맛이 아니라 <b>이것뿐</b>이라는 말을 다섯 번 했습니다.
+
+    <p>그래서 위 줄에 선 글은 아래 줄에서 뺍니다. 빼고 나서 세 장이 안 되는
+    줄은 안 세웁니다 — 한두 장짜리 줄은 「묶음」이 아니라 빈자리입니다. 그리고
+    글이 {@link CURATION_MIN} 개보다 적으면 줄을 아예 안 세웁니다. 그때는
+    아래 목록 하나가 전부를 보여 주고, 줄은 그 목록을 되풀이할 뿐입니다.
+  */
+  const seen = new Set<string>();
+  const rows = data.map((page, i) => {
+    let posts = page.posts.filter((p) => !seen.has(p.id));
+    /* 아무도 안 가져간 글은 「많이 가져간」 줄에 서면 안 됩니다. 서버의
+       sort=copied 는 차례만 정하고 거르지는 않습니다(목록의 정렬로도 써서). */
+    if (i === 0) {
+      posts = posts.filter((p) => (p.copyCount ?? 0) > 0);
+    }
+    if (posts.length < SHELF_MIN) {
+      return { posts: [] as PostPage['posts'] };
+    }
+    posts.forEach((p) => seen.add(p.id));
+    return { posts };
+  });
+
   return (
     <>
-      <ShelfRow title="이번 주 많이 가져간 여행" path="/api/posts?sort=copied&size=6" onOpen={onOpen} />
-      <ShelfRow title="새로 올라온 여행" path="/api/posts?sort=new&size=6" onOpen={onOpen} />
-      {shelfTags.map((tag) => (
-        <ShelfRow
+      <Shelf title="많이 가져간 여행" posts={rows[0].posts} onOpen={onOpen} />
+      <Shelf title="새로 올라온 여행" posts={rows[1].posts} onOpen={onOpen} />
+      {shelfTags.map((tag, i) => (
+        <Shelf
           key={tag}
           title={`#${tag}`}
-          path={`/api/posts?sort=hot&size=6&tag=${encodeURIComponent(tag)}`}
+          posts={rows[2 + i]?.posts ?? []}
           onOpen={onOpen}
           onMore={() => onTag(tag)}
         />
@@ -81,6 +125,11 @@ export function Curation({
     </>
   );
 }
+
+/** 이보다 글이 적으면 둘러보기에 줄을 안 세웁니다. 줄 둘(여섯 장씩)이 서로 안 겹칠 만큼. */
+const CURATION_MIN = 12;
+/** 겹치는 것을 빼고 나서 이보다 적으면 그 줄은 안 섭니다. */
+const SHELF_MIN = 3;
 
 /**
  * 내 여행에 서는 추천 묶음 — 다음은 어디로.
@@ -209,7 +258,23 @@ function ShelfRow({
   onMore?: () => void;
 }) {
   const { data } = useAsync<PostPage>((signal) => api.get(path, signal), [path]);
-  const posts = data?.posts ?? [];
+  return <Shelf title={title} posts={data?.posts ?? []} note={note} onOpen={onOpen} onMore={onMore} />;
+}
+
+/** 받아 온 글들을 가로로 흘립니다. 비었으면 안 그립니다. */
+function Shelf({
+  title,
+  posts,
+  note,
+  onOpen,
+  onMore,
+}: {
+  title: string;
+  posts: PostPage['posts'];
+  note?: string;
+  onOpen: (id: string) => void;
+  onMore?: () => void;
+}) {
   if (posts.length === 0) {
     return null;
   }

@@ -631,15 +631,15 @@ export default function Community() {
       {/*
         큐레이션 줄 — 아무것도 안 걸고 첫 쪽을 볼 때만.
 
-        <p>목록 하나뿐이라 올라온 여행이 적으면 카드 몇 장이 전부였습니다. 같은
-        여행이 여러 줄에 나와도 괜찮습니다 — 여러 기준으로 다시 묶어 보여 주면
-        열 개뿐이어도 고를 맛이 납니다.
+        <p>글이 적을 때는 줄이 안 섭니다 — 같은 몇 장이 줄마다 되풀이됐습니다
+        ({@link Curation} 의 문서). 전체 글 수를 넘겨 그쪽이 가립니다.
       */}
       {view === 'all' && !filtered && page === 0 ? (
         <Curation
           /* 조건 고르는 판이 쓰는 것과 같은 목록입니다. 넘겨 주지 않으면
              한 화면이 같은 길을 두 번 묻습니다({@link Curation}). */
           tags={tagList?.tags ?? null}
+          total={data?.total ?? 0}
           onOpen={(id) => router.push(`/community/${id}`)}
           onTag={(t) => refilter(() => setTag(t))}
         />

@@ -50,6 +50,18 @@ public interface PopularRepository extends JpaRepository<TripPost, String> {
      * <p>한 글에서 같은 곳을 두 번 넣었어도 한 번으로 셉니다. 사흘 내내 같은
      * 카페에 갔다고 그 카페가 세 배 인기 있는 것은 아닙니다.
      *
+     * <h3>들르는 곳만 셉니다</h3>
+     *
+     * <p>운영 서버의 1~3위가 「삼환하이펙스B동」 · 「인계동 행정복지센터」 ·
+     * 「판교역」이었습니다 — 퇴근길을 올린 글 하나에서 나온 것입니다. 일정에는
+     * 들르는 곳 말고도 <b>지나가는 곳</b>(역·공항)과 <b>자는 곳</b>(숙소)이
+     * 잔뜩 들어가고(도쿄 3박 4일 63곳 중 서른 남짓이 역), 갈래를 안 고른
+     * 곳은 대개 주소를 찍어 둔 건물입니다. 셋 다 남에게 권할 곳이 아닙니다.
+     *
+     * <p>그래서 갈래를 고르지 않고 부를 때는 그 셋을 뺍니다. 갈래를 골라
+     * 부르면({@code kind=move}) 고른 대로 줍니다 — 그 사람이 찾는 것이
+     * 역입니다.
+     *
      * <h3>내 자리를 주면 가까운 순입니다</h3>
      *
      * <p>「지금 내 근처」입니다. 거리를 여기서 셉니다 — 열 줄을 받아 화면에서
@@ -117,6 +129,9 @@ public interface PopularRepository extends JpaRepository<TripPost, String> {
                    WHERE p.hidden = false AND p.visibility = 'LISTED'
                      AND pl->>'name' IS NOT NULL
                      AND (:kind IS NULL OR pl->>'icon' = :kind)
+                     AND (:kind IS NOT NULL
+                          OR (nullif(pl->>'icon', '') IS NOT NULL
+                              AND pl->>'icon' NOT IN ('move', 'stay')))
                      AND (:region IS NULL OR p.region = :region)
                      AND (cast(:south as double precision) IS NULL
                           OR ((pl->>'lat')::double precision

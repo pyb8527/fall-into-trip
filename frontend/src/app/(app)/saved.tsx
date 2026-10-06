@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { api, ApiError, UNEXPECTED } from '@/api/client';
-import type { PopularPlace, PostPage, SavedPlace, TripDetail, TripSummary } from '@/api/types';
+import type { PopularPlace, SavedPlace, TripDetail, TripSummary } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { IconPicker } from '@/components/icon-picker';
 import type { MapPlace } from '@/components/map-types';
@@ -932,15 +932,16 @@ export default function Saved() {
 }
 
 /**
- * 비었을 때 담을 거리 — 지금 뜨는 곳 다섯(담는 단추와 함께)과 인기 여행 셋.
+ * 비었을 때 담을 거리 — 지금 뜨는 곳 다섯(담는 단추와 함께).
  *
  * <p>빈 화면에 「담아 보세요」만 있으면 어디서 무엇을 담는지를 또 찾아 나서야
  * 합니다. 여기서 바로 담고, 남이 다녀온 여행으로 넘어갈 수 있게 둡니다.
  */
 function StarterPicks({ onKept }: { onKept: () => void }) {
-  const router = useRouter();
   const { data: top } = useAsync<{ places: PopularPlace[] }>((signal) => api.get('/api/popular/places', signal), []);
-  const { data: hot } = useAsync<PostPage>((signal) => api.get('/api/posts?sort=hot', signal), []);
+  /* 「인기 여행」 셋도 여기 있었습니다. 바로 아래 SavedShelf 의 「하트 많은
+     여행기」가 같은 글을 또 세워서 한 화면에 같은 세 장이 두 번 섰습니다.
+     여행기는 그 줄에 맡깁니다. */
   /*
     이 칸은 보석함이 <b>빈 사람</b>에게만 섭니다(이 칸을 부르는 자리의 조건이
     {@code all.length === 0}). 그래서 「이미 담겼나」를 서버에 물을 일이 없고
@@ -991,17 +992,6 @@ function StarterPicks({ onKept }: { onKept: () => void }) {
             onPress={() => keep(p)}
           />
         </Row>
-      ))}
-      {(hot?.posts.length ?? 0) > 0 ? <SectionHeader title="인기 여행" tight /> : null}
-      {hot?.posts.slice(0, 3).map((post, i, rows) => (
-        <ListRow
-          key={post.id}
-          left={<Mark icon="compass" />}
-          title={post.title}
-          subtitle={[post.region, `${post.placeCount}곳`].filter(Boolean).join(' · ')}
-          last={i === rows.length - 1}
-          onPress={() => router.push({ pathname: '/community/[id]', params: { id: post.id } })}
-        />
       ))}
     </>
   );
