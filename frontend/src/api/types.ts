@@ -115,6 +115,8 @@ export type Trip = {
   createdAt: string;
   /** 여행 예산(원). 안 정했으면 비어 있습니다. 상세(/api/trip)에만 실립니다. */
   budget?: Maybe<number>;
+  /** 가고 싶은 곳 투표를 받는 마지막 날(그날 포함, YYYY-MM-DD). 없으면 마감 없음. */
+  voteUntil?: Maybe<string>;
 };
 
 export type Move = {

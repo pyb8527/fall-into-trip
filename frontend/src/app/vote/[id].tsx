@@ -34,6 +34,8 @@ import {
 } from '@/ui';
 import { TripTabs } from '@/ui/tab-bar';
 import { WANT } from '@/constants/words';
+import { DeadlineLine, DeadlineSheet } from '@/components/vote-deadline';
+import { todayIso } from '@/lib/countdown';
 
 /** 무엇만 볼지. 후보가 스무 개쯤 되면 한 번에 다 훑기 어렵습니다. */
 type View3 = 'all' | 'agreed' | 'open';
@@ -62,10 +64,15 @@ export default function Vote() {
     (signal) => api.get(`/api/trips/${encodeURIComponent(id)}/candidates`, signal),
     [id],
   );
-  const { data: trip } = useAsync<TripDetail>(
+  const tripQ = useAsync<TripDetail>(
     (signal) => api.get(`/api/trip?trip=${encodeURIComponent(id)}`, signal),
     [id],
   );
+  const trip = tripQ.data;
+  /* 마감. 그날까지(그날 포함) 표를 받고, 지나면 표와 새 후보를 서버가 막습니다. */
+  const until = trip?.trip.voteUntil ?? null;
+  const closed = until != null && until < todayIso();
+  const [deadlining, setDeadlining] = useState(false);
 
   const [adding, setAdding] = useState(false);
   /* 눌러서 보고 있는 곳. 판이 이걸로 열립니다. */
@@ -93,9 +100,14 @@ export default function Vote() {
     동의」이고, 표 안 던진 사람은 <b>미정</b>입니다({@code CandidateService}).
     마감으로 밀어붙이면 안 간다고 한 사람을 끌고 가는 셈입니다.
 
-    <p>받은 것은 <b>순서만</b>입니다. 결정 규칙도, 마감도, 기본값도 안
-    받습니다. 순서는 아무 말도 강요하지 않으면서 「지금 어디까지 왔나」를
-    보여 줍니다.
+    <p>받은 것은 <b>순서만</b>입니다. 결정 규칙도 기본값도 안 받습니다.
+    순서는 아무 말도 강요하지 않으면서 「지금 어디까지 왔나」를 보여 줍니다.
+
+    <p>마감은 나중에 들였습니다(2026-10-06 운영 점검 — 출발 이틀 전에도 「2명 중
+    0명 찬성」으로 열려 있었습니다). 다만 <b>정하는 규칙은 그대로</b>입니다.
+    마감이 지나면 표와 새 후보를 안 받을 뿐, 득표가 많은 곳을 정해진 것으로
+    올리지 않습니다 — 모두 좋다고 한 곳만 정해진 것이고, 마감은 「이제 정해진
+    것을 옮기자」는 신호입니다.
 
     <p>차례는 셋입니다.
     <ol>
@@ -183,7 +195,12 @@ export default function Vote() {
         agreed.length > 0 ? (
           <Row gap={Spacing.s2} style={styles.footerRow}>
             <View style={styles.footerSide}>
-              <Button label="후보 올리기" variant="secondary" onPress={() => setAdding(true)} />
+              <Button
+                label="후보 올리기"
+                variant="secondary"
+                disabled={closed}
+                onPress={() => setAdding(true)}
+              />
             </View>
             <View style={styles.footerMain}>
               <Button
@@ -192,6 +209,9 @@ export default function Vote() {
               />
             </View>
           </Row>
+        ) : closed ? (
+          /* 마감 뒤에 정해진 곳이 없으면 할 일은 마감을 늦추는 것뿐입니다. */
+          <Button label="마감 늦추기" variant="secondary" onPress={() => setDeadlining(true)} />
         ) : (
           <Button label="가고 싶은 곳 올리기" onPress={() => setAdding(true)} />
         )
@@ -218,6 +238,7 @@ export default function Vote() {
           <Caption tone="secondary">
             다 좋다고 한 곳만 일정으로 옮겨요. 아직 안 누른 사람이 있으면 정해지지 않아요.
           </Caption>
+          <DeadlineLine until={until} closed={closed} onEdit={() => setDeadlining(true)} />
         </View>
         {all.length > 0 ? (
           <Caption tone="muted">
@@ -346,6 +367,7 @@ export default function Vote() {
               label="좋아요"
               tone="yes"
               chosen={candidate.myVote === true}
+              disabled={closed}
               onPress={() => vote(candidate, candidate.myVote === true ? null : true)}
             />
             <Choice
@@ -353,6 +375,7 @@ export default function Vote() {
               label="별로예요"
               tone="no"
               chosen={candidate.myVote === false}
+              disabled={closed}
               onPress={() => vote(candidate, candidate.myVote === false ? null : false)}
             />
           </Row>
@@ -383,6 +406,18 @@ export default function Vote() {
         place={looking}
         onClose={() => setLooking(null)}
         scrap={looking ? { kept: kept.has(looking.name), onPress: () => keep(looking) } : null}
+      />
+
+      <DeadlineSheet
+        visible={deadlining}
+        tripId={id}
+        until={until}
+        startIso={trip?.days[0]?.iso ?? null}
+        onClose={() => setDeadlining(false)}
+        onDone={() => {
+          setDeadlining(false);
+          tripQ.reload();
+        }}
       />
 
       <AddSheet
@@ -446,6 +481,7 @@ function Choice({
   label,
   tone,
   chosen,
+  disabled,
   onPress,
 }: {
   icon: 'thumbs-up' | 'thumbs-down';
@@ -453,6 +489,8 @@ function Choice({
   /** 좋다 쪽은 브랜드색 옅은 면, 아니다 쪽은 회색 면입니다. */
   tone: 'yes' | 'no';
   chosen: boolean;
+  /** 마감이 지나 표를 안 받습니다. 고른 쪽은 그대로 보입니다. */
+  disabled?: boolean;
   onPress: () => void;
 }) {
   const face = chosen
@@ -464,10 +502,11 @@ function Choice({
   return (
     <Press
       onPress={onPress}
+      disabled={disabled}
       scale={0.96}
-      accessibilityState={{ selected: chosen }}
+      accessibilityState={{ selected: chosen, disabled }}
       accessibilityLabel={chosen ? `${label} 무르기` : label}
-      style={[styles.choice, face]}>
+      style={[styles.choice, face, disabled ? styles.choiceDisabled : null]}>
       {/* 그림만 둡니다 — 글자는 읽어 주는 기기(accessibilityLabel)가 말합니다.
           엄지 위·아래는 어디서나 같은 뜻이라 글자 없이도 읽힙니다. */}
       <Icon name={icon} size={18} tone={chosen && tone === 'yes' ? 'brand' : 'secondary'} />
@@ -650,6 +689,9 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
   },
   /* 막대 옆 작은 단추. 보이는 크기는 40 — 손가락이 닿는 44 에 가깝게. */
+  choiceDisabled: {
+    opacity: 0.4,
+  },
   choice: {
     width: 40,
     height: 40,

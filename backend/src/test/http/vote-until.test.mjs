@@ -12,7 +12,8 @@ async function call(method, path, { body, token } = {}) {
   let data = null; try { data = await r.json(); } catch {}
   return { status: r.status, data };
 }
-const iso = (d) => d.toISOString().slice(0, 10);
+/* 서버와 같은 날짜(기기의 하루)로 적습니다. toISOString 은 UTC 라 자정 근처에 하루 어긋납니다. */
+const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const today = new Date();
 const tomorrow = new Date(Date.now() + 86400000);
 const yesterday = new Date(Date.now() - 86400000);
