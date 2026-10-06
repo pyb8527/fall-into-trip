@@ -59,8 +59,14 @@ import { Platform } from 'react-native';
   합니다. 그래서 여기만 환경 변수입니다.
 */
 const IOS = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ?? '';
-const ANDROID = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ?? '';
-const WEB = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ?? '';
+/*
+  웹 것은 EAS 에 {@code EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID} 로 들어 있습니다.
+  여기서 {@code EXPO_PUBLIC_GOOGLE_CLIENT_ID} 만 읽고 있어서 빌드에 웹 것이
+  빈 값으로 박혔고, 안드로이드는 계정을 고르고도 id_token 없이 돌아와
+  「창을 닫은 것」으로 읽혀 아무 일도 안 일어났습니다. 옛 이름도 받아 둡니다.
+*/
+const WEB =
+  process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ?? '';
 
 /**
  * 이 빌드가 구글 로그인을 할 수 있는지.
@@ -69,7 +75,7 @@ const WEB = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ?? '';
  * 안드로이드는 앱에 적을 값이 없는 대신(구글이 패키지 이름과 서명 지문으로
  * 알아봅니다) <b>웹 것</b>이 있어야 id_token 이 나옵니다.
  */
-export const canSignIn = Platform.OS === 'ios' ? !!IOS : !!WEB || !!ANDROID;
+export const canSignIn = Platform.OS === 'ios' ? !!IOS : !!WEB;
 
 /*
   설정은 한 번만 합니다.
@@ -132,7 +138,15 @@ export async function googleIdToken(): Promise<string | null> {
       /* 고르는 판을 닫았습니다. 고장이 아니므로 아무 말도 안 합니다. */
       return null;
     }
-    return got.data.idToken ?? null;
+    /*
+      계정은 골랐는데 토큰이 없습니다. 닫은 것과 다르므로 null 로 돌려주지
+      않습니다 — 그러면 웹이 아무 말도 안 하고, 누른 사람에게는 단추가
+      죽은 것으로 보입니다. 웹 클라이언트 ID 가 빌드에 없을 때 이렇게 됩니다.
+    */
+    if (!got.data.idToken) {
+      throw new Error('구글이 로그인 정보를 주지 않았어요');
+    }
+    return got.data.idToken;
   } catch (e) {
     /*
       판이 이미 떠 있는데 또 눌렀습니다. 두 번째 부름은 거절되는데, 그것은
