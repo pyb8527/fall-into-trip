@@ -4,7 +4,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { api, ApiError, UNEXPECTED } from '@/api/client';
 import type { Comment, Itinerary } from '@/api/types';
 import { useAuth } from '@/auth/auth-provider';
-import { Colors, Radius, Spacing, Type, Weight } from '@/constants/theme';
+import { Colors, Spacing, Type, Weight } from '@/constants/theme';
 import {
   Badge,
   Body,
@@ -22,6 +22,8 @@ import {
   Subtitle,
 } from '@/ui';
 import { formatInstant } from '@/lib/countdown';
+import { ProfileFace } from '@/components/profile-face';
+import { faceOf } from '@/constants/user-marks';
 
 /**
  * 일정에 달린 댓글.
@@ -296,9 +298,15 @@ function CommentRow({
       {/* 누가 말하는지를 얼굴 자리로 먼저 말합니다. 이름 첫 글자를
           동그라미에 담습니다 — 그림이 없어도 줄이 누구의 것인지
           한눈에 갈립니다. */}
-      <View style={styles.face}>
-        <Text style={styles.faceLetter}>{comment.authorName.slice(0, 1)}</Text>
-      </View>
+      {/* 사진을 올린 사람도 첫 글자로 섰습니다(V55 뒤에도). 다른 자리의
+          얼굴과 같은 부품을 씁니다 — 사진, 표식, 그래도 없으면 첫 글자. */}
+      <ProfileFace
+        photoId={comment.authorPhotoId}
+        mark={comment.authorMark ? faceOf(comment.authorMark, comment.authorName) : null}
+        size={32}
+        label={`${comment.authorName}의 얼굴`}
+        fallback={<Text style={styles.faceLetter}>{comment.authorName.slice(0, 1)}</Text>}
+      />
 
       <View style={styles.said}>
         {/*
@@ -406,14 +414,6 @@ const styles = StyleSheet.create({
     borderTopColor: Colors.border,
   },
   /* 이름 첫 글자가 드는 동그라미. 댓글 줄의 아바타 자리입니다. */
-  face: {
-    width: 32,
-    height: 32,
-    borderRadius: Radius.full,
-    backgroundColor: Colors.fill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   faceLetter: {
     ...Type.caption,
     fontWeight: Weight.semibold,

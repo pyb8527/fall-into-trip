@@ -110,7 +110,16 @@ export default function GroupScreen() {
     [id],
   );
 
-  const [lane, setLane] = useState<Lane>('trips');
+  /*
+    처음 여는 칸.
+
+    <p>늘 「여행」이었습니다. 그런데 여행 말고 피드로 모이는 모임이 있습니다
+    (「토요일 풋살」 — 여행은 없고 사진만 올라옵니다). 그런 모임을 열면 첫
+    화면이 「아직 짠 여행이 없어요」였고, 정작 올라온 것은 한 칸 옆에
+    숨어 있었습니다. 여행이 없으면 피드부터 엽니다. 사람이 고른 뒤에는
+    그대로 둡니다.
+  */
+  const [picked, setPicked] = useState<Lane | null>(null);
 
   /*
     이 모임의 여행을 날짜와 함께.
@@ -154,6 +163,8 @@ export default function GroupScreen() {
   const [failed, setFailed] = useState<string | null>(null);
 
   const group = data?.group;
+  const lane: Lane = picked ?? (group && group.tripCount === 0 ? 'feed' : 'trips');
+  const setLane = setPicked;
   const amOwner = group != null && group.ownerId === user?.id;
 
   async function drop() {

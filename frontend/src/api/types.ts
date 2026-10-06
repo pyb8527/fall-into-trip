@@ -776,6 +776,9 @@ export type Comment = {
   authorName: string;
   /** 이름을 누르면 그 사람 페이지로 */
   authorId?: string;
+  /** 남긴 사람의 얼굴 사진 · 지도 표식. 둘 다 없으면 이름 첫 글자입니다. */
+  authorPhotoId?: Maybe<string>;
+  authorMark?: Maybe<string>;
   /** 내가 남긴 것인지. 지울 수 있는지를 이걸로 정합니다. */
   mine: boolean;
   dayIndex: Maybe<number>;

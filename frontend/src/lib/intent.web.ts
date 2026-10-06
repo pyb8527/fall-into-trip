@@ -90,9 +90,20 @@ export function intentState(): IntentState {
 }
 
 /** 무엇을 받게 되는지 한 줄. 사람에게 크기를 먼저 알려 줘야 합니다. */
+/**
+ * 켜려면 무언가를 받아야 하는지.
+ *
+ * <p>브라우저에 모델이 들어 있으면 받을 것이 없습니다. 그런데 설정의 단추는
+ * 늘 「모델 받기」였어서, 바로 위 글이 「받을 것이 없어요」라고 하는데 단추는
+ * 받으라고 했습니다.
+ */
+export function needsDownload(): boolean {
+  return !builtIn();
+}
+
 export function modelNote(): string {
   if (builtIn()) {
-    return '이 브라우저에 이미 있는 모델을 써요. 받을 것이 없어요.';
+    return '이 브라우저에 들어 있는 모델을 써서 받을 것이 없어요.';
   }
   return `${pickModel().note} 를 한 번만 받으면 돼요.`;
 }

@@ -10,7 +10,7 @@ import { canSignInWithKakao, KakaoButton } from '@/components/kakao-button';
 import { ProfileFace } from '@/components/profile-face';
 import { addToCalendar, canAddToCalendar } from '@/lib/calendar';
 import { formatInstant, formatSpan, todayIso } from '@/lib/countdown';
-import { canParseHere, dropModel, fetchModel, intentState, modelNote } from '@/lib/intent';
+import { canParseHere, dropModel, fetchModel, intentState, modelNote, needsDownload } from '@/lib/intent';
 import type { IntentState } from '@/lib/intent-types';
 import { canLinkKakao } from '@/lib/kakao-signin';
 import { canNotify, notifyState, turnOff, turnOn, unblockHint } from '@/lib/notify';
@@ -470,14 +470,16 @@ function DeviceGroup() {
       <Body small tone="secondary">
         {brain === 'ready'
           ? '물어본 문장을 이 기기에서 먼저 추려요. 문장이 기기 밖으로 나가지 않아요.'
-          : `지금은 물어본 문장이 서버를 거쳐 구글로 가요. 모델을 받아 두면 이 기기에서 먼저 추려요. ${modelNote()}`}
+          : /* 「서버를 거쳐 구글로 가요」였습니다. 맞는 말이지만 쓰는 사람이 알고
+               싶은 것은 길이 아니라 <b>문장이 기기 밖으로 나가는지</b>입니다. */
+            `지금은 「어디 갈까」에 적은 문장이 기기 밖에서 풀려요. 켜 두면 이 기기 안에서 먼저 풀어요. ${modelNote()}`}
       </Body>
       {brain === 'fetching' ? (
         <Caption tone="secondary">받는 중이에요 ({Math.round(pulling * 100)}%).</Caption>
       ) : brain === 'ready' ? (
         <Line label="받아 둔 모델 지우기" last onPress={drop} />
       ) : (
-        <Line label="모델 받기" last onPress={pull} />
+        <Line label={needsDownload() ? '모델 받기' : '켜기'} last onPress={pull} />
       )}
     </>
   );

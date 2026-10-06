@@ -609,7 +609,7 @@ export default function Community() {
           }
           note={
             view === 'mine'
-              ? '여행 요약 화면에서 「여행기 쓰기」로 내놓을 수 있어요.'
+              ? '여행 요약 화면에서 「여행기 올리기」로 내놓을 수 있어요.'
               : view === 'liked'
                 ? '마음에 드는 길에 하트를 눌러 두면 여기 모입니다.'
                 : filtered
@@ -702,7 +702,7 @@ function FewPosts() {
       ))}
       <Press onPress={() => router.push('/(app)/trips')} scale={0.99} style={styles.invite}>
         <Body strong>내 여행도 내놓아 보세요</Body>
-        <Caption tone="secondary">다녀온 여행의 요약 화면에서 「여행기 쓰기」로 바로 올릴 수 있어요.</Caption>
+        <Caption tone="secondary">다녀온 여행의 요약 화면에서 「여행기 올리기」로 바로 올릴 수 있어요.</Caption>
       </Press>
     </View>
   );

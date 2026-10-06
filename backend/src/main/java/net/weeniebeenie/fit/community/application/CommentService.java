@@ -86,10 +86,20 @@ public class CommentService {
     }
 
     private List<Card> listOf(String postId, CommentKind kind, String meId) {
+        List<PostComment> found =
+                comments.findAllByPostIdAndKindAndHiddenFalseOrderByCreatedAtAsc(postId, kind);
+        /*
+          남긴 사람을 한 번에 받습니다.
+
+          <p>댓글마다 users.findById 를 불렀습니다 — 서른 개면 서른 번. 얼굴
+          사진까지 실으면서 한 번으로 모읍니다.
+        */
+        Map<String, User> who = new HashMap<>();
+        users.findAllById(found.stream().map(PostComment::getUserId).distinct().toList())
+                .forEach(u -> who.put(u.getId(), u));
         List<Card> out = new ArrayList<>();
-        for (PostComment c :
-                comments.findAllByPostIdAndKindAndHiddenFalseOrderByCreatedAtAsc(postId, kind)) {
-            out.add(cardOf(c, meId));
+        for (PostComment c : found) {
+            out.add(cardOf(c, meId, who.get(c.getUserId())));
         }
         return out;
     }
@@ -390,9 +400,15 @@ public class CommentService {
     }
 
     public Card cardOf(PostComment c, String meId) {
-        return new Card(c.getId(), c.getText(), nameOf(c.getUserId()),
+        return cardOf(c, meId, users.findById(c.getUserId()).orElse(null));
+    }
+
+    private Card cardOf(PostComment c, String meId, User author) {
+        return new Card(c.getId(), c.getText(), author == null ? "알 수 없음" : author.getName(),
                 c.getUserId().equals(meId), c.getDayIndex(), c.getPlaceIndex(), c.getCreatedAt(),
-                c.getUserId(), c.getEditedAt());
+                c.getUserId(), c.getEditedAt(),
+                author == null ? null : author.getPhotoId(),
+                author == null ? null : author.getMark());
     }
 
     public String nameOf(String userId) {
@@ -411,7 +427,9 @@ public class CommentService {
      */
     public record Card(String id, String text, String authorName, boolean mine,
                        Integer dayIndex, Integer placeIndex, Instant createdAt, String authorId,
-                       Instant editedAt) {
+                       Instant editedAt,
+                       /** 얼굴 사진 · 지도 표식. 이름 첫 글자만 그리고 있었습니다(V55 뒤에도). */
+                       String authorPhotoId, String authorMark) {
     }
 
     /**

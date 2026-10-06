@@ -52,6 +52,11 @@ const MAX_TOKENS = 96;
 export const canParseHere = true;
 
 /** 무엇을 받게 되는지 한 줄. 사람에게 크기를 먼저 알려 줘야 합니다. */
+/** 켜려면 무언가를 받아야 하는지. 앱은 늘 모델을 받습니다. */
+export function needsDownload(): boolean {
+  return true;
+}
+
 export function modelNote(): string {
   return '약 1GB 를 한 번만 받으면 돼요.';
 }

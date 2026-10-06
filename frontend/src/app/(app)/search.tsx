@@ -372,22 +372,27 @@ export default function Search() {
             더 많이 쓰이는지가 안 보입니다 — 「많이 찾는」 이라는 이름과
             어긋납니다.
             <p>번호를 붙여 두 줄로 세웁니다. 앞의 셋만 색을 씁니다.
+
+            <p>이름은 「많이 쓰인 태그」입니다. 「많이 찾는 말」이었는데 이
+            목록은 검색어를 센 것이 아니라 올라온 여행기의 태그를 센 것입니다
+            ({@code /api/posts/tags}) — 여행기가 하나뿐이면 그 글의 태그 셋이
+            「많이 찾는 말」 1~3위가 됐습니다.
           */}
           {(tagList?.tags.length ?? 0) > 0 ? (
             <View>
               {recent.length > 0 ? <Band /> : null}
-              <SectionHeader title="많이 찾는 말" tight={recent.length > 0} />
+              <SectionHeader title="많이 쓰인 태그" tight={recent.length > 0} />
               <View style={styles.grid}>
                 {tagList?.tags.slice(0, 10).map((t, i) => (
                   <Press
                     key={t.tag}
                     onPress={() => ask(t.tag)}
                     scale={1}
-                    accessibilityLabel={`${t.tag} 로 찾기`}
+                    accessibilityLabel={`#${t.tag} 로 찾기`}
                     style={styles.trend}>
                     <Text style={[styles.at, i < 3 ? styles.atTop : null]}>{i + 1}</Text>
                     <Body numberOfLines={1} style={styles.trendWord}>
-                      {t.tag}
+                      {`#${t.tag}`}
                     </Body>
                   </Press>
                 ))}

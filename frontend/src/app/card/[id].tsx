@@ -18,6 +18,7 @@ import {
   Spacing,
 } from '@/constants/theme';
 import { iconOf } from '@/constants/place-icons';
+import { todayIso } from '@/lib/countdown';
 import { money } from '@/lib/money';
 import { shareLink } from '@/lib/share';
 import {
@@ -88,6 +89,16 @@ export default function Card() {
 
   const router = useRouter();
   /* 여행기 판을 열어 두었는지. */
+  /*
+    다녀왔는지.
+
+    <p>출발 이틀 전에 이 화면을 열면 「함께한 사람」 · 「이 여행을 남길까요?
+    여행기 올리기」가 서 있었습니다. 아직 안 간 여행을 다녀온 것처럼 말하고,
+    남길 것이 없는 때에 남기라고 했습니다. 마지막 날이 지나야 다녀온
+    것입니다. 날짜가 없는 여행은 다녀온 것이 아닙니다.
+  */
+  const lastIso = data?.days[data.days.length - 1]?.iso ?? null;
+  const back = lastIso != null && lastIso < todayIso();
   const [publishing, setPublishing] = useState(false);
 
   if (loading && !data) {
@@ -117,7 +128,7 @@ export default function Card() {
       <SegmentedTabs items={FACES} value={face} onChange={setFace} />
 
       {face === 'receipt' ? (
-        <Receipt trip={data} mates={mates?.people ?? []} books={spent?.books ?? []} />
+        <Receipt trip={data} back={back} mates={mates?.people ?? []} books={spent?.books ?? []} />
       ) : (
         <Replay trip={data} />
       )}
@@ -152,8 +163,12 @@ export default function Card() {
         단추가 좌우 글자선에서 안으로 밀려 들어갔습니다.
       */}
       <SectionHeader
-        title="이 여행을 남길까요?"
-        note="여행기로 올리면 일정이 그대로 따라가요. 나만 볼 수도 있어요."
+        title={back ? '이 여행을 남길까요?' : '이 요약을 보낼까요?'}
+        note={
+          back
+            ? '여행기로 올리면 일정이 그대로 따라가요. 나만 볼 수도 있어요.'
+            : '같이 가는 사람에게 이 요약을 보낼 수 있어요. 다녀오면 여기서 여행기로 올릴 수 있어요.'
+        }
       />
       <Row gap={Spacing.s2}>
         <Grow>
@@ -166,7 +181,7 @@ export default function Card() {
         </Grow>
         {/* 장소가 하나도 없으면 안 냅니다 — 빈 일정을 여행기로 남기라고
             하는 것은 아직 이릅니다. */}
-        {data.days.some((d) => d.places.length > 0) ? (
+        {back && data.days.some((d) => d.places.length > 0) ? (
           <Grow>
             <Button label="여행기 올리기" compact onPress={() => setPublishing(true)} />
           </Grow>
@@ -208,15 +223,27 @@ function sharableUrl(id: string) {
  */
 function Receipt({
   trip,
+  back,
   mates,
   books,
 }: {
   trip: TripDetail;
+  /** 다녀왔는지. 아직이면 「같이 가는 사람」입니다. */
+  back: boolean;
   mates: Person[];
   /** 통화마다 하나. 적어 둔 것이 없으면 빈 배열입니다. */
   books: Books[];
 }) {
-  const places = trip.days.flatMap((d) => d.places);
+  /*
+    들른 곳만 셉니다.
+
+    <p>도쿄 3박 4일 「63곳」 가운데 서른 남짓이 역이었습니다 — 갈아타는 역을
+    장소로 넣어 두고 메모에 노선을 적는 사람이 많습니다. 숙소도 하루에 서너 번
+    들어갑니다. 영수증의 「몇 곳」은 다녀온 데를 말하는 자리라 둘을 뺍니다.
+  */
+  const stops = (list: { icon?: string | null }[]) =>
+    list.filter((p) => p.icon !== 'move' && p.icon !== 'stay');
+  const places = stops(trip.days.flatMap((d) => d.places));
 
   return (
     <View style={styles.paper}>
@@ -241,14 +268,14 @@ function Receipt({
       {trip.days.map((day) => (
         <Split key={day.id}>
           <Body small>{day.date || day.label}</Body>
-          <Body small>{day.places.length}곳</Body>
+          <Body small>{stops(day.places).length}곳</Body>
         </Split>
       ))}
 
       <View style={styles.tear} />
 
       <Split>
-        <Caption>담은 곳</Caption>
+        <Caption>{back ? '들른 곳' : '들를 곳'}</Caption>
         <Caption>{places.length}곳</Caption>
       </Split>
       {/*
@@ -274,7 +301,7 @@ function Receipt({
       ))}
       {mates.length > 1 ? (
         <Split>
-          <Caption>함께한 사람</Caption>
+          <Caption>{back ? '함께한 사람' : '같이 가는 사람'}</Caption>
           <Caption>{mates.length}명</Caption>
         </Split>
       ) : null}

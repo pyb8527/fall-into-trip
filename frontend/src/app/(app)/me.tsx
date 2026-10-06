@@ -178,7 +178,9 @@ export default function Me() {
                   않습니다. */}
               <Caption tone="secondary">
                 {me.mine
-                  ? `여행 ${me.counts.trips}번 · 함께한 사람 ${me.companions ?? 0}명`
+                  ? /* 「여행 1번」이었는데 이 수는 <b>만든</b> 여행이라 아직 안 간
+                       것도 듭니다. 다녀온 횟수는 아래 발자국이 셉니다. */
+                    `여행 ${me.counts.trips}개 · 함께한 사람 ${me.companions ?? 0}명`
                   : /* 우리 사이 한 줄. 남의 페이지에서 먼저 궁금한 것은 그 사람의 전체가
                        아니라 나와의 관계입니다. */
                     `우리 사이 · 같은 모임 ${me.between?.groups.length ?? 0}개 · 함께한 여행 ${me.between?.trips.length ?? 0}번`}
@@ -197,8 +199,20 @@ export default function Me() {
             늘어놓습니다.
           */}
           <Row style={styles.counts}>
-            <Tally n={me.counts.trips} what="여행" onPress={() => setLane('trips')} />
-            <Tally n={me.counts.posts} what="글" onPress={() => setLane('feed')} />
+            {/*
+              숫자와 누르면 열리는 칸이 같은 것을 가리켜야 합니다.
+
+              <p>「여행 1」을 누르면 「여행기」 칸이 열려 두 장이 있었고, 「글 0」을
+              누르면 「피드」 칸이 열렸습니다 — 앞의 것은 만든 여행 수를, 뒤의
+              것은 피드 글 수를 세는데 이름이 다른 것을 가리켰습니다. 여행은 내
+              여행 목록으로 보내고, 글은 칸 이름 그대로 「피드」라고 부릅니다.
+            */}
+            <Tally
+              n={me.counts.trips}
+              what="여행"
+              onPress={me.mine ? () => router.push('/(app)/trips') : undefined}
+            />
+            <Tally n={me.counts.posts} what="피드" onPress={() => setLane('feed')} />
             <Tally n={me.counts.reviews} what="리뷰" onPress={() => setLane('left')} />
             <Tally
               n={me.counts.groups}
