@@ -24,6 +24,8 @@ export function useHere(): HereState {
   const [error, setError] = useState<string | null>(null);
   const [watching, setWatching] = useState(false);
   const id = useRef<number | null>(null);
+  /* 이번에 켠 뒤 자리를 한 번이라도 받았는지(TIMEOUT 을 알릴지). */
+  const gotOne = useRef(false);
 
   const supported =
     typeof navigator !== 'undefined' && typeof navigator.geolocation !== 'undefined';
@@ -44,6 +46,7 @@ export function useHere(): HereState {
       return;
     }
     setError(null);
+    gotOne.current = false;
     setWatching(true);
 
     /*
@@ -63,20 +66,35 @@ export function useHere(): HereState {
 
     id.current = navigator.geolocation.watchPosition(
       (pos) => {
+        gotOne.current = true;
+        setError(null);
         setHere({
           lat: pos.coords.latitude,
           lng: pos.coords.longitude,
           accuracy: pos.coords.accuracy,
+          /* 서 있으면 브라우저가 NaN · null 을 줍니다 — 그때는 비워 둡니다. */
+          heading: Number.isFinite(pos.coords.heading) ? pos.coords.heading : null,
+          speed: Number.isFinite(pos.coords.speed) ? pos.coords.speed : null,
+          at: pos.timestamp,
         });
       },
       (e) => {
+        /* 거절이 아니면 멈추지 않습니다. 한동안 새 자리가 안 오거나(TIMEOUT —
+           가만히 서 있으면 그렇습니다) 잠깐 못 찾는 것(지하 · 터널)은 곧
+           풀립니다. 그때마다 멈추면 「지금 여기」 지도가 그 자리에 얼어붙습니다.
+           지켜보기는 그대로 두고, 아직 자리를 한 번도 못 받았을 때만 알립니다. */
+        if (e.code !== e.PERMISSION_DENIED) {
+          if (!gotOne.current) {
+            setError('지금 위치를 알 수 없어요.');
+          }
+          return;
+        }
+        if (id.current !== null) {
+          navigator.geolocation.clearWatch(id.current);
+        }
         setWatching(false);
         id.current = null;
-        setError(
-          e.code === e.PERMISSION_DENIED
-            ? '위치 사용을 허용해 주세요. 주소창 왼쪽에서 바꿀 수 있어요.'
-            : '지금 위치를 알 수 없어요.',
-        );
+        setError('위치 사용을 허용해 주세요. 주소창 왼쪽에서 바꿀 수 있어요.');
       },
       {
         /* 골목 단위로 맞아야 다음 장소까지의 시간이 뜻을 가집니다. */

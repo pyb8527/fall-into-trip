@@ -33,6 +33,7 @@ import { TripAlbum } from '@/components/trip-album';
 import { hasTiltMaps } from '@/components/replay-stage';
 import { TripMap, type MapPlace } from '@/components/trip-map';
 import { type Place3D, TripMap3D } from '@/components/trip-map-3d';
+import { LiveMap, type LiveTarget } from '@/components/live-map';
 import { iconOf, labelOf } from '@/constants/place-icons';
 import { glyphOf } from '@/constants/place-icons';
 import { faceOf } from '@/constants/user-marks';
@@ -420,6 +421,12 @@ export default function TripScreen() {
     안 섭니다.
   */
   const [threeD, setThreeD] = useState(false);
+  /*
+    「지금 여기」 — 내가 움직이는 대로 지도가 따라가는 보기(components/live-map).
+    여행 상세에서는 갈 곳(다음 장소)과 위치를 알리는 동행자도 함께 섭니다.
+    3D 는 위 threeD 를 같이 씁니다.
+  */
+  const [live, setLive] = useState(false);
   /* 판이 지금 몇 픽셀을 덮고 있는지. 지도가 이것을 알아야 고른 핀을 판에
      가리지 않는 자리에 놓습니다. */
   const [covered, setCovered] = useState(0);
@@ -1058,6 +1065,68 @@ export default function TripScreen() {
   }, [threeD, days, activeDay, gapAfter, chosenOf]);
 
   /*
+    「지금 여기」에서 갈 곳.
+
+    <ol>
+      <li>장소를 골라 두었으면 그곳.</li>
+      <li>아니면 <b>오늘</b> 날의 장소 중 — 시간이 적힌 곳이 있으면 지금 이후
+          첫 곳, 없으면 가장 가까운 곳(이미 그 앞 80m 안이면 그다음 곳).</li>
+      <li>오늘이 여행 날이 아니면 갈 곳이 없습니다 — 내 자리만 봅니다.</li>
+    </ol>
+
+    <p>내 자리가 바뀔 때마다 다시 고르지 않습니다(herePoint — 십여 미터 단위).
+  */
+  const nearKey = me.here ? `${me.here.lat.toFixed(4)},${me.here.lng.toFixed(4)}` : null;
+  const liveTarget = useMemo<LiveTarget | null>(() => {
+    if (!live) {
+      return null;
+    }
+    const as = (p: Place, di: number): LiveTarget => ({
+      id: p.id,
+      name: p.name,
+      lat: p.lat,
+      lng: p.lng,
+      color: days[di]?.color || dayColor(di),
+    });
+    for (let di = 0; di < days.length; di++) {
+      const hit = days[di].places.find((p) => p.id === activePlaceId);
+      if (hit) {
+        return as(hit, di);
+      }
+    }
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const di = days.findIndex((d) => d.iso === today);
+    if (di < 0 || days[di].places.length === 0) {
+      return null;
+    }
+    const list = days[di].places;
+    const minutes = now.getHours() * 60 + now.getMinutes();
+    const timed = list
+      .map((p) => ({ p, at: minutesOf(p.time) }))
+      .filter((x): x is { p: Place; at: number } => x.at !== null);
+    if (timed.length > 0) {
+      const next = timed.find((x) => x.at >= minutes);
+      return next ? as(next.p, di) : null;
+    }
+    if (!me.here) {
+      return as(list[0], di);
+    }
+    const here = me.here;
+    let best = 0;
+    list.forEach((p, i) => {
+      if (metersBetween(here, p) < metersBetween(here, list[best])) {
+        best = i;
+      }
+    });
+    if (metersBetween(here, list[best]) < 80) {
+      return best + 1 < list.length ? as(list[best + 1], di) : null;
+    }
+    return as(list[best], di);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [live, days, activePlaceId, live ? nearKey : null]);
+
+  /*
     이 날 장소들이 언제 문을 여는지. 월요일 휴관을 모르고 갔다가 하루를 날리는
     일이 흔합니다.
   */
@@ -1138,14 +1207,16 @@ export default function TripScreen() {
       .catch(() => {});
   }, [id]);
 
+  /* 「지금 여기」를 보는 동안에는 동행자가 움직이는 것이 보여야 하므로 5초마다
+     묻습니다. 평소(위치를 알리는 중)에는 20초. */
   useEffect(() => {
     pullLive();
-    if (!sharing) {
+    if (!sharing && !live) {
       return;
     }
-    const timer = setInterval(pullLive, 20_000);
+    const timer = setInterval(pullLive, live ? 5_000 : 20_000);
     return () => clearInterval(timer);
-  }, [pullLive, sharing]);
+  }, [pullLive, sharing, live]);
 
   /* 자리는 소수 넷째 자리(십여 미터)까지만 봅니다. 그보다 잘게 보면 가만히
      서 있어도 값이 떨려 계속 보냅니다. */
@@ -1358,6 +1429,21 @@ export default function TripScreen() {
             accessibilityLabel="저장해 둔 동선"
           />
         </View>
+      ) : live ? (
+        <View style={[styles.map3d, { bottom: covered + dock }]}>
+          <LiveMap
+            here={me.here}
+            threeD={threeD}
+            target={liveTarget}
+            mates={mates.map((m) => ({
+              id: m.userId,
+              name: m.name,
+              face: faceOf(m.mark, m.name),
+              lat: m.lat,
+              lng: m.lng,
+            }))}
+          />
+        </View>
       ) : threeD ? (
         /* 판과 띠가 덮는 아래를 비워 둡니다 — 3D 는 카메라가 탈것을 화면 가운데에
            두므로, 지도가 판 뒤까지 내려가 있으면 탈것이 판 뒤로 들어갑니다. */
@@ -1439,6 +1525,21 @@ export default function TripScreen() {
         <Row gap={Spacing.s2}>
           {/* 3D 로 보기. 지도 ID 가 있고 살아 있는 지도를 볼 때만 — 저장해 둔
               그림은 기울일 것이 없습니다. */}
+          {/* 지금 여기 — 내 자리를 따라가며 다음 장소까지 안내합니다. */}
+          {me.supported && !keptMap ? (
+            <IconButton
+              name="navigation"
+              label={live ? '지금 여기 끄기' : '지금 여기'}
+              onMap
+              active={live}
+              onPress={() => {
+                if (!live) {
+                  me.start();
+                }
+                setLive((v) => !v);
+              }}
+            />
+          ) : null}
           {hasTiltMaps() && !keptMap ? (
             <IconButton
               name="cube"
@@ -1486,7 +1587,7 @@ export default function TripScreen() {
           안 일어나면서 자리 알림만 켜지는 것이 가장 나쁩니다. */}
       {/* 3D 에서는 뺍니다 — 3D 카메라는 탈것을 따라가므로 「내 위치로」 옮겨도
           다음 순간 탈것 쪽으로 돌아갑니다. */}
-      {me.supported && !keptMap && !threeD ? (
+      {me.supported && !keptMap && !threeD && !live ? (
         <View style={[styles.floatRight, { bottom: covered + dock + Spacing.s3 }]}>
           {/*
             십자를 누르면 나오는 둘.
@@ -4755,6 +4856,12 @@ function earlierThan(order: { time?: string | null }[], at: number): string | nu
     return before > now ? before : null;
   }
   return null;
+}
+
+/** 「10:30」 · 「9:00~」 처럼 적힌 시간 → 그날 0시부터 몇 분. 못 읽으면 null. */
+function minutesOf(time: string | null): number | null {
+  const m = time?.match(/(\d{1,2}):(\d{2})/);
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null;
 }
 
 /** 「이동 시간」의 수단 → 동선 탈것의 수단(lib/vehicles 의 FROM_MODE 열쇠). */

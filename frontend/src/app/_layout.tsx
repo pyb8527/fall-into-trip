@@ -167,6 +167,8 @@ export default function RootLayout() {
             <Stack.Screen name="feed/[id]" options={stackHeader('피드 글')} />
             <Stack.Screen name="community" options={{ headerShown: false }} />
             <Stack.Screen name="admin" options={{ headerShown: false }} />
+            {/* 「지금 여기」 — 지도가 화면 전체라 머리 막대 대신 지도 위 단추로 나갑니다. */}
+            <Stack.Screen name="here" options={{ headerShown: false }} />
           </Stack>
         </ThemeProvider>
         </HandFont>

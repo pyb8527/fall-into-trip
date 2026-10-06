@@ -8,6 +8,15 @@ export type Here = {
   lng: number;
   /** 이 반경 안쪽 어딘가라는 뜻. 미터. */
   accuracy: number;
+  /**
+   * 가는 쪽(북쪽에서 시계 방향, 도). 기기가 알려 줄 때만 — 서 있으면 대개 비어
+   * 있습니다. 「지금 여기」 지도가 탈것을 그쪽으로 돌립니다.
+   */
+  heading?: number | null;
+  /** 빠르기(m/s). 기기가 알려 줄 때만. 걷기와 탈것을 가르는 데 씁니다. */
+  speed?: number | null;
+  /** 이 자리를 잡은 때(ms). 두 자리 사이를 부드럽게 이을 때 씁니다. */
+  at?: number;
 };
 
 export type HereState = {
@@ -92,6 +101,9 @@ export function useHere(): HereState {
             lat: pos.coords.latitude,
             lng: pos.coords.longitude,
             accuracy: pos.coords.accuracy ?? 0,
+            heading: pos.coords.heading != null && pos.coords.heading >= 0 ? pos.coords.heading : null,
+            speed: pos.coords.speed != null && pos.coords.speed >= 0 ? pos.coords.speed : null,
+            at: pos.timestamp,
           });
         },
       );

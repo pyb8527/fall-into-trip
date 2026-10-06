@@ -342,6 +342,13 @@ export default function Home() {
                 bare
                 onPress={() => router.push('/(app)/search')}
               />
+              {/* 지금 내 자리 — 여행과 상관없이 지도에서 나를 따라가 봅니다(app/here). */}
+              <IconButton
+                name="navigation"
+                label="지금 여기"
+                bare
+                onPress={() => router.push('/here')}
+              />
               {/* 알림함으로 가는 자리. 「모임 소식」이라고 적던 구역이 아래에
                   따로 있고, 둘이 같은 곳을 엽니다. */}
               <IconButton
