@@ -45,9 +45,11 @@ import type { Vehicle } from '@/lib/vehicles';
  * 탈것마다 받을 파일. 여럿이면 첫 것이 앞이고 나머지가 뒤로 줄지어 붙습니다.
  *
  * <ul>
- *   <li>사람 — character-female-b. 처음에 쓴 female-a 는 Kenney 의 「도움 기구를
- *       쓰는 사람」 모델이라 두 손에 팔꿈치 목발을 쥐고 있었습니다 — 지도 위에서
- *       「왜 총을 들고 있냐」로 보였습니다.</li>
+ *   <li>사람 — Quaternius 「Casual_Male」(CC0). 처음에 쓴 Kenney female-a 는
+ *       「도움 기구를 쓰는 사람」 모델이라 두 손에 팔꿈치 목발을 쥐고 있었고(「왜
+ *       총을 들고 있냐」), Kenney 사람들은 머리가 몸만 한 장난감 비율이라 더
+ *       사람 같은 Quaternius 로 바꿨습니다. Quaternius 는 피부를 검정 실루엣으로
+ *       칠하는 스타일이라 피부 · 눈 색만 바꿨습니다(LICENSES.txt).</li>
  *   <li>기차 — 고속열차 앞 칸(bullet-a)에 객차 둘(bullet-b · c). Kenney 기차는
  *       한 칸짜리가 장난감 비율이라 하나만 두면 「너무 뚱뚱」했습니다. 세 칸을
  *       이으니 길고 날렵해집니다.</li>
@@ -159,7 +161,9 @@ export async function createVehicleScene(map: any): Promise<VehicleScene> {
       const box = new THREE.Box3().setFromObject(model);
       const size = box.getSize(new THREE.Vector3());
       const center = box.getCenter(new THREE.Vector3());
-      const longest = Math.max(size.x, size.z) || 1;
+      /* 탈것은 긴 쪽(앞뒤 · 좌우), 사람은 키로 맞춥니다 — 사람은 키가 폭의 두 배라
+         긴 쪽으로 맞추면 VEHICLE_PX 의 두 배로 커집니다. */
+      const longest = (vehicle === 'walk' ? Math.max(size.x, size.y, size.z) : Math.max(size.x, size.z)) || 1;
       model.position.set(-center.x, -box.min.y, -center.z);
       const unit = new THREE.Group();
       unit.add(model);
@@ -175,7 +179,8 @@ export async function createVehicleScene(map: any): Promise<VehicleScene> {
       let idle: Loaded['idle'] = null;
       if (gltf.animations.length > 0) {
         mixer = new THREE.AnimationMixer(gltf.scene);
-        const clip = (name: string) => gltf.animations.find((a) => a.name === name);
+        /* Kenney 는 walk · idle, Quaternius 는 Walk · Idle — 글자 크기를 안 가립니다. */
+        const clip = (name: string) => gltf.animations.find((a) => a.name.toLowerCase() === name);
         const w = clip('walk');
         const i = clip('idle') ?? clip('static');
         walk = w ? mixer.clipAction(w) : null;
