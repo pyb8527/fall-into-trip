@@ -3022,6 +3022,7 @@ function DayCard({
                     /* 마지막 장소 뒤에는 갈 데가 없습니다. */
                     gapping={gapping && i < order.length - 1}
                     arriveBy={order[i + 1]?.time ?? null}
+                    earlierThan={earlierThan(order, i)}
                     spent={spentAt.get(place.id) ?? null}
                     touched={touchedOf(place)}
                     chosenOf={chosenOf}
@@ -3211,6 +3212,7 @@ function PlaceRow({
   gap,
   gapping,
   arriveBy,
+  earlierThan,
   spent,
   touched,
   chosenOf,
@@ -3255,6 +3257,8 @@ function PlaceRow({
   gapping: boolean;
   /** 다음 장소에 적어 둔 시각. 안 적었으면 비어 있습니다. */
   arriveBy: string | null;
+  /** 앞 장소에 이 줄보다 늦은 시각이 적혀 있으면 그 시각. 아니면 null. */
+  earlierThan?: string | null;
   /** 여기서 실제로 쓴 돈. 통화마다 하나씩. 안 적었으면 비어 있습니다. */
   spent: Map<string, { sum: number; decimals: number }> | null;
   /** 남이 최근에 손댔으면 "지영 님 · 2시간 전". 아니면 비어 있습니다. */
@@ -3287,7 +3291,9 @@ function PlaceRow({
       */}
       <View style={styles.when}>
         {place.time ? (
-          <Caption strong>{place.time}</Caption>
+          <Caption strong tone={earlierThan ? 'danger' : undefined}>
+            {place.time}
+          </Caption>
         ) : null}
       </View>
 
@@ -3399,6 +3405,18 @@ function PlaceRow({
                 <p>둘러보기 상세와 같은 모양입니다. 내 여행에서 보는 것과 남의
                 글에서 보는 것이 같은 것이라 다르게 그릴 이유가 없습니다.
               */}
+              {/*
+                시각이 거꾸로 갑니다.
+
+                <p>줄을 끌어 옮기면 차례만 바뀌고 적어 둔 시각은 그대로라,
+                「12:30 센소지」 다음에 「11:15」가 서는 일이 생깁니다. 고치는
+                것은 사람 몫입니다 — 차례가 맞는지 시각이 맞는지는 우리가 모릅니다.
+              */}
+              {earlierThan ? (
+                <Caption tone="danger" strong>
+                  앞 장소({earlierThan})보다 이른 시각이에요
+                </Caption>
+              ) : null}
               {info ? <PlaceHours info={info} at={place.time} /> : null}
               {/*
                 「○일에도 넣어 뒀어요」를 걷었습니다.
@@ -4600,6 +4618,31 @@ function CloneSheet({
  * 검사를 피하고 있는지 알 수 없습니다.
  */
 const NO_SCROLL_HERE = { touchAction: 'none' } as unknown as ViewStyle;
+
+/**
+ * 앞쪽에 이 줄보다 늦은 시각이 적혀 있으면 그 시각.
+ *
+ * <p>시각을 안 적은 줄은 건너뛰고 가장 가까운 앞의 시각과 견줍니다. 밤
+ * 늦게(20시 넘어) 다음에 새벽(5시 전)이 오는 것은 자정을 넘긴 것으로 봅니다 —
+ * 「23:00 이자카야 → 01:00 라멘」은 틀린 것이 아닙니다.
+ */
+function earlierThan(order: { time?: string | null }[], at: number): string | null {
+  const now = order[at]?.time;
+  if (!now) {
+    return null;
+  }
+  for (let i = at - 1; i >= 0; i--) {
+    const before = order[i]?.time;
+    if (!before) {
+      continue;
+    }
+    if (before >= '20:00' && now < '05:00') {
+      return null;
+    }
+    return before > now ? before : null;
+  }
+  return null;
+}
 
 const styles = StyleSheet.create({
   /* 챙길 것을 맡을 사람 얼굴. 손가락 크기는 Tap.chip 높이에 맞춥니다. */

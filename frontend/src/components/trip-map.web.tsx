@@ -1213,10 +1213,20 @@ export function TripMap({
         bottom: 56 + bottomInset,
         left: 56,
       });
-      /* 한 곳만 있는 하루에서는 fitBounds 가 끝까지 당겨 버립니다. */
-      if ((map.current.getZoom() ?? 0) > FOCUS_ZOOM) {
-        map.current.setZoom(FOCUS_ZOOM);
-      }
+      /*
+        한 곳만 있는 하루나 붙어 있는 두 곳(공항 1·2터미널)에서는 fitBounds 가
+        끝까지 당겨 버립니다.
+
+        <p>바로 뒤에 getZoom 으로 보고 있었는데, fitBounds 는 배율을 <b>나중에</b>
+        바꿉니다 — 그 자리에서 읽으면 옮기기 전 배율이 나와 막는 줄이 한 번도
+        안 걸렸습니다. 배율이 정해진 뒤에 한 번 봅니다.
+      */
+      const m = map.current;
+      g.event.addListenerOnce(m, 'idle', () => {
+        if ((m.getZoom() ?? 0) > FOCUS_ZOOM) {
+          m.setZoom(FOCUS_ZOOM);
+        }
+      });
     } else if (chosen && map.current) {
       map.current.panTo({ lat: chosen.lat, lng: chosen.lng });
       if ((map.current.getZoom() ?? 0) < FOCUS_ZOOM) {
