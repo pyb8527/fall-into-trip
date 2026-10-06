@@ -61,6 +61,12 @@ export function PlaceForm({
   /* 고른 곳이 구글의 어느 장소인지. 저장해 두면 나중에 영업시간을 물어볼 수
      있습니다. 좌표를 직접 넣으면 비어 있습니다. */
   const [placeId, setPlaceId] = useState<string | null>(place?.placeId ?? null);
+  /*
+    고치다가 찾아서 <b>다른 곳</b>을 골랐는지. 그러면 원어 이름(ja · en)을 비웁니다 —
+    찾기 결과에는 원어 이름이 없어서, 안 비우면 바꾼 곳 밑에 전 장소의 일본어
+    이름이 그대로 붙어 있습니다.
+  */
+  const [switched, setSwitched] = useState(false);
   /* 지도에 찍힐 그림. 찾아서 고르면 서버가 구글 갈래로 미리 하나 찍어 줍니다. */
   const [icon, setIcon] = useState<string | null>(place?.icon ?? null);
   const [time, setTime] = useState(place?.time ?? '');
@@ -96,6 +102,7 @@ export function PlaceForm({
     setLng(place ? String(place.lng) : '');
     setPicked(place?.ja ?? place?.en ?? null);
     setPlaceId(place?.placeId ?? null);
+    setSwitched(false);
     setIcon(place?.icon ?? null);
     setTime(place?.time ?? '');
     setCat(place?.cat ?? '');
@@ -164,6 +171,8 @@ export function PlaceForm({
         /* 빈 문자열은 "그림 빼기" 입니다. null 은 "손대지 마라" 라서, 골라 둔
            것을 도로 뺄 수 있으려면 둘을 갈라야 합니다. */
         icon: icon ?? '',
+        /* 다른 곳으로 바꿨으면 전 장소의 원어 이름을 지웁니다(빈 글자 = 지우기). */
+        ...(switched ? { ja: '', en: '' } : {}),
         version: place?.version,
       };
       if (place) {
@@ -192,13 +201,25 @@ export function PlaceForm({
       {/* 1. 어디인지 먼저 정합니다. */}
       <PlaceSearch
         onPick={(found) => {
-          if (!name.trim()) {
-            setName(found.name);
-          }
+          /*
+            고른 곳의 이름으로 바꿉니다.
+
+            <p>이름이 비어 있을 때만 채우고 있었습니다 — 「우리끼리 부르는 이름」을
+            지키려던 것인데, 고치는 판에는 늘 전 장소의 이름이 들어 있어서 <b>다른
+            곳을 골라도 이름이 그대로</b>였습니다(「장소 상세에서 다른 장소를 검색해
+            선택하면 이름이 안 바뀐다」). 찾아서 고르는 것은 그 곳으로 바꾸겠다는
+            뜻이라 늘 바꿉니다. 부르는 이름은 고른 뒤에 아래 칸에서 고치면 됩니다.
+          */
+          const other = found.placeId == null || found.placeId !== placeId;
+          setName(found.name);
           setPlaceId(found.placeId);
-          /* 이미 골라 둔 것이 있으면 덮지 않습니다. 다른 곳을 다시 찾았다고
-             일부러 바꿔 둔 그림이 사라지면 화가 납니다. */
-          setIcon((prev) => prev ?? found.icon ?? null);
+          if (editing && other) {
+            setSwitched(true);
+          }
+          /* 그림 — 같은 곳을 다시 고른 것이면 골라 둔 그림을 지킵니다. 다른 곳이면
+             그 곳의 갈래 그림으로 바꿉니다(라멘집이 카페로 바뀌었는데 라멘 그림이
+             남으면 안 됩니다). 갈래를 모르는 곳이면 있던 것을 둡니다. */
+          setIcon((prev) => (other ? (found.icon ?? prev) : (prev ?? found.icon ?? null)));
           setLat(String(found.lat));
           setLng(String(found.lng));
           setPicked(found.address || found.name);

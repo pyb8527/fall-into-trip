@@ -805,9 +805,22 @@ export default function TripScreen() {
 
     영업시간도 같습니다. 순서와는 상관없지만 장소가 늘거나 줄면 다시 물어야
     새로 넣은 곳의 여는 시간이 붙습니다.
+
+    <h3>자리와 구글 번호도 열쇠에 넣습니다</h3>
+
+    <p>장소 번호(id)만 늘어놓고 있었습니다. 그런데 장소를 고쳐서 <b>다른 곳으로
+    바꾸면</b> 번호는 그대로이고 자리 · 구글 번호만 바뀝니다 — 열쇠가 같으니 다시
+    묻지 않아서, 바꾼 곳 밑에 전 장소의 영업시간 · 별점이 그대로 붙어 있었고
+    이동 시간도 전 자리에서 잰 것이었습니다(「장소를 바꾸면 정보가 리프레시가
+    안 되고 그 전 장소의 정보로 보여」).
   */
   const daySeq = useMemo(
-    () => (dayIndex >= 0 ? (days[dayIndex]?.places ?? []).map((p) => p.id).join(',') : ''),
+    () =>
+      dayIndex >= 0
+        ? (days[dayIndex]?.places ?? [])
+            .map((p) => `${p.id}@${p.lat.toFixed(5)},${p.lng.toFixed(5)}:${p.placeId ?? ''}`)
+            .join('|')
+        : '',
     [days, dayIndex],
   );
 
