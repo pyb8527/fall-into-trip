@@ -462,6 +462,30 @@ public class TripService {
         return trip;
     }
 
+    /**
+     * 가고 싶은 곳 투표의 마지막 날을 정합니다. 비우면 마감이 없습니다.
+     *
+     * <p>멤버 누구나 정합니다(예산 · 안내판과 같은 규칙). 지난 날은 안 받습니다 —
+     * 고르는 순간 닫혀 버리는 마감은 「닫기」 단추이지 마감이 아닙니다.
+     */
+    @Transactional
+    public Trip writeVoteUntil(AuthPrincipal me, String tripId, String iso) {
+        Trip trip = access.mine(tripId, me.id());
+        access.requireCanEdit(tripId, me.id());
+        java.time.LocalDate until = null;
+        if (iso != null && !iso.isBlank()) {
+            until = DayLabels.parse(iso);
+            if (until.isBefore(java.time.LocalDate.now())) {
+                throw ApiException.badRequest("마감은 오늘이나 그 뒤 날짜로 정해 주세요.");
+            }
+        }
+        trip.setVoteUntil(until);
+        trips.saveAndFlush(trip);
+        audit.log(me.id(), "trip.vote-until", tripId,
+                Map.of("until", until == null ? "" : until.toString()));
+        return trip;
+    }
+
     /* ------------------------------------------------------- 참석 응답 */
 
     /**

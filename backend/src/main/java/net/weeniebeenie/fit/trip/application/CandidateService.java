@@ -8,6 +8,7 @@ import net.weeniebeenie.fit.trip.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -36,6 +37,7 @@ public class CandidateService {
     private final PlaceRepository places;
     private final DayRepository days;
     private final TripAccessPolicy access;
+    private final TripRepository trips;
 
     @Transactional(readOnly = true)
     public List<Card> listOf(AuthPrincipal me, String tripId) {
@@ -83,6 +85,7 @@ public class CandidateService {
     @Transactional
     public TripCandidate add(AuthPrincipal me, String tripId, Draft draft) {
         access.requireCanEdit(tripId, me.id());
+        requireOpen(tripId);
 
         if (candidates.countByTripId(tripId) >= MAX_CANDIDATES) {
             throw ApiException.badRequest("후보가 너무 많아요. 정한 것을 일정으로 옮겨 주세요.");
@@ -124,6 +127,7 @@ public class CandidateService {
         TripCandidate candidate = candidates.findById(candidateId)
                 .orElseThrow(() -> ApiException.notFound("후보를 찾을 수 없어요."));
         access.requireCanRead(candidate.getTripId(), me.id());
+        requireOpen(candidate.getTripId());
 
         if (yes == null) {
             votes.deleteByCandidateIdAndUserId(candidateId, me.id());
@@ -149,6 +153,20 @@ public class CandidateService {
             throw ApiException.forbidden("올린 사람만 내릴 수 있어요.");
         }
         candidates.delete(candidate);
+    }
+
+    /**
+     * 마감이 지났으면 막습니다.
+     *
+     * <p>표와 새 후보만 막습니다. 내리기와 일정으로 옮기기는 마감 뒤에 하는
+     * 일이라 그대로 둡니다 — 마감은 「이제 정한 대로 옮기자」는 뜻입니다.
+     */
+    private void requireOpen(String tripId) {
+        trips.findById(tripId).ifPresent(t -> {
+            if (t.votingClosed(LocalDate.now())) {
+                throw ApiException.conflict("투표가 마감됐어요. 마감을 늦추면 다시 받을 수 있어요.");
+            }
+        });
     }
 
     private boolean isOwner(String tripId, String userId) {

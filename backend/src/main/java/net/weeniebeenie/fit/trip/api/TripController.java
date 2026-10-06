@@ -122,6 +122,19 @@ public class TripController {
     public record BudgetBody(Long amount) {
     }
 
+    /** 가고 싶은 곳 투표 마감. {@code date} 를 비우면 마감이 없어집니다. */
+    @PutMapping("/trips/{id}/vote-until")
+    public Map<String, Object> voteUntil(@CurrentUser AuthPrincipal me, @PathVariable String id,
+                                         @RequestBody(required = false) VoteUntilBody body) {
+        Trip trip = trips.writeVoteUntil(me, id, body == null ? null : body.date());
+        Map<String, Object> out = new java.util.HashMap<>();
+        out.put("voteUntil", trip.getVoteUntil());
+        return out;
+    }
+
+    public record VoteUntilBody(String date) {
+    }
+
     /**
      * 안내판 한 장 — 글, 누가 언제 고쳤나, 다음에 고칠 때 보낼 판.
      *

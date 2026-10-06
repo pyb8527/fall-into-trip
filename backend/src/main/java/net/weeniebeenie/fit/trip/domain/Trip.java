@@ -68,6 +68,15 @@ public class Trip {
     /** 예산(원). 안 정했으면 비어 있습니다(V56). */
     private Long budget;
 
+    /** 가고 싶은 곳 투표를 받는 마지막 날(그날 포함). 비어 있으면 마감 없음(V57). */
+    @Column(name = "vote_until")
+    private java.time.LocalDate voteUntil;
+
+    /** 오늘(서버의 날짜) 투표가 닫혀 있는지. */
+    public boolean votingClosed(java.time.LocalDate today) {
+        return voteUntil != null && today.isAfter(voteUntil);
+    }
+
     /**
      * 로그인 없이 보는 일정 링크의 열쇠 — SHA-256 만 둡니다.
      *
