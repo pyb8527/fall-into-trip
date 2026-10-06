@@ -30,7 +30,9 @@ import { SavedPicker } from '@/components/saved-picker';
 import { PublishForm } from '@/components/publish-form';
 import { TipSheet } from '@/components/tip-sheet';
 import { TripAlbum } from '@/components/trip-album';
+import { hasTiltMaps } from '@/components/replay-stage';
 import { TripMap, type MapPlace } from '@/components/trip-map';
+import { type Place3D, TripMap3D } from '@/components/trip-map-3d';
 import { iconOf, labelOf } from '@/constants/place-icons';
 import { glyphOf } from '@/constants/place-icons';
 import { faceOf } from '@/constants/user-marks';
@@ -412,6 +414,12 @@ export default function TripScreen() {
      다른 날을 골라 놓아도 다시 오늘로 끌려갑니다. */
   const jumped = useRef(false);
   const [activePlaceId, setActivePlaceId] = useState<string | null>(null);
+  /*
+    지도를 기울여 3D 로 보는지(「3D」 단추). 장소를 고르면 앞에 고른 곳에서 거기까지
+    탈것이 갑니다 — components/trip-map-3d. 지도 ID 가 없는 빌드에서는 단추가
+    안 섭니다.
+  */
+  const [threeD, setThreeD] = useState(false);
   /* 판이 지금 몇 픽셀을 덮고 있는지. 지도가 이것을 알아야 고른 핀을 판에
      가리지 않는 자리에 놓습니다. */
   const [covered, setCovered] = useState(0);
@@ -1001,6 +1009,42 @@ export default function TripScreen() {
   }, [gaps, dayIndex, days]);
 
   /*
+    3D 지도에 줄 곳들 — 평평한 지도와 같은 곳에, 다음 곳까지 무엇을 타고 어느
+    길로 가는지를 붙입니다.
+
+    <p>수단은 적어 둔 이동(place.move)이 먼저이고, 없으면 「이동 시간」에서 고른
+    수단입니다. 길은 「이동 시간」으로 찾아 둔 구간의 선(gapAfter — 지금 보는
+    날의 것만)입니다. 전체를 볼 때는 구간을 안 물으므로 곧게 갑니다.
+  */
+  const places3d = useMemo<Place3D[]>(() => {
+    if (!threeD) {
+      return [];
+    }
+    const out: Place3D[] = [];
+    days.forEach((day, di) => {
+      if (activeDay !== ALL && di !== activeDay) {
+        return;
+      }
+      day.places.forEach((p, i) => {
+        const gap = gapAfter.get(p.id);
+        const option = gap ? chosenOf(gap) : null;
+        out.push({
+          id: p.id,
+          name: p.name,
+          lat: p.lat,
+          lng: p.lng,
+          dayIndex: di,
+          order: i + 1,
+          color: day.color || dayColor(di),
+          mode: p.move?.mode ?? (option ? MODE_OF[option.mode] : null),
+          path: option?.polyline ? decodePolyline(option.polyline) : null,
+        });
+      });
+    });
+    return out;
+  }, [threeD, days, activeDay, gapAfter, chosenOf]);
+
+  /*
     이 날 장소들이 언제 문을 여는지. 월요일 휴관을 모르고 갔다가 하루를 날리는
     일이 흔합니다.
   */
@@ -1301,6 +1345,12 @@ export default function TripScreen() {
             accessibilityLabel="저장해 둔 동선"
           />
         </View>
+      ) : threeD ? (
+        /* 판과 띠가 덮는 아래를 비워 둡니다 — 3D 는 카메라가 탈것을 화면 가운데에
+           두므로, 지도가 판 뒤까지 내려가 있으면 탈것이 판 뒤로 들어갑니다. */
+        <View style={[styles.map3d, { bottom: covered + dock }]}>
+          <TripMap3D places={places3d} activeId={activePlaceId} onSelect={pickOnMap} />
+        </View>
       ) : (
       <TripMap
         places={mapPlaces}
@@ -1374,6 +1424,17 @@ export default function TripScreen() {
           보는 사람 하나만 세우고 나머지는 점 세 개 안으로 넣습니다.
         */}
         <Row gap={Spacing.s2}>
+          {/* 3D 로 보기. 지도 ID 가 있고 살아 있는 지도를 볼 때만 — 저장해 둔
+              그림은 기울일 것이 없습니다. */}
+          {hasTiltMaps() && !keptMap ? (
+            <IconButton
+              name="cube"
+              label={threeD ? '평평한 지도로 보기' : '3D 로 보기'}
+              onMap
+              active={threeD}
+              onPress={() => setThreeD((v) => !v)}
+            />
+          ) : null}
           <IconButton
             name="users"
             label="같이 보는 사람"
@@ -1410,7 +1471,9 @@ export default function TripScreen() {
       {/* 저장해 둔 그림을 깔고 있을 때는 뺍니다. 이 단추가 하는 일은 지도를
           내 자리로 옮기는 것인데 그림은 움직이지 않습니다. 눌러도 아무 일이
           안 일어나면서 자리 알림만 켜지는 것이 가장 나쁩니다. */}
-      {me.supported && !keptMap ? (
+      {/* 3D 에서는 뺍니다 — 3D 카메라는 탈것을 따라가므로 「내 위치로」 옮겨도
+          다음 순간 탈것 쪽으로 돌아갑니다. */}
+      {me.supported && !keptMap && !threeD ? (
         <View style={[styles.floatRight, { bottom: covered + dock + Spacing.s3 }]}>
           {/*
             십자를 누르면 나오는 둘.
@@ -4681,6 +4744,13 @@ function earlierThan(order: { time?: string | null }[], at: number): string | nu
   return null;
 }
 
+/** 「이동 시간」의 수단 → 동선 탈것의 수단(lib/vehicles 의 FROM_MODE 열쇠). */
+const MODE_OF: Record<TravelMode, string> = {
+  WALK: 'walk',
+  TRANSIT: 'transit',
+  DRIVE: 'car',
+};
+
 const styles = StyleSheet.create({
   /* 챙길 것을 맡을 사람 얼굴. 손가락 크기는 Tap.chip 높이에 맞춥니다. */
   packFace: {
@@ -4753,6 +4823,13 @@ const styles = StyleSheet.create({
   /* 지도가 쓰는 자리. */
   mapPane: {
     flex: 1,
+  },
+  /* 3D 지도 자리. 아래는 판이 덮는 만큼 비웁니다(bottom 을 그때그때 줌). */
+  map3d: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
   },
   /* 넓은 화면에서는 왼쪽을 패널에 내줍니다. 여백(margin)으로 비킵니다 —
      안쪽 여백(padding)으로 두면 떠 있는 것들의 왼쪽 0 이 그 안으로

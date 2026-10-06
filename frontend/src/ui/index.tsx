@@ -2457,7 +2457,9 @@ export type IconName =
   | 'walk'
   | 'car'
   | 'airplane'
-  | 'boat';
+  | 'boat'
+  /** 지도를 기울여 3D 로 보기(여행 상세). */
+  | 'cube';
 
 /**
  * 이름 하나가 가리키는 두 가지 — 선과 채움.
@@ -2554,6 +2556,7 @@ const ionicon: Record<IconName, { line: string; solid: string }> = {
   'car': { line: 'car-outline', solid: 'car' },
   'airplane': { line: 'airplane-outline', solid: 'airplane' },
   'boat': { line: 'boat-outline', solid: 'boat' },
+  'cube': { line: 'cube-outline', solid: 'cube' },
 };
 
 export function Icon({
