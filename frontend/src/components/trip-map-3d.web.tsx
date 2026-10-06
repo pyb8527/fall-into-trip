@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 
+import { FollowButton } from '@/components/follow-button';
 import { gmaps } from '@/lib/gmaps.web';
 import { createJourney, type Journey, type JourneyPoint } from '@/lib/journey.web';
 import { createTiltMap } from '@/lib/tilt-map.web';
@@ -55,6 +56,8 @@ export function TripMap3D({
   const map = useRef<any>(null);
   const journey = useRef<Journey | null>(null);
   const [ready, setReady] = useState(false);
+  /* 손으로 카메라를 가져갔는지 — 그때만 「따라가기」가 섭니다. */
+  const [following, setFollowing] = useState(true);
   const pins = useRef<any[]>([]);
   const lines = useRef<any[]>([]);
   /* 마지막으로 서 있던 곳. 새 곳을 고르면 여기서 출발합니다. */
@@ -79,6 +82,7 @@ export function TripMap3D({
         }
         map.current = made;
         journey.current = createJourney(made);
+        journey.current.onFollowChange(setFollowing);
         setReady(true);
       })
       .catch(() => {
@@ -159,6 +163,9 @@ export function TripMap3D({
     if (!to) {
       return;
     }
+    /* 새 곳을 골랐으면 가는 모습을 보여 줍니다 — 손으로 카메라를 가져가 있었어도
+       다시 붙습니다. */
+    j.follow();
     const fromIndex = places.findIndex((p) => p.id === standing.current);
     const from = fromIndex >= 0 ? places[fromIndex] : null;
     standing.current = to.id;
@@ -176,6 +183,7 @@ export function TripMap3D({
   return (
     <View style={{ flex: 1 }}>
       <div ref={box} style={{ width: '100%', height: '100%' }} />
+      <FollowButton visible={!following} onPress={() => journey.current?.follow()} />
     </View>
   );
 }

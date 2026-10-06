@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 
+import { FollowButton } from '@/components/follow-button';
 import { gmaps } from '@/lib/gmaps.web';
 import { aimAlong, createJourney, type Journey, type JourneyPoint } from '@/lib/journey.web';
 import { createTiltMap } from '@/lib/tilt-map.web';
@@ -61,6 +62,8 @@ export function ReplayStage({
   const journey = useRef<Journey | null>(null);
   /* 상태로 둡니다 — 아래 그리기가 지도가 선 뒤에 다시 돌아야 합니다. */
   const [ready, setReady] = useState(false);
+  /* 손으로 카메라를 가져갔는지 — 그때만 「따라가기」가 섭니다. */
+  const [following, setFollowing] = useState(true);
   const lines = useRef<any[]>([]);
   const trail = useRef<{ glow: any; core: any } | null>(null);
   const dots = useRef<any[]>([]);
@@ -79,6 +82,7 @@ export function ReplayStage({
         }
         map.current = made;
         journey.current = createJourney(made);
+        journey.current.onFollowChange(setFollowing);
         /* 3D 탈것을 받을 때까지(길어야 4초) 출발을 미룹니다 — 첫 구간부터 제
            탈것이 서게(lib/journey 의 ready). */
         return Promise.race([
@@ -203,6 +207,7 @@ export function ReplayStage({
   return (
     <View style={{ height, borderRadius: 12, overflow: 'hidden' }}>
       <div ref={box} style={{ width: '100%', height: '100%' }} />
+      <FollowButton visible={!following} onPress={() => journey.current?.follow()} />
     </View>
   );
 }

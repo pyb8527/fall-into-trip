@@ -128,6 +128,29 @@ export function aimAlong(
   };
 }
 
+/**
+ * 한 자리를 겨눕니다 — 구간이 없을 때(「지금 여기」의 내 자리처럼).
+ *
+ * @param heading 가는 쪽(북쪽에서 시계 방향). 카메라는 거기서 비껴 봅니다
+ * @param zoom    안 주면 그 탈것의 배율(lib/vehicles.cameraFor)
+ */
+export function aimAt(
+  at: { lat: number; lng: number; color: string },
+  opts: { heading: number; vehicle: Vehicle; still: boolean; zoom?: number },
+): Aim {
+  return {
+    lat: at.lat,
+    lng: at.lng,
+    heading: (opts.heading + SIDE_VIEW) % 360,
+    zoom: opts.zoom ?? cameraFor(opts.vehicle, 0.3).zoom,
+    legHeading: opts.heading,
+    lift: 0,
+    color: at.color,
+    vehicle: opts.vehicle,
+    still: opts.still,
+  };
+}
+
 export type Journey = {
   /**
    * 3D 탈것을 받았거나(또는 못 받기로 끝났거나) 하면 풀립니다. 처음 출발을 이것
@@ -135,6 +158,14 @@ export type Journey = {
    * 몇 초 동안 첫 구간이 탈것 없이(또는 엉뚱한 그림으로) 지나갑니다.
    */
   ready: Promise<void>;
+  /**
+   * 카메라를 다시 탈것에 붙입니다. 사람이 손으로 지도를 움직이면 카메라를 놓아
+   * 주는데(밀기 · 확대 · 돌리기 · 기울이기), 그 뒤에 「따라가기」를 누르면
+   * 부릅니다. 사람이 맞춰 둔 확대 정도는 이어 씁니다.
+   */
+  follow(): void;
+  /** 카메라가 탈것을 따라가는지 바뀔 때마다 부릅니다(「따라가기」 단추를 세우고 걷는 데). */
+  onFollowChange(listener: (following: boolean) => void): void;
   /** 목표를 직접 정합니다(박자를 바깥이 쥘 때). null 이면 탈것을 걷습니다. */
   aim(aim: Aim | null): void;
   /**
@@ -184,6 +215,50 @@ export function createJourney(map: any): Journey {
       flat = true;
     });
 
+  /*
+    사람이 손으로 지도를 움직였는지.
+
+    <p>카메라를 매 화면 탈것 쪽으로 옮기고 있어서, 손으로 확대하거나 돌려도 다음
+    순간 되돌아갔습니다(「3D 지도도 확대 · 축소 · 이동 · 방향 전환 할 수 있게」).
+    이제 사람이 움직이면 카메라를 놓아 줍니다 — 탈것은 제 길을 계속 가고, 화면은
+    사람이 둔 대로입니다. 「따라가기」(follow)로 다시 붙습니다.
+
+    <h3>사람인지 우리인지 가리기</h3>
+
+    <p>우리가 옮긴 값(set)을 적어 두고, 지도가 알려 오는 값이 그것과 다르면 사람이
+    움직인 것입니다. 밀기는 dragstart 가 바로 알려 줍니다. fitBounds(전부 보기)처럼
+    우리가 크게 옮기는 동안에는 잠깐 안 봅니다(quietUntil).
+  */
+  let free = false;
+  let zoomShift = 0;
+  let set: { zoom: number; heading: number; tilt: number } | null = null;
+  let quietUntil = 0;
+  const listeners: ((following: boolean) => void)[] = [];
+  function letGo() {
+    if (free || performance.now() < quietUntil || !goal) {
+      return;
+    }
+    free = true;
+    listeners.forEach((l) => l(false));
+  }
+  const watchers = [
+    g.event.addListener(map, 'dragstart', letGo),
+    ...['zoom_changed', 'heading_changed', 'tilt_changed'].map((name) =>
+      g.event.addListener(map, name, () => {
+        if (!set) {
+          return;
+        }
+        const z = map.getZoom?.() ?? set.zoom;
+        const h = map.getHeading?.() ?? set.heading;
+        const t = map.getTilt?.() ?? set.tilt;
+        const turned = Math.abs(((h - set.heading + 540) % 360) - 180) > 1;
+        if (Math.abs(z - set.zoom) > 0.05 || turned || Math.abs(t - set.tilt) > 1) {
+          letGo();
+        }
+      }),
+    ),
+  ];
+
   let raf = 0;
   let last = performance.now();
   const frame = (nowMs: number) => {
@@ -204,16 +279,16 @@ export function createJourney(map: any): Journey {
     c.lift += (want.lift - c.lift) * slow;
     cam = c;
 
-    map.moveCamera({
-      center: { lat: c.lat, lng: c.lng },
-      zoom: c.zoom,
-      heading: c.heading,
-      tilt: tiltFor(c.zoom),
-    });
+    /* 사람이 쥐고 있으면 카메라는 그대로 둡니다. 탈것은 아래에서 계속 그립니다. */
+    const viewZoom = free ? (map.getZoom?.() ?? c.zoom) : Math.max(3, Math.min(20, c.zoom + zoomShift));
+    if (!free) {
+      set = { zoom: viewZoom, heading: c.heading, tilt: tiltFor(viewZoom) };
+      map.moveCamera({ center: { lat: c.lat, lng: c.lng }, ...set });
+    }
 
     if (scene) {
-      /* 크기는 화면 픽셀로 — 그 자리의 1픽셀이 몇 m 인지로 나눕니다. */
-      const mpp = (156543.03392 * Math.cos((c.lat * Math.PI) / 180)) / Math.pow(2, c.zoom);
+      /* 크기는 화면 픽셀로 — 그 자리(지금 보이는 배율)의 1픽셀이 몇 m 인지로 나눕니다. */
+      const mpp = (156543.03392 * Math.cos((c.lat * Math.PI) / 180)) / Math.pow(2, viewZoom);
       scene.draw({
         vehicle: want.vehicle,
         lat: c.lat,
@@ -231,7 +306,7 @@ export function createJourney(map: any): Journey {
       return;
     }
     /* 3D 를 못 받았을 때 — 가는 쪽을 보는 평평한 비행기. 카메라가 돈 만큼 뺍니다. */
-    const rotation = (want.legHeading - c.heading + 360) % 360;
+    const rotation = (want.legHeading - (free ? (map.getHeading?.() ?? c.heading) : c.heading) + 360) % 360;
     const key = `${Math.round(rotation)}|${Math.round(c.lift * 20)}|${want.color}`;
     if (!flier) {
       flier = new g.Marker({
@@ -265,6 +340,24 @@ export function createJourney(map: any): Journey {
 
   return {
     ready: ready.then(() => undefined),
+
+    follow() {
+      if (!free) {
+        return;
+      }
+      /* 사람이 맞춰 둔 확대 정도를 이어 씁니다 — 붙자마자 원래 배율로 튀지 않게.
+         너무 멀리 두면 탈것이 점이 되므로 위아래를 막습니다. */
+      const z = map.getZoom?.();
+      if (goal && typeof z === 'number') {
+        zoomShift = Math.max(-5, Math.min(3, z - goal.zoom));
+      }
+      free = false;
+      listeners.forEach((l) => l(true));
+    },
+
+    onFollowChange(listener) {
+      listeners.push(listener);
+    },
 
     aim(next) {
       cancelTrip();
@@ -332,6 +425,15 @@ export function createJourney(map: any): Journey {
       }
       const bounds = new g.LatLngBounds();
       points.forEach((p) => bounds.extend({ lat: p.lat, lng: p.lng }));
+      /* 우리가 크게 옮기는 동안에는 사람 손으로 안 봅니다. 다음 출발 때는
+         다시 따라가고, 확대 맞춤도 처음으로. */
+      quietUntil = performance.now() + 2500;
+      set = null;
+      zoomShift = 0;
+      if (free) {
+        free = false;
+        listeners.forEach((l) => l(true));
+      }
       map.fitBounds(bounds, 48);
       g.event.addListenerOnce(map, 'idle', () => {
         map.moveCamera({ tilt: TILT_FAR + 10, heading: 0 });
@@ -341,6 +443,7 @@ export function createJourney(map: any): Journey {
 
     dispose() {
       alive = false;
+      watchers.forEach((w) => w.remove());
       cancelTrip();
       cancelAnimationFrame(raf);
       hideVehicle();
@@ -412,7 +515,7 @@ export function distanceKm(a: { lat: number; lng: number }, b: { lat: number; ln
 }
 
 /** 북쪽에서 시계 방향 각도. */
-function bearing(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
+export function bearing(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
   const mid = ((a.lat + b.lat) / 2) * (Math.PI / 180);
   const dx = (b.lng - a.lng) * Math.cos(mid);
   const dy = b.lat - a.lat;
