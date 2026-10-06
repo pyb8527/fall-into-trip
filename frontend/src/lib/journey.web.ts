@@ -225,13 +225,15 @@ export function createJourney(map: any): Journey {
 
     <h3>사람인지 우리인지 가리기</h3>
 
-    <p>우리가 옮긴 값(set)을 적어 두고, 지도가 알려 오는 값이 그것과 다르면 사람이
-    움직인 것입니다. 밀기는 dragstart 가 바로 알려 줍니다. fitBounds(전부 보기)처럼
-    우리가 크게 옮기는 동안에는 잠깐 안 봅니다(quietUntil).
+    <p>우리가 moveCamera 를 부르는 동안(ours) 지도가 알려 오는 바뀜은 우리 것이고,
+    그 밖에 오는 확대 · 방향 · 기울기 바뀜은 사람 것입니다. 값을 견주지는 않습니다
+    — moveCamera 는 확대를 먼저 바꾸고 알린 뒤 방향 · 기울기를 바꾸므로, 그 사이에
+    견주면 우리 이동도 사람 손으로 읽힙니다. 밀기는 dragstart 가 바로 알려 줍니다.
+    fitBounds(전부 보기)처럼 천천히 옮기는 동안에는 잠깐 안 봅니다(quietUntil).
   */
   let free = false;
   let zoomShift = 0;
-  let set: { zoom: number; heading: number; tilt: number } | null = null;
+  let ours = false;
   let quietUntil = 0;
   const listeners: ((following: boolean) => void)[] = [];
   function letGo() {
@@ -245,14 +247,7 @@ export function createJourney(map: any): Journey {
     g.event.addListener(map, 'dragstart', letGo),
     ...['zoom_changed', 'heading_changed', 'tilt_changed'].map((name) =>
       g.event.addListener(map, name, () => {
-        if (!set) {
-          return;
-        }
-        const z = map.getZoom?.() ?? set.zoom;
-        const h = map.getHeading?.() ?? set.heading;
-        const t = map.getTilt?.() ?? set.tilt;
-        const turned = Math.abs(((h - set.heading + 540) % 360) - 180) > 1;
-        if (Math.abs(z - set.zoom) > 0.05 || turned || Math.abs(t - set.tilt) > 1) {
+        if (!ours) {
           letGo();
         }
       }),
@@ -282,8 +277,12 @@ export function createJourney(map: any): Journey {
     /* 사람이 쥐고 있으면 카메라는 그대로 둡니다. 탈것은 아래에서 계속 그립니다. */
     const viewZoom = free ? (map.getZoom?.() ?? c.zoom) : Math.max(3, Math.min(20, c.zoom + zoomShift));
     if (!free) {
-      set = { zoom: viewZoom, heading: c.heading, tilt: tiltFor(viewZoom) };
-      map.moveCamera({ center: { lat: c.lat, lng: c.lng }, ...set });
+      ours = true;
+      try {
+        map.moveCamera({ center: { lat: c.lat, lng: c.lng }, zoom: viewZoom, heading: c.heading, tilt: tiltFor(viewZoom) });
+      } finally {
+        ours = false;
+      }
     }
 
     if (scene) {
@@ -428,7 +427,6 @@ export function createJourney(map: any): Journey {
       /* 우리가 크게 옮기는 동안에는 사람 손으로 안 봅니다. 다음 출발 때는
          다시 따라가고, 확대 맞춤도 처음으로. */
       quietUntil = performance.now() + 2500;
-      set = null;
       zoomShift = 0;
       if (free) {
         free = false;
@@ -436,7 +434,9 @@ export function createJourney(map: any): Journey {
       }
       map.fitBounds(bounds, 48);
       g.event.addListenerOnce(map, 'idle', () => {
+        ours = true;
         map.moveCamera({ tilt: TILT_FAR + 10, heading: 0 });
+        ours = false;
         cam = null;
       });
     },
