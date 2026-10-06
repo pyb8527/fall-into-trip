@@ -52,9 +52,23 @@ export type StagePlace = {
   color: string;
 };
 
-/** 기울기. 가까이 걸을 때는 많이 눕히고, 멀리 날 때는 세웁니다. */
-const TILT_NEAR = 62;
+/** 다 보고 물러났을 때의 기울기. */
 const TILT_FAR = 35;
+
+type Goal = {
+  lat: number;
+  lng: number;
+  /** 카메라가 볼 쪽(다음 구간과 섞인 것). */
+  heading: number;
+  zoom: number;
+  /** 탈것이 실제로 가는 쪽. */
+  legHeading: number;
+  /** 0~1. 얼마나 떠 있는지. */
+  lift: number;
+  color: string;
+};
+
+type Cam = { lat: number; lng: number; heading: number; zoom: number; lift: number };
 
 export function ReplayStage({
   places,
@@ -81,9 +95,11 @@ export function ReplayStage({
   const trail = useRef<{ glow: any; core: any } | null>(null);
   const dots = useRef<any[]>([]);
   const flier = useRef<any>(null);
-  /* 카메라가 지금 보고 있는 쪽. 다음 쪽으로 조금씩 돌립니다 — 한 번에 돌리면
-     구간이 바뀔 때마다 화면이 홱 돕니다. */
-  const heading = useRef(0);
+  /* 카메라와 탈것이 가야 할 자리(박자가 정함)와 지금 있는 자리(화면이 옮김). */
+  const goal = useRef<Goal | null>(null);
+  const cam = useRef<Cam | null>(null);
+  /* 탈것 그림을 매 화면 새로 만들지 않으려고 — 각도 · 높이 · 색이 같으면 그대로. */
+  const flierKey = useRef('');
 
   /* 지도를 한 번 세웁니다. */
   useEffect(() => {
@@ -99,7 +115,7 @@ export function ReplayStage({
           renderingType: g.RenderingType?.VECTOR ?? 'VECTOR',
           center: places[0] ? { lat: places[0].lat, lng: places[0].lng } : { lat: 35.68, lng: 139.76 },
           zoom: 14,
-          tilt: TILT_NEAR,
+          tilt: tiltFor(14),
           heading: 0,
           disableDefaultUI: true,
           gestureHandling: 'greedy',
@@ -177,34 +193,53 @@ export function ReplayStage({
         zIndex: 3,
       }),
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [places, ready]);
 
-  /* 한 박자마다 — 지나온 길을 늘리고, 탈것을 옮기고, 카메라를 따라 붙입니다. */
+  /*
+    한 박자마다(Replay 가 1초에 스무 번) — 지나온 길을 늘리고, 카메라와 탈것이
+    <b>가야 할 자리</b>만 정합니다. 실제로 옮기는 것은 아래 화면 갱신 고리입니다.
+
+    <h3>왜 둘로 나누는가</h3>
+
+    <p>처음에는 박자마다 카메라를 그 자리로 바로 옮겼습니다. 1초에 스무 번
+    뚝뚝 옮기니 화면이 떨렸고, 무엇보다 <b>곳에 닿는 순간</b> 다음 구간에 맞춘
+    배율 · 기울기 · 방향이 한꺼번에 바뀌어 덜컹했습니다 — 「도착할 때 끊기고
+    바라보는 쪽이 갑자기 달라져서 이어지는 느낌이 없다」.
+
+    <p>이제 박자는 목표만 정하고, 카메라는 매 화면(1초에 예순 번) 목표 쪽으로
+    조금씩 다가갑니다. 그리고 목표 자체를 미리 섞습니다 — 구간의 마지막 3할
+    동안 방향과 배율이 <b>다음 구간 것으로 서서히</b> 넘어가므로, 닿을 즈음엔
+    이미 다음 쪽을 보고 있습니다. 머무는 동안에도 카메라는 마저 돌고 있어서
+    멈춘 것이 아니라 숨 고르는 것으로 보입니다.
+  */
   useEffect(() => {
     const m = map.current;
     if (!m || !ready || places.length === 0) {
       return;
     }
     const g = gmaps();
-    const now = places[Math.min(step, places.length - 1)];
-    const next = done ? null : (places[step + 1] ?? null);
-    const t = ease(Math.min(1, Math.max(0, gone)));
-    const at = next
+    const at0 = Math.min(step, places.length - 1);
+    const now = places[at0];
+    const next = done ? null : (places[at0 + 1] ?? null);
+    const after = done ? null : (places[at0 + 2] ?? null);
+    const raw = Math.min(1, Math.max(0, gone));
+    const t = ease(raw);
+    const pos = next
       ? { lat: now.lat + (next.lat - now.lat) * t, lng: now.lng + (next.lng - now.lng) * t }
       : { lat: now.lat, lng: now.lng };
 
     /* 지나온 길 */
-    const passed = places.slice(0, Math.min(step, places.length - 1) + 1).map((p) => ({ lat: p.lat, lng: p.lng }));
-    const path = next ? [...passed, at] : passed;
+    const passed = places.slice(0, at0 + 1).map((p) => ({ lat: p.lat, lng: p.lng }));
+    const path = next ? [...passed, pos] : passed;
     const color = (next ?? now).color;
     trail.current?.glow.setOptions({ path, strokeColor: color });
     trail.current?.core.setOptions({ path, strokeColor: color });
 
     /* 들른 곳은 채웁니다 */
-    dots.current.forEach((d, i) => d.setIcon(dotIcon(g, places[i].color, i <= step)));
+    dots.current.forEach((d, i) => d.setIcon(dotIcon(g, places[i].color, i <= at0)));
 
     if (done) {
+      goal.current = null;
       flier.current?.setMap(null);
       flier.current = null;
       /* 다 봤으면 물러나 전부를 비스듬히. */
@@ -213,33 +248,95 @@ export function ReplayStage({
       m.fitBounds(bounds, 48);
       g.event.addListenerOnce(m, 'idle', () => {
         m.moveCamera({ tilt: TILT_FAR + 10, heading: 0 });
+        cam.current = null;
       });
       return;
     }
 
-    /* 카메라 — 가는 쪽을 보고, 먼 구간일수록 높이 올라갑니다. */
+    /* 이 구간과 다음 구간. 마지막 3할 동안 다음 것으로 섞습니다. */
     const km = next ? distanceKm(now, next) : 0;
-    const want = next ? bearing(now, next) : heading.current;
-    heading.current = turnToward(heading.current, want, 0.12);
-    const base = zoomFor(km);
+    const legHeading = next ? bearing(now, next) : (cam.current?.heading ?? 0);
+    const mix = next && after ? smooth((raw - 0.7) / 0.3) : 0;
+    const nextKm = next && after ? distanceKm(next, after) : km;
+    const nextHeading = next && after ? bearing(next, after) : legHeading;
     /* 가운데에서 가장 높이. 멀리 갈수록 더 올라가 앞뒤가 다 보입니다. */
-    const lift = Math.sin(Math.min(1, Math.max(0, gone)) * Math.PI) * (km > 50 ? 2.2 : km > 5 ? 1.2 : 0.4);
-    m.moveCamera({
-      center: at,
-      zoom: base - lift,
-      heading: heading.current,
-      tilt: km > 50 ? TILT_FAR : TILT_NEAR,
-    });
+    const lift = Math.sin(raw * Math.PI) * (km > 50 ? 2.4 : km > 5 ? 1.3 : 0.5);
+    const zoom = zoomFor(km) * (1 - mix) + zoomFor(nextKm) * mix - lift;
 
-    /* 탈것. 카메라가 가는 쪽을 보므로 지도 위에서는 늘 위(앞)를 봅니다. */
-    const icon = flierIcon(g, (want - heading.current + 360) % 360, lift / 2.2, color);
-    if (!flier.current) {
-      flier.current = new g.Marker({ map: m, position: at, icon, zIndex: 999, clickable: false });
-    } else {
-      flier.current.setPosition(at);
-      flier.current.setIcon(icon);
-    }
+    goal.current = {
+      lat: pos.lat,
+      lng: pos.lng,
+      heading: blendAngle(legHeading, nextHeading, mix),
+      zoom,
+      legHeading,
+      lift: lift / 2.4,
+      color,
+    };
   }, [places, step, gone, done, ready]);
+
+  /*
+    화면 갱신 고리. 카메라와 탈것을 목표 쪽으로 조금씩.
+
+    <p>탈것은 빨리(목표에 거의 붙어서), 카메라 방향 · 배율 · 기울기는 천천히
+    따라갑니다. 카메라 한가운데는 <b>탈것이 그려진 자리</b>입니다 — 둘을 따로
+    따라가게 두면 탈것이 화면 안에서 흔들립니다.
+  */
+  useEffect(() => {
+    if (!ready) {
+      return;
+    }
+    const g = gmaps();
+    let raf = 0;
+    let last = performance.now();
+    const frame = (nowMs: number) => {
+      raf = requestAnimationFrame(frame);
+      const m = map.current;
+      const want = goal.current;
+      const dt = Math.min(0.1, (nowMs - last) / 1000);
+      last = nowMs;
+      if (!m || !want) {
+        return;
+      }
+      const c = cam.current ?? { ...want };
+      const fast = 1 - Math.exp(-dt * 18);
+      const slow = 1 - Math.exp(-dt * 3.2);
+      c.lat += (want.lat - c.lat) * fast;
+      c.lng += (want.lng - c.lng) * fast;
+      c.zoom += (want.zoom - c.zoom) * slow;
+      c.heading = turnToward(c.heading, want.heading, slow);
+      c.lift += (want.lift - c.lift) * slow;
+      cam.current = c;
+
+      m.moveCamera({
+        center: { lat: c.lat, lng: c.lng },
+        zoom: c.zoom,
+        heading: c.heading,
+        tilt: tiltFor(c.zoom),
+      });
+
+      /* 탈것은 가는 쪽을 봅니다. 카메라가 돌아 있는 만큼 빼서 그립니다. */
+      const rotation = (want.legHeading - c.heading + 360) % 360;
+      const key = `${Math.round(rotation)}|${Math.round(c.lift * 20)}|${want.color}`;
+      if (!flier.current) {
+        flier.current = new g.Marker({
+          map: m,
+          position: { lat: c.lat, lng: c.lng },
+          icon: flierIcon(g, rotation, c.lift, want.color),
+          zIndex: 999,
+          clickable: false,
+        });
+        flierKey.current = key;
+      } else {
+        flier.current.setPosition({ lat: c.lat, lng: c.lng });
+        if (flierKey.current !== key) {
+          flier.current.setIcon(flierIcon(g, rotation, c.lift, want.color));
+          flierKey.current = key;
+        }
+      }
+    };
+    raf = requestAnimationFrame(frame);
+    return () => cancelAnimationFrame(raf);
+  }, [ready]);
 
   return (
     <View style={{ height, borderRadius: 12, overflow: 'hidden' }}>
@@ -282,14 +379,34 @@ function turnToward(from: number, to: number, rate: number) {
 }
 
 /**
- * 구간 길이에 맞는 배율. 1km 남짓 걷는 구간은 골목이 보이게, 수백 km 나는
- * 구간은 두 도시가 한 화면에 들어오게.
+ * 구간 길이에 맞는 배율. 걷는 구간은 건물이 블록으로 서는 데까지(17 넘게 —
+ * 16.5 로 막아 두었더니 3D 건물이 한 번도 안 섰습니다), 수백 km 나는 구간은
+ * 두 도시가 한 화면에 들어오게.
  */
 function zoomFor(km: number) {
-  if (km <= 0.05) {
-    return 16.5;
-  }
-  return Math.max(5, Math.min(16.5, 16.2 - Math.log2(Math.max(0.3, km) / 0.4)));
+  return Math.max(5, Math.min(17.8, 17.8 - Math.log2(Math.max(0.25, km) / 0.25)));
+}
+
+/**
+ * 배율에 맞는 기울기. 가까울수록 눕힙니다 — 구글은 배율이 낮으면 많이 못
+ * 눕히고, 멀리서 많이 눕히면 지평선만 보입니다. 배율과 함께 움직여야 날아오를 때
+ * 자연스럽게 세워집니다.
+ */
+function tiltFor(zoom: number) {
+  const k = Math.max(0, Math.min(1, (zoom - 9) / 8));
+  return 30 + k * 37;
+}
+
+/** 0~1 을 부드럽게. 0 아래는 0, 1 위는 1. */
+function smooth(x: number) {
+  const t = Math.max(0, Math.min(1, x));
+  return t * t * (3 - 2 * t);
+}
+
+/** 두 방향 사이를 짧은 쪽으로 섞습니다. */
+function blendAngle(a: number, b: number, k: number) {
+  const diff = ((b - a + 540) % 360) - 180;
+  return (a + diff * k + 360) % 360;
 }
 
 function dotIcon(g: any, color: string, passed: boolean) {
