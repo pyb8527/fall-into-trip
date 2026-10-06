@@ -856,10 +856,11 @@ export default function Post() {
         title="이 장소를 글에서 뺄까요?"
         message={
           dropping
-            ? `${
+            ? `${quoted(
                 data.itinerary.days[dropping.dayIndex]?.places[dropping.placeIndex]?.name ??
-                '이 장소'
-              } 이(가) 이 글에서 사라져요. 여기 달린 댓글도 함께 사라져요. 내 여행은 그대로 남아요.`
+                  '이 장소',
+                '이가',
+              )} 이 글에서 사라져요. 여기 달린 댓글도 함께 사라져요. 내 여행은 그대로 남아요.`
             : ''
         }
         confirmLabel="빼기"

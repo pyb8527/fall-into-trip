@@ -75,7 +75,7 @@ public class PlaceService {
                 .url(blankToNull(draft.url()))
                 .radius(draft.radius())
                 .fit(draft.fit())
-                .move(blankToNull(draft.move()))
+                .move(Leg.clean(draft.move()))
                 .placeId(blankToNull(draft.placeId()))
                 .icon(blankToNull(draft.icon()))
                 .updatedBy(me.id())
@@ -129,7 +129,7 @@ public class PlaceService {
         if (draft.note() != null) place.setNote(blankToNull(draft.note()));
         if (draft.url() != null) place.setUrl(blankToNull(draft.url()));
         if (draft.radius() != null) place.setRadius(draft.radius());
-        if (draft.move() != null) place.setMove(blankToNull(draft.move()));
+        if (draft.move() != null) place.setMove(Leg.clean(draft.move()));
         if (draft.fit() != null) place.setFit(draft.fit());
 
         /* 날짜를 옮기는 것도 수정으로 봅니다. 하루 늦춰졌을 때 지웠다 다시

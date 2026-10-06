@@ -108,6 +108,7 @@ import { TripTabs } from '@/ui/tab-bar';
 import { TripMark } from '@/components/trip-mark';
 import { CountdownBadge } from '@/components/countdown-badge';
 import { quoted } from '@/lib/josa';
+import { hasLeg, LegLine, LegSheet } from '@/components/leg-sheet';
 
 /** 전체를 보는 상태. 특정 날짜가 아니라는 뜻입니다. */
 const ALL = -1;
@@ -2688,6 +2689,8 @@ function DayCard({
   */
   /** 잘 곳을 정하는 판을 열어 두었는지. */
   const [staying, setStaying] = useState(false);
+  /* 이동을 적고 있는 장소. 그 장소에서 다음 장소까지입니다. */
+  const [legFrom, setLegFrom] = useState<Place | null>(null);
   const [tidy, setTidy] = useState<Tidy | null>(null);
   const [tidying, setTidying] = useState(false);
 
@@ -2954,6 +2957,15 @@ function DayCard({
               onChanged();
             }}
           />
+          <LegSheet
+            place={legFrom}
+            nextName={legFrom ? (order[order.findIndex((p) => p.id === legFrom.id) + 1]?.name ?? null) : null}
+            onClose={() => setLegFrom(null)}
+            onDone={() => {
+              setLegFrom(null);
+              onChanged();
+            }}
+          />
 
           {day.places.length === 0 ? (
             <Caption tone="muted">이 날에는 아직 장소가 없어요.</Caption>
@@ -2984,6 +2996,7 @@ function DayCard({
                     onFocus={() => onFocus(place.id)}
                     onEdit={() => setEditing(place)}
                     onAddAfter={() => setAddingAfter(place.id)}
+                    onLeg={() => setLegFrom(place)}
                     onRemove={() => onRemove(place.id)}
                     info={infoOf.get(place.id)}
                     onLook={onLook}
@@ -3208,6 +3221,7 @@ function PlaceRow({
   onFocus,
   onEdit,
   onAddAfter,
+  onLeg,
   onRemove,
   gap,
   gapping,
@@ -3250,6 +3264,8 @@ function PlaceRow({
   onEdit: () => void;
   /** 이 장소 다음에 새 장소를 넣습니다. */
   onAddAfter: () => void;
+  /** 다음 장소까지의 이동을 적는 판을 엽니다. */
+  onLeg: () => void;
   onRemove: () => void;
   /** 다음 장소까지의 이동. 마지막 장소 뒤에는 없습니다. */
   gap?: Gap;
@@ -3676,6 +3692,21 @@ function PlaceRow({
             처럼 <b>어느 곳 다음</b>이 정해져 있는 때가 훨씬 많습니다. 맨 뒤에
             붙여 놓고 끌어서 올리는 것은 스무 곳짜리 날에서 할 짓이 아닙니다.
           */}
+          {/*
+            다음 장소까지 어떻게 가는지.
+
+            <p>역을 장소로 넣고 메모에 노선을 적던 자리를 대신합니다
+            ({@link LegSheet}). 적어 두면 이 줄 아래에 한 줄로 섭니다.
+          */}
+          <ListRow
+            left={<Icon name="train" tone="secondary" />}
+            title={hasLeg(place.move) ? '다음 장소까지 이동 고치기' : '다음 장소까지 이동 적기'}
+            subtitle="노선 · 걸리는 시간 · 요금을 적어 둬요. 역을 장소로 넣지 않아도 돼요."
+            onPress={() => {
+              setFolded(false);
+              onLeg();
+            }}
+          />
           <ListRow
             left={<Icon name="plus" tone="secondary" />}
             title="여기 다음에 장소 넣기"
@@ -3702,7 +3733,7 @@ function PlaceRow({
         <ConfirmDialog
           visible={confirming}
           title="이 장소를 지울까요?"
-          message={`${place.name} 이(가) 일정에서 사라져요. 되돌릴 수 없어요.`}
+          message={`${quoted(place.name, '이가')} 일정에서 사라져요. 되돌릴 수 없어요.`}
           confirmLabel="지우기"
           danger
           onCancel={() => setConfirming(false)}
@@ -3711,6 +3742,12 @@ function PlaceRow({
             onRemove();
           }}
         />
+      </View>
+
+      {/* 사람이 적어 둔 길. 구글이 셈한 구간(아래) 위에 섭니다 — 정해 둔 것이
+          먼저입니다. */}
+      <View style={styles.legSlot}>
+        <LegLine move={place.move} onPress={canEdit ? onLeg : undefined} />
       </View>
 
       {gap ? (
@@ -4970,6 +5007,10 @@ const styles = StyleSheet.create({
     자리에서 시작합니다. 위 여백은 몸통의 첫 줄 높이에 맞춰, 시각이 이름과
     나란히 보이게 합니다.
   */
+  /* 장소 카드 바로 아래, 구간 줄(gap)과 같은 들여쓰기. */
+  legSlot: {
+    paddingLeft: Spacing.s2,
+  },
   when: {
     width: 48,
     alignItems: 'flex-end',

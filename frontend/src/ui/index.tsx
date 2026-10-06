@@ -2451,7 +2451,13 @@ export type IconName =
   | 'color-palette'
   | 'ticket'
   | 'wallet'
-  | 'thumbs-down';
+  | 'thumbs-down'
+  /* 이동 수단. 장소와 장소 사이에 적어 두는 길(trip/[id] 의 LegLine). */
+  | 'bus'
+  | 'walk'
+  | 'car'
+  | 'airplane'
+  | 'boat';
 
 /**
  * 이름 하나가 가리키는 두 가지 — 선과 채움.
@@ -2543,6 +2549,11 @@ const ionicon: Record<IconName, { line: string; solid: string }> = {
   'ticket': { line: 'ticket-outline', solid: 'ticket' },
   'wallet': { line: 'wallet-outline', solid: 'wallet' },
   'thumbs-down': { line: 'thumbs-down-outline', solid: 'thumbs-down' },
+  'bus': { line: 'bus-outline', solid: 'bus' },
+  'walk': { line: 'walk-outline', solid: 'walk' },
+  'car': { line: 'car-outline', solid: 'car' },
+  'airplane': { line: 'airplane-outline', solid: 'airplane' },
+  'boat': { line: 'boat-outline', solid: 'boat' },
 };
 
 export function Icon({
