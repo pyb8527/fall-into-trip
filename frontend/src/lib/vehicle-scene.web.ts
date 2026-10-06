@@ -41,14 +41,29 @@ import type { Vehicle } from '@/lib/vehicles';
  * <p>모델은 처음 타는 순간 받고, 한 번 받은 것은 다시 받지 않습니다.
  */
 
-const MODEL_URL: Record<Vehicle, string> = {
-  walk: '/models/walk.glb',
-  car: '/models/car.glb',
-  bus: '/models/bus.glb',
-  train: '/models/train.glb',
-  boat: '/models/boat.glb',
-  plane: '/models/plane.glb',
+/**
+ * 탈것마다 받을 파일. 여럿이면 첫 것이 앞이고 나머지가 뒤로 줄지어 붙습니다.
+ *
+ * <ul>
+ *   <li>사람 — character-female-b. 처음에 쓴 female-a 는 Kenney 의 「도움 기구를
+ *       쓰는 사람」 모델이라 두 손에 팔꿈치 목발을 쥐고 있었습니다 — 지도 위에서
+ *       「왜 총을 들고 있냐」로 보였습니다.</li>
+ *   <li>기차 — 고속열차 앞 칸(bullet-a)에 객차 둘(bullet-b · c). Kenney 기차는
+ *       한 칸짜리가 장난감 비율이라 하나만 두면 「너무 뚱뚱」했습니다. 세 칸을
+ *       이으니 길고 날렵해집니다.</li>
+ * </ul>
+ */
+const MODEL_URL: Record<Vehicle, string[]> = {
+  walk: ['/models/walk.glb'],
+  car: ['/models/car.glb'],
+  bus: ['/models/bus.glb'],
+  train: ['/models/train.glb', '/models/train-car-b.glb', '/models/train-car-c.glb'],
+  boat: ['/models/boat.glb'],
+  plane: ['/models/plane.glb'],
 };
+
+/** 칸과 칸 사이(모델 단위). Kenney 기차 한 칸이 2.6~2.8 입니다. */
+const CAR_GAP = 0.06;
 
 /**
  * 모델마다 앞이 어느 쪽인지(라디안). 정규화한 뒤 앞이 북쪽(-Z)을 보도록 더하는
@@ -64,6 +79,8 @@ const FACING: Record<Vehicle, number> = {
 };
 
 export type VehicleScene = {
+  /** 많이 타는 탈것(사람 · 차 · 기차 · 비행기)을 받아 두면 풀립니다. 하나쯤 못 받아도 풀립니다. */
+  ready: Promise<void>;
   /** 탈것 하나를 그 자리 · 그 방향 · 그 크기로. 매 화면 부릅니다. */
   draw(at: {
     vehicle: Vehicle;
@@ -119,8 +136,26 @@ export async function createVehicleScene(map: any): Promise<VehicleScene> {
     if (loaded.has(vehicle) || pending.has(vehicle)) {
       return;
     }
-    const job = loader.loadAsync(MODEL_URL[vehicle]).then((gltf) => {
-      const model = gltf.scene;
+    const job = Promise.all(MODEL_URL[vehicle].map((url) => loader.loadAsync(url))).then((parts) => {
+      const gltf = parts[0];
+      /*
+        여러 칸이면 앞 칸 뒤(-Z 쪽, Kenney 는 앞이 +Z)로 줄지어 붙입니다. 칸마다
+        길이를 재서 붙이므로 칸이 바뀌어도 틈이 안 생깁니다.
+      */
+      const model = new THREE.Group();
+      let tail = 0;
+      parts.forEach((part, i) => {
+        const car = part.scene;
+        const b = new THREE.Box3().setFromObject(car);
+        if (i === 0) {
+          tail = b.min.z;
+        } else {
+          car.position.z = tail - CAR_GAP - b.max.z;
+          tail = car.position.z + b.min.z;
+        }
+        model.add(car);
+      });
+      smoothTextures(model);
       const box = new THREE.Box3().setFromObject(model);
       const size = box.getSize(new THREE.Vector3());
       const center = box.getCenter(new THREE.Vector3());
@@ -139,7 +174,7 @@ export async function createVehicleScene(map: any): Promise<VehicleScene> {
       let walk: Loaded['walk'] = null;
       let idle: Loaded['idle'] = null;
       if (gltf.animations.length > 0) {
-        mixer = new THREE.AnimationMixer(model);
+        mixer = new THREE.AnimationMixer(gltf.scene);
         const clip = (name: string) => gltf.animations.find((a) => a.name === name);
         const w = clip('walk');
         const i = clip('idle') ?? clip('static');
@@ -157,10 +192,35 @@ export async function createVehicleScene(map: any): Promise<VehicleScene> {
     );
   }
 
+  /*
+    텍스처를 부드럽게.
+
+    <p>Kenney 파일은 텍스처를 「가장 가까운 픽셀」로 읽게 적어 두었습니다
+    (magFilter NEAREST) — 게임에서 각진 맛을 내려는 것인데, 지도 위에서는
+    <b>픽셀이 보여서</b> 어색했습니다. 섞어 읽고(Linear) 밉맵을 씁니다.
+  */
+  function smoothTextures(root: InstanceType<typeof THREE.Object3D>) {
+    root.traverse((o: any) => {
+      const mats = Array.isArray(o.material) ? o.material : o.material ? [o.material] : [];
+      mats.forEach((m: any) => {
+        if (m.map) {
+          m.map.magFilter = THREE.LinearFilter;
+          m.map.minFilter = THREE.LinearMipmapLinearFilter;
+          m.map.generateMipmaps = true;
+          m.map.anisotropy = 4;
+          m.map.needsUpdate = true;
+        }
+      });
+    });
+  }
+
   /* 많이 타는 것부터 미리. */
-  (['walk', 'car', 'train', 'plane'] as Vehicle[]).forEach(load);
+  const first: Vehicle[] = ['walk', 'car', 'train', 'plane'];
+  first.forEach(load);
+  const ready = Promise.all(first.map((v) => pending.get(v))).then(() => undefined);
 
   return {
+    ready,
     draw(at) {
       load(at.vehicle);
       if (shown && shown !== at.vehicle) {

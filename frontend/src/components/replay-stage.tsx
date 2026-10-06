@@ -15,6 +15,7 @@ export type StagePlace = {
   lat: number;
   lng: number;
   color: string;
+  mode?: string | null;
 };
 
 export function ReplayStage(_: {

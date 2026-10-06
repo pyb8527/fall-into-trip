@@ -1,9 +1,12 @@
 동선 다시 보기(여행 요약 · 동선)의 탈것 모델.
 
-walk.glb   Kenney「Mini Characters」 character-female-a   CC0 1.0   https://kenney.nl/assets/mini-characters
+walk.glb   Kenney「Mini Characters」 character-female-b   CC0 1.0   https://kenney.nl/assets/mini-characters
+           (female-a 는 팔꿈치 목발을 쥔 모델이라 바꿨습니다)
 car.glb    Kenney「Car Kit」 sedan                        CC0 1.0   https://kenney.nl/assets/car-kit
 bus.glb    Kenney「Car Kit」 van                          CC0 1.0   https://kenney.nl/assets/car-kit
-train.glb  Kenney「Train Kit」 train-electric-bullet-a    CC0 1.0   https://kenney.nl/assets/train-kit
+train.glb        Kenney「Train Kit」 train-electric-bullet-a (앞 칸)  CC0 1.0   https://kenney.nl/assets/train-kit
+train-car-b.glb  Kenney「Train Kit」 train-electric-bullet-b (객차)  CC0 1.0
+train-car-c.glb  Kenney「Train Kit」 train-electric-bullet-c (객차)  CC0 1.0
 boat.glb   Kenney「Watercraft Pack」 ship-small           CC0 1.0   https://kenney.nl/assets/watercraft-kit
 plane.glb  「Airplane」 by Poly by Google                  CC-BY 3.0 https://poly.pizza/m/8ciDd9k8wha
            (https://creativecommons.org/licenses/by/3.0/)
