@@ -37,6 +37,7 @@ import {
   Split,
 } from '@/ui';
 import { TripTabs } from '@/ui/tab-bar';
+import { hasTiltMaps, ReplayStage } from '@/components/replay-stage';
 
 /**
  * 다녀온 여행을 한 장으로.
@@ -556,25 +557,38 @@ function Replay({ trip }: { trip: TripDetail }) {
             <Loading label="지도를 가져오고 있어요" />
           </View>
         ) : null}
-        <TripMap
-          onReady={() => {
-            setMapReady(true);
-            /* 출발 전에 경로 전체가 들어오게 한 번 맞춥니다. */
-            setFitAt((n) => n + 1);
-          }}
-          places={places}
-          /* 지금 떠난 자리로 지도가 따라갑니다. follow 가 앞뒤 곳까지 한 화면에
-             넣으므로, 나는 동안 떠난 곳과 닿을 곳이 함께 보입니다. */
-          activeId={now?.id ?? null}
-          onSelect={() => {}}
-          traveler={traveler}
-          /* 따라가되 당기지 않습니다. 바짝 당기면 먼 다음 곳이 늘 화면 밖이고,
-             옮겨 가는 도중에 다음 옮김이 시작돼 앞엣것이 잘립니다 — 그것이
-             "멀리 있으면 끊긴다" 의 정체였습니다. */
-          follow
-          fitAt={fitAt}
-          height={360}
-        />
+        {/* 지도 ID 가 있으면 기울인 지도에서 돕니다({@link ReplayStage}). 없으면
+            지금까지의 평평한 지도입니다 — 같은 박자(step · gone)를 씁니다. */}
+        {hasTiltMaps() ? (
+          <ReplayStage
+            places={places}
+            step={Math.min(step, Math.max(0, places.length - 1))}
+            gone={gone}
+            done={done}
+            onReady={() => setMapReady(true)}
+            height={360}
+          />
+        ) : (
+          <TripMap
+            onReady={() => {
+              setMapReady(true);
+              /* 출발 전에 경로 전체가 들어오게 한 번 맞춥니다. */
+              setFitAt((n) => n + 1);
+            }}
+            places={places}
+            /* 지금 떠난 자리로 지도가 따라갑니다. follow 가 앞뒤 곳까지 한 화면에
+               넣으므로, 나는 동안 떠난 곳과 닿을 곳이 함께 보입니다. */
+            activeId={now?.id ?? null}
+            onSelect={() => {}}
+            traveler={traveler}
+            /* 따라가되 당기지 않습니다. 바짝 당기면 먼 다음 곳이 늘 화면 밖이고,
+               옮겨 가는 도중에 다음 옮김이 시작돼 앞엣것이 잘립니다 — 그것이
+               "멀리 있으면 끊긴다" 의 정체였습니다. */
+            follow
+            fitAt={fitAt}
+            height={360}
+          />
+        )}
       </View>
 
       <Row gap={Spacing.s2}>

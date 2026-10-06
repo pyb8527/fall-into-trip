@@ -27,6 +27,11 @@ ENV EXPO_PUBLIC_API_BASE=$EXPO_PUBLIC_API_BASE
 ARG EXPO_PUBLIC_GMAPS_KEY=""
 ENV EXPO_PUBLIC_GMAPS_KEY=$EXPO_PUBLIC_GMAPS_KEY
 
+# 지도 ID. 있으면 여행 요약의 「동선」이 기울인 벡터 지도에서 돕니다
+# (components/replay-stage). 비워 두면 지금까지의 평평한 지도입니다.
+ARG EXPO_PUBLIC_GMAPS_MAP_ID=""
+ENV EXPO_PUBLIC_GMAPS_MAP_ID=$EXPO_PUBLIC_GMAPS_MAP_ID
+
 # 카카오톡 공유 카드. JavaScript 키라 비밀이 아니고, 카카오 콘솔에 등록한
 # 도메인에서만 돕니다. 비워 두면 카톡 단추가 빠지고 보통 공유만 남습니다.
 ARG EXPO_PUBLIC_KAKAO_JS_KEY=""
