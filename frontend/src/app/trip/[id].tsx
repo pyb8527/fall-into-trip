@@ -59,6 +59,7 @@ import { canKeep, keepTrip, keepTripMap, keptAgo, keptTrip, keptTripMap } from '
 import { costLabel, money } from '@/lib/money';
 import { canPrint, printItinerary } from '@/lib/print';
 import { useHere } from '@/lib/here';
+import { inShell } from '@/lib/shell-bridge.web';
 import { decodePolyline } from '@/lib/polyline';
 import { DateField } from '@/ui/date-field';
 import {
@@ -1250,8 +1251,13 @@ export default function TripScreen() {
     십자를 누를 때까지 묻지 않습니다 — 그때는 무엇 때문에 묻는지가 분명하고,
     거절해도 그 한 번으로 끝나지 않습니다.
   */
+  /*
+    「앱에서는 안 켭니다」를 Platform.OS 로만 가렸더니, 앱 껍데기 안의 웹뷰도
+    web 이라 여행 상세를 열자마자 폰 위치 창이 떴습니다. 껍데기 안이면 켜지
+    않습니다 — 십자 · 「지금 여기」를 누를 때 묻습니다.
+  */
   useEffect(() => {
-    if (Platform.OS === 'web' && me.supported && !keptMap) {
+    if (Platform.OS === 'web' && !inShell && me.supported && !keptMap) {
       me.start();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
