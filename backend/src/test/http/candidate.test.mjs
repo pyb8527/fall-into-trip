@@ -23,7 +23,7 @@ async function makeGroup(ownerToken, name, mates = []) {
 }
 const stamp = Date.now();
 const reg = (who, name) => call("POST", "/api/auth/register",
-  { body: { email: `${who}-${stamp}@test.com`, name, password: "pw-12345678" } });
+  { body: { email: `${who}-${stamp}@test.com`, name, password: "pw-12345678", over14: true, terms: true, privacy: true } });
 const cardOf = (list, id) => list.find(c => c.id === id);
 
 console.log("\n[1] 주인과 동행자");

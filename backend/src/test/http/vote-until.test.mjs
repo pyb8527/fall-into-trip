@@ -20,7 +20,7 @@ const yesterday = new Date(Date.now() - 86400000);
 const stamp = Date.now();
 const reg = async (who, name) => {
   const r = await call("POST", "/api/auth/register",
-    { body: { email: `${who}-${stamp}@test.com`, name, password: "pw-12345678" } });
+    { body: { email: `${who}-${stamp}@test.com`, name, password: "pw-12345678", over14: true, terms: true, privacy: true } });
   return r.data.accessToken;
 };
 

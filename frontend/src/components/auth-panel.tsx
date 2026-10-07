@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { ApiError, UNEXPECTED } from '@/api/client';
 import { useAuth } from '@/auth/auth-provider';
 import { Colors, Spacing, Type, Weight } from '@/constants/theme';
+import { agreedAll, ConsentChecks, NO_CONSENT } from '@/components/consent-checks';
 import { GoogleButton } from '@/components/google-button';
 import { canSignInWithKakao, KakaoButton } from '@/components/kakao-button';
 import { startKakao } from '@/lib/kakao-signin';
@@ -64,6 +65,7 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
+  const [consent, setConsent] = useState(NO_CONSENT);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -144,12 +146,16 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
       setError(`비밀번호는 ${PASSWORD_MIN}자 이상이어야 해요.`);
       return;
     }
+    if (isRegister && !agreedAll(consent)) {
+      setError('만 14세 이상이고 약관과 개인정보처리방침에 동의해야 가입할 수 있어요.');
+      return;
+    }
 
     setError(null);
     setBusy(true);
     try {
       if (isRegister) {
-        await register(email.trim(), name.trim(), password);
+        await register(email.trim(), name.trim(), password, consent);
       } else {
         await login(email.trim(), password);
       }
@@ -239,6 +245,12 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
           onSubmitEditing={submit}
         />
 
+        {/*
+          약관 동의. 가입할 때만 묻습니다 — 로그인하는 사람은 이미 동의했거나,
+          아직이면 들어온 뒤에 동의 화면이 따로 묻습니다(consent-gate).
+        */}
+        {isRegister ? <ConsentChecks value={consent} onChange={setConsent} /> : null}
+
         {error ? <ErrorNote message={error} /> : null}
         {!error && socialError ? <ErrorNote message={socialError} /> : null}
       </View>
@@ -248,6 +260,10 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
           label={isRegister ? '가입하고 시작하기' : '로그인'}
           onPress={submit}
           busy={busy}
+          /* 다른 칸과 달리 동의 칸은 잠급니다. 위에서 말한 자동완성 걱정이
+             네모에는 없고, 셋을 다 켜야 한다는 것이 잠긴 단추로 바로
+             보입니다. */
+          disabled={isRegister && !agreedAll(consent)}
         />
       </View>
 

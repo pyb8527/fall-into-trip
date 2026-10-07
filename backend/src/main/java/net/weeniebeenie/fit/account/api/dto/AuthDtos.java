@@ -31,7 +31,34 @@ public final class AuthDtos {
             String name,
 
             @NotBlank(message = "비밀번호를 넣어 주세요.")
-            String password) {
+            String password,
+
+            Boolean over14,
+            Boolean terms,
+            Boolean privacy) {
+
+        /** 셋 다 켰는가. 하나라도 빠지면 가입을 받지 않습니다 — {@link AgreeRequest} 와 같은 규칙. */
+        public boolean agreedAll() {
+            return Boolean.TRUE.equals(over14) && Boolean.TRUE.equals(terms) && Boolean.TRUE.equals(privacy);
+        }
+    }
+
+    /**
+     * 약관 · 개인정보 수집 · 이용 동의.
+     *
+     * <p>세 칸을 하나로 뭉치지 않습니다. 법이 「만 14세 이상인지」와 「약관」과
+     * 「개인정보 수집 · 이용」을 따로 묻게 하고(개인정보 보호법 제22조), 화면도
+     * 칸을 셋으로 그립니다. 하나로 받으면 화면이 「모두 동의」 한 칸만 보내도
+     * 통과하게 됩니다.
+     *
+     * <p>{@code @AssertTrue} 를 안 겁니다. 그러면 빠진 칸마다 다른 문구가 나가는데,
+     * 어느 칸이 빠졌든 할 말은 하나입니다.
+     */
+    public record AgreeRequest(Boolean over14, Boolean terms, Boolean privacy) {
+
+        public boolean agreedAll() {
+            return Boolean.TRUE.equals(over14) && Boolean.TRUE.equals(terms) && Boolean.TRUE.equals(privacy);
+        }
     }
 
     public record SetupRequest(
@@ -69,15 +96,20 @@ public final class AuthDtos {
      *                프로필에, 표식은 지도 핀에 쓰이는 다른 값입니다
      *                (16픽셀로 줄인 얼굴 사진은 누구인지 안 보입니다).
      *                고치는 자리는 {@code PATCH /api/me/profile} 하나입니다
+     * @param needsConsent 지금 판의 약관 · 처리방침에 아직 동의하지 않았는지
+     *                ({@link User#needsConsent}). 켜져 있으면 화면이 다른 것을
+     *                안 보여 주고 동의 화면부터 띄웁니다. 세션을 내주는 모든
+     *                자리(로그인 · 가입 · 소셜 · 재발급 · /me)가 이 꼴을 쓰므로
+     *                어느 길로 들어와도 같은 판단을 받습니다
      */
     public record UserView(String id, String email, String name, String role,
                            String mark, String photoId, boolean disabled, Instant createdAt,
-                           Instant lastLoginAt) {
+                           Instant lastLoginAt, boolean needsConsent) {
 
         public static UserView of(User u) {
             return new UserView(u.getId(), u.getEmail(), u.getName(), u.getRole().name(),
                     u.getMark(), u.getPhotoId(), u.isDisabled(), u.getCreatedAt(),
-                    u.getLastLoginAt());
+                    u.getLastLoginAt(), u.needsConsent());
         }
     }
 

@@ -16,7 +16,7 @@ const stamp = Date.now();
 
 console.log("\n[1] 사흘짜리 여행, 날마다 곳 둘씩");
 let r = await call("POST", "/api/auth/register", {
-  body: { email: `edit-${stamp}@test.com`, name: "짜는 사람", password: "pw-12345678" },
+  body: { email: `edit-${stamp}@test.com`, name: "짜는 사람", password: "pw-12345678", over14: true, terms: true, privacy: true },
 });
 const author = r.data.accessToken;
 T("가입", r.status === 200, r.data);
@@ -51,7 +51,7 @@ T("곳은 3일차 것", r.data.itinerary.days[0].places[0].name === "3일차앞"
 
 console.log("\n[3] 골라 가져와도 번호와 색이 맞는다");
 r = await call("POST", "/api/auth/register", {
-  body: { email: `taker-e-${stamp}@test.com`, name: "가져가는 사람", password: "pw-12345678" },
+  body: { email: `taker-e-${stamp}@test.com`, name: "가져가는 사람", password: "pw-12345678", over14: true, terms: true, privacy: true },
 });
 const taker = r.data.accessToken;
 r = await call("POST", `/api/trips/${tripId}/publish`, { token: author, body: { title: "사흘 전부" } });

@@ -15,7 +15,7 @@ async function call(method, path, { body, token } = {}) {
 
 const stamp = Date.now();
 let r = await call("POST", "/api/auth/register", {
-  body: { email: `after-${stamp}@test.com`, name: "짜는 사람", password: "pw-12345678" },
+  body: { email: `after-${stamp}@test.com`, name: "짜는 사람", password: "pw-12345678", over14: true, terms: true, privacy: true },
 });
 const token = r.data.accessToken;
 T("가입", r.status === 200, r.data);

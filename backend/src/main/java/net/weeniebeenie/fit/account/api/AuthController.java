@@ -85,8 +85,22 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<TokenResponse> register(@Valid @RequestBody RegisterRequest req,
                                                   HttpServletRequest http) {
-        User user = auth.register(req.email(), req.name(), req.password());
+        User user = auth.register(req.email(), req.name(), req.password(), req.agreedAll());
         return withNewSession(user, http);
+    }
+
+    /**
+     * 약관 · 개인정보 수집 · 이용에 동의합니다.
+     *
+     * <p>{@code user.needsConsent} 가 켜진 사람의 동의 화면이 부릅니다. 세션은
+     * 그대로 둡니다 — 동의했다고 다른 기기에서 로그아웃될 까닭이 없습니다.
+     * 바뀐 {@code user} 를 돌려주므로 화면은 그것으로 바꿔 끼우면 됩니다.
+     */
+    @PostMapping("/agree")
+    public Map<String, Object> agree(@CurrentUser AuthPrincipal me,
+                                     @RequestBody(required = false) AgreeRequest req) {
+        User user = auth.agree(me.id(), req != null && req.agreedAll());
+        return Map.of("user", UserView.of(user));
     }
 
     @PostMapping("/setup")

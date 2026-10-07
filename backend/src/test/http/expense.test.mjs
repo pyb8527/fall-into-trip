@@ -35,13 +35,13 @@ const A = r.data.accessToken;
 const aId = r.data.user.id;
 T("첫 사람", !!A, r.data);
 
-r = await call("POST", "/api/auth/register", { body: { email: `b-${TAG}@local.test`, name: "나", password: "mate-test-1234" } });
+r = await call("POST", "/api/auth/register", { body: { email: `b-${TAG}@local.test`, name: "나", password: "mate-test-1234", over14: true, terms: true, privacy: true } });
 const B = r.data.accessToken;
 const bId = r.data.user.id;
-r = await call("POST", "/api/auth/register", { body: { email: `c-${TAG}@local.test`, name: "다", password: "mate-test-1234" } });
+r = await call("POST", "/api/auth/register", { body: { email: `c-${TAG}@local.test`, name: "다", password: "mate-test-1234", over14: true, terms: true, privacy: true } });
 const C = r.data.accessToken;
 const cId = r.data.user.id;
-r = await call("POST", "/api/auth/register", { body: { email: `x-${TAG}@local.test`, name: "남", password: "other-test-1234" } });
+r = await call("POST", "/api/auth/register", { body: { email: `x-${TAG}@local.test`, name: "남", password: "other-test-1234", over14: true, terms: true, privacy: true } });
 const X = r.data.accessToken;
 
 const groupId = await makeGroup(A, "셋이서", [B, C]);

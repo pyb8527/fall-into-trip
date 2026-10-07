@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AuthProvider, useAuth } from '@/auth/auth-provider';
+import { ConsentGate } from '@/components/consent-gate';
 import { tellShellCanGoBack } from '@/lib/shell-bridge.web';
 import { ShellInsets } from '@/lib/shell-insets.web';
 import { listenForShellOpen } from '@/lib/shell-open.web';
@@ -181,7 +182,16 @@ export default function RootLayout() {
               name="account/delete"
               options={stackHeader('회원 탈퇴', { up: '/(app)/settings' })}
             />
+            <Stack.Screen name="blocks" options={stackHeader('차단한 사람', { up: '/(app)/settings' })} />
           </Stack>
+          {/*
+            약관에 아직 동의하지 않았으면 그 위를 덮습니다.
+
+            <p>여기서 덮는 까닭은 (app) 층 밖에도 로그인한 사람의 화면(여행 상세 ·
+            가계부 · 모임 …)이 있기 때문입니다. 길은 그대로 두고 덮으므로,
+            동의하면 열려던 화면이 그대로 남아 있습니다(consent-gate).
+          */}
+          <ConsentGate />
         </ThemeProvider>
         </HandFont>
       </AuthProvider>

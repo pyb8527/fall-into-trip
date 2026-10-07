@@ -19,7 +19,7 @@ async function call(method, path, { body, token } = {}) {
 /* 같은 DB 로 여러 번 돌려도 부딪히지 않게 이름을 매번 다르게 씁니다. */
 const TAG = Date.now().toString(36);
 const ADMIN = { email: `admin@local.test`, name: "관리자", password: "trip-test-1234" };
-const MEMBER = { email: `member-${TAG}@local.test`, name: "동행자", password: "member-test-1234" };
+const MEMBER = { email: `member-${TAG}@local.test`, name: "동행자", password: "member-test-1234", over14: true, terms: true, privacy: true };
 
 console.log("\n[0] 준비 — 운영자와 회원");
 

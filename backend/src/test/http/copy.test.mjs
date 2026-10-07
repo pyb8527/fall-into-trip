@@ -34,9 +34,9 @@ r = await call("POST", "/api/auth/setup", { body: { email: `admin@local.test`, n
 const host = r.data.accessToken;
 T("운영자 준비", !!host, r.data);
 
-r = await call("POST", "/api/auth/register", { body: { email: `mate-${TAG}@local.test`, name: "동행자", password: "mate-test-1234" } });
+r = await call("POST", "/api/auth/register", { body: { email: `mate-${TAG}@local.test`, name: "동행자", password: "mate-test-1234", over14: true, terms: true, privacy: true } });
 const mate = r.data.accessToken;
-r = await call("POST", "/api/auth/register", { body: { email: `x-${TAG}@local.test`, name: "남", password: "other-test-1234" } });
+r = await call("POST", "/api/auth/register", { body: { email: `x-${TAG}@local.test`, name: "남", password: "other-test-1234", over14: true, terms: true, privacy: true } });
 const stranger = r.data.accessToken;
 
 r = await call("POST", "/api/trips", { token: host, body: { title: "오사카 세 밤", startIso: "2026-11-02", nights: 2 } });

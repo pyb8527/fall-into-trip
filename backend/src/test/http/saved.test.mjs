@@ -12,7 +12,7 @@ async function call(method, path, { body, token } = {}) {
 }
 const stamp = Date.now();
 const reg = (who, name) => call("POST", "/api/auth/register",
-  { body: { email: `${who}-${stamp}@test.com`, name, password: "pw-12345678" } });
+  { body: { email: `${who}-${stamp}@test.com`, name, password: "pw-12345678", over14: true, terms: true, privacy: true } });
 
 console.log("\n[1] 두 사람과 여행 하나");
 let r = await reg("saver", "담는이");

@@ -46,7 +46,7 @@ console.log("\n[6] 잇기 시작은 로그인한 사람만");
 r = await fetch(BASE + "/api/auth/link/kakao", { method: "POST" });
 T("로그인 없이 401", r.status === 401, r.status);
 const reg = await fetch(BASE + "/api/auth/register", { method: "POST", headers: { "content-type": "application/json" },
-  body: JSON.stringify({ email: `k-${Date.now()}@test.com`, name: "카", password: "pw-12345678" }) });
+  body: JSON.stringify({ email: `k-${Date.now()}@test.com`, name: "카", password: "pw-12345678", over14: true, terms: true, privacy: true }) });
 const token = (await reg.json()).accessToken;
 r = await fetch(BASE + "/api/auth/link/kakao", { method: "POST", headers: { authorization: "Bearer " + token } });
 j = await r.json();
@@ -57,7 +57,7 @@ T("잇기를 취소하면 설정으로", r.headers.get("location") === "/setting
 
 console.log("\n[7] 자리 주소는 가입에 못 씀");
 r = await fetch(BASE + "/api/auth/register", { method: "POST", headers: { "content-type": "application/json" },
-  body: JSON.stringify({ email: "kakao-1@users.invalid", name: "x", password: "pw-12345678" }) });
+  body: JSON.stringify({ email: "kakao-1@users.invalid", name: "x", password: "pw-12345678", over14: true, terms: true, privacy: true }) });
 T("400", r.status === 400, r.status);
 
 console.log("\n[8] 앱(껍데기)에서 시작 — 쿠키 대신 nonce, 끝은 fit://kakao");

@@ -1,7 +1,7 @@
 import Constants from 'expo-constants';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Linking, StyleSheet, Text, View } from 'react-native';
 
 import { api, API_BASE, ApiError, UNEXPECTED } from '@/api/client';
 import type { TripSummary } from '@/api/types';
@@ -126,6 +126,10 @@ export default function Settings() {
 
       <AccountGroup />
 
+      {/* 차단한 사람. 차단은 글 · 프로필의 메뉴에서 하고, 푸는 것은 여기서 —
+          누구를 막아 두었는지 한곳에서 보여야 풀 수도 있습니다. */}
+      <Line label="차단한 사람" last onPress={() => router.push('/blocks')} />
+
       <Band />
 
       {/* 나가는 일 셋. 로그아웃은 되돌릴 수 있고, 아래 둘은 다른 기기까지
@@ -136,6 +140,24 @@ export default function Settings() {
           않고, 무엇이 지워지는지는 누르면 열리는 화면이 다 보여 준 뒤에
           묻습니다. */}
       <Line label="회원 탈퇴" danger last onPress={() => router.push('/account/delete')} />
+
+      <Band />
+
+      {/*
+        약관과 처리방침.
+
+        <p>가입할 때 동의한 문서를 나중에 다시 볼 자리가 있어야 합니다 — 처리방침은
+        「언제든 쉽게 볼 수 있게」 두라고 법이 정해 둡니다(개인정보 보호법
+        제30조). 앱 화면이 아니라 따로 둔 정적 문서라 새 창으로 엽니다.
+        앱(껍데기) 안에서는 같은 자리라 웹뷰가 그대로 띄우고, 뒤로가기로
+        돌아옵니다.
+
+        <p>판 줄 바로 위, 맨 아래에 둡니다. 날마다 누를 줄이 아니라 찾을 때
+        찾는 줄입니다.
+      */}
+      <Line label="이용약관" onPress={() => Linking.openURL('/terms')} />
+      <Line label="개인정보처리방침" onPress={() => Linking.openURL('/privacy')} />
+      <Line label="위치기반서비스 이용약관" last onPress={() => Linking.openURL('/location-terms')} />
 
       {/*
         몇 판인지.

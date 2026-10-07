@@ -5,6 +5,29 @@ import type { AuthState, TokenResponse, User } from '@/api/types';
 import { forgetTrips } from '@/lib/keep';
 
 /**
+ * 약관 · 개인정보 수집 · 이용 동의 세 칸.
+ *
+ * <p>하나로 뭉치지 않습니다. 서버도 세 칸을 따로 받습니다 — 법이 셋을 따로
+ * 묻게 하고, 「모두 동의」는 셋을 한 번에 켜는 손쉬운 길일 뿐 넷째 칸이
+ * 아닙니다({@code AuthDtos.AgreeRequest}).
+ */
+export type Consent = { over14: boolean; terms: boolean; privacy: boolean };
+
+/**
+ * 세션이 들고 있는 사람.
+ *
+ * <p>{@code needsConsent} 는 서버의 {@code UserView} 가 함께 내려보내는
+ * 값입니다. 켜져 있으면 지금 판의 약관 · 처리방침에 아직 동의하지 않은
+ * 것이고, 그동안은 동의 화면만 뜹니다({@code components/consent-gate}).
+ * 구글 · 카카오로 처음 들어온 사람, 이 칸이 생기기 전에 가입한 사람이
+ * 그렇습니다.
+ *
+ * <p>공용 타입({@code api/types})에 안 넣고 여기 둡니다. 이 값을 읽는 곳이
+ * 로그인 상태를 쥔 이 파일과 동의 화면뿐입니다.
+ */
+export type SessionUser = User & { needsConsent?: boolean };
+
+/**
  * 로그인 상태.
  *
  * 액세스 토큰은 client.ts 의 메모리에만 있고 여기서는 다루지 않습니다.
@@ -13,7 +36,7 @@ import { forgetTrips } from '@/lib/keep';
 type AuthContextValue = {
   /** 첫 확인이 끝났는지. 끝나기 전에는 화면을 고르면 안 됩니다. */
   ready: boolean;
-  user: User | null;
+  user: SessionUser | null;
   /** 운영자가 아직 없어 최초 설치 화면을 띄워야 하는지. */
   setupNeeded: boolean;
   /**
@@ -27,7 +50,12 @@ type AuthContextValue = {
   /** 서버가 카카오 로그인을 켰는지. 꺼져 있으면 단추를 안 냅니다 */
   kakaoEnabled: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, name: string, password: string) => Promise<void>;
+  register: (email: string, name: string, password: string, consent: Consent) => Promise<void>;
+  /**
+   * 동의 화면에서 셋 다 켜고 넘어갑니다. 서버가 돌려준 사람으로 바꿔 끼우므로
+   * {@code needsConsent} 가 꺼지고, 그 순간 동의 화면이 걷힙니다.
+   */
+  agree: (consent: Consent) => Promise<void>;
   setup: (email: string, name: string, password: string, token: string) => Promise<void>;
   changePassword: (current: string, next: string) => Promise<void>;
   signInWithGoogle: (credential: string) => Promise<void>;
@@ -57,7 +85,7 @@ export function useAuth() {
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<SessionUser | null>(null);
   const [setupNeeded, setSetupNeeded] = useState(false);
   const [googleClientId, setGoogleClientId] = useState('');
   const [kakaoEnabled, setKakaoEnabled] = useState(false);
@@ -185,11 +213,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const register = useCallback(
-    async (email: string, name: string, password: string) => {
-      accept(await api.anon<TokenResponse>('/api/auth/register', { email, name, password }));
+    async (email: string, name: string, password: string, consent: Consent) => {
+      accept(
+        await api.anon<TokenResponse>('/api/auth/register', { email, name, password, ...consent }),
+      );
     },
     [accept],
   );
+
+  const agree = useCallback(async (consent: Consent) => {
+    const res = await api.post<{ user: SessionUser }>('/api/auth/agree', consent);
+    setUser(res.user);
+  }, []);
 
   const setup = useCallback(
     async (email: string, name: string, password: string, token: string) => {
@@ -236,7 +271,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const refreshUser = useCallback(async () => {
-    const res = await api.get<{ user: User }>('/api/auth/me');
+    const res = await api.get<{ user: SessionUser }>('/api/auth/me');
     setUser(res.user);
   }, []);
 
@@ -251,6 +286,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signInWithKakaoTicket,
       login,
       register,
+      agree,
       setup,
       changePassword,
       logout,
@@ -258,7 +294,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       withdraw,
       refreshUser,
     }),
-    [ready, user, setupNeeded, googleClientId, kakaoEnabled, login, register, setup, changePassword, logout,
+    [ready, user, setupNeeded, googleClientId, kakaoEnabled, login, register, agree, setup, changePassword, logout,
      logoutAll, withdraw, refreshUser, signInWithGoogle, signInWithKakaoTicket],
   );
 

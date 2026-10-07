@@ -39,7 +39,7 @@ const stamp = Date.now();
 
 console.log("\n[1] 다녀온 여행 하나");
 let r = await call("POST", "/api/auth/register", {
-  body: { email: `j-${stamp}@test.com`, name: "쓰는 사람", password: "pw-12345678" },
+  body: { email: `j-${stamp}@test.com`, name: "쓰는 사람", password: "pw-12345678", over14: true, terms: true, privacy: true },
 });
 const me = r.data.accessToken;
 T("가입", r.status === 200, r.data);
@@ -81,7 +81,7 @@ T("챙겨 둔 사진은 안 따라간다", (place.photos ?? []).length === 0, pl
 
 console.log("\n[4] 남의 사진은 표지로 못 쓴다");
 r = await call("POST", "/api/auth/register", {
-  body: { email: `other-${stamp}@test.com`, name: "남", password: "pw-12345678" },
+  body: { email: `other-${stamp}@test.com`, name: "남", password: "pw-12345678", over14: true, terms: true, privacy: true },
 });
 const other = r.data.accessToken;
 const hers = await upload(other);

@@ -47,7 +47,7 @@ async function photo(token) {
 
 const TAG = Date.now().toString(36);
 const reg = (who, name) => call("POST", "/api/auth/register",
-  { body: { email: `${who}-${TAG}@local.test`, name, password: "story-test-1234" } });
+  { body: { email: `${who}-${TAG}@local.test`, name, password: "story-test-1234", over14: true, terms: true, privacy: true } });
 
 /** 오늘부터 며칠 뒤. 여행 날짜를 오늘에 걸쳐 두려고 씁니다. */
 function isoAfter(days) {

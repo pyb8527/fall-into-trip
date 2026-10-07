@@ -59,7 +59,7 @@ const stamp = Date.now();
 
 console.log("\n[1] 사람 하나");
 let r = await call("POST", "/api/auth/register", {
-  body: { email: `photo-${stamp}@test.com`, name: "찍는 사람", password: "pw-12345678" },
+  body: { email: `photo-${stamp}@test.com`, name: "찍는 사람", password: "pw-12345678", over14: true, terms: true, privacy: true },
 });
 const me = r.data.accessToken;
 T("가입", r.status === 200, r.data);
@@ -97,7 +97,7 @@ T("그림은 살아 있다", body.length > 100 && body[0] === 0xff && body[1] ==
 
 console.log("\n[5] 내 것만 지운다");
 r = await call("POST", "/api/auth/register", {
-  body: { email: `other-${stamp}@test.com`, name: "남", password: "pw-12345678" },
+  body: { email: `other-${stamp}@test.com`, name: "남", password: "pw-12345678", over14: true, terms: true, privacy: true },
 });
 const other = r.data.accessToken;
 r = await call("DELETE", `/api/photos/${id}`, { token: other });

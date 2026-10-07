@@ -116,6 +116,33 @@ public class User {
     @Column(name = "photo_id", length = 16)
     private String photoId;
 
+    /**
+     * 지금 받는 약관 · 개인정보 처리방침의 판.
+     *
+     * <p><b>약관이나 처리방침을 고쳐 다시 동의를 받아야 하면 이 값만
+     * 바꿉니다.</b> 그러면 모두가 다음에 들어올 때 동의 화면을 한 번 더
+     * 거칩니다. 글자만 다듬어 다시 물을 필요가 없으면 그대로 둡니다 — 판이
+     * 바뀔 때마다 모든 사람의 앱이 막히기 때문입니다.
+     *
+     * <p>날짜 꼴로 둡니다. 화면의 문서(/terms · /privacy)에 적은 시행일과
+     * 맞춰 두면 「어느 판에 동의했는지」를 사람이 읽고 바로 찾습니다.
+     */
+    public static final String CONSENT_VERSION = "2026-10-07";
+
+    /**
+     * 만 14세 이상 · 이용약관 · 개인정보 수집 · 이용에 동의한 때(V60).
+     *
+     * <p>비어 있으면 동의한 적이 없습니다 — V60 전에 가입한 사람, 구글 ·
+     * 카카오로 처음 들어온 사람. 그때 화면은 다른 것을 안 보여 주고 동의
+     * 화면부터 띄웁니다.
+     */
+    @Column(name = "agreed_at")
+    private Instant agreedAt;
+
+    /** 그때 동의한 판. {@link #CONSENT_VERSION} 과 다르면 다시 묻습니다. */
+    @Column(name = "agreed_version", length = 16)
+    private String agreedVersion;
+
     @Builder
     public User(String email, String name, String passwordHash, Role role) {
         this.id = Ids.next();
@@ -139,5 +166,16 @@ public class User {
      */
     public boolean hasPassword() {
         return passwordHash != null && !passwordHash.isBlank();
+    }
+
+    /** 지금 판에 아직 동의하지 않았는가. 화면이 이것을 보고 동의 화면을 띄웁니다. */
+    public boolean needsConsent() {
+        return !CONSENT_VERSION.equals(agreedVersion);
+    }
+
+    /** 지금 판에 동의했다고 적습니다. 무엇에 동의했는지 확인하는 일은 부르는 쪽이 합니다. */
+    public void agreeNow() {
+        this.agreedAt = Instant.now();
+        this.agreedVersion = CONSENT_VERSION;
     }
 }

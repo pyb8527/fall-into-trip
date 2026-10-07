@@ -46,7 +46,7 @@ async function photo(token) {
 
 const TAG = Date.now().toString(36);
 const reg = (who, name) => call("POST", "/api/auth/register",
-  { body: { email: `${who}-${TAG}@local.test`, name, password: "feed-test-1234" } });
+  { body: { email: `${who}-${TAG}@local.test`, name, password: "feed-test-1234", over14: true, terms: true, privacy: true } });
 
 async function makeGroup(ownerToken, name, mates = []) {
   const g = await call("POST", "/api/groups", { token: ownerToken, body: { name } });

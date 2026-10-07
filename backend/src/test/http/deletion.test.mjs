@@ -52,7 +52,7 @@ const stamp = Date.now();
 const PW = "pw-12345678";
 async function reg(who, name) {
   const email = `${who}-${stamp}@test.com`;
-  const r = await call("POST", "/api/auth/register", { body: { email, name, password: PW } });
+  const r = await call("POST", "/api/auth/register", { body: { email, name, password: PW, over14: true, terms: true, privacy: true } });
   return { email, token: r.data?.accessToken, id: r.data?.user?.id, cookie: refreshCookieOf(r.res) };
 }
 

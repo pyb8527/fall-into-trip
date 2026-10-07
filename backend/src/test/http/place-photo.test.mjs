@@ -16,7 +16,7 @@ const stamp = Date.now();
 
 console.log("\n[1] 사람 하나");
 let r = await call("POST", "/api/auth/register", {
-  body: { email: `photo-${stamp}@test.com`, name: "보는 사람", password: "pw-12345678" },
+  body: { email: `photo-${stamp}@test.com`, name: "보는 사람", password: "pw-12345678", over14: true, terms: true, privacy: true },
 });
 const me = r.data.accessToken;
 T("가입", r.status === 200, r.data);

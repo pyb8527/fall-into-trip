@@ -51,9 +51,26 @@ public class AuthService {
         return users.countByRoleAndDisabledFalse(Role.ADMIN) == 0;
     }
 
-    /** 누구나 가입합니다. */
+    /** 동의가 빠졌을 때의 말. 가입과 동의 화면이 같은 말을 씁니다. */
+    public static final String CONSENT_REQUIRED =
+            "만 14세 이상이고 약관과 개인정보처리방침에 동의해야 가입할 수 있어요.";
+
+    /**
+     * 누구나 가입합니다.
+     *
+     * <p>만 14세 이상 · 이용약관 · 개인정보 수집 · 이용 셋에 다 동의해야
+     * 받습니다. 받고 나면 동의한 때와 판을 함께 적어 둡니다 — 비밀번호로
+     * 가입한 사람은 가입 화면에서 이미 동의했으니 동의 화면을 또 거치지
+     * 않습니다.
+     *
+     * <p>만 14세 미만은 법정대리인 동의를 따로 받아야 하는데(개인정보 보호법
+     * 제22조의2), 그 절차를 두지 않았으므로 받지 않는 쪽을 택했습니다.
+     */
     @Transactional
-    public User register(String email, String name, String password) {
+    public User register(String email, String name, String password, boolean agreedAll) {
+        if (!agreedAll) {
+            throw ApiException.badRequest(CONSENT_REQUIRED);
+        }
         String normalized = Email.of(email).value();
         String cleanName = requireName(name);
         validatePassword(password);
@@ -78,8 +95,10 @@ public class AuthService {
                 .passwordHash(encoder.encode(password))
                 .role(Role.MEMBER)
                 .build());
+        user.agreeNow();
 
-        audit.log(user.getId(), "user.register", user.getId(), Map.of("email", normalized));
+        audit.log(user.getId(), "user.register", user.getId(),
+                Map.of("email", normalized, "consent", User.CONSENT_VERSION));
         return user;
     }
 
@@ -104,7 +123,11 @@ public class AuthService {
         String cleanName = requireName(name);
         validatePassword(password);
 
-        /* 이미 회원으로 가입해 둔 사람을 운영자로 올릴 수도 있습니다. */
+        /* 이미 회원으로 가입해 둔 사람을 운영자로 올릴 수도 있습니다.
+
+           운영자도 동의한 것으로 적습니다. 이 서비스를 차려 놓는 사람이라
+           자기 약관을 따로 묻지 않습니다 — 묻게 두면 설치를 마치자마자 동의
+           화면이 한 번 더 뜹니다. */
         User admin = users.findByEmail(normalized)
                 .map(existing -> {
                     existing.setRole(Role.ADMIN);
@@ -116,6 +139,7 @@ public class AuthService {
                         .passwordHash(encoder.encode(password))
                         .role(Role.ADMIN)
                         .build()));
+        admin.agreeNow();
 
         audit.log(admin.getId(), "admin.setup", admin.getId(), Map.of("email", normalized));
         return admin;
@@ -158,6 +182,26 @@ public class AuthService {
         attempts.reset(key);
         user.setLastLoginAt(Instant.now());
         audit.log(user.getId(), "login", user.getId());
+        return user;
+    }
+
+    /**
+     * 동의 화면에서 셋 다 켜고 「동의하고 시작하기」를 눌렀습니다.
+     *
+     * <p>구글 · 카카오로 처음 들어온 사람, V60 전에 가입한 사람, 판이 바뀐 뒤에
+     * 들어온 사람이 여기로 옵니다. 이미 지금 판에 동의했어도 다시 적을 뿐
+     * 거절하지 않습니다 — 두 기기에서 같이 눌러도 둘 다 넘어가야 합니다.
+     */
+    @Transactional
+    public User agree(String userId, boolean agreedAll) {
+        if (!agreedAll) {
+            throw ApiException.badRequest("만 14세 이상이고 약관과 개인정보처리방침에 동의해야 쓸 수 있어요.");
+        }
+        User user = users.findById(userId)
+                .filter(u -> !u.isDisabled())
+                .orElseThrow(() -> ApiException.unauthorized("로그인이 필요해요."));
+        user.agreeNow();
+        audit.log(userId, "user.consent", userId, Map.of("version", User.CONSENT_VERSION));
         return user;
     }
 

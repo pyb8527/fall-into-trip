@@ -16,7 +16,7 @@ async function call(method, path, { body, token } = {}) {
 const stamp = Date.now();
 console.log("\n[1] 사흘짜리 여행 하나");
 let r = await call("POST", "/api/auth/register", {
-  body: { email: `days-${stamp}@test.com`, name: "짜는 사람", password: "pw-12345678" },
+  body: { email: `days-${stamp}@test.com`, name: "짜는 사람", password: "pw-12345678", over14: true, terms: true, privacy: true },
 });
 const author = r.data.accessToken;
 T("가입", r.status === 200, r.data);
@@ -66,7 +66,7 @@ T("못 올림", r.status === 400, r.data);
 
 console.log("\n[5] 남의 글에서 하루만 가져온다");
 r = await call("POST", "/api/auth/register", {
-  body: { email: `taker-${stamp}@test.com`, name: "가져가는 사람", password: "pw-12345678" },
+  body: { email: `taker-${stamp}@test.com`, name: "가져가는 사람", password: "pw-12345678", over14: true, terms: true, privacy: true },
 });
 const taker = r.data.accessToken;
 

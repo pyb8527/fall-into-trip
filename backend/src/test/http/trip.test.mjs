@@ -209,7 +209,7 @@ T("남의 캐시에 얹히지 않음", m.status !== 200 || /private/.test(m.cach
 m = await mapOf(null);
 T("로그인 없이는 못 봄", m.status === 401, m);
 
-r = await call("POST", "/api/auth/register", { body: { email: `nosy-${Date.now()}@t.test`, name: "남", password: "pw-12345678" } });
+r = await call("POST", "/api/auth/register", { body: { email: `nosy-${Date.now()}@t.test`, name: "남", password: "pw-12345678", over14: true, terms: true, privacy: true } });
 T("남 가입", r.status === 200, r.data);
 m = await mapOf(r.data.accessToken);
 /* 403 이면 "있긴 있다" 를 알려 주는 셈이라 404 입니다. */

@@ -21,7 +21,7 @@ async function call(method, path, { body, token } = {}) {
 const stamp = Date.now();
 const join = async (who) => {
   const r = await call("POST", "/api/auth/register",
-    { body: { email: `${who}-${stamp}@t.test`, name: who, password: "pw-12345678" } });
+    { body: { email: `${who}-${stamp}@t.test`, name: who, password: "pw-12345678", over14: true, terms: true, privacy: true } });
   return r.data?.accessToken;
 };
 

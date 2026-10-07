@@ -21,7 +21,7 @@ async function call(method, path, { body, token } = {}) {
 
 const TAG = Date.now().toString(36);
 const reg = (who, name) => call("POST", "/api/auth/register",
-  { body: { email: `${who}-${TAG}@local.test`, name, password: "group-test-1234" } });
+  { body: { email: `${who}-${TAG}@local.test`, name, password: "group-test-1234", over14: true, terms: true, privacy: true } });
 
 let r;
 

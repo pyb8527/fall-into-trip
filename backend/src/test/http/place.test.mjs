@@ -19,7 +19,7 @@ async function call(method, path, { body, token, raw } = {}) {
   return { status: r.status, data };
 }
 
-const ADMIN = { email: "place@local.test", name: "Tester", password: "place-test-1234" };
+const ADMIN = { email: "place@local.test", name: "Tester", password: "place-test-1234", over14: true, terms: true, privacy: true };
 
 console.log("\n[0] 준비");
 let r = await call("POST", "/api/auth/setup", { body: { ...ADMIN, token: SETUP_TOKEN } });
