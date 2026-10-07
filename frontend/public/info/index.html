@@ -219,7 +219,6 @@ img { max-width: 100%; }
 .tab .bar::after { content: ""; position: absolute; inset: 0; border-radius: 2px; background: var(--violet); transform-origin: left; transform: scaleX(0); }
 .tab[aria-selected="true"] .bar { opacity: 1; }
 .tab[aria-selected="true"] .bar::after { animation: fill var(--cycle, 4.5s) linear both; }
-.plan.paused .tab .bar::after { animation-play-state: paused; }
 @keyframes fill { to { transform: scaleX(1); } }
 
 .swap-stage { position: relative; display: grid; place-items: center; min-height: 760px; }
@@ -857,8 +856,6 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
   };
   const run = () => { clearInterval(timer); if (!reduce) timer = setInterval(() => show((cur + 1) % tabs.length), CYCLE); };
   tabs.forEach((t, i) => t.addEventListener('click', () => { show(i); run(); }));
-  plan.addEventListener('mouseenter', () => { clearInterval(timer); plan.classList.add('paused'); });
-  plan.addEventListener('mouseleave', () => { plan.classList.remove('paused'); show(cur); run(); });
   run();
 
   /* 같이 짜기 — 지금 보이는 장면을 왼쪽 판의 점에 */
