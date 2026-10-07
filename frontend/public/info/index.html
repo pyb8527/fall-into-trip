@@ -89,6 +89,8 @@ img { max-width: 100%; }
 
 .phone { position: relative; padding: 8px; border-radius: 38px; background: var(--bezel); box-shadow: var(--shadow); cursor: zoom-in; }
 .phone img { display: block; width: 100%; height: auto; aspect-ratio: 528 / 909; border-radius: 30px; background: #fff; }
+/* 녹화한 화면 — 폰 화면 비율 그대로(상태 막대 · 손짓 막대는 잘라 냄). */
+.phone video { display: block; width: 100%; height: auto; aspect-ratio: 600 / 1384; border-radius: 30px; background: #fff; object-fit: cover; }
 .lift { transition: transform .45s var(--ease); }
 .lift:hover { transform: translateY(-6px); }
 
@@ -297,7 +299,7 @@ img { max-width: 100%; }
 .vehicle.on svg { color: #fff; }
 
 .go-stage { position: relative; display: grid; place-items: center; min-height: 760px; }
-.go-stage > .phone { width: 360px; z-index: 2; }
+.go-stage > .phone { width: 340px; z-index: 2; }
 .go-stage .route { inset: -8% -16%; width: 132%; height: 116%; }
 .go-stage .route .draw { stroke: #B9AFFF; }
 .go-stage .route .pin { fill: #8C7DFF; }
@@ -372,6 +374,7 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
 .viewer[open] { animation: zoomIn .45s var(--spring); }
 @keyframes zoomIn { from { opacity: 0; transform: scale(.85); } }
 .viewer::backdrop { background: rgba(14, 12, 23, .76); backdrop-filter: blur(6px); }
+.viewer video { display: block; width: 100%; height: auto; max-height: calc(94vh - 16px); object-fit: contain; border-radius: 28px; background: #fff; }
 .viewer img { display: block; width: 100%; height: auto; max-height: calc(94vh - 16px); object-fit: contain; border-radius: 28px; background: #fff; }
 .viewer button { position: absolute; top: 18px; right: 18px; width: 40px; height: 40px; border: 0; border-radius: 50%; background: rgba(23, 21, 31, .8); color: #fff; font: 600 22px/1 var(--sans); cursor: pointer; }
 
@@ -387,6 +390,7 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
   .swap-stage, .go-stage, .money-stage { min-height: 0; padding-block: 48px; }
   .swap { width: min(350px, 78vw); }
   .go-stage > .phone, .money-stage > .phone { width: min(340px, 76vw); }
+  .go-stage > .phone { width: min(310px, 70vw); }
   .money-stage { order: 2; }
   .together { grid-template-columns: minmax(0, 1fr); }
   .panel { position: relative; height: auto; padding: 100px 24px 80px; }
@@ -426,7 +430,7 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
   .vehicles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .perks { grid-template-columns: minmax(0, 1fr); }
   .phone { padding: 6px; border-radius: 30px; }
-  .phone img, .swap .screen { border-radius: 24px; }
+  .phone img, .phone video, .swap .screen { border-radius: 24px; }
   .track-x { gap: 16px; }
   .track-x .phone { width: 66vw; }
   .track-x .phone:nth-child(even) { margin-top: 32px; }
@@ -643,11 +647,11 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
             </animateMotion>
           </circle>
         </svg>
-        <div class="phone lift"><img src="/info/shots/s10.webp" alt="동선 다시 보기. 기울인 지도 위 전철 모형" width="528" height="909"></div>
+        <div class="phone lift clip"><video src="/info/shots/go3d.mp4" poster="/info/shots/go3d-poster.jpg" muted loop playsinline autoplay preload="metadata" width="600" height="1384" aria-label="여행 상세의 3D 지도. 사람 모형이 시부야에서 하라주쿠까지 찾아 둔 길을 따라 걸어간다"></video></div>
         <div class="chip-card live-card fl"><span class="live-dot"></span><span><small>지금 여기</small>내 위치 따라가기</span></div>
         <div class="chip-card here-card fl b">
           <span class="arrow-ic"><svg><use href="#i-nav"/></svg></span>
-          <span><small>다음 · 칸다역</small><b><span class="num">1.3km</span> · 걸어서 18분</b></span>
+          <span><small>다음 · 하라주쿠역</small><b><span class="num">1.1km</span> · 걸어서 15분</b></span>
         </div>
       </div>
     </div>
@@ -754,6 +758,7 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
 
 <dialog class="viewer" id="viewer" aria-label="화면 크게 보기">
   <img id="viewer-img" alt="">
+  <video id="viewer-video" muted loop playsinline hidden></video>
   <button type="button" id="viewer-close" aria-label="닫기">×</button>
 </dialog>
 
@@ -869,6 +874,16 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
     $$('.scene').forEach((s) => io3.observe(s));
   }
 
+  /* 3D 녹화 — 칸이 보일 때만 돌립니다. 지나간 뒤에도 돌면 폰 배터리만 닳습니다.
+     움직임을 줄여 달라고 한 사람에게는 첫 장면만 둡니다. */
+  $$('.phone video').forEach((clip) => {
+    if (reduce) { clip.removeAttribute('autoplay'); clip.pause(); return; }
+    if (!('IntersectionObserver' in window)) return;
+    new IntersectionObserver((entries) => {
+      entries.forEach((e) => { if (e.isIntersecting) clip.play().catch(() => {}); else clip.pause(); });
+    }, { threshold: 0.25 }).observe(clip);
+  });
+
   /* 탈것 돌아가며 켜기 */
   const vs = $$('.vehicle');
   let vi = 0;
@@ -877,12 +892,25 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
   /* 크게 보기 */
   const dlg = $('#viewer');
   const big = $('#viewer-img');
+  const bigVideo = $('#viewer-video');
   if (dlg && typeof dlg.showModal === 'function') {
     $$('.phone').forEach((phone) => {
       const open = () => {
-        const img = $('.screen img.on', phone) || $('img', phone);
-        big.src = img.currentSrc || img.src;
-        big.alt = img.alt;
+        const clip = $('video', phone);
+        if (clip) {
+          big.hidden = true;
+          bigVideo.hidden = false;
+          bigVideo.src = clip.currentSrc || clip.src;
+          bigVideo.currentTime = clip.currentTime;
+          bigVideo.play().catch(() => {});
+        } else {
+          const img = $('.screen img.on', phone) || $('img', phone);
+          bigVideo.hidden = true;
+          bigVideo.pause();
+          big.hidden = false;
+          big.src = img.currentSrc || img.src;
+          big.alt = img.alt;
+        }
         dlg.showModal();
       };
       phone.addEventListener('click', open);
@@ -892,6 +920,7 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
       phone.setAttribute('aria-label', '화면 크게 보기');
       phone.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
     });
+    dlg.addEventListener('close', () => bigVideo.pause());
     $('#viewer-close').addEventListener('click', () => dlg.close());
     dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); });
   }
