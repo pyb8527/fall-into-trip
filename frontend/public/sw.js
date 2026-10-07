@@ -90,6 +90,13 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  /* 소개 페이지(/info)는 앱이 아니라 따로 선 한 장입니다. 아래 화면 규칙에
+     걸리면 그 html 이 앱의 껍데기(/index.html) 자리에 담겨, 인터넷이 끊겼을
+     때 앱 대신 소개 페이지가 뜹니다. 손대지 않고 그대로 받게 둡니다. */
+  if (url.pathname === '/info' || url.pathname.startsWith('/info/')) {
+    return;
+  }
+
   if (hashed(url)) {
     /* 담아 둔 것이 있으면 그것부터. 없으면 받아 와서 담아 둡니다. */
     event.respondWith(
