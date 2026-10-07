@@ -23,6 +23,9 @@
 }
 
 :root {
+  /* 앱에 다크 모드가 없어 소개 페이지도 늘 밝게 둡니다. 어두운 칸(첫 화면 · 3D · 끝)은
+     밝기와 상관없이 원래 어둡습니다. */
+  color-scheme: light;
   --violet: #6D5BF6;
   --violet-ink: #5644E0;
   --violet-soft: #EFEDFF;
@@ -44,42 +47,6 @@
   --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
   --ease: cubic-bezier(.2, .75, .2, 1);
   --spring: cubic-bezier(.34, 1.56, .64, 1);
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    color-scheme: dark;
-    --violet: #8C7DFF;
-    --violet-ink: #A99EFF;
-    --violet-soft: #241F43;
-    --paper: #100F17;
-    --tint: #16141F;
-    --card: #1D1A28;
-    --ink: #EFEEF6;
-    --muted: #A6A3B8;
-    --faint: #7D7A90;
-    --line: #2B2839;
-    --street: rgba(140, 125, 255, .08);
-    --bezel: #050408;
-    --shadow: 0 32px 64px -30px rgba(0, 0, 0, .75), 0 14px 28px -18px rgba(0, 0, 0, .6);
-    --float: 0 18px 40px -18px rgba(0, 0, 0, .7), 0 2px 6px rgba(0, 0, 0, .3);
-  }
-}
-:root[data-theme="dark"] {
-  color-scheme: dark;
-  --violet: #8C7DFF;
-  --violet-ink: #A99EFF;
-  --violet-soft: #241F43;
-  --paper: #100F17;
-  --tint: #16141F;
-  --card: #1D1A28;
-  --ink: #EFEEF6;
-  --muted: #A6A3B8;
-  --faint: #7D7A90;
-  --line: #2B2839;
-  --street: rgba(140, 125, 255, .08);
-  --bezel: #050408;
-  --shadow: 0 32px 64px -30px rgba(0, 0, 0, .75), 0 14px 28px -18px rgba(0, 0, 0, .6);
-  --float: 0 18px 40px -18px rgba(0, 0, 0, .7), 0 2px 6px rgba(0, 0, 0, .3);
 }
 
 * { box-sizing: border-box; }
