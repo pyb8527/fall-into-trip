@@ -6,7 +6,9 @@ import net.weeniebeenie.fit.account.domain.User;
 import net.weeniebeenie.fit.account.domain.UserRepository;
 import net.weeniebeenie.fit.account.infrastructure.security.AuthPrincipal;
 import net.weeniebeenie.fit.shared.error.ApiException;
+import net.weeniebeenie.fit.safety.application.BlockService;
 import net.weeniebeenie.fit.support.audit.AuditService;
+import net.weeniebeenie.fit.support.moderation.BadWords;
 import net.weeniebeenie.fit.tip.domain.PlaceTip;
 import net.weeniebeenie.fit.tip.domain.PlaceTipRepository;
 import net.weeniebeenie.fit.tip.domain.PlaceTipView;
@@ -26,6 +28,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 다녀온 사람이 남기는 한 줄.
@@ -60,12 +63,24 @@ public class TipService {
     private final TipReportRepository reports;
     private final UserRepository users;
     private final AuditService audit;
+    /* 막은 사이의 한 줄을 거릅니다. */
+    private final BlockService blocks;
 
     @Transactional(readOnly = true)
     public List<Card> listOf(String placeId, String meId) {
+        /*
+          막은 사이의 한 줄은 뺍니다 — 내가 막은 사람과 나를 막은 사람 둘 다.
+
+          <p>장소 위의 수(「팁 3」)와 별점은 그대로 둡니다. 그것은 글이 아니라
+          셈이고, 사람마다 다르게 세면 같은 장소의 수가 보는 사람마다 달라집니다.
+        */
+        Set<String> apart = blocks.hiddenFor(meId);
         List<Card> out = new ArrayList<>();
         for (PlaceTip tip : tips.findAllByPlaceIdAndHiddenFalseAndCreatedAtAfterOrderByCreatedAtDesc(
                 placeId, Instant.now().minus(FRESH))) {
+            if (apart.contains(tip.getUserId())) {
+                continue;
+            }
             out.add(cardOf(tip, meId));
         }
         return out;
@@ -144,6 +159,7 @@ public class TipService {
         if (clean.length() > MAX_LENGTH) {
             throw ApiException.badRequest("한 줄 팁은 " + MAX_LENGTH + "자까지예요.");
         }
+        BadWords.check(clean);
         if (tips.countByUserIdAndPlaceIdAndCreatedAtAfter(
                 me.id(), placeId, Instant.now().minus(Duration.ofDays(1))) >= MAX_PER_DAY) {
             throw ApiException.badRequest("같은 곳에는 하루 " + MAX_PER_DAY + "번까지 남길 수 있어요.");
@@ -200,6 +216,7 @@ public class TipService {
         if (clean.length() > MAX_LENGTH) {
             throw ApiException.badRequest("한 줄 팁은 " + MAX_LENGTH + "자까지예요.");
         }
+        BadWords.check(clean);
 
         tip.setText(clean);
         /* 별을 떼는 것도 고치는 일입니다. 보낸 대로 넣습니다 — 비어 있으면
@@ -270,7 +287,7 @@ public class TipService {
 
     public Card cardOf(PlaceTip tip, String meId) {
         return new Card(tip.getId(), tip.getText(), tip.getStars(), nameOf(tip.getUserId()),
-                tip.getUserId().equals(meId), tip.getCreatedAt(), tip.getEditedAt());
+                tip.getUserId().equals(meId), tip.getCreatedAt(), tip.getEditedAt(), tip.getUserId());
     }
 
     public String nameOf(String userId) {
@@ -283,9 +300,11 @@ public class TipService {
      * @param editedAt 고친 때. <b>비어 있으면 안 고친 것입니다.</b> 「지금 대기
      *                 40분」은 언제 적힌 것인지가 내용만큼 중요해서, 처음 쓴
      *                 때와 함께 냅니다
+     * @param authorId 남긴 사람. 판에서 「이 사람 차단」을 걸 자리입니다 — 이름만으로는
+     *                 누구를 막는지 가릴 수 없습니다. 댓글 쪽도 같은 값을 냅니다
      */
     public record Card(String id, String text, Integer stars, String authorName,
-                       boolean mine, Instant createdAt, Instant editedAt) {
+                       boolean mine, Instant createdAt, Instant editedAt, String authorId) {
     }
 
     /**

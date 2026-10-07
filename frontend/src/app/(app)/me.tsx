@@ -15,6 +15,7 @@ import { glyphOf } from '@/constants/place-icons';
 import { formatInstant, formatNights, formatSpan, todayIso } from '@/lib/countdown';
 import { money } from '@/lib/money';
 import { Colors, Radius, Spacing, Tap, Type } from '@/constants/theme';
+import { BlockDialog } from '@/components/block-dialog';
 import { FacePicker } from '@/components/face-picker';
 import { ProfileFace } from '@/components/profile-face';
 import { markOf } from '@/constants/user-marks';
@@ -107,6 +108,18 @@ export default function Me() {
 
   const [lane, setLane] = useState<Lane>('trips');
   const [editing, setEditing] = useState(false);
+  /*
+    남의 페이지에서 하는 일 — 신고와 차단.
+
+    <p>⋯ 하나로 접어 둡니다. 남의 페이지에 빨간 단추가 서 있으면 그 사람을
+    처음 보러 온 자리가 신고하러 온 자리처럼 보입니다.
+  */
+  const [acting, setActing] = useState(false);
+  const [reporting, setReporting] = useState(false);
+  const [blocking, setBlocking] = useState<{ id: string; name: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [said, setSaid] = useState<string | null>(null);
+  const [failed, setFailed] = useState<string | null>(null);
   /* 달력에서 누른 날. 그날 장소와 쓴 돈을 달력 아래에 그립니다. */
   const [picked, setPicked] = useState<string | null>(null);
   const me = profile.data;
@@ -120,6 +133,31 @@ export default function Me() {
     <p>{@code /api/trips} 가 여행마다 날짜와 모임 이름을 이미 돌려줍니다.
     달력을 위해 새로 받는 것이 없습니다.
   */
+  async function report(id: string) {
+    setFailed(null);
+    setBusy(true);
+    try {
+      await api.post(`/api/users/${encodeURIComponent(id)}/report`, { reason: '' });
+      setSaid('신고했어요. 운영자가 확인해요.');
+    } catch (e) {
+      setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /* 푸는 것은 묻지 않습니다. 되돌릴 수 있는 일이고, 다시 막는 길이 바로 옆에 있습니다. */
+  async function unblock(id: string) {
+    setFailed(null);
+    try {
+      await api.delete(`/api/users/${encodeURIComponent(id)}/block`);
+      setSaid(null);
+      profile.reload();
+    } catch (e) {
+      setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
+    }
+  }
+
   const trips = useAsync<{ trips: TripSummary[] }>(
     (signal) => (whose ? Promise.resolve({ trips: [] }) : api.get('/api/trips', signal)),
     [whose],
@@ -188,8 +226,25 @@ export default function Me() {
             </Grow>
             {me.mine ? (
               <Button label="프로필 편집" variant="secondary" compact onPress={() => setEditing(true)} />
+            ) : user ? (
+              <IconButton
+                name="more-horizontal"
+                label={`${me.name} 님 신고 · 차단`}
+                bare
+                onPress={() => setActing(true)}
+              />
             ) : null}
           </Row>
+
+          {/* 내가 막은 사람이면 그렇다고 적습니다. 소개와 숫자가 비어 있는
+              까닭을 모르면 그 사람이 다 지운 줄 압니다. */}
+          {me.blocked ? (
+            <Caption tone="secondary">
+              차단한 사람이에요. 서로의 글이 안 보여요. 함께 쓰던 여행과 모임은 그대로예요.
+            </Caption>
+          ) : null}
+          {failed ? <ErrorNote message={failed} /> : null}
+          {said ? <Caption tone="secondary">{said}</Caption> : null}
 
           {/*
             해 온 것.
@@ -326,6 +381,68 @@ export default function Me() {
                 />
               ) : null}
               <Caption tone="muted">FIT {Constants.expoConfig?.version ?? ''}</Caption>
+            </>
+          ) : null}
+
+          {!me.mine ? (
+            <>
+              <BottomSheet visible={acting} title={me.name} onClose={() => setActing(false)}>
+                <ListRow
+                  left={<Icon name="flag" tone="secondary" />}
+                  title="신고"
+                  subtitle="이름 · 한 줄 소개 · 얼굴 사진"
+                  onPress={() => {
+                    setActing(false);
+                    setReporting(true);
+                  }}
+                />
+                {me.blocked ? (
+                  <ListRow
+                    left={<Icon name="user-minus" tone="secondary" />}
+                    title="차단 풀기"
+                    last
+                    onPress={() => {
+                      setActing(false);
+                      unblock(me.id);
+                    }}
+                  />
+                ) : (
+                  <ListRow
+                    left={<Icon name="user-minus" tone="secondary" />}
+                    title="차단"
+                    last
+                    onPress={() => {
+                      setActing(false);
+                      setBlocking({ id: me.id, name: me.name });
+                    }}
+                  />
+                )}
+              </BottomSheet>
+
+              <ConfirmDialog
+                visible={reporting}
+                title={`${me.name} 님의 프로필을 신고할까요?`}
+                message="여러 사람이 신고하면 운영자가 확인할 때까지 한 줄 소개와 사진이 감춰져요."
+                confirmLabel="신고"
+                danger
+                busy={busy}
+                onCancel={() => setReporting(false)}
+                onConfirm={() => {
+                  setReporting(false);
+                  report(me.id);
+                }}
+              />
+
+              <BlockDialog
+                person={blocking}
+                onCancel={() => setBlocking(null)}
+                onDone={() => {
+                  setBlocking(null);
+                  setSaid(null);
+                  profile.reload();
+                }}
+                onFailed={setFailed}
+              />
             </>
           ) : null}
 

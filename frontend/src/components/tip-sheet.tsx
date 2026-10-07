@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import { api, ApiError, UNEXPECTED } from '@/api/client';
 import type { OurStars, Tip } from '@/api/types';
 import { useAuth } from '@/auth/auth-provider';
+import { BlockDialog } from '@/components/block-dialog';
 import { Colors, Gutter, Spacing } from '@/constants/theme';
 import {
   Band,
@@ -56,6 +57,8 @@ export function TipSheet({
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
   const [reporting, setReporting] = useState<Tip | null>(null);
+  /* 막으려는 사람. 막으면 그 사람의 한 줄이 이 판에서 빠집니다(서버가 거릅니다). */
+  const [blocking, setBlocking] = useState<{ id: string; name: string } | null>(null);
   /**
    * 고치는 중인 내 한 줄. 비어 있으면 새로 남기는 것입니다.
    *
@@ -197,12 +200,22 @@ export function TipSheet({
             ) : user ? (
               /* 댓글 목록과 같은 모양입니다. 한쪽은 글자 단추, 한쪽은
                  깃발이면 같은 일을 두 모양으로 하는 셈입니다. */
-              <IconButton
-                name="flag"
-                label="이 한 줄 신고"
-                bare
-                onPress={() => setReporting(tip)}
-              />
+              <Row gap={Spacing.s1}>
+                <IconButton
+                  name="flag"
+                  label="이 한 줄 신고"
+                  bare
+                  onPress={() => setReporting(tip)}
+                />
+                {tip.authorId ? (
+                  <IconButton
+                    name="user-minus"
+                    label="이 사람 차단"
+                    bare
+                    onPress={() => setBlocking({ id: tip.authorId!, name: tip.authorName })}
+                  />
+                ) : null}
+              </Row>
             ) : null}
           </Split>
         </View>
@@ -296,6 +309,16 @@ export function TipSheet({
             run(() => api.post(`/api/tips/${target.id}/report`, {}));
           }
         }}
+      />
+
+      <BlockDialog
+        person={blocking}
+        onCancel={() => setBlocking(null)}
+        onDone={() => {
+          setBlocking(null);
+          run(async () => undefined);
+        }}
+        onFailed={setFailed}
       />
     </BottomSheet>
   );

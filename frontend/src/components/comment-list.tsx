@@ -18,10 +18,12 @@ import {
   Field,
   IconButton,
   Loading,
+  Row,
   Split,
   Subtitle,
 } from '@/ui';
 import { formatInstant } from '@/lib/countdown';
+import { BlockDialog } from '@/components/block-dialog';
 import { ProfileFace } from '@/components/profile-face';
 import { faceOf } from '@/constants/user-marks';
 
@@ -124,6 +126,8 @@ export function CommentList({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reporting, setReporting] = useState<Comment | null>(null);
+  /* 막으려는 사람. 막으면 그 사람의 댓글이 목록에서 빠집니다(서버가 거릅니다). */
+  const [blocking, setBlocking] = useState<{ id: string; name: string } | null>(null);
 
   /**
    * 서버에 한 번 다녀옵니다.
@@ -204,12 +208,26 @@ export function CommentList({
                 onPress={() => run(() => api.delete(`/api/comments/${comment.id}`))}
               />
             ) : user ? (
-              <IconButton
-                name="flag"
-                label="이 댓글 신고"
-                bare
-                onPress={() => setReporting(comment)}
-              />
+              /* 신고 옆에 차단을 둡니다. 신고는 운영자에게 맡기는 일이고
+                 차단은 지금 내 화면에서 치우는 일이라, 둘 다 있어야 합니다. */
+              <Row gap={Spacing.s1}>
+                <IconButton
+                  name="flag"
+                  label="이 댓글 신고"
+                  bare
+                  onPress={() => setReporting(comment)}
+                />
+                {comment.authorId ? (
+                  <IconButton
+                    name="user-minus"
+                    label="이 사람 차단"
+                    bare
+                    onPress={() =>
+                      setBlocking({ id: comment.authorId!, name: comment.authorName })
+                    }
+                  />
+                ) : null}
+              </Row>
             ) : null
           }
         />
@@ -266,6 +284,16 @@ export function CommentList({
             run(() => api.post(`/api/comments/${target.id}/report`, {}));
           }
         }}
+      />
+
+      <BlockDialog
+        person={blocking}
+        onCancel={() => setBlocking(null)}
+        onDone={() => {
+          setBlocking(null);
+          run(async () => undefined);
+        }}
+        onFailed={setError}
       />
     </View>
   );

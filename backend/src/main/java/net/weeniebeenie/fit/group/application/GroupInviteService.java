@@ -5,6 +5,7 @@ import net.weeniebeenie.fit.account.domain.User;
 import net.weeniebeenie.fit.account.domain.UserRepository;
 import net.weeniebeenie.fit.account.infrastructure.security.AuthPrincipal;
 import net.weeniebeenie.fit.group.domain.*;
+import net.weeniebeenie.fit.safety.application.BlockService;
 import net.weeniebeenie.fit.shared.domain.Ids;
 import net.weeniebeenie.fit.shared.error.ApiException;
 import net.weeniebeenie.fit.support.audit.AuditService;
@@ -43,6 +44,8 @@ public class GroupInviteService {
     private final UserRepository users;
     private final GroupService service;
     private final AuditService audit;
+    /* 링크를 만든 사람이 나를 막았으면 그 링크로는 못 들어옵니다. */
+    private final BlockService blocks;
 
     /**
      * 링크를 만듭니다.
@@ -110,6 +113,25 @@ public class GroupInviteService {
            남의 몫이 하나 줄어들 이유가 없습니다. */
         if (members.findByIdGroupIdAndIdUserId(invite.getGroupId(), me.id()).isPresent()) {
             return invite.getGroupId();
+        }
+
+        /*
+          링크를 만든 사람이 나를 막았으면 들어오지 못합니다.
+
+          <p>링크는 건네지는 것이라 막힌 사람 손에 들어갈 수 있습니다 — 단톡방에
+          올린 링크가 그렇습니다. 막은 사람이 그 모임에서 다시 마주치지 않게
+          여기서 돌려보냅니다.
+
+          <p>말은 「막혔다」고 하지 않습니다. 조용히 막는 것이 약속이라
+          (BlockService), 링크가 안 맞는다는 말만 하고 다른 사람에게 받아
+          보라고 합니다. 모임의 다른 사람이 만든 링크는 막지 않습니다 — 그
+          사람은 막지 않았습니다.
+
+          <p>이미 든 사람은 위에서 지나갔습니다. 함께 쓰던 모임과 여행은 막은
+          뒤에도 그대로입니다.
+        */
+        if (blocks.hasBlocked(invite.getCreatedBy(), me.id())) {
+            throw ApiException.forbidden("이 링크로는 들어갈 수 없어요. 모임의 다른 사람에게 링크를 받아 주세요.");
         }
 
         service.requireRoom(invite.getGroupId());

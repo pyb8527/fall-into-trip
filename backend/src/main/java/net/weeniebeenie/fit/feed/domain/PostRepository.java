@@ -181,6 +181,19 @@ public interface PostRepository extends JpaRepository<Post, String> {
     @Query("SELECT p.id FROM Post p WHERE p.groupId = :groupId")
     List<String> idsOfGroup(@Param("groupId") String groupId);
 
-    /** 운영자가 봐야 할 것 — 감춰진 글. */
-    Page<Post> findAllByHiddenTrueOrderByCreatedAtDesc(Pageable pageable);
+    /**
+     * 운영자가 봐야 할 것 — 신고가 들어왔거나 그래서 감춰진 글.
+     *
+     * <p>감춰진 글만 내던 자리였습니다. 그런데 피드 글에는 신고가 없어서
+     * 감춰질 길이 없었고, 이제 신고가 생기면서 「들어왔지만 아직 보이는 것」도
+     * 운영자가 봐야 합니다 — 팁 쪽({@code PlaceTipRepository.findNeedingReview})과
+     * 같은 꼴입니다.
+     */
+    @Query("""
+           SELECT p FROM Post p
+           WHERE p.hidden = true
+              OR EXISTS (SELECT 1 FROM FeedReport r WHERE r.postId = p.id)
+           ORDER BY p.hidden DESC, p.createdAt DESC
+           """)
+    Page<Post> findNeedingReview(Pageable pageable);
 }

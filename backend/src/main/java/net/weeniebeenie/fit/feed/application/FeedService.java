@@ -8,6 +8,8 @@ import net.weeniebeenie.fit.account.infrastructure.security.AuthPrincipal;
 import net.weeniebeenie.fit.community.domain.CommentKind;
 import net.weeniebeenie.fit.community.domain.PostCommentRepository;
 import net.weeniebeenie.fit.feed.domain.Audience;
+import net.weeniebeenie.fit.feed.domain.FeedReport;
+import net.weeniebeenie.fit.feed.domain.FeedReportRepository;
 import net.weeniebeenie.fit.feed.domain.Post;
 import net.weeniebeenie.fit.feed.domain.PostPhoto;
 import net.weeniebeenie.fit.feed.domain.PostPhotoRepository;
@@ -15,8 +17,10 @@ import net.weeniebeenie.fit.feed.domain.PostRepository;
 import net.weeniebeenie.fit.group.application.GroupService;
 import net.weeniebeenie.fit.group.domain.GroupRole;
 import net.weeniebeenie.fit.photo.domain.PhotoRepository;
+import net.weeniebeenie.fit.safety.application.BlockService;
 import net.weeniebeenie.fit.shared.error.ApiException;
 import net.weeniebeenie.fit.support.audit.AuditService;
+import net.weeniebeenie.fit.support.moderation.BadWords;
 import net.weeniebeenie.fit.trip.domain.Day;
 import net.weeniebeenie.fit.trip.domain.DayRepository;
 import net.weeniebeenie.fit.trip.domain.Place;
@@ -133,6 +137,15 @@ public class FeedService {
     private static final int PAGE = 20;
 
     /**
+     * 이만큼 신고가 쌓이면 사람이 볼 때까지 감춥니다.
+     *
+     * <p>여행기 · 댓글 · 팁과 같은 수입니다. 「모두」로 열어 둔 글은 번호만
+     * 알면 누구나 보므로, 신고 없이 두면 문제되는 사진을 내릴 길이 운영자
+     * 손뿐입니다.
+     */
+    private static final long HIDE_AT_REPORTS = 3;
+
+    /**
      * 달력이 한 번에 물을 수 있는 날 수.
      *
      * <p>한 해 조금 넘게 둡니다 — 달력은 한 달씩 묻고, 연 단위로 보여 주는
@@ -160,6 +173,9 @@ public class FeedService {
     private final AuditService audit;
     /* 남의 피드를 걸러 낼 때 「함께 속한 모임」을 셉니다. */
     private final net.weeniebeenie.fit.group.domain.GroupMemberRepository members;
+    private final FeedReportRepository reports;
+    /* 막은 사람과 나를 막은 사람의 글을 거릅니다({@link Viewer#canRead}). */
+    private final BlockService blocks;
 
     /* ---------------------------------------------------------------- 읽기 */
 
@@ -378,6 +394,11 @@ public class FeedService {
         if (clean != null && clean.length() > MAX_TEXT) {
             throw ApiException.badRequest("글이 너무 길어요. " + MAX_TEXT + "자 아래로 적어 주세요.");
         }
+        /* 꼬리표도 봅니다. 글 아래 이름표로 서서 글만큼 남의 눈에 띕니다. */
+        BadWords.check(clean);
+        if (tags != null) {
+            tags.forEach(BadWords::check);
+        }
         List<String> pics = minePhotos(me, photoIds);
         if (clean == null && pics.isEmpty()) {
             throw ApiException.badRequest("사진을 고르거나 한 줄 적어 주세요.");
@@ -445,9 +466,11 @@ public class FeedService {
             if (clean != null && clean.length() > MAX_TEXT) {
                 throw ApiException.badRequest("글이 너무 길어요. " + MAX_TEXT + "자 아래로 적어 주세요.");
             }
+            BadWords.check(clean);
             post.setText(clean);
         }
         if (tags != null) {
+            tags.forEach(BadWords::check);
             post.setTags(cleanTags(tags));
         }
         if (placeId != null) {
@@ -499,18 +522,85 @@ public class FeedService {
      */
     @Transactional
     public void remove(AuthPrincipal me, String postId) {
-        Post post = mine(postId, me.id());
+        /*
+          운영자는 울타리를 거치지 않고 찾습니다.
+
+          <p>신고로 감춰진 글은 울타리({@link #visible})가 아무에게도 안 내주므로,
+          그 길로 찾으면 운영 화면에서 「지우기」를 눌러도 없다고 답합니다 —
+          지워야 할 글일수록 감춰져 있습니다. 모임 주인인지도 운영자에게는 안
+          묻습니다. 모임에 안 든 운영자가 물으면 그 자리가 404 를 던집니다.
+        */
+        boolean admin = me.role() == Role.ADMIN;
+        Post post = admin
+                ? posts.findById(postId).orElseThrow(() -> ApiException.notFound("글을 찾을 수 없어요."))
+                : mine(postId, me.id());
         boolean author = post.getAuthorId().equals(me.id());
-        boolean host = post.getGroupId() != null
+        boolean host = !author && !admin && post.getGroupId() != null
                 && groups.requireMember(post.getGroupId(), me.id()).getRole() == GroupRole.OWNER;
-        if (!author && !host && me.role() != Role.ADMIN) {
+        if (!author && !host && !admin) {
             throw ApiException.forbidden("내가 쓴 글만 지울 수 있어요.");
         }
 
         comments.deleteAllByPostId(postId);
         postPhotos.deleteAllByPostId(postId);
         posts.delete(post);
-        audit.log(me.id(), author ? "feed.remove" : "feed.remove.host", postId);
+        audit.log(me.id(), author ? "feed.remove" : host ? "feed.remove.host" : "feed.remove.admin", postId);
+    }
+
+    /* ---------------------------------------------------------------- 신고 */
+
+    /**
+     * 신고.
+     *
+     * <p>세 건이 쌓이면 사람이 볼 때까지 자동으로 감춥니다 — 여행기 · 댓글 ·
+     * 팁과 같은 규칙입니다. 지우지 않고 감추기만 하므로 운영자가 되돌릴 수
+     * 있습니다. 몇 사람이 짜면 멀쩡한 글도 내려가는데, 되살릴 수 없으면
+     * 신고가 곧 삭제가 됩니다.
+     *
+     * <p>볼 수 있는 글만 신고합니다({@link #mine}). 못 보는 글에 신고를 받으면
+     * 번호를 넣어 보는 것으로 어느 글이 있는지 가려낼 수 있습니다.
+     */
+    @Transactional
+    public void report(AuthPrincipal me, String postId, String reason) {
+        Post post = mine(postId, me.id());
+        if (post.getAuthorId().equals(me.id())) {
+            throw ApiException.badRequest("내 글은 신고할 수 없어요.");
+        }
+        if (reports.existsByPostIdAndUserId(postId, me.id())) {
+            throw ApiException.badRequest("이미 신고한 글이에요.");
+        }
+        reports.save(new FeedReport(postId, me.id(),
+                reason == null || reason.isBlank() ? null : reason.trim()));
+
+        if (reports.countByPostId(postId) >= HIDE_AT_REPORTS) {
+            post.setHidden(true);
+        }
+        audit.log(me.id(), "feed.report", postId);
+    }
+
+    /* ---------------------------------------------------------------- 운영 */
+
+    /** 운영자가 봐야 할 글 — 신고가 들어왔거나 그래서 감춰진 것. */
+    @Transactional(readOnly = true)
+    public Page<Post> needingReview(Pageable pageable) {
+        return posts.findNeedingReview(pageable);
+    }
+
+    public long reportCountOf(String postId) {
+        return reports.countByPostId(postId);
+    }
+
+    public String authorNameOf(Post post) {
+        return users.findById(post.getAuthorId()).map(User::getName).orElse("알 수 없음");
+    }
+
+    /** 운영자가 감추거나 다시 올립니다. */
+    @Transactional
+    public void setHidden(AuthPrincipal me, String postId, boolean hidden) {
+        Post post = posts.findById(postId)
+                .orElseThrow(() -> ApiException.notFound("글을 찾을 수 없어요."));
+        post.setHidden(hidden);
+        audit.log(me.id(), hidden ? "feed.hide" : "feed.unhide", postId);
     }
 
     /* ---------------------------------------------------------------- 울타리 */
@@ -598,6 +688,8 @@ public class FeedService {
         private final String id;
         private Set<String> myGroups;
         private Set<String> myMates;
+        /* 내가 막은 사람과 나를 막은 사람. 처음 물을 때 한 번만 셉니다. */
+        private Set<String> apart;
 
         Viewer(String id) {
             this(id, null);
@@ -612,8 +704,28 @@ public class FeedService {
             this.myGroups = myGroups;
         }
 
+        /**
+         * 막은 사이면 글쓴이가 무엇을 골랐든 안 보입니다.
+         *
+         * <p>{@link #visible} 에 넣지 않고 여기서 먼저 거릅니다. 그 셈은
+         * 「누가 볼 수 있게 열어 두었나」이고, 막음은 그와 따로 <b>보는 사람이
+         * 고른 것</b>입니다 — 한 셈에 섞으면 공개 범위를 고칠 때 막음을 함께
+         * 건드리게 됩니다. 지키는 자리는 여전히 이 한 곳이라, 목록 · 글 하나 ·
+         * 댓글 · 신고가 다 같이 막힙니다.
+         *
+         * <p>제 글이면 막음을 안 묻습니다 — 저를 막을 수는 없으므로, 내 피드와
+         * 달력은 한 번도 묻지 않고 지나갑니다.
+         */
         boolean canRead(Post post) {
-            return visible(post, id, this::inGroup, this::isMate);
+            return visible(post, id, this::inGroup, this::isMate)
+                    && (post.getAuthorId().equals(id) || !apart().contains(post.getAuthorId()));
+        }
+
+        private Set<String> apart() {
+            if (apart == null) {
+                apart = blocks.hiddenFor(id);
+            }
+            return apart;
         }
 
         private boolean inGroup(String groupId) {

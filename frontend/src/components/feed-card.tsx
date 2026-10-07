@@ -6,6 +6,7 @@ import { api, ApiError, UNEXPECTED } from '@/api/client';
 import type { FeedAudience, FeedPost } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
+import { BlockDialog } from '@/components/block-dialog';
 import { PhotoStrip } from '@/components/photo-strip';
 import { ProfileFace } from '@/components/profile-face';
 import { Spacing } from '@/constants/theme';
@@ -96,6 +97,25 @@ export function FeedCard({
   const [acting, setActing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
+  /* 남의 글에서 하는 두 가지 — 신고와 차단. 「모두」로 열어 둔 글은 모르는
+     사람도 보므로, 문제되는 글을 내릴 길이 글 옆에 있어야 합니다. */
+  const [reporting, setReporting] = useState(false);
+  const [blocking, setBlocking] = useState<{ id: string; name: string } | null>(null);
+  /* 신고가 들어갔다는 한 줄. 아무 말이 없으면 눌린 줄도 모릅니다. */
+  const [said, setSaid] = useState<string | null>(null);
+
+  async function report() {
+    setBusy(true);
+    setFailed(null);
+    try {
+      await api.post(`/api/feed/${encodeURIComponent(post.id)}/report`, { reason: '' });
+      setSaid('신고했어요. 운영자가 확인해요.');
+    } catch (e) {
+      setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function drop() {
     setBusy(true);
@@ -212,6 +232,7 @@ export function FeedCard({
       ) : null}
 
       {failed ? <ErrorNote message={failed} /> : null}
+      {said ? <Caption tone="secondary">{said}</Caption> : null}
 
       <Press
         onPress={() => setOpen(!open)}
@@ -239,6 +260,28 @@ export function FeedCard({
             }}
           />
         ) : null}
+        {/* 남의 글이면 신고와 차단이 먼저입니다. 지우기는 모임 주인만 되는
+            일이라(위 설명) 대개 막히고, 남의 글에서 사람이 찾는 것은 이 둘입니다. */}
+        {!post.mine && user ? (
+          <>
+            <ListRow
+              left={<Icon name="flag" tone="secondary" />}
+              title="신고"
+              onPress={() => {
+                setActing(false);
+                setReporting(true);
+              }}
+            />
+            <ListRow
+              left={<Icon name="user-minus" tone="secondary" />}
+              title="이 사람 차단"
+              onPress={() => {
+                setActing(false);
+                setBlocking({ id: post.authorId, name: post.authorName });
+              }}
+            />
+          </>
+        ) : null}
         <ListRow
           left={<Icon name="trash-2" tone="secondary" />}
           title="지우기"
@@ -249,6 +292,32 @@ export function FeedCard({
           }}
         />
       </BottomSheet>
+
+      <ConfirmDialog
+        visible={reporting}
+        title="이 글을 신고할까요?"
+        message="여러 사람이 신고하면 운영자가 확인할 때까지 자동으로 감춰져요."
+        confirmLabel="신고"
+        danger
+        busy={busy}
+        onCancel={() => setReporting(false)}
+        onConfirm={() => {
+          setReporting(false);
+          report();
+        }}
+      />
+
+      {/* 막으면 그 사람의 글이 목록에서 빠집니다. 글 하나만 서는 화면은 다시
+          읽을 것이 없어 돌려보냅니다 — 지웠을 때와 같은 갈래입니다. */}
+      <BlockDialog
+        person={blocking}
+        onCancel={() => setBlocking(null)}
+        onDone={() => {
+          setBlocking(null);
+          (onGone ?? onChanged)();
+        }}
+        onFailed={setFailed}
+      />
 
       <ConfirmDialog
         visible={dropping}

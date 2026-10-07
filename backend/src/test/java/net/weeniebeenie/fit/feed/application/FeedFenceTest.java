@@ -82,6 +82,9 @@ class FeedFenceTest {
     @Mock private UserRepository users;
     @Mock private AuditService audit;
     @Mock private GroupMemberRepository members;
+    /* 막음은 비어 있습니다 — 묻지 않은 목은 빈 집합을 돌려줍니다. 이 시험은
+       울타리를 보고, 막음은 http 시험(ugc-safety)이 봅니다. */
+    @Mock private net.weeniebeenie.fit.safety.application.BlockService blocks;
 
     @InjectMocks private FeedService feed;
 

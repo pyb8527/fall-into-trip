@@ -77,6 +77,8 @@ public class NewsService {
     private final TripAccessPolicy access;
     private final net.weeniebeenie.fit.group.domain.GroupMemberRepository members;
     private final UserRepository users;
+    /* 막은 사이의 사람이 내 글에 한 일은 안 싣습니다. */
+    private final net.weeniebeenie.fit.safety.application.BlockService blocks;
 
     /**
      * 소식 한 줄.
@@ -201,6 +203,22 @@ public class NewsService {
                     r.postId(), r.postTitle(),
                     one ? quoted(r.postTitle()) + "에 댓글을 남겼어요."
                         : quoted(r.postTitle()) + "에 " + r.people() + "명이 댓글을 남겼어요."));
+        }
+
+        /*
+          막은 사이의 사람이 <b>글</b>에서 한 일은 뺍니다 — 피드 글 · 댓글 · 추천.
+
+          <p>글 목록에서는 이미 서로 안 보이는데 소식함에 「○○ 님이 댓글을
+          남겼어요」가 뜨면 막은 뜻이 없습니다. 여행 안에서 한 일(장소 · 후보 ·
+          안내판 · 투표)과 모임에 들어온 일은 둡니다 — 함께 쓰는 여행과 모임은
+          막은 뒤에도 그대로라(BlockService), 그 소식이 빠지면 일정이 왜
+          바뀌었는지 모르게 됩니다. 여럿이 한 줄로 접힌 것은 사람을 안 적으므로
+          그대로입니다.
+        */
+        Set<String> apart = blocks.hiddenFor(me.id());
+        if (!apart.isEmpty()) {
+            rows.removeIf(i -> i.actorId() != null && apart.contains(i.actorId())
+                    && (i.kind().startsWith("feed.") || i.kind().startsWith("post.")));
         }
 
         rows.sort(Comparator.comparing(Item::at).reversed());

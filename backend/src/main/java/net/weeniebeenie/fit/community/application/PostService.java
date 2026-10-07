@@ -10,8 +10,10 @@ import net.weeniebeenie.fit.account.domain.User;
 import net.weeniebeenie.fit.account.domain.UserRepository;
 import net.weeniebeenie.fit.account.infrastructure.security.AuthPrincipal;
 import net.weeniebeenie.fit.community.domain.*;
+import net.weeniebeenie.fit.safety.application.BlockService;
 import net.weeniebeenie.fit.shared.error.ApiException;
 import net.weeniebeenie.fit.support.audit.AuditService;
+import net.weeniebeenie.fit.support.moderation.BadWords;
 import net.weeniebeenie.fit.trip.domain.*;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -91,6 +93,8 @@ public class PostService {
 
     private final AuditService audit;
     private final ObjectMapper mapper;
+    /* 막은 사이의 글을 목록과 글 보기에서 거릅니다. */
+    private final BlockService blocks;
 
     /* ------------------------------------------------------------ 올리기 */
 
@@ -118,6 +122,17 @@ public class PostService {
         }
 
         String clean = title == null || title.isBlank() ? trip.getTitle() : title.trim();
+        /*
+          둘러보기에 서는 글입니다 — 아무나 봅니다.
+
+          <p>제목은 안 적으면 여행 이름이 그대로 올라옵니다. 여행 이름은 저
+          혼자나 모임 안에서 보던 것이라 거른 적이 없으므로, 내놓는 이 자리에서
+          봅니다. 꼬리표도 카드에 서므로 함께 봅니다.
+        */
+        BadWords.check(clean, summary);
+        if (tags != null) {
+            tags.forEach(BadWords::check);
+        }
         /*
           지역을 안 골랐으면 좌표에서 꼽습니다.
 
@@ -759,7 +774,42 @@ public class PostService {
                 && !post.getAuthorId().equals(viewerId)) {
             throw ApiException.notFound("글을 찾을 수 없어요.");
         }
+        /*
+          막은 사이 — 어느 쪽이 막았든 없는 글입니다.
+
+          <p>주소를 아는 사람만(LINK)인 글도 막습니다. 막은 사람이 바라는 것은
+          「그 사람과 서로 안 보이는 것」이고, 주소를 받아 들어오는 길도 거기
+          듭니다. 신고 · 댓글 · 추천도 이 길을 거치므로 함께 막힙니다.
+        */
+        if (blocks.between(viewerId, post.getAuthorId())) {
+            throw ApiException.notFound("글을 찾을 수 없어요.");
+        }
         return post;
+    }
+
+    /**
+     * 막은 사이의 글을 목록에서 뺍니다.
+     *
+     * <h3>왜 질의에서 안 거르나</h3>
+     *
+     * <p>둘러보기 목록의 질의가 정렬마다 따로 있습니다(인기 · 새 글 · 추천 ·
+     * 가져간 수). 넷에 같은 조건을 적으면 하나를 고칠 때 셋이 남고, 질의가
+     * 하나 늘 때 빼먹으면 조용히 새어 나갑니다 — 피드가 울타리를 한 곳
+     * ({@code FeedService.visible})에 둔 것과 같은 까닭입니다.
+     *
+     * <p>값은 쪽 수입니다. 스무 개를 받아 열아홉 개를 그리는 쪽이 생깁니다.
+     * 사람이 막는 수는 많아야 몇이고 그 사람의 글이 한 쪽에 몰려 있을 일도
+     * 드물어서, 그 값이 질의 넷을 갈라 두는 값보다 작습니다.
+     *
+     * @param viewerId 보는 사람. 손님이면 거를 것이 없습니다
+     */
+    @Transactional(readOnly = true)
+    public List<TripPost> withoutBlocked(List<TripPost> found, String viewerId) {
+        Set<String> apart = blocks.hiddenFor(viewerId);
+        if (apart.isEmpty()) {
+            return found;
+        }
+        return found.stream().filter(p -> !apart.contains(p.getAuthorId())).toList();
     }
 
     /** 하루에 한 번만 셉니다. 새로고침으로는 늘지 않습니다. */
@@ -947,6 +997,12 @@ public class PostService {
                          String region, List<String> tags, Boolean feedback,
                          String coverPhotoId, Visibility visibility) {
         TripPost post = mine(me, postId);
+        /* 올릴 때와 같은 거름입니다. 고치기가 빠져 있으면 멀쩡히 올린 뒤
+           제목만 바꾸는 것으로 지나갑니다. */
+        BadWords.check(title, summary);
+        if (tags != null) {
+            tags.forEach(BadWords::check);
+        }
 
         if (title != null && !title.isBlank()) {
             post.setTitle(title.trim());

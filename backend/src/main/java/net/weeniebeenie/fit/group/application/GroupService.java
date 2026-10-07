@@ -9,6 +9,7 @@ import net.weeniebeenie.fit.feed.domain.PostRepository;
 import net.weeniebeenie.fit.group.domain.*;
 import net.weeniebeenie.fit.shared.error.ApiException;
 import net.weeniebeenie.fit.support.audit.AuditService;
+import net.weeniebeenie.fit.support.moderation.BadWords;
 import net.weeniebeenie.fit.trip.domain.Trip;
 import net.weeniebeenie.fit.trip.domain.TripRepository;
 import org.springframework.stereotype.Service;
@@ -73,6 +74,9 @@ public class GroupService {
         if (clean.length() > 40) {
             throw ApiException.badRequest("모임 이름이 너무 길어요. 40자 아래로 적어 주세요.");
         }
+        /* 모임 이름과 소개는 초대 링크 미리보기에 섭니다 — 로그인 없이 링크만
+           받은 사람도 봅니다. */
+        BadWords.check(clean, about);
         if (members.countByIdUserId(me.id()) >= MAX_PER_USER) {
             throw ApiException.badRequest("속할 수 있는 모임 수를 넘었어요.");
         }
@@ -139,9 +143,11 @@ public class GroupService {
             if (clean.isEmpty() || clean.length() > 40) {
                 throw ApiException.badRequest("모임 이름은 1자에서 40자까지예요.");
             }
+            BadWords.check(clean);
             group.setName(clean);
         }
         if (about != null) {
+            BadWords.check(about);
             group.setAbout(trimmed(about, 200));
         }
         if (emoji != null) {

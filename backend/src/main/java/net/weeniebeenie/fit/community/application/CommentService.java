@@ -9,7 +9,9 @@ import net.weeniebeenie.fit.account.domain.UserRepository;
 import net.weeniebeenie.fit.account.infrastructure.security.AuthPrincipal;
 import net.weeniebeenie.fit.community.domain.*;
 import net.weeniebeenie.fit.shared.error.ApiException;
+import net.weeniebeenie.fit.safety.application.BlockService;
 import net.weeniebeenie.fit.support.audit.AuditService;
+import net.weeniebeenie.fit.support.moderation.BadWords;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -20,6 +22,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 올라온 일정에 달리는 댓글.
@@ -72,6 +75,8 @@ public class CommentService {
     private final AuditService audit;
     /* 여행기의 사본을 풀어 가리킨 장소 이름을 꺼낼 때만 씁니다 — mine(). */
     private final ObjectMapper mapper;
+    /* 막은 사이의 댓글을 거르고, 막은 사람의 글에 댓글을 못 달게 합니다. */
+    private final BlockService blocks;
 
     /** 여행기 댓글. */
     @Transactional(readOnly = true)
@@ -86,8 +91,18 @@ public class CommentService {
     }
 
     private List<Card> listOf(String postId, CommentKind kind, String meId) {
+        /*
+          막은 사이의 댓글은 뺍니다 — 내가 막은 사람과 나를 막은 사람 둘 다.
+
+          <p>질의에서 거르지 않고 받은 뒤에 거릅니다. 댓글은 쪽을 나누지 않는
+          목록이라 받아 놓고 버려도 수가 어긋날 자리가 없고, 막은 사람은 많아야
+          몇이라 집합 하나면 됩니다.
+        */
+        Set<String> apart = blocks.hiddenFor(meId);
         List<PostComment> found =
-                comments.findAllByPostIdAndKindAndHiddenFalseOrderByCreatedAtAsc(postId, kind);
+                comments.findAllByPostIdAndKindAndHiddenFalseOrderByCreatedAtAsc(postId, kind).stream()
+                        .filter(c -> !apart.contains(c.getUserId()))
+                        .toList();
         /*
           남긴 사람을 한 번에 받습니다.
 
@@ -109,6 +124,9 @@ public class CommentService {
                            Integer dayIndex, Integer placeIndex) {
         TripPost post = posts.findById(postId)
                 .filter(p -> !p.isHidden())
+                /* 막은 사이면 글이 안 보이므로 댓글 자리도 없습니다. 글 보기와
+                   같은 404 입니다 — 따로 말하면 막혔다는 알림이 됩니다. */
+                .filter(p -> !blocks.between(me.id(), p.getAuthorId()))
                 .orElseThrow(() -> ApiException.notFound("글을 찾을 수 없어요."));
         if (!post.isFeedback()) {
             throw ApiException.badRequest("이 글은 의견을 받지 않아요.");
@@ -121,6 +139,7 @@ public class CommentService {
         if (clean.length() > MAX_LENGTH) {
             throw ApiException.badRequest("댓글은 " + MAX_LENGTH + "자까지예요.");
         }
+        BadWords.check(clean);
         if (comments.countByUserIdAndPostId(me.id(), postId) >= MAX_PER_POST) {
             throw ApiException.badRequest("한 글에는 " + MAX_PER_POST + "개까지 남길 수 있어요.");
         }
@@ -156,6 +175,7 @@ public class CommentService {
         if (clean.length() > MAX_LENGTH) {
             throw ApiException.badRequest("댓글은 " + MAX_LENGTH + "자까지예요.");
         }
+        BadWords.check(clean);
         if (comments.countByUserIdAndPostId(me.id(), postId) >= MAX_PER_POST) {
             throw ApiException.badRequest("한 글에는 " + MAX_PER_POST + "개까지 남길 수 있어요.");
         }
@@ -204,6 +224,7 @@ public class CommentService {
         if (clean.length() > MAX_LENGTH) {
             throw ApiException.badRequest("댓글은 " + MAX_LENGTH + "자까지예요.");
         }
+        BadWords.check(clean);
 
         comment.setText(clean);
         comment.setEditedAt(Instant.now());

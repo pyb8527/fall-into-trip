@@ -16,6 +16,7 @@ import {
   useComments,
 } from '@/components/comment-list';
 import type { MapPlace } from '@/components/map-types';
+import { BlockDialog } from '@/components/block-dialog';
 import { PhotoStrip } from '@/components/photo-strip';
 import { PlaceDetailSheet } from '@/components/place-detail-sheet';
 import { StoryBlock } from '@/components/story-block';
@@ -114,6 +115,8 @@ export default function Post() {
   const [reporting, setReporting] = useState(false);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  /* 막으려는 사람 — 이 글을 쓴 사람입니다. */
+  const [blocking, setBlocking] = useState<{ id: string; name: string } | null>(null);
   const { undo, show: showUndo, hide: hideUndo } = useUndo();
   /** 펼쳐 둔 날. 첫날만 열어 둡니다 — 다 접히면 제목만 늘어선 화면이 됩니다. */
   const [opened, setOpened] = useState<Set<number>>(() => new Set([0]));
@@ -698,16 +701,32 @@ export default function Post() {
           />
         </>
       ) : (
-        <ListRow
-          left={<Icon name="flag" size={20} tone="muted" />}
-          title={
-            <Body strong tone="secondary">
-              신고
-            </Body>
-          }
-          last
-          onPress={() => (user ? setReporting(true) : needLogin('report'))}
-        />
+        <>
+          <ListRow
+            left={<Icon name="flag" size={20} tone="muted" />}
+            title={
+              <Body strong tone="secondary">
+                신고
+              </Body>
+            }
+            last={!user || !data.authorId}
+            onPress={() => (user ? setReporting(true) : needLogin('report'))}
+          />
+          {/* 차단은 로그인한 사람만 봅니다. 손님은 막을 「나」가 없습니다 —
+              신고처럼 가입으로 이어 주지 않는 까닭입니다. */}
+          {user && data.authorId ? (
+            <ListRow
+              left={<Icon name="user-minus" size={20} tone="muted" />}
+              title={
+                <Body strong tone="secondary">
+                  이 사람 차단
+                </Body>
+              }
+              last
+              onPress={() => setBlocking({ id: data.authorId!, name: data.authorName })}
+            />
+          ) : null}
+        </>
       )}
       </MapAside>
 
@@ -896,6 +915,23 @@ export default function Post() {
       />
 
       <SignUpGate intent={gate} onClose={() => setGate(null)} />
+
+      {/* 막으면 이 글은 서버가 없다고 답합니다. 다시 읽어 「글을 찾을 수
+          없어요」를 띄우지 않고 왔던 곳으로 돌려보냅니다 — 막은 사람에게 그건
+          오류가 아니라 제가 한 일입니다. */}
+      <BlockDialog
+        person={blocking}
+        onCancel={() => setBlocking(null)}
+        onDone={() => {
+          setBlocking(null);
+          if (router.canGoBack()) {
+            router.back();
+          } else {
+            router.replace('/community');
+          }
+        }}
+        onFailed={setFailed}
+      />
 
       <ConfirmDialog
         visible={reporting}

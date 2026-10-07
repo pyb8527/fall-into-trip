@@ -63,7 +63,10 @@ public class PostController {
         Page<TripPost> found =
                 posts.list(sort, region, tag, days, q, who, PageRequest.of(Math.max(0, page), take));
         Map<String, Object> out = new LinkedHashMap<>();
-        out.put("posts", posts.cardsOf(found.getContent(), me == null ? null : me.id()));
+        /* 막은 사이의 글을 뺍니다. 쪽 수는 DB 가 센 그대로 둡니다 — 거르는
+           까닭과 값은 PostService.withoutBlocked 에 있습니다. */
+        String viewer = me == null ? null : me.id();
+        out.put("posts", posts.cardsOf(posts.withoutBlocked(found.getContent(), viewer), viewer));
         out.put("page", found.getNumber());
         out.put("totalPages", found.getTotalPages());
         out.put("total", found.getTotalElements());
@@ -114,7 +117,7 @@ public class PostController {
                                      @RequestParam(name = "page", defaultValue = "0") int page) {
         Page<TripPost> found = posts.liked(me, PageRequest.of(Math.max(0, page), SIZE));
         Map<String, Object> out = new LinkedHashMap<>();
-        out.put("posts", posts.cardsOf(found.getContent(), me.id()));
+        out.put("posts", posts.cardsOf(posts.withoutBlocked(found.getContent(), me.id()), me.id()));
         out.put("page", found.getNumber());
         out.put("totalPages", found.getTotalPages());
         out.put("total", found.getTotalElements());
@@ -140,6 +143,9 @@ public class PostController {
         out.put("coverPhotoId", post.getCoverPhotoId());
         out.put("visibility", post.getVisibility().name());
         out.put("authorName", posts.authorNameOf(post));
+        /* 글 메뉴의 「이 사람 차단」이 누구를 막는지 알아야 합니다. 이름은
+           겹칠 수 있습니다. */
+        out.put("authorId", post.getAuthorId());
         out.put("dayCount", post.getDayCount());
         out.put("placeCount", post.getPlaceCount());
         out.put("likeCount", post.getLikeCount());

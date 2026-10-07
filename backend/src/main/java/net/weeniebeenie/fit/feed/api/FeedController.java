@@ -163,6 +163,23 @@ public class FeedController {
         return Map.of("ok", true);
     }
 
+    /**
+     * 신고. 세 건이 쌓이면 사람이 볼 때까지 감춥니다.
+     *
+     * <p>여행기({@code /api/posts/{id}/report}) · 팁 · 댓글과 같은 꼴입니다 —
+     * 화면이 같은 몸({@code {"reason": "..."}})을 보냅니다.
+     */
+    @PostMapping("/api/feed/{id}/report")
+    public Map<String, Object> report(@CurrentUser AuthPrincipal me,
+                                      @PathVariable String id,
+                                      @RequestBody(required = false) ReasonRequest req) {
+        feed.report(me, id, req == null ? null : req.reason());
+        return Map.of("ok", true);
+    }
+
+    public record ReasonRequest(String reason) {
+    }
+
     /* ---------------------------------------------------------------- 댓글 */
 
     /**

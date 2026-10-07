@@ -61,6 +61,10 @@ public class ProfileService {
       파일을 두고 떼기만 하는 규칙이 그쪽에 있습니다.
     */
     private final net.weeniebeenie.fit.photo.application.PhotoService photoBook;
+    /* 막은 사이면 소개 · 사진 · 우리 사이를 비웁니다. */
+    private final net.weeniebeenie.fit.safety.application.BlockService blocks;
+    /* 신고가 쌓였으면 소개와 사진을 남에게 감춥니다. */
+    private final net.weeniebeenie.fit.safety.application.ProfileReportService reports;
 
     /**
      * 한 사람의 프로필.
@@ -91,8 +95,35 @@ public class ProfileService {
                             posts.countByAuthorId(target),
                             tips.countByUserIdAndHiddenFalseAndStarsIsNotNull(target),
                             members.countByIdUserId(target)),
-                    null);
+                    null, false);
         }
+
+        /*
+          막은 사이 — 이름과 표식만 둡니다.
+
+          <p>404 로 닫지 않습니다. 막은 사람은 이 화면에서 「차단 풀기」를
+          눌러야 하고, 막힌 사람에게 404 는 「모임에서 나갔다」와 구별이 안
+          되지만 그 사람이 여전히 모임 사람 목록에 서 있으니 오히려 무언가
+          일어났다는 말이 됩니다. 비어 보이는 프로필은 그냥 조용한 사람입니다.
+
+          <p>{@code blocked} 는 <b>내가 막았을 때만</b> 켭니다. 막힌 쪽에 켜면
+          그것이 곧 「당신은 막혔다」는 알림입니다.
+        */
+        if (blocks.between(me.id(), target)) {
+            return new Profile(
+                    user.getId(), user.getName(), user.getMark(), null, null,
+                    user.getCreatedAt(), false, 0,
+                    new Counts(0, 0, 0, 0),
+                    new Between(List.of(), List.of()),
+                    blocks.hasBlocked(me.id(), target));
+        }
+
+        /*
+          신고가 쌓인 프로필 — 운영자가 볼 때까지 소개와 사진을 비웁니다.
+          이름은 둡니다(ProfileReportService 의 설명). 내 것에는 이 일이 없습니다 —
+          위에서 이미 돌아갔고, 제 소개를 고칠 수 있어야 합니다.
+        */
+        boolean held = reports.held(target);
 
         /*
           남의 페이지 — 숫자를 <b>함께 속한 모임</b> 안으로 좁힙니다.
@@ -125,13 +156,13 @@ public class ProfileService {
                 .toList();
 
         return new Profile(
-                user.getId(), user.getName(), user.getMark(), user.getPhotoId(),
-                user.getBio(), user.getCreatedAt(), false,
+                user.getId(), user.getName(), user.getMark(), held ? null : user.getPhotoId(),
+                held ? null : user.getBio(), user.getCreatedAt(), false,
                 companionsOf(target, shared),
                 new Counts(theirTrips, theirPosts,
                         tips.countByUserIdAndHiddenFalseAndStarsIsNotNull(target),
                         shared.size()),
-                new Between(groupRefs, tripRefs));
+                new Between(groupRefs, tripRefs), false);
     }
 
     /**
@@ -153,6 +184,9 @@ public class ProfileService {
             if (clean.length() > 80) {
                 throw ApiException.badRequest("이름이 너무 길어요.");
             }
+            /* 이름은 신고가 쌓여도 안 감춥니다(ProfileReportService) — 그러니
+               올릴 때 막는 것이 유일한 자리입니다. */
+            net.weeniebeenie.fit.support.moderation.BadWords.check(clean);
             user.setName(clean);
         }
         if (bio != null) {
@@ -160,6 +194,7 @@ public class ProfileService {
             if (clean.length() > 80) {
                 throw ApiException.badRequest("한 줄 소개는 80자까지예요.");
             }
+            net.weeniebeenie.fit.support.moderation.BadWords.check(clean);
             user.setBio(clean.isEmpty() ? null : clean);
         }
         if (photoId != null) {
@@ -289,10 +324,13 @@ public class ProfileService {
      *                섭니다. 표식을 대신하지 않습니다 — 지도의 핀은 계속
      *                표식입니다({@code User.photoId})
      * @param mine    내 것인지. 「내 계정」 줄을 붙일지를 이걸로 정합니다
+     * @param blocked 내가 이 사람을 막았는지. 화면이 「차단」과 「차단 풀기」 중
+     *                무엇을 세울지 여기서 정합니다. <b>나를 막은 사람이면 꺼져
+     *                있습니다</b> — 켜면 그것이 곧 막혔다는 알림입니다
      */
     public record Profile(String id, String name, String mark, String photoId, String bio,
                           Instant since, boolean mine, long companions, Counts counts,
-                          Between between) {
+                          Between between, boolean blocked) {
     }
 
     /**

@@ -751,6 +751,8 @@ export type PostDetail = Omit<PostCard, 'summary'> & {
   summary: string | null;
   /** 내가 쓴 글인지. 내릴 수 있는지를 이걸로 정합니다. */
   mine: boolean;
+  /** 쓴 사람. 글 메뉴의 「이 사람 차단」이 씁니다. */
+  authorId?: string;
   /** 어디까지 보이는지. */
   visibility: Visibility;
   /** 댓글을 받는 글인지. 열어 둔 글에만 댓글칸이 생깁니다. */
@@ -935,6 +937,8 @@ export type Tip = {
    */
   stars?: number | null;
   authorName: string;
+  /** 남긴 사람. 「이 사람 차단」이 누구를 막는지 여기서 압니다 — 이름은 겹칠 수 있습니다. */
+  authorId?: string;
   /** 내가 남긴 것인지. 지울 수 있는지를 이걸로 정합니다. */
   mine: boolean;
   createdAt: string;
@@ -1056,6 +1060,13 @@ export type Profile = {
   /** 가입한 때 */
   since: string;
   mine: boolean;
+  /**
+   * 내가 이 사람을 막았는지. 「차단」과 「차단 풀기」 중 무엇을 세울지 정합니다.
+   *
+   * <p>나를 막은 사람이면 꺼져 있습니다 — 서버가 일부러 안 알려 줍니다. 막은 사이면
+   * 어느 쪽이든 소개 · 사진 · 우리 사이가 비어 옵니다.
+   */
+  blocked?: boolean;
   /** 같은 모임에 든 사람 수(자기 빼고, 겹치면 한 번) */
   companions?: number;
   counts: {
@@ -1290,4 +1301,17 @@ export type News = {
     /** 쓰인 <b>횟수</b>입니다. 사람 수가 아닙니다. */
     viewCount: number;
   } | null;
+};
+
+/**
+ * 내가 막은 사람 한 줄 — {@code GET /api/me/blocks}.
+ *
+ * <p>나를 막은 사람의 목록은 없습니다. 조용히 막는 것이 약속입니다.
+ */
+export type BlockedPerson = {
+  id: string;
+  name: string;
+  mark?: Maybe<string>;
+  photoId?: Maybe<string>;
+  blockedAt: string;
 };
