@@ -35,10 +35,15 @@ public interface UserRepository extends JpaRepository<User, String> {
      * 비어 있는 조건은 걸지 않습니다. 조건마다 메서드를 따로 두면 조합이
      * 늘어날수록 감당이 안 되므로 한 곳에서 받습니다. {@code q} 는 부르는
      * 쪽에서 소문자 + 양쪽 % 로 다듬어 넘깁니다.
+     *
+     * <p>「탈퇴한 사람」 자리표시 계정({@link User#WITHDRAWN_ID})은 빼고
+     * 셉니다. 사람이 아니라 자리라서, 목록에 서 있으면 운영자가 잠그거나
+     * 지우려고 듭니다 — 지우면 그 자리를 가리키던 지출이 갈 곳을 잃습니다.
      */
     @Query("""
            SELECT u FROM User u
-           WHERE (:q IS NULL OR lower(u.email) LIKE :q OR lower(u.name) LIKE :q)
+           WHERE u.id <> 'withdrawn0000000'
+             AND (:q IS NULL OR lower(u.email) LIKE :q OR lower(u.name) LIKE :q)
              AND (:role IS NULL OR u.role = :role)
              AND (:disabled IS NULL OR u.disabled = :disabled)
            """)

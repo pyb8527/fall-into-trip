@@ -95,10 +95,12 @@ public class KakaoLogin {
      * 기다리는 한 건.
      *
      * @param userId 잇기면 그 계정. 로그인이면 비어 있습니다
-     * @param nonce  앱(껍데기)에서 시작했으면 그 웹뷰가 낸 값의 해시.
-     *               브라우저면 비어 있습니다
+     * @param nonce    앱(껍데기)에서 시작했으면 그 웹뷰가 낸 값의 해시.
+     *                 브라우저면 비어 있습니다
+     * @param withdraw 탈퇴 직전의 다시 확인인지. 그러면 {@code userId} 는
+     *                 탈퇴하려는 계정입니다 — 잇기와 같은 칸을 씁니다
      */
-    public record Pending(String userId, Instant until, String nonce) {
+    public record Pending(String userId, Instant until, String nonce, boolean withdraw) {
         public boolean fromApp() {
             return nonce != null;
         }
@@ -123,12 +125,39 @@ public class KakaoLogin {
      *              값을 내야 합니다 — 쿠키를 대신하는 두 번째 겹입니다
      */
     public String authorizeUrl(String state, String userId, String nonce) {
+        return start(state, userId, nonce, false);
+    }
+
+    /**
+     * 탈퇴 직전에 카카오로 다시 확인합니다 — 시작.
+     *
+     * <h3>왜 다시 로그인하나</h3>
+     *
+     * <p>카카오와의 연결을 끊으려면(연결 끊기 API) 그 사람의 액세스 토큰이나
+     * 앱의 <b>Admin 키</b>가 있어야 합니다. Admin 키는 아무 사람이나 끊을 수
+     * 있는 열쇠라 서버에 두지 않기로 했습니다. 로그인할 때 받은 토큰은
+     * 저장하지 않으므로(그 자리에서 누구인지만 묻고 버립니다), 탈퇴 직전에
+     * 한 번 더 카카오를 다녀와 <b>그때 받은 토큰</b>으로 끊습니다.
+     *
+     * <p>그 길이 「남이 잠깐 빌린 폰으로 지우지 못하게」 하는 다시 확인도
+     * 겸합니다.
+     *
+     * @param userId 탈퇴하려는 계정. 콜백에는 로그인 헤더가 안 실리므로 여기
+     *               적어 둡니다
+     * @param nonce  앱(껍데기)에서 시작했으면 웹뷰가 만든 값. 쿠키를 못 보는
+     *               길이라 앱에서 시작했다는 표시로만 씁니다
+     */
+    public String authorizeUrlToWithdraw(String state, String userId, String nonce) {
+        return start(state, userId, nonce, true);
+    }
+
+    private String start(String state, String userId, String nonce, boolean withdraw) {
         if (!enabled()) {
             throw ApiException.badRequest("카카오 로그인이 꺼져 있어요.");
         }
         sweep();
         pending.put(state, new Pending(userId, Instant.now().plus(WAIT),
-                nonce == null ? null : sha256(nonce)));
+                nonce == null ? null : sha256(nonce), withdraw));
         return "https://kauth.kakao.com/oauth/authorize?response_type=code"
                 + "&client_id=" + enc(restKey.trim())
                 + "&redirect_uri=" + enc(redirectUri())
@@ -187,6 +216,21 @@ public class KakaoLogin {
 
     /** 코드를 토큰으로 바꾸고, 그 토큰으로 누구인지 묻습니다. */
     public SocialTokens.Person read(String code) {
+        return readSigned(code).who();
+    }
+
+    /**
+     * 카카오에서 받은 사람과, 그때 받은 액세스 토큰.
+     *
+     * <p>토큰은 탈퇴 직전의 다시 확인에서만 꺼냅니다. 보통 로그인에서는
+     * {@link #read} 가 사람만 돌려주고 토큰은 버립니다 — 들고 있을 까닭이
+     * 없는 것은 들고 있지 않습니다.
+     */
+    public record Signed(SocialTokens.Person who, String accessToken) {
+    }
+
+    /** {@link #read} 와 같되 토큰도 함께 돌려줍니다. */
+    public Signed readSigned(String code) {
         if (code == null || code.isBlank()) {
             throw ApiException.badRequest("카카오에서 돌아온 값이 비어 있어요.");
         }
@@ -230,7 +274,71 @@ public class KakaoLogin {
         if (name == null) {
             name = me.path("properties").path("nickname").asText(null);
         }
-        return new SocialTokens.Person(KAKAO, subject, email, name);
+        return new Signed(new SocialTokens.Person(KAKAO, subject, email, name), access);
+    }
+
+    /* ------------------------------------------------------------ 탈퇴 */
+
+    /** 다시 확인한 뒤 탈퇴를 누를 때까지 기다리는 시간. 안내를 읽을 만큼입니다. */
+    private static final Duration GRANT = Duration.ofMinutes(10);
+
+    /** 계정 → 탈퇴 직전에 받은 카카오 토큰. 메모리에만, 잠깐만 둡니다. */
+    private final Map<String, Grant> grants = new ConcurrentHashMap<>();
+
+    private record Grant(String accessToken, Instant until) {
+    }
+
+    /**
+     * 다시 확인을 마쳤습니다. 탈퇴를 누르면 이 토큰으로 연결을 끊습니다.
+     *
+     * <p>DB 에 적지 않습니다. 서버가 다시 뜨면 사라지고, 그러면 사람이 한 번
+     * 더 확인하면 됩니다 — 남의 카카오 토큰을 디스크에 남기는 것보다 낫습니다.
+     */
+    public void grantWithdraw(String userId, String accessToken) {
+        sweep();
+        grants.put(userId, new Grant(accessToken, Instant.now().plus(GRANT)));
+    }
+
+    /** 다시 확인한 지 10분이 안 됐으면 그때 받은 토큰. 꺼내도 지우지 않습니다. */
+    public java.util.Optional<String> withdrawGrant(String userId) {
+        Grant got = grants.get(userId);
+        if (got == null || got.until().isBefore(Instant.now())) {
+            return java.util.Optional.empty();
+        }
+        return java.util.Optional.of(got.accessToken());
+    }
+
+    /** 다 썼습니다. 탈퇴가 끝난 뒤에 부릅니다. */
+    public void dropWithdrawGrant(String userId) {
+        grants.remove(userId);
+    }
+
+    /**
+     * 카카오와의 연결을 끊습니다(연결 끊기 API).
+     *
+     * <p><b>실패해도 던지지 않습니다.</b> 계정과 데이터는 이미 지웠습니다.
+     * 여기서 터지면 다 지워 놓고 「탈퇴하지 못했어요」라고 말하게 됩니다.
+     * 끊지 못한 연결은 사람이 카카오 설정(연결된 서비스 관리)에서 끊을 수
+     * 있고, 다시 카카오로 들어오면 새 계정으로 시작합니다 — 지운 계정에
+     * 다시 닿는 길은 없습니다(user_identities 가 함께 지워졌습니다).
+     *
+     * @return 끊었으면 true
+     */
+    public boolean unlink(String accessToken) {
+        if (accessToken == null || accessToken.isBlank()) {
+            return false;
+        }
+        try {
+            send(HttpRequest.newBuilder(URI.create("https://kapi.kakao.com/v1/user/unlink"))
+                    .timeout(Duration.ofSeconds(10))
+                    .header("Authorization", "Bearer " + accessToken)
+                    .POST(HttpRequest.BodyPublishers.noBody())
+                    .build());
+            return true;
+        } catch (ApiException e) {
+            log.warn("kakao unlink failed: {}", e.getMessage());
+            return false;
+        }
     }
 
     private JsonNode send(HttpRequest req) {
@@ -264,6 +372,7 @@ public class KakaoLogin {
             }
         }
         tickets.values().removeIf(t -> t.until().isBefore(now));
+        grants.values().removeIf(g -> g.until().isBefore(now));
     }
 
     private static String sha256(String raw) {

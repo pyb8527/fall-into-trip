@@ -128,10 +128,14 @@ export default function Settings() {
 
       <Band />
 
-      {/* 나가는 일 둘. 하나는 되돌릴 수 있고 하나는 다른 기기까지 끊습니다 —
-          그래서 아래쪽 것만 빨간 글씨입니다. */}
+      {/* 나가는 일 셋. 로그아웃은 되돌릴 수 있고, 아래 둘은 다른 기기까지
+          끊거나 계정을 지웁니다 — 그래서 아래쪽 것만 빨간 글씨입니다. */}
       <Line label="로그아웃" onPress={logout} />
-      <Line label="모든 기기에서 로그아웃" danger last onPress={() => setLeaving(true)} />
+      <Line label="모든 기기에서 로그아웃" danger onPress={() => setLeaving(true)} />
+      {/* 맨 끝에 둡니다. 되돌릴 수 없는 일이라 손이 먼저 닿는 자리에 두지
+          않고, 무엇이 지워지는지는 누르면 열리는 화면이 다 보여 준 뒤에
+          묻습니다. */}
+      <Line label="회원 탈퇴" danger last onPress={() => router.push('/account/delete')} />
 
       {/*
         몇 판인지.

@@ -2,6 +2,7 @@ package net.weeniebeenie.fit.expense.application;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import net.weeniebeenie.fit.account.domain.User;
 import net.weeniebeenie.fit.account.domain.UserRepository;
 import net.weeniebeenie.fit.account.infrastructure.security.AuthPrincipal;
 import net.weeniebeenie.fit.expense.domain.*;
@@ -317,6 +318,10 @@ public class ExpenseService {
         Map<String, String> out = new LinkedHashMap<>();
         access.everyoneOf(tripId).forEach(id -> users.findById(id)
                 .ifPresent(u -> out.put(u.getId(), u.getName())));
+        /* 탈퇴한 동행자가 낸 돈은 「탈퇴한 사람」 자리로 옮겨 와 있습니다
+           (AccountDeletionService). 그 자리는 멤버가 아니라 위에서 안 잡히고,
+           그대로 두면 「나간 사람」으로 찍혀 모임을 나간 줄 압니다. */
+        out.putIfAbsent(User.WITHDRAWN_ID, User.WITHDRAWN_NAME);
         return out;
     }
 

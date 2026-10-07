@@ -1,0 +1,40 @@
+-- 회원 탈퇴 — 「탈퇴한 사람」 자리표시 계정.
+--
+-- 사람이 스스로 계정을 지울 길이 없었습니다. 운영자 삭제만 있었고, 그마저
+-- 여행 주인이거나 지출 기록이 있으면 막혔습니다. 막히는 까닭은 CASCADE 가
+-- 없는 외래키들입니다 — trips.owner_id, groups.owner_id, expenses.payer_id ·
+-- created_by, places.updated_by, trip_items.created_by.
+--
+-- 그 칸들에 CASCADE 를 걸지 않습니다. 걸면 탈퇴한 사람이 낸 지출이 통째로
+-- 사라지고, 같이 간 사람들의 정산이 말없이 바뀝니다 — 「민수가 낸 30만 원」이
+-- 없어지면 남은 사람들이 서로 주고받을 돈이 달라집니다.
+--
+-- 대신 그 칸들을 이 계정으로 옮깁니다(AccountDeletionService). 이름 말고는
+-- 아무것도 없는 계정이라 개인정보가 남지 않고, 정산은 그대로 맞습니다.
+-- 주인 칸(trips · groups)은 옮기지 않고 남은 사람에게 넘기거나 지웁니다 —
+-- 아무도 손댈 수 없는 여행이 남으면 안 됩니다.
+--
+-- ------------------------------------------------------------------ 못 들어옴
+--
+-- 이 계정으로는 아무도 들어올 수 없어야 합니다. 세 겹으로 막습니다.
+--
+--   · password_hash 가 비어 있습니다 — 비밀번호 로그인은 hasPassword 를 먼저
+--     봅니다(AuthService.login)
+--   · user_identities 에 줄이 없습니다 — 구글 · 카카오로 이 계정에 닿을 길이
+--     없습니다
+--   · disabled 입니다 — 위 둘이 언젠가 바뀌어도 잠긴 계정입니다
+--
+-- 주소는 아무 데도 닿지 않는 끝자리(.invalid 와 같은 뜻의 「invalid」)입니다.
+-- 이메일 칸이 비어 있을 수 없어 자리만 채웁니다.
+--
+-- id 는 고정입니다. 서버 코드(User.WITHDRAWN_ID)가 이 값을 그대로 씁니다.
+--
+-- ------------------------------------------------------------------ 들어온 차례
+--
+-- 계획서에는 「trip_members 에 joined_at 을 단다」가 있었습니다. 그 표는
+-- V38 에서 그룹 멤버로 합쳐지며 없어졌고, 여행을 같이 보는 사람은 이제
+-- group_members 이며 거기에는 joined_at 이 처음부터 있습니다(V38). 그래서
+-- 여기서는 칸을 달지 않습니다.
+INSERT INTO users (id, email, name, password_hash, role, disabled)
+VALUES ('withdrawn0000000', 'withdrawn@invalid', '탈퇴한 사람', NULL, 'MEMBER', TRUE)
+ON CONFLICT DO NOTHING;

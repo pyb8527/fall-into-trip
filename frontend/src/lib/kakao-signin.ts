@@ -11,3 +11,8 @@ export async function startKakao(
 }
 
 export const canLinkKakao = false;
+
+/** 탈퇴 직전의 카카오 다시 확인. 원래 화면에서는 이 길을 안 탑니다. */
+export async function confirmKakaoForWithdraw(): Promise<'redirected' | 'done' | 'closed'> {
+  return 'closed';
+}

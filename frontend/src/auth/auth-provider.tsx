@@ -35,6 +35,13 @@ type AuthContextValue = {
   signInWithKakaoTicket: (ticket: string, nonce: string) => Promise<void>;
   logout: () => Promise<void>;
   logoutAll: () => Promise<void>;
+  /**
+   * 회원 탈퇴. 서버가 지우고 나면 이 기기에서도 로그인 상태를 걷습니다.
+   *
+   * @param password 비밀번호 사용자만. 카카오 · 구글 사용자는 그 전에 다시
+   *                 확인해 두어야 합니다(account/delete 화면)
+   */
+  withdraw: (password?: string) => Promise<void>;
   refreshUser: () => Promise<void>;
 };
 
@@ -216,6 +223,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [clear]);
 
+  /*
+    로그아웃과 달리 서버가 실패하면 이 기기도 그대로 둡니다. 지워지지 않은
+    계정에서 로그아웃만 되면, 사람은 탈퇴된 줄 압니다.
+  */
+  const withdraw = useCallback(
+    async (password?: string) => {
+      await request('/api/auth/me', { method: 'DELETE', body: { password: password ?? null } });
+      clear();
+    },
+    [clear],
+  );
+
   const refreshUser = useCallback(async () => {
     const res = await api.get<{ user: User }>('/api/auth/me');
     setUser(res.user);
@@ -236,10 +255,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       changePassword,
       logout,
       logoutAll,
+      withdraw,
       refreshUser,
     }),
     [ready, user, setupNeeded, googleClientId, kakaoEnabled, login, register, setup, changePassword, logout,
-     logoutAll, refreshUser, signInWithGoogle, signInWithKakaoTicket],
+     logoutAll, withdraw, refreshUser, signInWithGoogle, signInWithKakaoTicket],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

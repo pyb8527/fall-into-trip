@@ -124,6 +124,10 @@ EU DSA.
 - `backend/src/test/http` 에 탈퇴 시험: 주인 여행 넘김 · 혼자 여행 지움 · 정산
   그대로 · 사진 파일 지워짐 · 다른 기기 토큰 끊김 · 같은 계정으로 다시 로그인 안 됨.
 
+> **지었음(2026-10-07).** `AccountDeletionService` · `DELETE /api/auth/me` ·
+> V58(「탈퇴한 사람」) · `/account/delete` · `deletion.test.mjs`. 문의 이메일
+> (`constants/support.ts` 의 `SUPPORT_EMAIL`)은 아직 비어 있습니다.
+
 ## 2단계 — 약관 · 처리방침 · 동의 · 권한 안내
 
 ### 문서 (초안은 지어 두고, 최종 검토는 사람이)

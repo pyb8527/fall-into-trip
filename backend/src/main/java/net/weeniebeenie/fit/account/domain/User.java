@@ -14,6 +14,21 @@ import java.time.Instant;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class User {
 
+    /**
+     * 「탈퇴한 사람」 자리표시 계정(V58).
+     *
+     * <p>탈퇴한 사람이 낸 지출 · 적은 지출 · 고친 장소 · 만든 챙길 것이 이
+     * 계정으로 옮겨 갑니다. 지우면 같이 간 사람들의 정산이 바뀌고, 남겨 두면
+     * 그 사람의 계정이 남습니다 — 이름 하나만 있는 계정으로 바꿔 끼웁니다.
+     *
+     * <p>이 계정으로는 아무도 못 들어옵니다. 비밀번호도 이어 둔 소셜도 없고,
+     * 잠겨 있습니다. 운영 화면의 계정 목록에도 안 나옵니다.
+     */
+    public static final String WITHDRAWN_ID = "withdrawn0000000";
+
+    /** 그 계정의 이름. 가계부 · 정산에 이 이름으로 찍힙니다. */
+    public static final String WITHDRAWN_NAME = "탈퇴한 사람";
+
     @Id
     @Column(length = 16)
     private String id;

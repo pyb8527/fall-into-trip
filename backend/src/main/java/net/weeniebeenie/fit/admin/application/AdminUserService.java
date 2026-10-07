@@ -1,6 +1,7 @@
 package net.weeniebeenie.fit.admin.application;
 
 import lombok.RequiredArgsConstructor;
+import net.weeniebeenie.fit.account.application.AccountDeletionService;
 import net.weeniebeenie.fit.account.application.AuthService;
 import net.weeniebeenie.fit.account.application.RefreshTokenService;
 import net.weeniebeenie.fit.account.domain.RefreshTokenRepository;
@@ -12,7 +13,6 @@ import net.weeniebeenie.fit.admin.api.dto.AdminDtos.AdminUserView;
 import net.weeniebeenie.fit.shared.error.ApiException;
 import net.weeniebeenie.fit.support.audit.AuditService;
 import net.weeniebeenie.fit.trip.domain.TripRepository;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -50,6 +50,7 @@ public class AdminUserService {
     private final PasswordEncoder encoder;
     private final AuditService audit;
     private final AdminGuard guard;
+    private final AccountDeletionService deletion;
 
     /* ------------------------------------------------------------ 조회 */
 
@@ -168,9 +169,14 @@ public class AdminUserService {
     /**
      * 계정을 지웁니다.
      *
-     * <p>여행·지출·장소 기록이 그 사람을 가리키고 있으면 지울 수 없습니다.
-     * 억지로 지우면 누가 냈는지 모르는 지출 같은 것이 남아 정산이 무너집니다.
-     * 그럴 때는 지우지 말고 잠그라고 안내합니다.
+     * <p>여행·지출·장소 기록이 그 사람을 가리키고 있으면 지울 수 없었습니다.
+     * 무엇을 어디로 옮기는지를 정하지 않았기 때문입니다. 이제 그것을 회원
+     * 탈퇴와 같은 자리({@link AccountDeletionService})가 정합니다 — 주인인
+     * 여행 · 모임은 남은 사람에게 넘기거나 지우고, 지출 기록은 「탈퇴한
+     * 사람」으로 바꿉니다. 사람이 스스로 탈퇴할 때와 결과가 같아야 합니다.
+     *
+     * <p>여기서 지키는 것은 운영자만의 두 가지입니다 — 자기 자신과 마지막
+     * 운영자. 기록에는 번호만 남깁니다(이메일을 남기면 지운 것이 아닙니다).
      */
     @Transactional
     public void delete(AuthPrincipal me, String userId) {
@@ -182,23 +188,7 @@ public class AdminUserService {
         }
         requireNotLastAdmin(target, "마지막 운영자의 계정은 지울 수 없어요.");
 
-        long owned = trips.countByOwnerId(target.getId());
-        if (owned > 0) {
-            throw ApiException.conflict("이 계정이 여행 " + owned
-                    + "개의 주인이에요. 여행을 넘기거나 지운 뒤에 다시 시도하거나, 계정을 잠가 주세요.");
-        }
-
-        String email = target.getEmail();
-        sessions.revokeAllOf(target.getId());
-        try {
-            users.delete(target);
-            users.flush();
-        } catch (DataIntegrityViolationException e) {
-            /* 지출·장소 기록처럼 아직 이 사람을 가리키는 것이 남아 있습니다. */
-            throw ApiException.conflict("이 계정이 남긴 기록이 있어 지울 수 없어요. 계정을 잠가 주세요.");
-        }
-
-        audit.log(actor.getId(), "admin.user.delete", target.getId(), Map.of("email", email));
+        deletion.eraseByAdmin(actor.getId(), target.getId());
     }
 
     /* ------------------------------------------------------------ 도우미 */

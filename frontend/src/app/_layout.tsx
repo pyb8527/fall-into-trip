@@ -169,6 +169,18 @@ export default function RootLayout() {
             <Stack.Screen name="admin" options={{ headerShown: false }} />
             {/* 「지금 여기」 — 지도가 화면 전체라 머리 막대 대신 지도 위 단추로 나갑니다. */}
             <Stack.Screen name="here" options={{ headerShown: false }} />
+            {/*
+              회원 탈퇴.
+
+              <p>(app) 안에 두지 않습니다. 그 층은 로그인 안 한 사람을 로그인
+              화면으로 돌려보내는데, 이 주소는 구글 플레이에 적는 「웹에서
+              탈퇴하는 곳」이라 앱을 지운 사람도 열 수 있어야 합니다. 로그인
+              여부는 화면이 스스로 봅니다.
+            */}
+            <Stack.Screen
+              name="account/delete"
+              options={stackHeader('회원 탈퇴', { up: '/(app)/settings' })}
+            />
           </Stack>
         </ThemeProvider>
         </HandFont>

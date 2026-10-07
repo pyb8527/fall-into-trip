@@ -198,6 +198,20 @@ public class SocialAuthService {
         audit.log(userId, "identity.unlink." + provider, userId);
     }
 
+    /**
+     * 이 사람이 이 계정에 이어 둔 그 사람인가.
+     *
+     * <p>탈퇴 직전에 카카오로 다시 확인할 때 봅니다. 아무 카카오 계정으로나
+     * 다녀와도 받아 주면, 남의 폰을 잠깐 든 사람이 제 카카오로 「확인」하고
+     * 그 폰 주인의 계정을 지울 수 있습니다.
+     */
+    @Transactional(readOnly = true)
+    public boolean owns(String userId, SocialTokens.Person who) {
+        return userId != null && identities.findByProviderAndSubject(who.provider(), who.subject())
+                .map(found -> found.getUserId().equals(userId))
+                .orElse(false);
+    }
+
     private static String label(String provider) {
         return "kakao".equals(provider) ? "카카오" : "구글";
     }

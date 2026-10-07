@@ -158,21 +158,32 @@ T("세션 끊기 200", r.status === 200 && typeof r.data?.revoked === "number", 
 r = await call("GET", `/api/admin/users?q=${encodeURIComponent(MEMBER.email)}`, { token: adminToken });
 T("끊고 나면 세션 0", r.data?.items?.[0]?.activeSessions === 0, r.data?.items?.[0]);
 
-console.log("\n[6] 삭제 — 기록이 남아 있으면 막고 안내");
+console.log("\n[6] 삭제 — 여행 주인이어도 지움(탈퇴와 같은 길)");
 
+/* 전에는 여행 주인이면 409 로 막았습니다. 이제 회원 탈퇴와 같은 자리
+   (AccountDeletionService)가 주인인 여행을 넘기거나 지우므로 막을 까닭이
+   없습니다. 넘기는 것 · 정산은 deletion.test.mjs 가 봅니다. */
 r = await call("POST", "/api/auth/login", { body: { email: MEMBER.email, password: NEW_PASSWORD } });
 memberToken2 = r.data?.accessToken;
 
 r = await call("POST", "/api/trips", { token: memberToken2, body: { title: `테스트 여행 ${TAG}`, startIso: "2026-10-08", nights: 1 } });
 T("회원이 여행을 만듦", r.status === 200, r.data);
-const tripId = r.data?.trip?.id;
 
 r = await call("DELETE", `/api/admin/users/${memberId}`, { token: adminToken });
-T("여행 주인은 못 지움 409", r.status === 409, r.data);
-T("어떻게 하라고 알려 줌", /잠가|넘기|지운/.test(r.data?.error ?? ""), r.data?.error);
+T("여행 주인도 지움 200", r.status === 200, r.data);
 
-r = await call("DELETE", `/api/trips/${tripId}`, { token: memberToken2 });
-T("여행 삭제", r.status === 200, r.data);
+r = await call("GET", `/api/admin/users?q=${encodeURIComponent(MEMBER.email)}`, { token: adminToken });
+T("목록에서 사라짐", r.status === 200 && r.data?.items?.length === 0, r.data);
+
+r = await call("POST", "/api/auth/login", { body: { email: MEMBER.email, password: NEW_PASSWORD } });
+T("지운 계정은 로그인 불가", r.status === 401, r.data);
+
+r = await call("GET", `/api/admin/users?q=${encodeURIComponent("탈퇴한 사람")}`, { token: adminToken });
+T("「탈퇴한 사람」 자리는 목록에 안 나옴", r.status === 200
+  && !r.data?.items?.some(u => u.id === "withdrawn0000000"), r.data?.items);
+
+r = await call("DELETE", `/api/admin/users/withdrawn0000000`, { token: adminToken });
+T("「탈퇴한 사람」 자리는 못 지움", r.status === 400, r.data);
 
 r = await call("GET", "/api/admin/users?q=" + encodeURIComponent("없는사람zzz"), { token: adminToken });
 T("검색 결과 없음도 정상 응답", r.status === 200 && r.data?.items?.length === 0, r.data);

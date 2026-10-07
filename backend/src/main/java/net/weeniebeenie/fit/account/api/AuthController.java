@@ -12,6 +12,7 @@ import net.weeniebeenie.fit.account.infrastructure.security.CurrentUser;
 import net.weeniebeenie.fit.account.infrastructure.security.JwtProperties;
 import net.weeniebeenie.fit.account.infrastructure.security.JwtProvider;
 import net.weeniebeenie.fit.account.infrastructure.security.KakaoLogin;
+import net.weeniebeenie.fit.account.application.AccountDeletionService;
 import net.weeniebeenie.fit.account.application.AuthService;
 import net.weeniebeenie.fit.account.application.SocialAuthService;
 import net.weeniebeenie.fit.account.application.RefreshTokenService;
@@ -51,6 +52,7 @@ public class AuthController {
     private final JwtProvider jwt;
     private final JwtProperties props;
     private final KakaoLogin kakao;
+    private final AccountDeletionService deletion;
 
     /** 카카오 로그인의 state 를 그 브라우저에 묶는 쿠키. {@link KakaoLogin} 의 두 겹. */
     private static final String KAKAO_COOKIE = "fit_kakao_state";
@@ -210,6 +212,9 @@ public class AuthController {
         } catch (ApiException e) {
             return back("/login", e.getMessage());
         }
+        if (waiting.withdraw()) {
+            return withdrawConfirmed(code, error, waiting);
+        }
         String home = waiting.userId() == null ? "/login" : "/settings";
 
         /* 동의 화면에서 「취소」를 누르면 code 없이 error 만 옵니다. 그건
@@ -269,6 +274,102 @@ public class AuthController {
                 .path(KAKAO_PATH)
                 .maxAge(state.isEmpty() ? 0 : 600)
                 .build();
+    }
+
+    /* ------------------------------------------------------------ 탈퇴 */
+
+    /** 탈퇴 화면. 카카오로 다시 확인하고 돌아올 자리이기도 합니다. */
+    private static final String WITHDRAW_PAGE = "/account/delete";
+
+    /**
+     * 탈퇴하면 무엇이 어떻게 되는지.
+     *
+     * <p>내가 주인인 여행 · 모임이 누구에게 넘어가는지(또는 지워지는지)와,
+     * 무엇으로 다시 확인해야 하는지를 함께 줍니다. 화면은 이것을 보여 준 뒤에만
+     * 「탈퇴하기」를 엽니다.
+     */
+    @GetMapping("/me/deletion-preview")
+    public AccountDeletionService.Preview deletionPreview(@CurrentUser AuthPrincipal me) {
+        return deletion.preview(me.id());
+    }
+
+    /**
+     * 탈퇴합니다. 되돌릴 수 없습니다.
+     *
+     * <p>비밀번호 사용자는 지금 비밀번호를 함께 보냅니다. 카카오를 이어 둔
+     * 사람은 먼저 {@code POST /api/auth/withdraw/kakao} 로 다시 확인하고,
+     * 구글로만 들어오는 사람은 10분 안에 다시 로그인한 뒤에 부릅니다 — 규칙은
+     * {@link AccountDeletionService#withdraw} 에 있습니다.
+     *
+     * <p>끝나면 이 기기의 리프레시 쿠키도 걷습니다. 다른 기기의 토큰은 서버가
+     * 이미 끊었습니다.
+     */
+    @DeleteMapping("/me")
+    public ResponseEntity<Map<String, Object>> withdraw(@CurrentUser AuthPrincipal me,
+                                                        @RequestBody(required = false) WithdrawRequest req) {
+        deletion.withdraw(me.id(), req == null ? null : req.password());
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, clearedCookie().toString())
+                .body(Map.of("ok", true));
+    }
+
+    public record WithdrawRequest(String password) {
+    }
+
+    /**
+     * 탈퇴 직전에 카카오로 다시 확인합니다 — 시작.
+     *
+     * <p>잇기와 같은 모양입니다. 콜백에는 로그인 헤더가 안 실리므로 「누구의
+     * 탈퇴인지」를 state 에 적어 두고 갈 주소를 돌려줍니다. 앱(껍데기)이면
+     * 웹뷰가 만든 값({@code nonce})을 함께 보냅니다 — 앱 위에 띄운 브라우저에는
+     * 이 쿠키가 없어서, 그 값이 「앱에서 시작했다」는 표시가 됩니다.
+     *
+     * <p>왜 다시 다녀오는지는 {@link KakaoLogin#authorizeUrlToWithdraw} 에
+     * 적었습니다 — 연결을 끊을 토큰을 받는 길이 이것뿐입니다.
+     */
+    @PostMapping("/withdraw/kakao")
+    public ResponseEntity<Map<String, Object>> withdrawKakao(@CurrentUser AuthPrincipal me,
+                                                             @RequestBody(required = false) WithdrawKakaoRequest req) {
+        if (!social.providersOf(me.id()).contains(KakaoLogin.KAKAO)) {
+            throw ApiException.badRequest("카카오를 이어 두지 않았어요.");
+        }
+        String nonce = req == null ? null : req.nonce();
+        if (nonce != null && (nonce.length() < 16 || nonce.length() > 128)) {
+            throw ApiException.badRequest("확인을 다시 시작해 주세요.");
+        }
+        String state = net.weeniebeenie.fit.shared.domain.Ids.secret();
+        String url = kakao.authorizeUrlToWithdraw(state, me.id(), nonce);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, kakaoCookie(state).toString())
+                .body(Map.of("url", url));
+    }
+
+    public record WithdrawKakaoRequest(String nonce) {
+    }
+
+    /**
+     * 카카오에서 돌아왔습니다 — 탈퇴 직전의 다시 확인.
+     *
+     * <p><b>탈퇴하려는 계정에 이어 둔 그 카카오 계정</b>이어야 받습니다. 아무
+     * 카카오 계정으로나 다녀와도 되면 다시 확인한 것이 아닙니다.
+     *
+     * <p>받은 토큰은 메모리에 10분만 둡니다. 그 안에 「탈퇴하기」를 누르면 그
+     * 토큰으로 카카오 연결을 끊습니다.
+     */
+    private ResponseEntity<Void> withdrawConfirmed(String code, String error, KakaoLogin.Pending waiting) {
+        if (error != null || code == null) {
+            return waiting.fromApp() ? toApp("cancel", "1") : back(WITHDRAW_PAGE, null);
+        }
+        try {
+            KakaoLogin.Signed got = kakao.readSigned(code);
+            if (!social.owns(waiting.userId(), got.who())) {
+                throw ApiException.badRequest("이 계정에 이어 둔 카카오 계정으로 확인해 주세요.");
+            }
+            kakao.grantWithdraw(waiting.userId(), got.accessToken());
+            return waiting.fromApp() ? toApp("withdraw", "1") : back(WITHDRAW_PAGE + "?kakao=ok", null);
+        } catch (ApiException e) {
+            return waiting.fromApp() ? toApp("error", e.getMessage()) : back(WITHDRAW_PAGE, e.getMessage());
+        }
     }
 
     /** 로그인한 사람이 자기 계정에 구글을 잇습니다. */
