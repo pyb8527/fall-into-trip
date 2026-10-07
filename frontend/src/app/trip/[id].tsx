@@ -1191,11 +1191,21 @@ export default function TripScreen() {
   const [mates, setMates] = useState<LiveWhere[]>([]);
   const [sharing, setSharing] = useState(false);
   const [pins, setPins] = useState<LivePin[]>([]);
+  /*
+    위치 알리기 · 깃발을 서버가 받는지.
+
+    <p>위치기반서비스사업 신고 전에는 서버가 꺼 둡니다(LiveController 머리말).
+    꺼져 있으면 단추를 아예 세우지 않습니다 — 눌러서 「쓸 수 없어요」를 보는
+    것보다 없는 편이 낫습니다. 처음에는 꺼진 것으로 두었다가 서버가 켜져
+    있다고 하면 세웁니다. 이 값을 모르는 옛 서버는 켜진 것으로 봅니다.
+  */
+  const [liveOn, setLiveOn] = useState(false);
 
   const pullLive = useCallback(() => {
     api
-      .get<{ people: LiveWhere[]; sharing: boolean }>(`/api/trips/${id}/locations`)
+      .get<{ people: LiveWhere[]; sharing: boolean; enabled?: boolean }>(`/api/trips/${id}/locations`)
       .then((res) => {
+        setLiveOn(res.enabled !== false);
         setMates(res.people);
         setSharing(res.sharing);
       })
@@ -1614,7 +1624,7 @@ export default function TripScreen() {
             꺼져 있는 동안이 아닙니다. 평소에는 그림만 두고, 켜지면 그때
             글자를 답니다.
           */}
-          {tools ? (
+          {tools && liveOn ? (
             <>
               {sharing ? (
                 <Button
@@ -1655,7 +1665,10 @@ export default function TripScreen() {
                  안 일어납니다. */
               me.start();
               setGoHereAt((n) => n + 1);
-              setTools((on) => !on);
+              /* 펼칠 것(위치 알리기 · 깃발)이 없으면 옮기기만 합니다. */
+              if (liveOn) {
+                setTools((on) => !on);
+              }
             }}
           />
         </View>

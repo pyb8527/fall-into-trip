@@ -62,6 +62,10 @@ fit:
   # 올릴 때마다 사진이 통째로 사라집니다(docker-compose.yml 참고).
   #
   # 비워 두면 서버를 띄운 자리 옆의 photos 폴더입니다. 개발할 때 편합니다.
+  # 위치 알리기 · 깃발(위치를 서버로 받아 동행자에게 보이는 것). 위치기반서비스사업
+  # 신고를 마치기 전에는 끕니다 — trip/api/LiveController 의 머리말.
+  live-sharing:
+    enabled: ${LIVE_SHARING_ENABLED:false}
   photos:
     dir: ${PHOTOS_DIR:}
 
