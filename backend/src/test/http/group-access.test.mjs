@@ -132,6 +132,16 @@ T("지우기도 막힘", r.status === 404 || r.status === 403, r.data);
 r = await call("GET", `/api/trips/${groupTrip}/people`, { token: nam });
 T("사람들도 못 봄", r.status === 404, r.data);
 
+console.log("\n[5-0] 하루치 가게 정보도 같은 문 — 동행만");
+/* /places-info 의 답에는 그날 장소의 영업 · 휠체어 입구 · 옮긴 자리가 실립니다
+   (plan-constraints.md · plan-moved-place.md). 칸이 늘어도 문은 그대로인지
+   봅니다. 확인용 서버에는 구글 키가 없어 동행에게도 빈 목록이 옵니다 —
+   404 가 아닌 것이 요점입니다. */
+r = await call("GET", `/api/days/${dayId}/places-info`, { token: jun });
+T("동행은 부를 수 있음(404 아님)", r.status === 200 && Array.isArray(r.data?.info), r.data);
+r = await call("GET", `/api/days/${dayId}/places-info`, { token: nam });
+T("모임 밖 사람은 404 — 403 이 아님", r.status === 404, r.data);
+
 console.log("\n[5-1] 숙소 구간도 같은 문 — 동행만, 남의 여행 숙소는 안 샘");
 /* 하루를 펼치면 어젯밤 숙소에서 첫 곳까지 · 마지막 곳에서 오늘 숙소까지가
    /route/compare 에 함께 옵니다. 숙소는 앞 날에서 꺼내므로, 그 「앞 날」 이

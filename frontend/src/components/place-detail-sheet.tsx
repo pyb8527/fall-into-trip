@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Linking, StyleSheet, View } from 'react-native';
 
-import { api } from '@/api/client';
+import { api, ApiError, UNEXPECTED } from '@/api/client';
 import type { Comment, OurStars, PlaceInfo, TravelMode } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { CommentPeek } from '@/components/comment-list';
@@ -87,7 +87,7 @@ const PEEK = 5;
  * 내어 주고 무엇을 적을지는 안 정합니다.
  */
 export function PlaceDetailSheet({
-  place,
+  place: origin,
   /** 어느 날 기준으로 볼지. 있으면 그날 문 여는지를 봅니다. */
   onIso,
   /** 지금 서 있는 자리. 있으면 얼마나 먼지 적습니다. */
@@ -98,6 +98,7 @@ export function PlaceDetailSheet({
   scrap,
   actions,
   mode,
+  replaceWith,
   onClose,
 }: {
   place: Looked | null;
@@ -185,33 +186,104 @@ export function PlaceDetailSheet({
    * 운전 경로가 뜹니다.
    */
   mode?: TravelMode | null;
+  /**
+   * 옮긴 자리로 바꾸기.
+   *
+   * <p>아주 닫은 가게가 다른 자리로 옮겼을 때, 그 새 자리 판에 「여기로
+   * 바꾸기」 가 섭니다. 무엇을 바꿀지(일정의 장소 하나)는 부르는 자리만 알아서
+   * 밖에서 받습니다. 안 주면 단추가 안 섭니다 — 보석함 · 찾기 · 추천에서 연
+   * 판은 「새 자리 보기」 까지만 됩니다(plan-moved-place.md §3.5).
+   *
+   * <p>바꾸는 것은 사람이 누를 때만입니다. 앱이 혼자 새 자리로 옮기지 않습니다.
+   */
+  replaceWith?: (to: Looked) => Promise<void>;
   onClose: () => void;
 }) {
+  /*
+    옮긴 자리를 따라가 보는 중인지.
+
+    <p>어느 판에서 따라갔는지({@code from})를 함께 들고 있습니다. 판이 다른
+    곳으로 바뀌었는데 따라간 상태가 남아 있으면, 엉뚱한 가게 판에 남의 새
+    자리가 뜹니다. 들고 있는 출발점과 지금 판이 같을 때만 따라간 것으로 봅니다.
+
+    <p>한 칸씩입니다. 새 자리도 옮겼으면 거기서 또 「새 자리 보기」 가 뜨고,
+    누르면 한 칸 더 갑니다 — 사람이 누르는 만큼만 구글에 묻습니다.
+  */
+  const [follow, setFollow] = useState<{ from: string; to: string } | null>(null);
+  const followTo = follow && origin?.placeId === follow.from ? follow.to : null;
+  /* 「여기로 바꾸기」 를 누른 뒤. 실패하면 판에 그 까닭을 적습니다. */
+  const [swapping, setSwapping] = useState(false);
+  const [swapError, setSwapError] = useState<string | null>(null);
+
+  const close = () => {
+    setFollow(null);
+    setSwapError(null);
+    onClose();
+  };
+
   /*
     번호가 있을 때만 물어봅니다.
 
     좌표를 직접 넣은 곳에는 구글 번호가 없습니다. 그때는 물어볼 데가 없으니
     지도와 이름만 보여 줍니다 — 오류가 아닙니다.
   */
+  const askId = followTo ?? origin?.placeId ?? null;
   const { data, loading } = useAsync<{ info: PlaceInfo | null }>(
     (signal) =>
-      place?.placeId
+      askId
         ? api.get(
-            `/api/places/${encodeURIComponent(place.placeId)}/info${
+            `/api/places/${encodeURIComponent(askId)}/info${
               onIso ? `?on=${encodeURIComponent(onIso)}` : ''
             }`,
             signal,
           )
         : Promise.resolve({ info: null }),
-    [place?.placeId, onIso],
+    [askId, onIso],
   );
 
-  const info = data?.info ?? null;
+  /*
+    지금 판에 맞는 답만 씁니다.
+
+    <p>새로 받는 동안에도 앞의 답이 남아 있습니다. 따라가자마자 원래 가게의
+    「문을 닫은 곳이에요」 가 새 자리 이름 밑에 뜨면 안 됩니다. 번호로 물은
+    답은 {@code id} 가 그 번호라 그것으로 맞춰 봅니다.
+  */
+  const got = data?.info ?? null;
+  const info = followTo ? (got?.id === followTo ? got : null) : got;
+
+  /*
+    판에 띄울 곳.
+
+    <p>따라간 자리는 우리 DB 에 없는 곳이라 이름 · 좌표 · 주소를 구글 답에서
+    만듭니다. 좌표가 안 왔으면 지도와 「여기로 바꾸기」 를 세울 수 없으니
+    원래 자리를 그대로 둡니다 — 아래에서 못 불러왔다고 말합니다.
+  */
+  const moved: Looked | null =
+    followTo && info && info.lat != null && info.lng != null
+      ? {
+          name: info.name ?? origin?.name ?? '',
+          address: info.address ?? null,
+          lat: info.lat,
+          lng: info.lng,
+          placeId: followTo,
+          icon: null,
+        }
+      : null;
+  const place = moved ?? origin;
 
   /* 영업시간이 상자에 들어갈 것이 있는지. Hours 가 null 을 돌려주는 조건과
      같아야 합니다 — 어긋나면 빈 상자가 다시 생깁니다. */
   const hasHours = info != null && !info.permanentlyClosed
     && (info.onDay != null || info.hours.length > 0);
+
+  /* 휠체어 줄이 설지. {@code true} 일 때만입니다 — {@code false} 와 {@code null}
+     은 줄이 없습니다. 틀린 「못 들어가요」 는 들어갈 수 있는 곳을 사람이 아예
+     빼게 하고, 지나친 곳은 틀렸다는 것을 끝내 모릅니다. 줄이 없으면 오늘처럼
+     「구글 지도」 로 나가 보면 됩니다(plan-constraints.md §10.2).
+
+     <p>아주 닫은 곳에는 안 세웁니다. 영업시간과 같은 까닭입니다 — 갈 수 없는
+     곳의 입구를 말할 이유가 없습니다. */
+  const wheelchair = info != null && !info.permanentlyClosed && info.wheelchairEntrance === true;
 
   /* 판에 펼칠 것이 몇 줄인지. 받은 것이 다섯보다 적을 수 있으므로 개수와
      견주는 것은 「다섯」이 아니라 <b>실제로 펼치는 수</b>입니다 — 그걸 안
@@ -254,7 +326,7 @@ export function PlaceDetailSheet({
   }
 
   return (
-    <BottomSheet visible title={place.name} onClose={onClose}>
+    <BottomSheet visible title={place.name} onClose={close}>
       {/*
         그림 한 장, 그리고 늘 사는 지도.
 
@@ -331,7 +403,7 @@ export function PlaceDetailSheet({
           한 사람이 준 5.0 과 열한 명이 준 4.6 은 같은 숫자가 아닌데,
           평균만 띄우면 앞쪽이 더 좋아 보입니다.
         */}
-        {ours ? (
+        {ours && !followTo ? (
           <Body small strong>
             <Caption tone="brand">★ </Caption>
             {ours.average.toFixed(1)}
@@ -342,15 +414,98 @@ export function PlaceDetailSheet({
         {here ? <Caption tone="secondary">{awayFrom(here, place)}</Caption> : null}
       </Row>
 
-      {about}
+      {/* 부르는 자리가 준 것(왜 담았는지 · 우리 별점 · 한 줄 · 담기 · 넣기)은
+          원래 자리에 대한 것입니다. 따라간 동안에는 숨깁니다. */}
+      {followTo ? null : about}
 
-      {loading && place.placeId ? <Loading label="정보를 가져오고 있어요" /> : null}
+      {/*
+        따라간 자리라는 것을 먼저 말합니다.
+
+        <p>제목이 새 이름으로 바뀌므로, 이 판이 어디서 왔는지가 안 보이면
+        다른 가게를 잘못 연 것처럼 읽힙니다. 돌아가는 길과 바꾸는 길을 같은
+        자리에 둡니다.
+      */}
+      {followTo ? (
+        <View style={styles.followed}>
+          <Caption tone="secondary">{`「${origin?.name ?? ''}」 에서 옮긴 자리예요.`}</Caption>
+          {!loading && !moved ? (
+            <Caption tone="danger">옮긴 자리를 불러오지 못했어요.</Caption>
+          ) : null}
+          <Row gap={Spacing.s2} style={styles.facts}>
+            <Button
+              label="원래 자리로"
+              icon="chevron-left"
+              variant="secondary"
+              compact
+              onPress={() => {
+                setFollow(null);
+                setSwapError(null);
+              }}
+            />
+            {replaceWith && moved ? (
+              <Button
+                label="여기로 바꾸기"
+                compact
+                busy={swapping}
+                onPress={async () => {
+                  setSwapError(null);
+                  setSwapping(true);
+                  try {
+                    await replaceWith(moved);
+                    setFollow(null);
+                  } catch (e) {
+                    setSwapError(
+                      e instanceof ApiError && e.code === 'STALE'
+                        ? '다른 사람이 먼저 고쳤어요. 일정을 새로 불러온 뒤 다시 해 주세요.'
+                        : e instanceof ApiError
+                          ? e.message
+                          : UNEXPECTED,
+                    );
+                  } finally {
+                    setSwapping(false);
+                  }
+                }}
+              />
+            ) : null}
+          </Row>
+          {swapError ? <Caption tone="danger">{swapError}</Caption> : null}
+        </View>
+      ) : null}
+
+      {loading && askId ? (
+        <Loading label={followTo ? '옮긴 자리를 가져오고 있어요' : '정보를 가져오고 있어요'} />
+      ) : null}
 
       {/* 아예 문 닫은 가게를 넣게 두면 안 됩니다. 가장 먼저 말합니다. */}
       {info?.permanentlyClosed ? (
         <Caption tone="danger" strong>
           문을 닫은 곳이에요.
         </Caption>
+      ) : null}
+      {/*
+        옮긴 자리가 있으면 그 아래 한 줄.
+
+        <p>「문을 닫은 곳이에요」 까지만 말하면 망한 것인지 옆 골목으로 옮긴
+        것인지 모릅니다. 사람은 구글 지도로 나가 「이전함」 을 보고, 새 이름을
+        외워 와서 다시 찾아 넣었습니다. 구글이 새 자리 번호를 주면 여기서 한
+        번 누르면 됩니다.
+
+        <p>누르면 판이 새 자리로 바뀝니다. 그때 상세를 한 번 묻습니다 — 사람이
+        누를 때만입니다(plan-moved-place.md §6.1).
+      */}
+      {info?.permanentlyClosed && info.movedTo && origin?.placeId ? (
+        <Press
+          onPress={() => {
+            setSwapError(null);
+            setFollow({ from: origin.placeId as string, to: info.movedTo as string });
+          }}
+          scale={1}
+          accessibilityLabel="옮긴 자리 보기"
+          hitSlop={Tap.compactSlop}>
+          <Caption tone="brand" strong>
+            옮겼어요 · 새 자리 보기 ›
+          </Caption>
+        </Press>
       ) : null}
 
       {/*
@@ -369,7 +524,9 @@ export function PlaceDetailSheet({
         안 알려진 곳이면 {@link Hours} 가 null 을 돌려주고, <b>빈 회색 네모</b>
         만 사진 밑에 남습니다. 뭘 못 불러온 것처럼 보입니다.
        */}
-      {place.address || hasHours ? (
+      {/* 휠체어 줄도 조건에 넣습니다. 안 넣으면 주소 · 영업시간이 없는 가게에서
+          그 한 줄이 상자째 안 뜹니다. */}
+      {place.address || hasHours || wheelchair ? (
         <View style={styles.facts0}>
           {place.address ? (
             <Row gap={Spacing.s2} style={styles.fact}>
@@ -384,6 +541,24 @@ export function PlaceDetailSheet({
             </Row>
           ) : null}
           {info && !info.permanentlyClosed ? <Hours info={info} onIso={onIso} /> : null}
+          {/*
+            휠체어 입구 한 줄.
+
+            <p>라벨을 「입구」 로 둡니다. 「휠체어」 로 두면 값에서 같은 말을
+            되풀이합니다. 화장실 · 주차 · 좌석은 받지 않습니다 — 「들어갈 수
+            있는가」 가 첫 물음이고, 넷을 다 세우면 이 상자가 접근성 칸으로
+            채워집니다(plan-constraints.md §3.4).
+          */}
+          {wheelchair ? (
+            <Row gap={Spacing.s2} style={styles.fact}>
+              <View style={styles.factLabel}>
+                <Caption tone="secondary">입구</Caption>
+              </View>
+              <View style={styles.factValue}>
+                <Body small>휠체어로 들어갈 수 있어요</Body>
+              </View>
+            </Row>
+          ) : null}
         </View>
       ) : null}
 
@@ -430,7 +605,7 @@ export function PlaceDetailSheet({
         ) : null}
         {/* 사진·후기·메뉴·거리뷰는 저쪽에 있습니다. 우리가 옮겨 오지 않습니다. */}
         <Way icon="map-pin" label="구글 지도" onPress={() => openPlace(place, info?.mapUrl)} />
-        {scrap ? (
+        {scrap && !followTo ? (
           <Way
             icon="bookmark"
             label={scrap.kept ? '담겼어요' : '보석함'}
@@ -443,7 +618,7 @@ export function PlaceDetailSheet({
 
       {/* 사람 말은 사실 다음입니다. 여기까지가 "여기가 어떤 데지" 에 대한
           답이고, 그다음은 이 곳을 어디에 담을지입니다. */}
-      {talk ? (
+      {talk && !followTo ? (
         <>
           <Band />
           {shown > 0 ? (
@@ -482,7 +657,7 @@ export function PlaceDetailSheet({
         </>
       ) : null}
 
-      {actions ? (
+      {actions && !followTo ? (
         <>
           <Band />
           {actions}
@@ -640,6 +815,10 @@ const styles = StyleSheet.create({
   },
   week: {
     gap: 2,
+  },
+  /* 따라간 자리의 머리. 어디서 왔는지와 돌아가는 길 · 바꾸는 길. */
+  followed: {
+    gap: Spacing.s2,
   },
   /* 나가는 길들. 칸을 고르게 나눕니다. */
   ways: {

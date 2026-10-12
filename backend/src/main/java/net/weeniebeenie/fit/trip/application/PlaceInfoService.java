@@ -154,7 +154,45 @@ public class PlaceInfoService {
               밝히라고 합니다. 이름을 못 받으면 사진을 안 씁니다.
             */
             "photos.name",
-            "photos.authorAttributions.displayName");
+            "photos.authorAttributions.displayName",
+            /*
+              휠체어로 입구를 지나갈 수 있는지.
+
+              <p>{@code accessibilityOptions} 는 입구 · 화장실 · 주차 · 좌석 넷을
+              함께 주지만 입구 하나만 달라고 합니다. 「들어갈 수 있는가」 가 첫
+              물음이고, 화면도 그 한 줄만 씁니다 — 화면이 안 쓰는 것은 받지
+              않는다는 위의 말 그대로입니다.
+
+              <p>등급은 Pro 입니다. 이 요청은 영업시간 때문에 이미 Enterprise 라
+              값이 오르지 않습니다(docs/2026-10/plan-constraints.md §6.1).
+            */
+            "accessibilityOptions.wheelchairAccessibleEntrance",
+            /*
+              옮긴 자리.
+
+              <p>아주 닫은 가게가 다른 자리로 옮겼으면 구글이 새 자리의 번호를
+              줍니다(2025-10 부터). 지금은 「문을 닫은 곳이에요」 까지만 말해서,
+              망한 것인지 옆 골목으로 옮긴 것인지를 사람이 구글 지도로 나가
+              알아봐야 했습니다.
+
+              <p>{@code movedPlace}(자원 이름)는 받지 않습니다 — 같은 것의 다른
+              모양이고, 우리는 번호로 들고 있습니다.
+            */
+            "movedPlaceId",
+            /*
+              이 곳의 이름 · 좌표 · 주소.
+
+              <p>옮긴 자리를 보려면 그 번호로 이 길을 한 번 더 지나옵니다. 그런데
+              새 자리는 우리 DB 에 없는 곳이라 번호만으로는 판을 그릴 이름과
+              좌표가 없고, 「여기로 바꾸기」 가 보낼 좌표도 없습니다. 그래서
+              어느 곳을 물어도 셋을 함께 받습니다.
+
+              <p>셋 다 Enterprise 아래라(이름 Pro, 좌표 · 주소 Essentials) 값이
+              오르지 않습니다(docs/2026-10/plan-moved-place.md §6.1).
+            */
+            "displayName",
+            "location",
+            "formattedAddress");
 
     private final GoogleQuota quota;
     private final GoogleQuotaKey quotaKey;
@@ -224,7 +262,7 @@ public class PlaceInfoService {
             }
             Raw raw = lookup(place.getPlaceId());
             if (raw != null) {
-                out.add(viewOf(place.getId(), raw, day.getIso()));
+                out.add(viewOf(place.getId(), place.getPlaceId(), raw, day.getIso()));
             }
             if (out.size() >= MAX_PLACES) {
                 break;
@@ -250,7 +288,7 @@ public class PlaceInfoService {
             return null;
         }
         Raw raw = lookup(googleId);
-        return raw == null ? null : viewOf(googleId, raw, on);
+        return raw == null ? null : viewOf(googleId, googleId, raw, on);
     }
 
     private Raw lookup(String googleId) {
@@ -268,8 +306,11 @@ public class PlaceInfoService {
      *
      * <p>날짜가 없는 여행이면 그 장소가 있는 곳의 오늘로 봅니다. 여기 서버의
      * 오늘이 아닙니다 — 서울이 화요일 아침일 때 파리는 아직 월요일 밤입니다.
+     *
+     * @param placeId  화면에 돌려줄 번호. 하루치를 볼 때는 우리 장소 id 입니다
+     * @param googleId 물어본 구글 번호. 옮긴 자리가 자기를 가리키는지 볼 때 씁니다
      */
-    private static Info viewOf(String placeId, Raw raw, LocalDate on) {
+    static Info viewOf(String placeId, String googleId, Raw raw, LocalDate on) {
         LocalDate target = on;
         if (target == null && raw.utcOffsetMinutes() != null) {
             ZoneOffset zone = ZoneOffset.ofTotalSeconds(raw.utcOffsetMinutes() * 60);
@@ -293,10 +334,38 @@ public class PlaceInfoService {
             closed = spans.isEmpty() && text != null && looksClosed(text);
         }
 
+        boolean gone = CLOSED_PERMANENTLY.equals(raw.status());
         return new Info(placeId, text, closed, spans, raw.hours(),
                 raw.phone(), raw.website(), raw.rating(), raw.ratingCount(),
-                CLOSED_PERMANENTLY.equals(raw.status()), raw.status(), raw.mapUrl(),
-                raw.photoName(), raw.photoBy());
+                gone, raw.status(), raw.mapUrl(),
+                raw.photoName(), raw.photoBy(), raw.wheelchairEntrance(),
+                movedTo(gone, googleId, raw.movedPlaceId()),
+                raw.name(), raw.lat(), raw.lng(), raw.address());
+    }
+
+    /**
+     * 옮긴 자리를 가리킬지.
+     *
+     * <p><b>아주 닫았고, 번호가 있고, 그 번호가 자기가 아닐 때만</b>입니다.
+     *
+     * <ul>
+     *   <li>영업 중인 가게에 번호가 와도 띄우지 않습니다. 구글 문서는 「아주
+     *       닫았고 옮겼으면」 이라고 적었고, 그 밖의 경우는 무슨 뜻인지 모릅니다.
+     *       모르는 것을 「옮겼어요」 라고 말하면 멀쩡히 여는 가게를 두고 사람을
+     *       다른 데로 보냅니다.</li>
+     *   <li>자기 번호를 가리키면 따라가도 같은 판이 다시 뜨고, 거기서 또 같은
+     *       줄이 뜹니다. 고리입니다.</li>
+     * </ul>
+     *
+     * <p>한 칸만 가리킵니다. 새 자리도 옮겼을지는 사람이 그 판을 열 때 그 판이
+     * 다시 묻습니다 — 서버가 끝까지 따라가면 한 번 보는 데 상세 호출이 몇 번
+     * 나갈지 모릅니다.
+     */
+    private static String movedTo(boolean gone, String googleId, String moved) {
+        if (!gone || moved == null || moved.isBlank() || moved.equals(googleId)) {
+            return null;
+        }
+        return moved;
     }
 
     /**
@@ -339,10 +408,17 @@ public class PlaceInfoService {
             return null;
         }
 
-        if (r == null) {
-            return null;
-        }
+        return r == null ? null : rawOf(r);
+    }
 
+    /**
+     * 구글 응답 한 장을 우리 모양으로 읽습니다.
+     *
+     * <p>{@link #ask} 안에 있던 것을 떼어 냈습니다. 구글 키가 없는 확인용
+     * 서버에서는 응답이 한 번도 안 오므로, 읽는 자리가 맞는지는 고정 JSON 을
+     * 먹여 단위 시험으로만 볼 수 있습니다 — 그 시험이 부를 자리입니다.
+     */
+    static Raw rawOf(JsonNode r) {
         List<String> hours = new ArrayList<>();
         for (JsonNode line : r.path("regularOpeningHours").path("weekdayDescriptions")) {
             hours.add(line.asText());
@@ -359,7 +435,31 @@ public class PlaceInfoService {
                 text(r, "businessStatus"),
                 text(r, "googleMapsUri"),
                 firstPhoto(r),
-                firstPhotoBy(r));
+                firstPhotoBy(r),
+                wheelchairEntranceOf(r),
+                text(r, "movedPlaceId"),
+                text(r.path("displayName"), "text"),
+                coordOf(r, "latitude"),
+                coordOf(r, "longitude"),
+                text(r, "formattedAddress"));
+    }
+
+    private static Double coordOf(JsonNode r, String axis) {
+        JsonNode v = r.path("location").path(axis);
+        return v.isNumber() ? v.asDouble() : null;
+    }
+
+    /**
+     * 휠체어로 입구를 지나갈 수 있는지.
+     *
+     * <p>세 갈래입니다 — 된다({@code TRUE}), 안 된다({@code FALSE}), 모른다
+     * ({@code null}). 구글은 모르는 가게에 칸 자체를 안 보냅니다. 그것을
+     * {@code false} 로 읽으면 「모름」 이 「못 들어감」 이 되어, 들어갈 수 있는
+     * 곳을 사람이 지나칩니다. 칸이 있고 참거짓일 때만 그 값을 씁니다.
+     */
+    private static Boolean wheelchairEntranceOf(JsonNode r) {
+        JsonNode v = r.path("accessibilityOptions").path("wheelchairAccessibleEntrance");
+        return v.isBoolean() ? v.booleanValue() : null;
     }
 
     /**
@@ -536,15 +636,34 @@ public class PlaceInfoService {
                        /** 사진의 이름. 그림 주소는 /api/places/photo 가 풀어 줍니다. */
                        String photoName,
                        /** 찍은 사람. 사진을 쓰려면 함께 적어야 합니다. */
-                       String photoBy) {
+                       String photoBy,
+                       /**
+                        * 휠체어로 입구를 지나갈 수 있는지. 모르면 null.
+                        *
+                        * <p>{@code false} 도 그대로 내보냅니다. 화면이 그것을 띄울지는
+                        * 화면이 정합니다(지금은 안 띄움 — plan-constraints.md §10.2).
+                        */
+                       Boolean wheelchairEntrance,
+                       /**
+                        * 옮긴 자리의 구글 번호. 아주 닫았고 다른 곳을 가리킬 때만
+                        * 있습니다 — {@link #movedTo} 를 보세요.
+                        */
+                       String movedTo,
+                       /** 구글이 부르는 이름. 옮긴 자리 판의 제목이 됩니다. */
+                       String name,
+                       Double lat, Double lng,
+                       String address) {
     }
 
     /** 구글에서 받은 주간 원본. 날짜에 매이지 않아 캐시에 둘 수 있습니다. */
-    private record Raw(List<String> hours, Map<Integer, List<Span>> spansByDay,
-                       Integer utcOffsetMinutes, String phone, String website,
-                       Double rating, Integer ratingCount,
-                       String status, String mapUrl,
-                       String photoName, String photoBy) {
+    record Raw(List<String> hours, Map<Integer, List<Span>> spansByDay,
+               Integer utcOffsetMinutes, String phone, String website,
+               Double rating, Integer ratingCount,
+               String status, String mapUrl,
+               String photoName, String photoBy,
+               Boolean wheelchairEntrance,
+               String movedPlaceId,
+               String name, Double lat, Double lng, String address) {
     }
 
     private record Cached(Raw raw, Instant until) {

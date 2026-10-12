@@ -61,6 +61,21 @@ if (r.status === 200) {
   T("키 노출 (키 없어 건너뜀)", true);
 }
 
+console.log("\n[3-1] 번호 하나로 상세 — 옮긴 자리를 따라갈 때 이 길을 씁니다");
+/* 「새 자리 보기」 를 누르면 판이 옮긴 자리 번호로 이 길을 부릅니다
+   (plan-moved-place.md). 그 번호는 우리 DB 에 없는 곳이라, 모르는 번호가
+   와도 500 이 아니라 빈 답이어야 판이 「불러오지 못했어요」 를 말할 수
+   있습니다. 확인용 서버에는 키가 없어 늘 빈 답입니다. */
+r = await call("GET", "/api/places/ChIJ-no-such-place-0000/info");
+T("로그인 없이는 401", r.status === 401, r.data);
+r = await call("GET", "/api/places/ChIJ-no-such-place-0000/info", { token });
+if (r.status === 200 && r.data?.info) {
+  /* 키가 있는 서버라면 구글이 모르는 번호에 답을 줄 리 없습니다. */
+  T("모르는 번호에 정보가 오지 않음", false, r.data);
+} else {
+  T("모르는 번호 · 키 없음은 200 에 빈 정보(500 아님)", r.status === 200 && r.data?.info == null, r.data);
+}
+
 console.log("\n[4] 잘못 보낸 요청");
 r = await call("POST", "/api/auth/login", { raw: '{"email":' });
 T("깨진 JSON 은 400", r.status === 400, r.data);

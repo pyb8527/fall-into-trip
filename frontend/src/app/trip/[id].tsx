@@ -2127,6 +2127,34 @@ export default function TripScreen() {
               }
             : null
         }
+        /*
+          옮긴 자리로 바꾸기 — 고칠 수 있는 사람에게만.
+
+          <p>이미 있는 {@code PATCH /api/places/{id}} 를 그대로 씁니다. 권한과
+          버전 확인이 거기 있고, 성공하면 일정이 다시 읽혀 영업 정보 · 이동
+          시간도 새 자리로 다시 묻습니다.
+
+          <p>이름은 구글 이름으로 바꿉니다. 옛 이름이 남으면 옮기기 전 가게를
+          가리킵니다. 원어 이름(ja · en)도 지웁니다 — 장소 고치기 판이 다른
+          곳으로 바꿀 때 하는 것과 같습니다. 메모 · 시각 · 비용은 그대로 둡니다.
+        */
+        replaceWith={
+          canEdit && looking
+            ? async (to) => {
+                await api.patch(`/api/places/${looking.place.id}`, {
+                  name: to.name,
+                  lat: to.lat,
+                  lng: to.lng,
+                  placeId: to.placeId,
+                  ja: '',
+                  en: '',
+                  version: looking.place.version,
+                });
+                setLooking(null);
+                refresh();
+              }
+            : undefined
+        }
         onClose={() => setLooking(null)}
       />
 
@@ -4394,9 +4422,12 @@ function asDistance(meters: number) {
  */
 function PlaceHours({ info, at }: { info: PlaceInfo; at?: string | null }) {
   if (info.permanentlyClosed) {
+    /* 옮긴 자리가 있으면 그것까지 말합니다. 글자만 둡니다 — 줄은 이미 누르면
+       장소 판이 열리고, 「새 자리 보기」 는 거기 있습니다. 한 줄에 누를 곳이
+       둘이 되지 않게 합니다(plan-moved-place.md §3.6). */
     return (
       <Caption tone="danger" strong>
-        문을 닫은 곳이에요
+        {info.movedTo ? '문을 닫은 곳이에요 · 옮긴 자리가 있어요' : '문을 닫은 곳이에요'}
       </Caption>
     );
   }

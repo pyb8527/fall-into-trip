@@ -638,6 +638,32 @@ export type PlaceInfo = {
   photoName: Maybe<string>;
   /** 찍은 사람. 사진을 쓰려면 함께 적어야 합니다 — 구글이 그렇게 요구합니다. */
   photoBy: Maybe<string>;
+  /**
+   * 휠체어로 입구를 지나갈 수 있는지. 구글이 모르면 null.
+   *
+   * <p>{@code false} 도 옵니다. 화면은 {@code true} 일 때만 한 줄을 세웁니다 —
+   * 틀린 「못 들어가요」 는 갈 수 있는 곳을 사람이 아예 빼게 만듭니다
+   * (docs/2026-10/plan-constraints.md §10.2).
+   */
+  wheelchairEntrance?: Maybe<boolean>;
+  /**
+   * 옮긴 자리의 구글 번호.
+   *
+   * <p>아주 닫았고, 구글이 다른 자리를 가리킬 때만 옵니다. 영업 중이거나 자기를
+   * 가리키면 서버가 비워 둡니다. 한 칸만 가리킵니다 — 새 자리도 옮겼으면 그
+   * 판을 열 때 거기서 다시 나옵니다.
+   */
+  movedTo?: Maybe<string>;
+  /**
+   * 구글이 부르는 이름 · 좌표 · 주소.
+   *
+   * <p>옮긴 자리는 우리 DB 에 없는 곳이라, 그 번호로 이 정보를 받아야 판을
+   * 그리고 「여기로 바꾸기」 에 좌표를 실을 수 있습니다.
+   */
+  name?: Maybe<string>;
+  lat?: Maybe<number>;
+  lng?: Maybe<number>;
+  address?: Maybe<string>;
 };
 
 /* -------------------------------------------------------------- 게시판 */
