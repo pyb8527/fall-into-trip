@@ -65,6 +65,7 @@ public class ExpenseService {
     private final ExpenseRepository expenses;
     private final TripRateRepository rates;
     private final net.weeniebeenie.fit.expense.domain.SettleMarkRepository marks;
+    private final SettlePaymentRepository payments;
     private final DayRepository days;
     private final PlaceRepository places;
     private final UserRepository users;
@@ -90,6 +91,10 @@ public class ExpenseService {
      * <p>계산은 저장하지 않습니다. 지출이 하나 바뀌면 답이 달라지는데, 저장해
      * 두면 그 둘이 어긋난 채로 남습니다. 볼 때마다 셉니다 — 몇십 건짜리
      * 계산이라 그 편이 쌉니다.
+     *
+     * <p>이미 주고받은 돈({@link SettlePayment})은 지출과 함께 셈에 넣습니다.
+     * 그래서 나오는 잔액과 송금 줄은 <b>아직 남은 것</b>입니다 — 다 주고받은
+     * 뒤에 지출을 하나 더 적으면 그 지출의 몫만 새 줄로 섭니다.
      */
     @Transactional(readOnly = true)
     public List<Books> settle(AuthPrincipal me, String tripId) {
@@ -114,9 +119,27 @@ public class ExpenseService {
             byCurrency.computeIfAbsent(e.getCurrency(), c -> new ArrayList<>()).add(e);
         }
 
+        /*
+          주고받은 돈도 통화별로.
+
+          <p>지출이 하나도 남지 않은 통화에 오간 돈만 남는 일이 있습니다 — 엔으로
+          주고받은 뒤 엔 지출을 모두 지운 경우입니다. 그 통화도 장부로 냅니다.
+          받은 사람이 그 돈을 돌려줘야 하는 셈이고, 화면에서 그 기록을 거둘 수도
+          있어야 합니다.
+        */
+        Map<String, List<SettlePayment>> paidBy = new LinkedHashMap<>();
+        for (SettlePayment p : payments.findAllByTripIdOrderByConfirmedAtAsc(tripId)) {
+            paidBy.computeIfAbsent(p.getCurrency(), c -> new ArrayList<>()).add(p);
+            byCurrency.computeIfAbsent(p.getCurrency(), c -> new ArrayList<>());
+        }
+
         List<Books> out = new ArrayList<>();
         byCurrency.forEach((currency, list) -> {
-            Settlement made = calculator.calculate(memberIds, list, this::sharesOf);
+            List<SettlePayment> paidHere = paidBy.getOrDefault(currency, List.of());
+            Settlement made = calculator.calculate(memberIds, list, this::sharesOf,
+                    paidHere.stream()
+                            .map(p -> new Settlement.Transfer(p.getFromId(), p.getToId(), p.getAmount()))
+                            .toList());
 
             List<Owed> owes = made.balances().entrySet().stream()
                     .map(b -> new Owed(b.getKey(), names.getOrDefault(b.getKey(), "나간 사람"),
@@ -147,7 +170,13 @@ public class ExpenseService {
               화면이 「0원」을 그럴듯하게 띄웁니다.
             */
             Long krw = Exchange.toKrw(total, currency, noted.get(currency));
-            out.add(new Books(currency, Currencies.decimals(currency), total, krw, owes, sends));
+            List<Paid> paid = paidHere.stream()
+                    .map(p -> new Paid(p.getId(),
+                            p.getFromId(), names.getOrDefault(p.getFromId(), "나간 사람"),
+                            p.getToId(), names.getOrDefault(p.getToId(), "나간 사람"),
+                            p.getAmount(), p.getConfirmedAt()))
+                    .toList();
+            out.add(new Books(currency, Currencies.decimals(currency), total, krw, owes, sends, paid));
         });
         return out;
     }
@@ -601,7 +630,9 @@ public class ExpenseService {
      * 누가 누구에게 얼마를.
      *
      * @param sentAt     보낸 사람이 「보냈어요」를 누른 때. 금액이 그때와 같을 때만
-     * @param receivedAt 받은 사람이 「받았어요」를 누른 때. 둘 다 있으면 끝난 줄입니다
+     * @param receivedAt 받은 사람이 「받았어요」를 누른 때. 둘 다 눌리면 그 돈은
+     *                   {@link Paid} 로 옮겨 가고 이 줄은 사라지므로, 실제로는
+     *                   둘 중 하나만 옵니다
      */
     public record Send(String fromUserId, String fromName,
                        String toUserId, String toName, int amount,
@@ -621,6 +652,14 @@ public class ExpenseService {
      * <p>화면이 본 금액을 함께 보냅니다. 그 사이에 지출이 바뀌어 줄이 달라졌으면
      * 409 — 4만 원 줄에 3만 원짜리 「보냈어요」를 달지 않습니다. 금액이 바뀐
      * 줄에 새로 누르면 옛 표시는 지우고 새로 답니다.
+     *
+     * <h3>둘 다 누르면 오간 돈이 됩니다</h3>
+     *
+     * <p>이번 누름으로 양쪽이 다 찼으면 그 금액을 {@link SettlePayment} 한 건으로
+     * 적고 표시는 지웁니다. 같은 트랜잭션입니다 — 표시만 지워지고 기록이 안
+     * 남으면 오간 돈이 사라지고, 둘 다 남으면 같은 돈이 두 번 셈에 듭니다.
+     * 그 뒤로 이 줄은 셈에서 빠집니다(이미 갚은 빚이라). 줄을 접어 두고
+     * 「주고받았어요」를 붙이던 옛 방식은 지출이 늘면 이 돈을 잊었습니다.
      *
      * <p>앱이 대신 독촉하지 않습니다. 이 표시는 아무에게도 알림을 보내지 않습니다.
      */
@@ -661,19 +700,66 @@ public class ExpenseService {
         if (received != null) {
             row.setReceivedAt(received ? now : null);
         }
-        marks.save(row);
+        if (row.getSentAt() != null && row.getReceivedAt() != null) {
+            payments.save(new SettlePayment(tripId, fromId, toId, currency, amount, now));
+            /* 표시는 먼저 누른 쪽이 남겨 둔 줄입니다. 한 사람이 양쪽일 수는
+               없으니 대개 있지만, 없으면 지울 것도 없습니다. */
+            if (marks.existsById(key)) {
+                marks.deleteById(key);
+            }
+        } else {
+            marks.save(row);
+        }
         audit.log(me.id(), "settle.mark", tripId,
                 Map.of("to", toId, "currency", currency, "sent", String.valueOf(sent),
                         "received", String.valueOf(received)));
     }
 
     /**
+     * 주고받은 기록을 거둡니다 — 잘못 누른 「받았어요」 같은 것.
+     *
+     * <p>주고받은 두 사람만 거둡니다. 둘 중 누구든 「실은 안 받았어」를 말할 수
+     * 있어야 하지만, 같은 여행의 다른 사람이 남의 돈 기록을 지우면 두 사람 모르게
+     * 셈이 바뀝니다.
+     *
+     * <p>거두면 그 돈은 셈에서 빠지고 송금 줄이 다시 섭니다. 다른 여행의 번호로
+     * 부르면 없는 것과 같이 404 입니다 — 남의 여행에 그 번호가 있는지 알려 주지
+     * 않습니다.
+     */
+    @Transactional
+    public void undoPayment(AuthPrincipal me, String tripId, String paymentId) {
+        access.requireCanRead(tripId, me.id());
+        SettlePayment payment = payments.findById(paymentId)
+                .filter(p -> p.getTripId().equals(tripId))
+                .orElseThrow(() -> ApiException.notFound("그런 기록이 없어요."));
+        if (!me.id().equals(payment.getFromId()) && !me.id().equals(payment.getToId())) {
+            throw ApiException.forbidden("주고받은 두 사람만 거둘 수 있어요.");
+        }
+        payments.delete(payment);
+        audit.log(me.id(), "settle.payment.undo", tripId,
+                Map.of("payment", paymentId, "currency", payment.getCurrency(),
+                        "amount", payment.getAmount()));
+    }
+
+    /**
+     * 주고받은 돈 한 건.
+     *
+     * @param at 둘째 사람이 누른 때 — 그때 주고받기가 끝났습니다
+     */
+    public record Paid(String id, String fromUserId, String fromName,
+                       String toUserId, String toName, int amount, java.time.Instant at) {
+    }
+
+    /**
      * 통화 하나의 장부.
      *
-     * @param krw 이 통화 합계를 적어 둔 환율로 원화로 바꾼 값. 환율을 안
-     *            적어 두었으면 {@code null} — 「대충 얼마」로만 씁니다
+     * @param krw       이 통화 합계를 적어 둔 환율로 원화로 바꾼 값. 환율을 안
+     *                  적어 두었으면 {@code null} — 「대충 얼마」로만 씁니다
+     * @param balances  <b>아직</b> 받을 것 · 줄 것. 주고받은 돈을 넣고 센 값입니다
+     * @param transfers 아직 남은 송금 줄. 다 주고받았으면 비어 있습니다
+     * @param paid      이미 주고받은 기록
      */
     public record Books(String currency, int decimals, int total, Long krw,
-                        List<Owed> balances, List<Send> transfers) {
+                        List<Owed> balances, List<Send> transfers, List<Paid> paid) {
     }
 }

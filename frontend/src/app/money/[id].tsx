@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { StyleSheet, Text, TextInput, View, type TextStyle } from 'react-native';
 
 import { api, ApiError, UNEXPECTED } from '@/api/client';
-import type { Books, Person, Spend, Transfer, TripDetail, TripRates } from '@/api/types';
+import type { Books, Paid, Person, Spend, Transfer, TripDetail, TripRates } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
 import {
@@ -938,6 +938,8 @@ function Settle({
 }) {
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
+  /* 「거두기」를 한 번 누른 기록. 한 번 더 물어 확인합니다(창을 띄우지 않고 그 자리에서). */
+  const [undoing, setUndoing] = useState<string | null>(null);
 
   /*
     「보냈어요 / 받았어요」.
@@ -968,6 +970,29 @@ function Settle({
     }
   }
 
+  /*
+    주고받은 기록 거두기.
+
+    <p>「받았어요」를 잘못 눌렀을 때의 길입니다. 거두면 서버가 그 돈을 셈에서
+    빼고, 송금 줄이 다시 섭니다. 주고받은 두 사람만 거둡니다 — 다른 사람이
+    지우면 두 사람 모르게 셈이 바뀝니다.
+  */
+  async function undo(p: Paid) {
+    setBusy(true);
+    setFailed(null);
+    try {
+      await api.delete(
+        `/api/trips/${encodeURIComponent(tripId)}/settlement/payments/${encodeURIComponent(p.id)}`,
+      );
+    } catch (e) {
+      setFailed(e instanceof ApiError ? e.message : UNEXPECTED);
+    } finally {
+      setBusy(false);
+      setUndoing(null);
+      onChanged();
+    }
+  }
+
   if (loading && books.length === 0) {
     return <Loading />;
   }
@@ -975,9 +1000,10 @@ function Settle({
     return <Empty message="아직 나눌 것이 없어요." />;
   }
 
-  /* 주고받을 것이 하나도 없으면 그 말만 합니다. 0 인 줄만 늘어놓은 표는
-     읽을 것이 없습니다. */
-  const done = books.every((book) => book.transfers.length === 0);
+  /* 주고받을 것도, 주고받은 기록도 하나도 없으면 그 말만 합니다. 0 인 줄만
+     늘어놓은 표는 읽을 것이 없습니다. 기록이 있으면 장부를 그대로 둡니다 —
+     잘못 누른 「받았어요」를 거둘 자리가 있어야 합니다. */
+  const done = books.every((book) => book.transfers.length === 0 && !book.paid?.length);
   if (done) {
     return <Empty icon="check" message="정산이 끝났어요." />;
   }
@@ -1013,56 +1039,119 @@ function Settle({
             <>
               <Divider />
               <Caption tone="secondary">이렇게 주고받으면 끝나요</Caption>
-              {book.transfers.map((t, i) => {
-                /* 둘 다 눌렀으면 끝난 줄입니다. 접어서 흐리게 둡니다 —
-                   지우면 「아까 그 줄 어디 갔지」가 됩니다. */
-                const settled = !!t.sentAt && !!t.receivedAt;
+              {/* 둘 다 누른 줄은 여기 없습니다. 서버가 그 돈을 「주고받은 기록」으로
+                  옮겨 셈에 넣었고, 남은 줄은 아직 오가지 않은 몫뿐입니다. 전에는
+                  끝난 줄에 「주고받았어요」를 붙여 두었는데, 지출이 늘면 그 표시가
+                  새 금액 줄에 그대로 남거나 이미 보낸 돈을 잊었습니다. */}
+              {book.transfers.map((t, i) => (
+                <View key={i} style={styles.sendRow}>
+                  <Split style={styles.settleRow}>
+                    <Body>
+                      {t.fromName} → {t.toName}
+                    </Body>
+                    <Text style={[styles.amount, styles.give]}>
+                      {money(t.amount, book.currency, book.decimals)}
+                    </Text>
+                  </Split>
+                  <Row gap={Spacing.s2}>
+                    {t.sentAt ? (
+                      <Caption tone="secondary">{t.fromName} 님이 보냈대요</Caption>
+                    ) : null}
+                    {t.receivedAt ? (
+                      <Caption tone="secondary">{t.toName} 님이 받았대요</Caption>
+                    ) : null}
+                    {me === t.fromUserId ? (
+                      <Button
+                        label={t.sentAt ? '보냈어요 거두기' : '보냈어요'}
+                        variant={t.sentAt ? 'ghost' : 'secondary'}
+                        compact
+                        busy={busy}
+                        onPress={() => mark(t, book.currency, { sent: !t.sentAt })}
+                      />
+                    ) : null}
+                    {me === t.toUserId ? (
+                      <Button
+                        label={t.receivedAt ? '받았어요 거두기' : '받았어요'}
+                        variant={t.receivedAt ? 'ghost' : 'secondary'}
+                        compact
+                        busy={busy}
+                        onPress={() => mark(t, book.currency, { received: !t.receivedAt })}
+                      />
+                    ) : null}
+                  </Row>
+                </View>
+              ))}
+            </>
+          ) : book.paid?.length ? (
+            <>
+              <Divider />
+              <Caption tone="success">다 주고받았어요</Caption>
+            </>
+          ) : null}
+
+          {/* 이미 주고받은 돈. 위 잔액과 송금 줄은 이것을 넣고 센 것이라, 무엇이
+              빠졌는지 여기서 보입니다. */}
+          {book.paid?.length ? (
+            <View style={styles.paidList}>
+              <Caption tone="secondary">주고받은 기록</Caption>
+              {book.paid.map((p) => {
+                const mine = me === p.fromUserId || me === p.toUserId;
+                const asking = undoing === p.id;
                 return (
-                  <View key={i} style={styles.sendRow}>
+                  <View key={p.id} style={styles.sendRow}>
                     <Split style={styles.settleRow}>
-                      <Body tone={settled ? 'muted' : undefined}>
-                        {t.fromName} → {t.toName}
+                      <Body small tone="secondary">
+                        {p.fromName} → {p.toName} · {dayOf(p.at)}
                       </Body>
-                      <Text style={[styles.amount, settled ? styles.doneAmount : styles.give]}>
-                        {money(t.amount, book.currency, book.decimals)}
+                      <Text style={[styles.amount, styles.doneAmount]}>
+                        {money(p.amount, book.currency, book.decimals)}
                       </Text>
                     </Split>
-                    {settled ? (
-                      <Caption tone="success">주고받았어요</Caption>
-                    ) : (
+                    {mine ? (
                       <Row gap={Spacing.s2}>
-                        {t.sentAt ? (
-                          <Caption tone="secondary">{t.fromName} 님이 보냈대요</Caption>
-                        ) : null}
-                        {me === t.fromUserId ? (
+                        {asking ? (
+                          <>
+                            <Caption tone="secondary">거두면 이 돈이 다시 셈에 들어가요</Caption>
+                            <Button
+                              label="거두기"
+                              variant="secondary"
+                              compact
+                              busy={busy}
+                              onPress={() => undo(p)}
+                            />
+                            <Button
+                              label="그만두기"
+                              variant="ghost"
+                              compact
+                              onPress={() => setUndoing(null)}
+                            />
+                          </>
+                        ) : (
                           <Button
-                            label={t.sentAt ? '보냈어요 거두기' : '보냈어요'}
-                            variant={t.sentAt ? 'ghost' : 'secondary'}
+                            label="거두기"
+                            variant="ghost"
                             compact
                             busy={busy}
-                            onPress={() => mark(t, book.currency, { sent: !t.sentAt })}
+                            onPress={() => setUndoing(p.id)}
                           />
-                        ) : null}
-                        {me === t.toUserId ? (
-                          <Button
-                            label="받았어요"
-                            variant="secondary"
-                            compact
-                            busy={busy}
-                            onPress={() => mark(t, book.currency, { received: true })}
-                          />
-                        ) : null}
+                        )}
                       </Row>
-                    )}
+                    ) : null}
                   </View>
                 );
               })}
-            </>
+            </View>
           ) : null}
         </View>
       ))}
     </>
   );
+}
+
+/** 주고받은 날. 「10월 3일」. 시각까지는 안 적습니다 — 언제쯤인지만 알면 됩니다. */
+function dayOf(iso: string) {
+  const at = new Date(iso);
+  return Number.isNaN(at.getTime()) ? '' : `${at.getMonth() + 1}월 ${at.getDate()}일`;
 }
 
 /** 쓴 돈 적기. */
@@ -1116,7 +1205,7 @@ function SpendSheet({
   /* 장소는 날에 딸려 있습니다. 날을 바꾸면 비웁니다 — 안 그러면 어제 고른
      가게가 오늘 지출에 붙습니다. */
   const [placeId, setPlaceId] = useState<string | null>(spend?.placeId ?? null);
-  const [cat, setCat] = useState(spend?.cat ?? '');
+const [cat, setCat] = useState(spend?.cat ?? '');
   /* 비어 있으면 전원이 나눕니다. 여행 경비는 대개 그렇습니다. */
   const [share, setShare] = useState<string[]>(spend?.share ?? []);
   const [busy, setBusy] = useState(false);
@@ -1454,10 +1543,16 @@ const styles = StyleSheet.create({
     gap: Spacing.s1,
     paddingBottom: Spacing.s2,
   },
-  /* 끝난 줄의 금액. 주황을 빼고 흐리게 둡니다 — 더 할 일이 없습니다. */
+  /* 주고받은 기록의 금액. 주황을 빼고 흐리게 둡니다 — 더 할 일이 없습니다.
+     줄은 긋지 않습니다. 「취소된 돈」으로 읽히면 안 됩니다 — 실제로 오간
+     돈입니다. */
   doneAmount: {
     color: Colors.textMuted,
-    textDecorationLine: 'line-through',
+  },
+  /* 주고받은 기록 묶음. 송금 줄과 떨어뜨려 「이미 끝난 것」으로 읽히게. */
+  paidList: {
+    paddingTop: Spacing.s3,
+    gap: Spacing.s1,
   },
 
   /* -------------------------------------------------------------- 요약 */

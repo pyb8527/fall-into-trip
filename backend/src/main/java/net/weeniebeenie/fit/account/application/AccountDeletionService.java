@@ -43,7 +43,8 @@ import java.util.Map;
  *       지웁니다. 친구들이 같이 짠 일정이 내 탈퇴로 사라지면 안 됩니다</li>
  *   <li><b>내가 주인인 모임</b> — 같은 규칙입니다</li>
  *   <li><b>「탈퇴한 사람」으로 바꾸기</b> — 지출의 낸 사람 · 적은 사람 ·
- *       나눌 사람, 장소의 고친 사람, 챙길 것을 만든 사람. 지우면 남은 사람의
+ *       나눌 사람, 정산에서 주고받은 돈의 두 사람, 장소의 고친 사람, 챙길 것을
+ *       만든 사람. 지우면 남은 사람의
  *       정산이 바뀝니다({@link User#WITHDRAWN_ID})</li>
  *   <li><b>세션 끊기</b> — 다른 기기의 로그인도 바로 끝납니다</li>
  *   <li><b>지울 사진 파일 모으기</b> — 줄은 CASCADE 로 사라지지만 디스크의
@@ -295,6 +296,22 @@ public class AccountDeletionService {
                 WHERE jsonb_typeof(e.share) = 'array'
                   AND e.share @> jsonb_build_array(CAST(:me AS text))
                 """, swap);
+        /*
+          주고받은 돈(V62). 지출의 낸 사람과 같은 까닭으로 옮깁니다 — 탈퇴한
+          사람에게 보낸 1,900엔이 사라지면 보낸 사람에게 「1,900엔 보내세요」가
+          다시 섭니다.
+
+          <p>먼저 탈퇴한 동행자와 주고받은 기록은 옮기면 「탈퇴한 사람 →
+          탈퇴한 사람」이 됩니다. 그런 줄은 표가 받지 않고(from ≠ to), 한
+          자리에 +와 −가 같이 들어가 셈에도 아무 영향이 없으므로 지웁니다.
+        */
+        int paidBack = update("""
+                DELETE FROM settle_payments
+                WHERE (from_id = :me AND to_id = :gone) OR (from_id = :gone AND to_id = :me)
+                """, swap);
+        paidBack += update("UPDATE settle_payments SET from_id = :gone WHERE from_id = :me", swap);
+        paidBack += update("UPDATE settle_payments SET to_id = :gone WHERE to_id = :me", swap);
+        done.put("settlePayments", paidBack);
         update("UPDATE places SET updated_by = :gone WHERE updated_by = :me", swap);
         update("UPDATE trip_items SET created_by = :gone WHERE created_by = :me", swap);
         done.put("expensesPaid", paid);

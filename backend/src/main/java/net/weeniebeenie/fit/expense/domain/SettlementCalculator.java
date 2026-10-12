@@ -23,10 +23,12 @@ public class SettlementCalculator {
      * @param memberIds 이 여행의 동행자. 이 목록에 없는 사람은 계산에서 뺍니다.
      * @param expenses  지출 목록
      * @param sharesOf  지출 하나를 나눠 낼 사람들. 비어 있으면 동행자 전원으로 봅니다.
+     * @param paid      이미 주고받은 돈({@link SettlePayment}). 같은 통화의 것만 넘깁니다.
      */
     public Settlement calculate(List<String> memberIds,
                                 List<Expense> expenses,
-                                java.util.function.Function<Expense, List<String>> sharesOf) {
+                                java.util.function.Function<Expense, List<String>> sharesOf,
+                                List<Settlement.Transfer> paid) {
 
         Map<String, Integer> balances = new LinkedHashMap<>();
         for (String id : memberIds) {
@@ -51,6 +53,28 @@ public class SettlementCalculator {
             for (int i = 0; i < share.size(); i++) {
                 balances.merge(share.get(i), -each[i], Integer::sum);
             }
+        }
+
+        /*
+          이미 주고받은 돈을 셈에 넣습니다 — 송금 줄을 세기 <b>전에</b>.
+
+          <p>보낸 사람은 그만큼 덜 줄 것이 되고(+), 받은 사람은 그만큼 덜 받을
+          것이 됩니다(−). 지출로 생긴 빚을 돈이 오가며 갚은 것이라, 지출과 같은
+          장부에 들어가야 합니다. 셈이 끝난 줄에 「주고받았어요」를 붙이는
+          식으로는 지출이 하나 늘어 줄이 다시 서는 순간 오간 돈이 셈에서
+          사라졌습니다(V62).
+
+          <p>잔액도 남은 것으로 나갑니다. 「받을 / 줄」은 이제 <b>아직</b> 받을
+          것과 줄 것입니다.
+
+          <p>동행자 목록에 없는 사람이어도 넣습니다(못 가게 된 사람, 탈퇴한
+          사람 자리). 빼면 그 사람에게 보낸 돈이 셈에서 사라집니다. 다만 「전원이
+          나누는」 지출의 몫은 매기지 않습니다 — 위에서 이미 memberIds 로만
+          나눴습니다.
+        */
+        for (Settlement.Transfer p : paid) {
+            balances.merge(p.fromUserId(), p.amount(), Integer::sum);
+            balances.merge(p.toUserId(), -p.amount(), Integer::sum);
         }
 
         return new Settlement(balances, transfersOf(balances));

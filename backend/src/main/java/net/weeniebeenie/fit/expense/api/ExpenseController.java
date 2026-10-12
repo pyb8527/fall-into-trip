@@ -46,6 +46,14 @@ public class ExpenseController {
         return Map.of("books", expenses.settle(me, tripId));
     }
 
+    /** 주고받은 기록을 거둡니다. 두 사람만. 규칙은 ExpenseService.undoPayment. */
+    @DeleteMapping("/api/trips/{tripId}/settlement/payments/{paymentId}")
+    public Map<String, Object> undoPayment(@CurrentUser AuthPrincipal me, @PathVariable String tripId,
+                                           @PathVariable String paymentId) {
+        expenses.undoPayment(me, tripId, paymentId);
+        return Map.of("books", expenses.settle(me, tripId));
+    }
+
     /** @param sent·received 바꿀 것만. 비우면 그쪽은 그대로입니다 */
     public record MarkBody(String fromId, String toId, String currency, Integer amount,
                            Boolean sent, Boolean received) {

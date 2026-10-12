@@ -83,6 +83,15 @@ T("가가 낸 지출", r.status === 200, r.data);
 r = await call("POST", `/api/trips/${shared}/expenses`, { token: B.token, body: { name: "커피", amount: 6000, currency: "KRW", payerId: B.id, share: [A.id, B.id] } });
 T("나가 낸 지출(가 · 나만)", r.status === 200, r.data);
 
+/* 다가 가에게 10000 을 보냈고 둘 다 눌렀습니다 — 주고받은 돈 한 건(V62).
+   가가 탈퇴해도 이 돈이 셈에서 사라지면 다에게 「10000 보내세요」가 다시 섭니다. */
+const markC = (token, extra) => call("PUT", `/api/trips/${shared}/settlement/mark`, { token,
+  body: { fromId: C.id, toId: A.id, currency: "KRW", amount: 10000, ...extra } });
+r = await markC(C.token, { sent: true });
+T("다가 보냈어요", r.status === 200, r.data);
+r = await markC(A.token, { received: true });
+T("가가 받았어요 → 주고받은 기록", r.status === 200 && r.data?.books?.[0]?.paid?.length === 1, r.data);
+
 r = await upload(A.token);
 const photoId = r.data?.id;
 T("가의 사진", r.status === 200 && !!photoId, r.data);
@@ -146,10 +155,15 @@ T("정산 200", r.status === 200, r.data);
 const books = r.data?.books?.[0];
 const bal = Object.fromEntries((books?.balances ?? []).map((b) => [b.userId, b]));
 /* 30000 ÷ 3 = 10000, 6000 ÷ 2 = 3000.
-   탈퇴한 사람 +30000 −10000 −3000 = +17000, 나 +6000 −10000 −3000 = −7000, 다 −10000 */
-T("탈퇴한 사람 +17000", bal[GONE]?.balance === 17000 && bal[GONE]?.name === "탈퇴한 사람", books?.balances);
+   탈퇴한 사람 +30000 −10000 −3000 = +17000, 나 +6000 −10000 −3000 = −7000, 다 −10000.
+   다가 이미 10000 을 보냈으므로 탈퇴한 사람 +7000, 다 0 이 남습니다. */
+T("탈퇴한 사람 +7000", bal[GONE]?.balance === 7000 && bal[GONE]?.name === "탈퇴한 사람", books?.balances);
 T("나 −7000", bal[B.id]?.balance === -7000, books?.balances);
-T("다 −10000", bal[C.id]?.balance === -10000, books?.balances);
+T("다 0 (보낸 돈이 남음)", (bal[C.id]?.balance ?? 0) === 0, books?.balances);
+const paidC = books?.paid?.[0];
+T("주고받은 기록이 「탈퇴한 사람」에게로", books?.paid?.length === 1 && paidC.fromUserId === C.id
+  && paidC.toUserId === GONE && paidC.toName === "탈퇴한 사람" && paidC.amount === 10000, books?.paid);
+T("다에게 보낼 줄이 다시 서지 않음", !books?.transfers?.some((t) => t.fromUserId === C.id), books?.transfers);
 T("합이 0", (books?.balances ?? []).reduce((s, b) => s + b.balance, 0) === 0, books?.balances);
 T("보낼 곳 이름이 「탈퇴한 사람」", books?.transfers?.every((t) => t.toUserId !== GONE || t.toName === "탈퇴한 사람"), books?.transfers);
 

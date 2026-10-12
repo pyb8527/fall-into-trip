@@ -1193,8 +1193,29 @@ export type Books = {
    * 누군가 그만큼 손해입니다.
    */
   krw?: number | null;
+  /** <b>아직</b> 받을 것(+) · 줄 것(−). 이미 주고받은 돈을 넣고 센 값입니다. */
   balances: { userId: string; name: string; balance: number }[];
+  /** 아직 남은 송금 줄. 다 주고받았으면 비어 있습니다. */
   transfers: Transfer[];
+  /** 이미 주고받은 기록. 옛 서버는 안 보냅니다. */
+  paid?: Paid[];
+};
+
+/**
+ * 주고받은 돈 한 건.
+ *
+ * <p>송금 줄에 양쪽이 「보냈어요」·「받았어요」를 다 누르면 생깁니다. 서버가
+ * 이것을 지출과 함께 셈에 넣으므로, 그 뒤에 지출이 늘어도 송금 줄은 아직 남은
+ * 몫만 말합니다. {@code at} 은 둘째 사람이 누른 때입니다.
+ */
+export type Paid = {
+  id: string;
+  fromUserId: string;
+  fromName: string;
+  toUserId: string;
+  toName: string;
+  amount: number;
+  at: string;
 };
 
 /**
@@ -1202,7 +1223,8 @@ export type Books = {
  *
  * <p>{@code sentAt} 은 보낸 사람이, {@code receivedAt} 은 받은 사람이 누른
  * 때입니다. 금액이 그때와 같을 때만 옵니다 — 지출이 바뀌어 줄이 달라지면 옛
- * 표시는 사라집니다. 둘 다 있으면 끝난 줄입니다.
+ * 표시는 사라집니다. 둘 다 눌리면 그 줄은 {@link Paid} 로 옮겨 가고 송금
+ * 줄에서는 빠집니다.
  */
 export type Transfer = {
   fromUserId: string;
