@@ -1,5 +1,7 @@
 import { Platform } from 'react-native';
 
+import { invalidate, keysOfWrite, noteRead } from '@/api/invalidate';
+
 /**
  * 서버와 이야기하는 유일한 통로.
  *
@@ -186,6 +188,11 @@ async function send(path: string, options: Options): Promise<Response> {
  * 일은 그쪽과 상관없이 같아야 하므로 여기 한 곳에 둡니다.
  */
 async function fetchOk(path: string, options: Options = {}): Promise<Response> {
+  /* 무엇을 읽었는지 적어 둡니다. 나중에 그것이 바뀌면 다시 읽게 하려고요
+     ({@code invalidate.ts}). 적는 일은 응답과 상관없어 먼저 합니다. */
+  if ((options.method ?? 'GET') === 'GET') {
+    noteRead(path, options.signal);
+  }
   let res: Response;
   try {
     res = await send(path, options);
@@ -223,6 +230,22 @@ async function fetchOk(path: string, options: Options = {}): Promise<Response> {
 
 export async function request<T>(path: string, options: Options = {}): Promise<T> {
   const res = await fetchOk(path, options);
+  /*
+    바꾼 것이 있으면, 그것을 보던 자리에 알립니다.
+
+    <p>부르는 쪽마다 「무엇을 다시 읽어야 하나」를 챙기게 두었더니 대개 하나만
+    다시 읽었습니다 — 여행 상세에서 이야기를 올리면 일정만 다시 읽고, 그
+    장소 밑에 붙어야 할 사진은 새로고침 전까지 안 보였습니다. 성공한 쓰기는
+    모두 여기를 지나므로 한 번에 맡습니다. 무엇을 알릴지는 주소로 정합니다
+    ({@link keysOfWrite}).
+
+    <p>로그인 · 가입처럼 토큰 없이 부르는 것은 빼 둡니다. 그때는 화면 전체가
+    새로 섭니다.
+  */
+  const method = options.method ?? 'GET';
+  if (method !== 'GET' && !options.anonymous) {
+    invalidate(...keysOfWrite(path));
+  }
   if (res.status === 204) {
     return undefined as T;
   }

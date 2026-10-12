@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { api } from '@/api/client';
+import { useInvalidation } from '@/api/use-async';
 import type { FeedPost } from '@/api/types';
 import { Radius } from '@/constants/theme';
 import { Caption, Press, SectionHeader } from '@/ui';
@@ -67,6 +68,10 @@ export function TripAlbum({
   useEffect(() => {
     load();
   }, [load]);
+
+  /* 이야기 · 사진을 올리거나 지우면 다시 받습니다. 여행 상세에서 사진을 올려도
+     여기는 처음 받은 것을 들고 있어서, 새로고침 전까지 방금 올린 것이 없었습니다. */
+  useInvalidation(['feed'], load);
 
   /* 사진이 한 장도 없으면 칸을 안 세웁니다. 「아직 없어요」를 띄우면
      올리라는 재촉으로 읽힙니다. */

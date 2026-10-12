@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { api, ApiError, UNEXPECTED } from '@/api/client';
+import { useInvalidation } from '@/api/use-async';
 import type { Comment, Itinerary } from '@/api/types';
 import { useAuth } from '@/auth/auth-provider';
 import { Colors, Spacing, Type, Weight } from '@/constants/theme';
@@ -69,6 +70,10 @@ export function useComments(postId: string, enabled: boolean) {
   useEffect(() => {
     reload();
   }, [reload]);
+
+  /* 글이 바뀌거나 사람을 막으면 댓글도 달라집니다. 이 훅은 제 상태를 따로
+     들고 있어서, 알림을 따로 들어야 합니다. */
+  useInvalidation(['posts'], reload);
 
   return { comments, failed, reload };
 }

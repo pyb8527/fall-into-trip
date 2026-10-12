@@ -3,6 +3,7 @@ import { View } from 'react-native';
 import { StyleSheet } from 'react-native';
 
 import { api, ApiError, UNEXPECTED } from '@/api/client';
+import { useInvalidation } from '@/api/use-async';
 import type { FeedPost, FeedSlice } from '@/api/types';
 import { FeedCard } from '@/components/feed-card';
 import { FeedForm } from '@/components/feed-form';
@@ -101,6 +102,10 @@ export function FeedList({
 
   /** 쓰거나 지운 뒤. 보던 자리를 잃지 않게 첫 쪽부터 다시 받습니다. */
   const refresh = useCallback(() => load(0, false), [load]);
+
+  /* 이 목록 밖에서 바뀐 것도 따라갑니다 — 사람을 막으면 그 사람 글이 빠지고,
+     다른 화면에서 올린 글이 들어옵니다. 쓰고 지운 뒤와 같은 길(첫 쪽부터)입니다. */
+  useInvalidation(['feed'], refresh);
 
   /* 글에 달린 태그들을 모읍니다. 고를 거리를 따로 받아 오지 않습니다 —
      지금 보고 있는 것들에서 뽑으면 충분하고, 왕복이 하나 줍니다. */

@@ -17,7 +17,7 @@ import {
 
 import { api, ApiError, UNEXPECTED } from '@/api/client';
 import type { Day, FeedPost, Gap, GapOption, LivePin, LiveWhere, Money, OurStars, Person, Place, PlaceInfo, SavedPlace, Spend, Story, TravelMode, Trip, TripDetail } from '@/api/types';
-import { useAsync } from '@/api/use-async';
+import { useAsync, useInvalidation } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
 import { DatePollSheet } from '@/components/date-poll-sheet';
 import { NoticeBox } from '@/components/notice-box';
@@ -1181,6 +1181,9 @@ export default function TripScreen() {
   }, [dayPlaceIds]);
 
   useEffect(countTips, [countTips]);
+  /* 내 정보의 「남긴 한 줄」에서 고치거나 지우고 돌아와도 숫자 · 별이 따라와야
+     합니다. 세는 길이 useAsync 가 아니라 따로 알림을 듣습니다. */
+  useInvalidation(['tips'], countTips);
 
   /*
     자유시간에 서로 찾기 — 켜 둔 동행자와 잠깐 찍어 둔 핀.

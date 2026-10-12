@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { api, ApiError, query, UNEXPECTED } from '@/api/client';
 import type { ItineraryDay, ItineraryPlace, Maybe, PostDetail, Story } from '@/api/types';
-import { useAsync } from '@/api/use-async';
+import { useAsync, useInvalidation } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
 import {
   CommentList,
@@ -250,7 +250,12 @@ export default function Post() {
 
     <p>로그인 안 했으면 부르지 않습니다 — 401 이 돌아오고, 그 화면에서는
     어차피 담을 수도 없습니다.
+
+    <p>다른 화면에서 보석함을 고치고 돌아오면 다시 읽습니다({@code savedSeq}).
+    한 번만 읽어 두면 보석함에서 뺀 곳에 별이 그대로 채워져 있습니다.
   */
+  const [savedSeq, setSavedSeq] = useState(0);
+  useInvalidation(['saved'], () => setSavedSeq((n) => n + 1));
   useEffect(() => {
     if (!user) {
       setSavedIds(new Map());
@@ -270,7 +275,7 @@ export default function Post() {
     return () => {
       alive = false;
     };
-  }, [user]);
+  }, [user, savedSeq]);
 
   /**
    * 담고, 다시 누르면 뺍니다.
