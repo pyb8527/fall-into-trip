@@ -3,6 +3,7 @@ package net.weeniebeenie.fit.trip.api;
 import lombok.RequiredArgsConstructor;
 import net.weeniebeenie.fit.account.infrastructure.security.AuthPrincipal;
 import net.weeniebeenie.fit.account.infrastructure.security.CurrentUser;
+import net.weeniebeenie.fit.shared.error.ApiException;
 import net.weeniebeenie.fit.trip.application.ViewLinkService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
@@ -37,6 +38,19 @@ public class ViewLinkController {
     public Map<String, Object> revoke(@CurrentUser AuthPrincipal me, @PathVariable String id) {
         links.revoke(me, id);
         return Map.of("ok", true);
+    }
+
+    /** 장소 메모를 보일지 끕니다. 링크는 안 죽습니다. */
+    @PatchMapping("/trips/{id}/view-link")
+    public ViewLinkService.State notes(@CurrentUser AuthPrincipal me, @PathVariable String id,
+                                       @RequestBody(required = false) NotesRequest req) {
+        if (req == null || req.notes() == null) {
+            throw ApiException.badRequest("notes 가 있어야 해요.");
+        }
+        return links.notes(me, id, req.notes());
+    }
+
+    public record NotesRequest(Boolean notes) {
     }
 
     /** 로그인 없이. 중간에서 담아 두지 않게 합니다 — 끊어도 옛 일정이 나가면 안 됩니다. */

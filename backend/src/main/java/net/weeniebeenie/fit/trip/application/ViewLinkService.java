@@ -25,6 +25,14 @@ import java.util.List;
  * 이름·시각·메모만 보입니다. 가계부·위치·피드·사람 이름은 안 나가고,
  * 안내판도 안 나갑니다 — 도어락 번호가 들어 있는 자리입니다.
  *
+ * <h3>메모는 끌 수 있습니다</h3>
+ *
+ * <p>장소 메모에는 예약 번호 · 현관 비번처럼 동행끼리만 볼 것이 적힐 때가
+ * 있습니다. {@link Trip#isViewNotes()} 가 꺼져 있으면 {@link #show} 가
+ * 메모를 전부 {@code null} 로 냅니다 — 가린 메모도 메모 없는 장소와 응답
+ * 모양이 같아, 무엇을 가렸는지가 응답으로 드러나지 않습니다
+ * (docs/2026-10/plan-view-memo.md §6).
+ *
  * <h3>저절로 죽습니다</h3>
  *
  * <p>여행 마지막 날 다음 날부터 404 입니다. 죽는 날을 적어 두지 않고
@@ -47,7 +55,7 @@ public class ViewLinkService {
     @Transactional(readOnly = true)
     public State stateOf(AuthPrincipal me, String tripId) {
         Trip trip = access.mine(tripId, me.id());
-        return new State(trip.getViewTokenHash() != null, lastDay(tripId));
+        return new State(trip.getViewTokenHash() != null, lastDay(tripId), trip.isViewNotes());
     }
 
     /** 새 링크. 옛 링크는 이 순간 죽습니다. 원문은 여기서 한 번만 나갑니다. */
@@ -69,6 +77,22 @@ public class ViewLinkService {
         audit.log(me.id(), "trip.view.revoke", tripId);
     }
 
+    /**
+     * 장소 메모를 보일지 끕니다. 링크(viewTokenHash)는 그대로 둡니다 —
+     * 받은 사람에게 새 주소를 다시 보낼 일이 없습니다.
+     *
+     * <p>링크가 아직 없어도 받습니다. 값만 바뀌고, 다음에 만드는 링크가
+     * 그 값을 씁니다 — 링크를 만들기 전에도 고를 수 있게 하려는 것입니다.
+     */
+    @Transactional
+    public State notes(AuthPrincipal me, String tripId, boolean on) {
+        Trip trip = access.mine(tripId, me.id());
+        access.requireCanEdit(tripId, me.id());
+        trip.setViewNotes(on);
+        audit.log(me.id(), "trip.view.notes", tripId);
+        return new State(trip.getViewTokenHash() != null, lastDay(tripId), on);
+    }
+
     /** 링크를 연 사람이 보는 것. */
     @Transactional(readOnly = true)
     public Shown show(String raw) {
@@ -83,10 +107,12 @@ public class ViewLinkService {
             throw ApiException.notFound("없는 링크예요.");
         }
 
+        boolean showNotes = trip.isViewNotes();
         List<ShownDay> out = days.findAllByTripIdOrderBySortAsc(trip.getId()).stream()
                 .map(d -> new ShownDay(d.getLabel(), d.getDate(), d.getIso(),
                         places.findAllByDayIdOrderBySortAsc(d.getId()).stream()
-                                .map(p -> new ShownPlace(p.getName(), p.getTime(), p.getNote(),
+                                .map(p -> new ShownPlace(p.getName(), p.getTime(),
+                                        showNotes ? p.getNote() : null,
                                         p.getLat(), p.getLng(), p.getCat()))
                                 .toList()))
                 .toList();
@@ -107,8 +133,11 @@ public class ViewLinkService {
         }
     }
 
-    /** @param until 이 날까지 열립니다(여행 마지막 날) */
-    public record State(boolean on, LocalDate until) {
+    /**
+     * @param until 이 날까지 열립니다(여행 마지막 날)
+     * @param notes 켜져 있으면 장소 메모가 보입니다
+     */
+    public record State(boolean on, LocalDate until, boolean notes) {
     }
 
     /** 사람 이름이 하나도 없습니다 — 누가 넣었는지, 누가 가는지. */

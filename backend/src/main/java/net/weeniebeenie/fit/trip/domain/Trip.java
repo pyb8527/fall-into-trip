@@ -86,6 +86,15 @@ public class Trip {
     @Column(name = "view_token_hash", length = 64)
     private String viewTokenHash;
 
+    /**
+     * 보기 링크에서 장소 메모를 보일지. 기본은 켜짐(V61).
+     *
+     * <p>링크(viewTokenHash)와 따로 바뀝니다 — 링크를 새로 만들지 않고도
+     * 지금 살아 있는 링크에 바로 듣습니다({@code ViewLinkService#notes}).
+     */
+    @Column(name = "view_notes", nullable = false)
+    private boolean viewNotes = true;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 

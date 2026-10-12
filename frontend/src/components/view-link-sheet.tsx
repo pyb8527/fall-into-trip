@@ -7,7 +7,7 @@ import { Spacing } from '@/constants/theme';
 import { canShareToKakao, shareToKakao } from '@/lib/kakao-share';
 import { formatSpan } from '@/lib/countdown';
 import { shareLink } from '@/lib/share';
-import { Body, BottomSheet, Button, Caption, ErrorNote, Loading } from '@/ui';
+import { Body, BottomSheet, Button, Caption, ErrorNote, Loading, Switch } from '@/ui';
 
 /**
  * 로그인 없이 보는 일정 링크를 만들고 보냅니다.
@@ -42,7 +42,7 @@ export function ViewLinkSheet({
 
 function Inner({ tripId, tripTitle }: { tripId: string; tripTitle: string }) {
   const path = `/api/trips/${encodeURIComponent(tripId)}/view-link`;
-  const { data, loading, reload } = useAsync<{ on: boolean; until?: string | null }>(
+  const { data, loading, reload } = useAsync<{ on: boolean; until?: string | null; notes: boolean }>(
     (signal) => api.get(path, signal),
     [tripId],
   );
@@ -81,13 +81,33 @@ function Inner({ tripId, tripTitle }: { tripId: string; tripTitle: string }) {
     }
   }
 
+  async function toggleNotes(next: boolean) {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.patch(path, { notes: next });
+      reload();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : UNEXPECTED);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <>
       {loading && !data ? <Loading /> : null}
       <Body small tone="secondary">
-        계정이 없어도 이 링크로 날짜·장소·시각·메모를 볼 수 있어요. 가계부·위치·안내판·사람 이름은
-        안 보여요.
+        {data?.notes === false
+          ? '계정이 없어도 이 링크로 날짜·장소·시각을 볼 수 있어요. 장소 메모는 안 보여요. 가계부·위치·안내판·사람 이름도 안 보여요.'
+          : '계정이 없어도 이 링크로 날짜·장소·시각·메모를 볼 수 있어요. 가계부·위치·안내판·사람 이름은 안 보여요.'}
       </Body>
+      <Switch
+        label="장소 메모도 보이기"
+        hint="예약 번호나 비밀번호를 적어 둔 메모가 있으면 꺼 두세요."
+        value={data?.notes ?? true}
+        onChange={toggleNotes}
+      />
       {data?.until ? (
         <Caption tone="muted">
           여행 마지막 날({formatSpan(data.until, data.until)})이 지나면 저절로 닫혀요.

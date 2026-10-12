@@ -80,5 +80,48 @@ r = await call("POST", `/api/trips/${old}/view-link`, { token: A });
 r = await call("GET", "/api/view/" + r.data.path.split("/").pop());
 T("마지막 날 다음 날부터 404", r.status === 404, r.status);
 
+console.log("\n[6] 장소 메모 가리기");
+r = await call("GET", "/api/trip?trip=" + tripId, { token: A });
+const dayId6 = r.data.days[0].id;
+/* 원래부터 메모가 없는 장소 — §8 에서 "가려진 메모"와 응답 모양을 견줄 짝. */
+await call("POST", "/api/places", { token: A, body: { dayId: dayId6, name: "스타벅스", lat: 38.21, lng: 128.6, time: "13:00" } });
+
+r = await call("POST", `/api/trips/${tripId}/view-link`, { token: A });
+const key3 = r.data.path.split("/").pop();
+r = await call("GET", `/api/trips/${tripId}/view-link`, { token: A });
+T("새 링크는 notes:true", r.data.notes === true, r.data);
+
+r = await call("GET", "/api/view/" + key3);
+T("켜진 채로 보면 메모가 보임", r.data.days[0].places[0].note === "닭강정", r.data);
+const placeOn = r.data.days[0].places[0];
+
+r = await call("PATCH", `/api/trips/${tripId}/view-link`, { token: X, body: { notes: false } });
+T("남(X)이 PATCH 하면 404", r.status === 404, r.status);
+const forbidden404 = r.data;
+
+r = await call("PATCH", `/api/trips/nope-trip-id/view-link`, { token: A, body: { notes: false } });
+T("없는 여행 번호로 PATCH 하면 404 — 3 과 같은 응답",
+  r.status === 404 && JSON.stringify(r.data) === JSON.stringify(forbidden404), r.data);
+
+r = await call("PATCH", `/api/trips/${tripId}/view-link`, { token: B, body: { notes: false } });
+T("모임 사람(B)이 꺼도 됨 — notes:false", r.status === 200 && r.data.notes === false, r.data);
+
+r = await call("GET", "/api/view/" + key3);
+T("같은 열쇠로 보임 — 링크가 안 죽음", r.status === 200, r.status);
+const placeOff = r.data.days[0].places[0];
+const neverNoted = r.data.days[0].places[1];
+T("메모가 가려짐, 이름·시각은 그대로",
+  placeOff.note == null && placeOff.name === placeOn.name && placeOff.time === placeOn.time, placeOff);
+T("가려진 장소의 키 모음이 원래 메모 없던 장소와 같음 — 응답 모양으로 안 드러남",
+  JSON.stringify(Object.keys(placeOff).sort()) === JSON.stringify(Object.keys(neverNoted).sort()),
+  { placeOff, neverNoted });
+
+r = await call("PATCH", `/api/trips/${tripId}/view-link`, { token: A, body: {} });
+T("notes 없이 PATCH 하면 400", r.status === 400, r.status);
+
+/* 다시 켜 둡니다 — 2 와 같은 확인이라 세지 않습니다. 뒤에 메모를 기대하는
+   테스트가 더 생겨도 이 파일을 다시 켜진 상태로 남겨 둡니다. */
+await call("PATCH", `/api/trips/${tripId}/view-link`, { token: A, body: { notes: true } });
+
 console.log(`\n결과: ${pass} 통과 / ${fail} 실패`);
 process.exit(fail ? 1 : 0);
