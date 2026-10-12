@@ -59,8 +59,9 @@ class StayLegsTest {
            들어가지도 않은 호텔에서 출발합니다. */
         Day first = stayAt(day(0), "난바 호텔", LAT, LNG);
         Day second = stayAt(day(1), "교토 료칸", 35.0, 135.76);
+        Day third = day(2);
 
-        RouteService.StayEnds ends = RouteService.stayEnds(List.of(first, second), second);
+        RouteService.StayEnds ends = RouteService.stayEnds(List.of(first, second, third), second);
 
         assertNotNull(ends.morning());
         assertEquals("난바 호텔", ends.morning().getName());
@@ -94,6 +95,22 @@ class StayLegsTest {
         assertNull(ends.morning());
         assertNull(plan.morning());
         assertEquals(2, plan.between().size());
+    }
+
+    @Test
+    @DisplayName("마지막 날은 숙소가 적혀 있어도 저녁 구간이 없다")
+    void lastDayIgnoresItsStay() {
+        /* 「이후 날들도 같은 곳」 으로 채우면 공항 가는 날에도 숙소가
+           적힙니다. 체크아웃한 호텔로 돌아가는 구간을 묻지 않습니다. */
+        Day first = stayAt(day(0), "난바 호텔", LAT, LNG);
+        Day last = stayAt(day(1), "난바 호텔", LAT, LNG);
+
+        RouteService.StayEnds ends = RouteService.stayEnds(List.of(first, last), last);
+        RouteService.Planned plan = RouteService.legsOf(places(3), ends, 24);
+
+        assertNotNull(plan.morning(), "아침은 어젯밤 숙소에서");
+        assertNull(ends.evening());
+        assertNull(plan.evening());
     }
 
     @Test
@@ -137,10 +154,11 @@ class StayLegsTest {
            한 곳까지」 도 묻는 값입니다. */
         Day first = stayAt(day(0), "난바 호텔", LAT, LNG);
         Day second = stayAt(day(1), "우메다 호텔", 34.7025, 135.4959);
+        Day third = day(2);
         List<Place> one = List.of(place("오사카성", 34.6873, 135.5262));
 
         RouteService.Planned plan = RouteService.legsOf(one,
-                RouteService.stayEnds(List.of(first, second), second), 24);
+                RouteService.stayEnds(List.of(first, second, third), second), 24);
 
         assertTrue(plan.between().isEmpty());
         assertNotNull(plan.morning());

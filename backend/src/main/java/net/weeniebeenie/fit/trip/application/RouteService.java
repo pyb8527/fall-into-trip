@@ -352,6 +352,13 @@ public class RouteService {
      * <p>「앞 날」 을 날짜가 아니라 차례로 잡습니다. 날짜를 안 적은 여행도
      * 있고, 화면이 날을 늘어놓는 것도 차례입니다.
      *
+     * <h3>마지막 날은 저녁이 없습니다</h3>
+     *
+     * <p>마지막 날은 공항이나 집으로 가는 날입니다. 그런데 「이후 날들도 같은
+     * 곳」 으로 숙소를 채우면 그 날에도 숙소가 적혀, 체크아웃한 호텔로 「오늘
+     * 숙소까지」 가 붙었습니다. 마지막 날에 정말 묵는다면 다음 날이 일정에
+     * 있을 것입니다. (첫째 날은 앞 날이 없어 아침이 원래 없습니다.)
+     *
      * @param ordered 같은 여행의 날들, 차례대로
      */
     static StayEnds stayEnds(List<Day> ordered, Day day) {
@@ -362,7 +369,8 @@ public class RouteService {
             }
             before = d;
         }
-        return new StayEnds(stayOf(before), stayOf(day));
+        boolean last = !ordered.isEmpty() && ordered.get(ordered.size() - 1).getId().equals(day.getId());
+        return new StayEnds(stayOf(before), last ? null : stayOf(day));
     }
 
     /**
