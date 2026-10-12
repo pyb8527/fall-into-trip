@@ -855,26 +855,33 @@ function SpendRow({
  * 낫습니다.
  */
 function catMark(cat: string | null | undefined): IconName {
-  const word = (cat ?? '').toLowerCase();
+  /*
+    글자를 먼저 한 가지 꼴(NFC)로 맞춥니다.
+
+    <p>한글은 같은 「밥」 을 완성형 한 글자로도, 자모 셋(ㅂ ㅏ ㅂ)으로도 적을
+    수 있습니다. 화면에는 똑같이 보이는데, 키보드나 붙여 넣은 곳에 따라 자모로
+    들어오면 아래 /밥/ 에 걸리지 않아 갈래가 전부 「그 밖」 으로 떨어졌습니다.
+  */
+  const word = (cat ?? '').normalize('NFC').trim().toLowerCase();
   if (!word) {
     return 'wallet';
   }
-  if (/카페|커피|디저트|cafe/.test(word)) {
+  if (/카페|커피|디저트|음료|빵|아이스크림|cafe|coffee/.test(word)) {
     return 'cafe';
   }
-  if (/밥|식|먹|저녁|점심|아침|술|food/.test(word)) {
+  if (/밥|식|먹|저녁|점심|아침|술|맥주|간식|편의점|마트|장보|food|meal/.test(word)) {
     return 'restaurant';
   }
-  if (/교통|택시|기차|지하철|버스|렌트|항공|비행|기름/.test(word)) {
+  if (/교통|택시|기차|열차|전철|지하철|버스|렌트|항공|비행|기름|주유|주차|톨|공항|배|페리|이동/.test(word)) {
     return 'train';
   }
-  if (/숙|호텔|방|집/.test(word)) {
+  if (/숙|호텔|방|집|민박|료칸|게하|게스트|에어비앤비|hotel/.test(word)) {
     return 'bed';
   }
-  if (/쇼핑|기념|선물|옷/.test(word)) {
+  if (/쇼핑|기념|선물|옷|면세|굿즈|shop/.test(word)) {
     return 'bag';
   }
-  if (/입장|관광|티켓|표|체험|놀이/.test(word)) {
+  if (/입장|관광|티켓|표|체험|놀이|투어|공연|박물관|전시/.test(word)) {
     return 'ticket';
   }
   return 'wallet';
