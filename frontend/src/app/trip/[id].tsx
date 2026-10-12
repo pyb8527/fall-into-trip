@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 
 import { api, ApiError, UNEXPECTED } from '@/api/client';
-import type { Day, FeedPost, Gap, GapOption, LivePin, LiveWhere, Money, OurStars, Person, Place, PlaceInfo, SavedPlace, Spend, Story, TravelMode, Trip, TripDetail } from '@/api/types';
+import type { ComparedGaps, Day, FeedPost, Gap, GapOption, LivePin, LiveWhere, Money, OurStars, Person, Place, PlaceInfo, SavedPlace, Spend, Story, TravelMode, Trip, TripDetail } from '@/api/types';
 import { useAsync, useInvalidation } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
 import { DatePollSheet } from '@/components/date-poll-sheet';
@@ -833,6 +833,32 @@ export default function TripScreen() {
   );
 
   /*
+    아침에 나서는 숙소와 저녁에 돌아가는 숙소가 어디인지.
+
+    <p>사이사이 이동에 숙소 구간이 붙습니다 — 어젯밤 숙소에서 첫 곳까지,
+    마지막 곳에서 오늘 숙소까지. 숙소를 고치면 그 둘을 다시 물어야 하는데,
+    장소만 늘어놓은 daySeq 로는 숙소가 바뀐 줄 모릅니다. 고친 숙소 밑에 전
+    호텔에서 잰 시간이 그대로 붙어 있게 됩니다.
+
+    <h3>daySeq 에 섞지 않습니다</h3>
+
+    <p>daySeq 는 영업시간을 다시 묻는 열쇠이기도 하고, 사람이 장소 사이에서
+    고른 수단을 비우는 열쇠이기도 합니다. 숙소를 고쳤다고 영업시간을 다시 사
+    오고 고른 수단까지 잃을 까닭이 없어, 구간을 묻는 자리에만 더합니다.
+
+    <p>아침은 <b>앞 날</b>의 숙소입니다. 그날 숙소는 그날 밤 자는 곳이라,
+    거기서 나서게 하면 옮기는 날 아직 안 들어간 호텔에서 출발합니다.
+  */
+  const staySeq = useMemo(() => {
+    if (dayIndex < 0) {
+      return '';
+    }
+    const at = (stay: Day['stay'] | undefined) =>
+      stay?.lat != null && stay?.lng != null ? `${stay.lat.toFixed(5)},${stay.lng.toFixed(5)}` : '';
+    return `${at(days[dayIndex - 1]?.stay)}>${at(days[dayIndex]?.stay)}`;
+  }, [days, dayIndex]);
+
+  /*
     사이사이 이동 — 세 수단을 한꺼번에.
 
     "전체" 를 보고 있을 때는 부르지 않습니다. 날짜 수만큼, 구간마다, 수단마다
@@ -842,17 +868,14 @@ export default function TripScreen() {
     data: compared,
     loading: gapping,
     error: gapError,
-  } = useAsync<{ gaps: Gap[]; note?: string | null; trimmed?: boolean }>(
+  } = useAsync<ComparedGaps>(
     (signal) =>
       dayId && showGaps
-        ? api.get<{ gaps: Gap[]; note?: string | null; trimmed?: boolean }>(
-            `/api/days/${dayId}/route/compare`,
-            signal,
-          )
+        ? api.get<ComparedGaps>(`/api/days/${dayId}/route/compare`, signal)
         : /* 꺼 두었으면 부르지도 않습니다. 구간마다 수단마다 구글에 묻는
              호출이라, 안 보는 것을 사 올 이유가 없습니다. */
           Promise.resolve({ gaps: [], note: null }),
-    [dayId, daySeq, showGaps],
+    [dayId, daySeq, staySeq, showGaps],
   );
   const gaps = compared?.gaps ?? null;
   /*
@@ -871,6 +894,25 @@ export default function TripScreen() {
     시간이 붙고 뒤쪽만 비어서 <b>고장으로 읽힙니다.</b>
   */
   const gapTrimmed = compared?.trimmed ?? false;
+
+  /*
+    숙소 구간 — 어젯밤 숙소에서 첫 곳까지, 마지막 곳에서 오늘 숙소까지.
+
+    <p>지금 보는 날의 첫 곳 · 마지막 곳에 닿는 것만 씁니다. 날을 바꾸는 동안
+    compared 에는 직전 날의 답이 그대로 들어 있어서(routeLines 와 같은 까닭),
+    거르지 않으면 어제의 「호텔에서 첫 곳까지」 가 오늘 첫 줄 위에 붙습니다.
+  */
+  const stayMorning = useMemo(() => {
+    const first = dayIndex >= 0 ? days[dayIndex]?.places[0] : undefined;
+    const gap = compared?.morning ?? null;
+    return gap && first && gap.toId === first.id ? gap : null;
+  }, [compared, dayIndex, days]);
+  const stayEvening = useMemo(() => {
+    const list = dayIndex >= 0 ? (days[dayIndex]?.places ?? []) : [];
+    const last = list[list.length - 1];
+    const gap = compared?.evening ?? null;
+    return gap && last && gap.fromId === last.id ? gap : null;
+  }, [compared, dayIndex, days]);
 
   /**
    * 구간마다 어느 수단으로 볼지.
@@ -1834,7 +1876,12 @@ export default function TripScreen() {
           시간을 켜 둔 사람에게만 뜻이 있는 곁다리입니다. 켜고 끄는 단추
           바로 위로 내립니다.
         */}
-        <MovingNote gaps={gaps} gapping={gapping} chosenOf={chosenOf} />
+        <MovingNote
+          gaps={gaps}
+          stayLegs={[stayMorning, stayEvening]}
+          gapping={gapping}
+          chosenOf={chosenOf}
+        />
 
 
 
@@ -1919,6 +1966,9 @@ export default function TripScreen() {
               gapping={gapping}
               gapNote={gapNote}
               gapTrimmed={gapTrimmed}
+              stayMorning={stayMorning}
+              stayEvening={stayEvening}
+              prevStayName={days[di - 1]?.stay?.name ?? null}
               chosenOf={chosenOf}
               changedGaps={changedGaps}
               onPick={(fromId, mode) => setPicked((p) => ({ ...p, [fromId]: mode }))}
@@ -2569,14 +2619,26 @@ function Shortcut({
  */
 function MovingNote({
   gaps,
+  stayLegs,
   gapping,
   chosenOf,
 }: {
   gaps: Gap[] | null;
+  /**
+   * 숙소에서 첫 곳까지 · 마지막 곳에서 숙소까지. 없으면 null.
+   *
+   * <p>함께 더합니다. 「오늘 이동에 ○분」 을 묻는 사람이 알고 싶은 것은 호텔을
+   * 나서서 돌아올 때까지이고, 장소 사이만 더하면 하루에서 가장 긴 두 구간이
+   * 빠지기 쉽습니다.
+   */
+  stayLegs: (Gap | null)[];
   gapping: boolean;
   chosenOf: (gap: Gap) => GapOption | null;
 }) {
-  const moving = (gaps ?? []).reduce((n, g) => n + (chosenOf(g)?.seconds ?? 0), 0);
+  const moving = [...(gaps ?? []), ...stayLegs].reduce(
+    (n, g) => n + (g ? (chosenOf(g)?.seconds ?? 0) : 0),
+    0,
+  );
 
   if (gapping) {
     return (
@@ -2729,6 +2791,9 @@ function DayCard({
   gapping,
   gapNote,
   gapTrimmed,
+  stayMorning,
+  stayEvening,
+  prevStayName,
   chosenOf,
   changedGaps,
   onPick,
@@ -2763,6 +2828,12 @@ function DayCard({
   gapNote: string | null;
   /** 장소가 너무 많아 뒷부분의 이동 시간을 못 구했는지. */
   gapTrimmed: boolean;
+  /** 어젯밤 숙소에서 이 날 첫 곳까지. 첫째 날 · 숙소를 안 적은 날은 없습니다. */
+  stayMorning: Gap | null;
+  /** 이 날 마지막 곳에서 오늘 숙소까지. 숙소를 안 적은 날은 없습니다. */
+  stayEvening: Gap | null;
+  /** 앞 날에 적어 둔 숙소 이름. 아침 구간의 머리에 씁니다. */
+  prevStayName: string | null;
   chosenOf: (gap: Gap) => GapOption | null;
   /** 다시 물은 뒤 달라진 구간들. 출발하는 장소의 id 입니다. */
   changedGaps: Set<string>;
@@ -3166,6 +3237,34 @@ function DayCard({
             }}
           />
 
+          {/*
+            어젯밤 숙소에서 첫 곳까지.
+
+            <p>하루를 짤 때 가장 먼저 묻는 구간입니다 — 아침에 몇 시에 나가야
+            하나. 없어서 사람들이 숙소를 장소로 한 번 더 넣었고, 그러면 숙소가
+            「1번 장소」 가 되어 다녀온 곳 수에 들어갔습니다.
+
+            <p>그날 숙소가 아니라 <b>어젯밤</b> 숙소입니다. 숙소 카드 바로 아래에
+            있어도 그 카드는 오늘 밤 자는 곳이라, 머리 한 줄에 어느 호텔인지를
+            적어 둡니다. 「방금 바뀜」 표시는 달지 않습니다 — 이 구간은 숙소를
+            고칠 때만 바뀌고, 그때 사람은 방금 숙소 판을 닫은 참입니다.
+          */}
+          {stayMorning ? (
+            <View>
+              <View style={styles.stayLegHead}>
+                <Caption tone="muted">어젯밤 숙소{prevStayName ? `(${prevStayName})` : ''}에서</Caption>
+              </View>
+              <GapBlock
+                gap={stayMorning}
+                chosen={chosenOf(stayMorning)}
+                leaveAt={null}
+                arriveBy={order[0]?.time ?? null}
+                onPick={onPick}
+                justChanged={false}
+              />
+            </View>
+          ) : null}
+
           {day.places.length === 0 ? (
             <Caption tone="muted">이 날에는 아직 장소가 없어요.</Caption>
           ) : (
@@ -3245,6 +3344,28 @@ function DayCard({
               ))}
             </View>
           )}
+
+          {/*
+            마지막 곳에서 오늘 숙소까지 — 밤에 몇 시에 끊어야 하나.
+
+            <p>지도에는 긋지 않고 숫자만 둡니다. 지도에 숙소 핀이 없어서, 끝이
+            안 보이는 선이 하나 생기면 「이 선은 어디로 가나」 를 묻게 됩니다.
+          */}
+          {stayEvening ? (
+            <View>
+              <View style={styles.stayLegHead}>
+                <Caption tone="muted">오늘 숙소{day.stay?.name ? `(${day.stay.name})` : ''}까지</Caption>
+              </View>
+              <GapBlock
+                gap={stayEvening}
+                chosen={chosenOf(stayEvening)}
+                leaveAt={order[order.length - 1]?.time ?? null}
+                arriveBy={null}
+                onPick={onPick}
+                justChanged={false}
+              />
+            </View>
+          ) : null}
 
           {/*
             그날 맨 아래, 넣는 자리.
@@ -5421,6 +5542,11 @@ const styles = StyleSheet.create({
     paddingLeft: Spacing.s5,
     paddingVertical: Spacing.s2,
     gap: Spacing.s1,
+  },
+  /* 숙소 구간의 머리 한 줄. 구간 줄(gap)과 같은 들여쓰기에 섭니다. */
+  stayLegHead: {
+    paddingLeft: Spacing.s5,
+    paddingTop: Spacing.s2,
   },
   /* 앞 장소에서 이어진다는 것을 눈으로 잇습니다. */
   gapLine: {

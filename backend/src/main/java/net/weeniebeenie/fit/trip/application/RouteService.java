@@ -224,6 +224,25 @@ public class RouteService {
      *
      * <p>세 수단이 모두 안 되는 구간도 있습니다(몇 백 미터 거리에는 구글이
      * 대중교통을 안 태웁니다). 그런 것은 빼고 되는 것만 내놓습니다.
+     *
+     * <h3>숙소도 그날 동선의 앞뒤에 섭니다</h3>
+     *
+     * <p>하루를 짤 때 가장 먼저 묻는 두 구간이 없었습니다 — 「호텔에서 첫
+     * 곳까지 몇 분」(아침에 몇 시에 나가나)과 「마지막 곳에서 호텔까지 몇 분」
+     * (밤에 몇 시에 끊나). 숙소는 장소가 아니라 {@link Day} 의 다른 칸이라
+     * 짝짓기에 끼지 않았고, 사람은 숙소를 장소로 한 번 더 넣어 우회했습니다.
+     * 그러면 숙소가 「3번 장소」 가 됩니다.
+     *
+     * <p>아침은 <b>전날 밤</b> 숙소에서 나섭니다. {@code Day.stay} 는 그날
+     * 밤 자는 곳이라, 그날 숙소에서 출발시키면 체크아웃하고 옮기는 날 아직
+     * 들어가지도 않은 호텔에서 나서게 됩니다. 저녁은 그날 숙소로 돌아갑니다.
+     *
+     * <p>둘은 {@code gaps} 에 섞지 않고 따로 싣습니다. 지도 선과 「다음
+     * 곳까지」 를 그리는 쪽이 {@code gaps} 를 장소 사이로 읽고 있어서, 섞으면
+     * 그쪽이 모두 숙소를 가려내야 합니다.
+     *
+     * <p>한도 24 안에서 셉니다. 아침 하나가 먼저, 장소 사이가 남은 만큼,
+     * 저녁은 안 잘렸고 남았을 때만입니다 — {@link #legsOf}.
      */
     public Compared compare(AuthPrincipal me, String dayId) {
         Day day = days.findById(dayId)
@@ -234,41 +253,197 @@ public class RouteService {
             throw ApiException.badRequest("경로 안내가 꺼져 있어요.");
         }
 
+        /* 장소가 하나뿐이어도 숙소 구간은 나옵니다 — 「호텔에서 그 한 곳까지」
+           도 묻는 값입니다. 그래서 둘 미만이 아니라 하나도 없을 때만 그칩니다. */
         List<Place> list = places.findAllByDayIdOrderBySortAsc(dayId);
-        if (list.size() < 2) {
-            return new Compared(List.of(), null, false);
+        if (list.isEmpty()) {
+            return new Compared(List.of(), null, false, null, null);
         }
 
-        int pairs = Math.min(list.size() - 1, MAX_COMPARE_LEGS);
-        boolean trimmed = list.size() - 1 > MAX_COMPARE_LEGS;
-        List<Gap> out = new ArrayList<>(pairs);
-        /* 이 지역에 대중교통 안내가 아예 없는지 보려고 셉니다 — 아래 noteFor. */
-        int longEnough = 0;
-        int transitFound = 0;
+        /* 앞 날은 같은 여행 안에서만 찾습니다. 날짜 하나를 볼 수 있으면 그
+           여행 전체를 볼 수 있으므로(requireCanRead) 따로 묻지 않습니다. */
+        Planned plan = legsOf(list,
+                stayEnds(days.findAllByTripIdOrderBySortAsc(day.getTripId()), day),
+                MAX_COMPARE_LEGS);
 
+        Gap morning = plan.morning() == null ? null
+                : gapOf(plan.morning().from(), plan.morning().to(), day)
+                        .withEnds(STAY, plan.morning().to().getId());
+        List<Gap> out = new ArrayList<>(plan.between().size());
+        for (Pair pair : plan.between()) {
+            out.add(gapOf(pair.from(), pair.to(), day));
+        }
+        Gap evening = plan.evening() == null ? null
+                : gapOf(plan.evening().from(), plan.evening().to(), day)
+                        .withEnds(plan.evening().from().getId(), STAY);
+
+        /* 이 지역에 대중교통 안내가 아예 없는지 보려고 셉니다 — 아래 noteFor.
+           숙소 구간도 셉니다. 숙소에서 첫 곳까지가 그날 가장 긴 구간인 일이
+           흔해서, 빼면 짧은 구간만 남아 「대중교통이 없다」 를 못 짚습니다. */
+        List<Pair> asked = new ArrayList<>(plan.between());
+        List<Gap> answered = new ArrayList<>(out);
+        if (morning != null) {
+            asked.add(plan.morning());
+            answered.add(morning);
+        }
+        if (evening != null) {
+            asked.add(plan.evening());
+            answered.add(evening);
+        }
+        int longEnough = (int) asked.stream().filter(p -> farApart(p.from(), p.to())).count();
+        int transitFound = (int) answered.stream()
+                .filter(g -> g.options().stream().anyMatch(o -> o.mode() == Mode.TRANSIT))
+                .count();
+        return new Compared(out, noteFor(longEnough, transitFound), plan.trimmed(),
+                morning, evening);
+    }
+
+    /**
+     * 한 구간을 세 수단으로.
+     *
+     * <p>장소 사이 · 아침 · 저녁이 모두 이 길을 지납니다. 셋이 따로 물으면
+     * 말이 안 되는 걷기를 빼는 자리와 빠른 것 · 싼 것을 고르는 자리가 셋으로
+     * 갈리고, 하나만 고쳐질 날이 옵니다.
+     *
+     * <p>구글에는 {@link #leg} 로만 나갑니다 — 캐시를 먼저 보고, 없을 때만
+     * {@link #ask} 가 문턱을 1씩 깎습니다. 숙소 구간이라고 다른 셈을 하지
+     * 않습니다.
+     */
+    private Gap gapOf(Place from, Place to, Day day) {
+        List<Option> options = new ArrayList<>(3);
+        for (Mode mode : Mode.values()) {
+            Leg leg = leg(from, to, mode, departureFor(day, from));
+            if (leg.reachable() && leg.seconds() > 0) {
+                options.add(new Option(mode, leg.seconds(), leg.meters(),
+                        leg.polyline(), leg.fare()));
+            }
+        }
+        dropSillyWalk(options);
+        return new Gap(from.getId(), to.getId(), options,
+                pick(options, true), pick(options, false));
+    }
+
+    /**
+     * 숙소 쪽 끝을 가리키는 이름.
+     *
+     * <p>숙소는 장소가 아니라 번호가 없습니다. 화면은 고른 수단을
+     * {@code fromId} 로 기억하는데, 이 이름은 장소 번호와 겹칠 일이 없습니다
+     * (장소 번호는 {@code Ids.next()} 가 짓는 열여섯 자).
+     */
+    static final String STAY = "stay";
+
+    /**
+     * 숙소가 첫 곳 · 마지막 곳과 이만큼 가까우면 그 구간을 묻지 않습니다.
+     *
+     * <p>숙소를 장소로도 넣은 사람이 있습니다 — 숙소 칸이 생기기 전부터 그렇게
+     * 해 왔습니다. 그 사람에게 「호텔에서 호텔까지 0분」 을 세 수단으로 사 오는
+     * 것은 값만 들고 할 말이 없습니다. 잰 숫자가 아니라 가리려는 숫자입니다
+     * (계획서 「아직 모르는 것」).
+     */
+    private static final int STAY_SAME_PLACE = 100;
+
+    /**
+     * 그날의 아침 출발점과 저녁 도착점.
+     *
+     * <p>아침은 바로 앞 날({@code sort} 하나 앞)의 숙소, 저녁은 이 날의
+     * 숙소입니다. 좌표가 없으면 없는 것으로 둡니다 — 이름만으로는 구글에 물을
+     * 수 없습니다.
+     *
+     * <p>「앞 날」 을 날짜가 아니라 차례로 잡습니다. 날짜를 안 적은 여행도
+     * 있고, 화면이 날을 늘어놓는 것도 차례입니다.
+     *
+     * @param ordered 같은 여행의 날들, 차례대로
+     */
+    static StayEnds stayEnds(List<Day> ordered, Day day) {
+        Day before = null;
+        for (Day d : ordered) {
+            if (d.getId().equals(day.getId())) {
+                break;
+            }
+            before = d;
+        }
+        return new StayEnds(stayOf(before), stayOf(day));
+    }
+
+    /**
+     * 숙소를 구간의 끝으로 쓸 임시 장소.
+     *
+     * <p>저장하지 않습니다. {@link #fromHere} 가 「여기」 를 만드는 것과 같은
+     * 수법입니다 — {@link #leg} 와 캐시 열쇠가 보는 것은 좌표뿐이라, 장소 모양만
+     * 갖추면 장소 사이 구간과 같은 길을 지납니다.
+     */
+    private static Place stayOf(Day day) {
+        if (day == null || day.getStayLat() == null || day.getStayLng() == null) {
+            return null;
+        }
+        return Place.builder()
+                .name(day.getStayName())
+                .lat(day.getStayLat())
+                .lng(day.getStayLng())
+                .build();
+    }
+
+    /**
+     * 그날 어느 구간을 물을지.
+     *
+     * <p>구글을 부르지 않는 셈만 따로 떼어 둡니다. 어느 구간을 묻는가는 키가
+     * 없어도 잴 수 있어야 합니다 — 확인용 서버에는 키가 없습니다.
+     *
+     * <p>한도 {@code max} 를 셋이 나눕니다. 아침 하나가 먼저 자리를 잡습니다 —
+     * 하루를 펼친 사람이 맨 먼저 보는 줄이고, 앞쪽이 비면 고장으로 읽힙니다.
+     * 장소 사이가 남은 만큼, 저녁은 장소 사이가 하나도 안 잘렸고 자리가 남았을
+     * 때만입니다. 장소 사이가 잘렸는데 저녁이 붙어 있으면 「마지막 곳에서
+     * 호텔까지」 위로 빈 구간이 생기고, 그 빈칸이 어디서 왔는지 알 수 없습니다.
+     */
+    static Planned legsOf(List<Place> list, StayEnds ends, int max) {
+        if (list.isEmpty()) {
+            return new Planned(null, List.of(), null, false);
+        }
+        Place first = list.get(0);
+        Place last = list.get(list.size() - 1);
+
+        Pair morning = ends.morning() != null && !sameSpot(ends.morning(), first)
+                ? new Pair(ends.morning(), first) : null;
+        int room = max - (morning == null ? 0 : 1);
+
+        int wanted = list.size() - 1;
+        int pairs = Math.max(0, Math.min(wanted, room));
+        boolean trimmed = wanted > pairs;
+        List<Pair> between = new ArrayList<>(pairs);
         for (int i = 0; i < pairs; i++) {
-            Place from = list.get(i);
-            Place to = list.get(i + 1);
-
-            List<Option> options = new ArrayList<>(3);
-            for (Mode mode : Mode.values()) {
-                Leg leg = leg(from, to, mode, departureFor(day, from));
-                if (leg.reachable() && leg.seconds() > 0) {
-                    options.add(new Option(mode, leg.seconds(), leg.meters(),
-                            leg.polyline(), leg.fare()));
-                    if (mode == Mode.TRANSIT) {
-                        transitFound++;
-                    }
-                }
-            }
-            if (farApart(from, to)) {
-                longEnough++;
-            }
-            dropSillyWalk(options);
-            out.add(new Gap(from.getId(), to.getId(), options,
-                    pick(options, true), pick(options, false)));
+            between.add(new Pair(list.get(i), list.get(i + 1)));
         }
-        return new Compared(out, noteFor(longEnough, transitFound), trimmed);
+
+        Pair evening = !trimmed && room - pairs > 0
+                && ends.evening() != null && !sameSpot(last, ends.evening())
+                ? new Pair(last, ends.evening()) : null;
+        return new Planned(morning, between, evening, trimmed);
+    }
+
+    private static boolean sameSpot(Place a, Place b) {
+        return new Coordinates(a.getLat(), a.getLng())
+                .metersTo(new Coordinates(b.getLat(), b.getLng())) < STAY_SAME_PLACE;
+    }
+
+    /**
+     * 그날 앞뒤의 숙소. 없으면 비어 있습니다.
+     *
+     * @param morning 전날 밤 숙소 — 아침에 나서는 곳
+     * @param evening 이 날 밤 숙소 — 저녁에 돌아가는 곳
+     */
+    record StayEnds(Place morning, Place evening) {
+    }
+
+    /** 묻기로 한 구간 하나. */
+    record Pair(Place from, Place to) {
+    }
+
+    /**
+     * 그날 물을 구간들.
+     *
+     * @param trimmed 한도에 걸려 장소 사이를 다 못 물었는지
+     */
+    record Planned(Pair morning, List<Pair> between, Pair evening, boolean trimmed) {
     }
 
     /**
@@ -324,8 +499,12 @@ public class RouteService {
      *
      * @param trimmed 장소가 너무 많아 뒷부분을 못 구했는지. 이 말을 안 하면
      *                없는 것이 고장으로 읽힙니다
+     * @param morning 전날 밤 숙소에서 첫 곳까지. {@code fromId} 가 {@link #STAY}.
+     *                첫째 날 · 숙소 좌표가 없는 날 · 숙소가 첫 곳 바로 옆이면 없음
+     * @param evening 마지막 곳에서 이 날 숙소까지. {@code toId} 가 {@link #STAY}
      */
-    public record Compared(List<Gap> gaps, String note, boolean trimmed) {
+    public record Compared(List<Gap> gaps, String note, boolean trimmed,
+                           Gap morning, Gap evening) {
     }
 
     /**
@@ -428,6 +607,11 @@ public class RouteService {
      */
     public record Gap(String fromId, String toId, List<Option> options,
                       Mode fastest, Mode cheapest) {
+
+        /** 숙소 쪽 끝은 임시 장소의 번호가 아니라 {@link #STAY} 로 내려 보냅니다. */
+        Gap withEnds(String fromId, String toId) {
+            return new Gap(fromId, toId, options, fastest, cheapest);
+        }
     }
 
     /**

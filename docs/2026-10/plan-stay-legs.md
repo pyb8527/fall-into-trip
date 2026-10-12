@@ -2,7 +2,15 @@
 
 > `verdict.md` 5번에서 **재설계 권장**(후보마다가 아니라 그날 동선의 앞뒤에 숙소를)으로
 > 받은 것의 실행 계획입니다(2026-10-12).
-> 아직 코드는 한 줄도 바뀌지 않았습니다.
+>
+> **지었음 — 2026-10-12.** 백엔드(`RouteService.compare` · `gapOf` · `stayEnds` · `legsOf`,
+> `DayExtrasController` 의 `morning` · `evening`), 프런트(`ComparedGaps` 타입, `staySeq`,
+> 날 카드의 두 구간 블록, `MovingNote`), 시험(`StayLegsTest` 7, `group-access.test.mjs` [5-1] 4,
+> `icon.test.mjs` [8] 1 고침)까지 들어갔습니다. 계획과 달라진 것은 §10 에 적었습니다.
+> **남은 것:** §8 의 4 — 구글 키가 있는 서버에서 숙소를 적은 날을 펼쳐, 아침 구간이 전날
+> 호텔에서 나오는지 · 숙소를 고치면 구간이 다시 나오는지 · 화면에서 두 블록이 어떻게
+> 읽히는지(§9 첫 줄)를 사람이 봐야 합니다. 확인용 서버에는 키가 없어 `/route/compare` 가
+> 400 으로 끊기므로, 실제 구글 응답이 실린 `morning` · `evening` 은 아직 한 번도 못 봤습니다.
 
 ## 1. 하려는 것
 
@@ -211,3 +219,15 @@ HTTP 시험이 봅니다. `DepartureTimeTest` 가 같은 이유로 그렇게 섰
   바꿔 날짜와 어긋나게 둔 여행이 있다면, 날짜로 앞 날을 잡는 것이 맞을 수 있습니다. 그런
   여행이 실제로 있는지는 모릅니다.
 - **100m 라는 문턱.** 숙소를 장소로도 넣은 사람을 가리려는 숫자이고, 잰 값이 아닙니다.
+
+## 10. 지으면서 계획과 달라진 것
+
+구현에 들어가기 전에 적습니다(2026-10-12).
+
+| 계획 | 실제 | 왜 |
+|---|---|---|
+| `morning` · `evening` 은 `null` 이어도 응답에 실음(§5) | **없으면 안 실립니다** — `note` 와 같습니다 | `application.yml:25` 의 `default-property-inclusion: non_null` 이 맵 값의 `null` 도 뺍니다. `note` 가 이미 그렇게 내려가고(`DayExtrasController` 「없으면 안 실립니다」), 이 하나 때문에 전역 설정을 틀 수는 없습니다. 프런트 타입은 `morning?: Gap \| null` 이라 둘 다 받습니다. 그래서 `icon.test.mjs` [8]도 「`"morning" in r.data`」 가 아니라 「있으면 `Gap` 모양」 으로 봅니다 |
+| `daySeq` 에 숙소 좌표를 넣음(§5, §6.3) | **`staySeq` 를 따로 두고 `/route/compare` 의 열쇠에만 더합니다** | `daySeq` 는 구간만이 아니라 영업시간(`/places-info`)을 다시 묻는 열쇠이고, 사람이 고른 수단(`picked`)을 비우는 열쇠이기도 합니다. 숙소를 고칠 때마다 영업시간을 다시 사 오고 장소 사이에서 고른 수단까지 잃을 까닭이 없습니다. 「숙소를 고치면 구간을 다시 묻는다」 는 사슬은 그대로 이어집니다 |
+| `gapOf(from, to, day, counters)`(§5 ②) | `gapOf(from, to, day)` 가 `Gap` 만 돌려주고, 셈(`longEnough` · `transitFound`)은 부르는 쪽이 돌려받은 `Gap` 을 보고 합니다 | 셈 칸을 넘겨 안에서 고치게 하면 세 자리가 같은 변수를 손댑니다. 대중교통이 나왔는지는 `Gap.options` 에 이미 있습니다 |
+| `stayEnds(List<Day>, Day)` 하나(§5 ③) | `stayEnds` 에 더해 **`legsOf(places, ends, max)`** — 100m 거르기와 한도 24 나누기를 구글 없이 잴 수 있게 떼어 냄 | §7 의 「100m」 · 「25곳」 시험이 구글 키 없이 서려면 어느 구간을 묻는지가 순수한 셈이어야 합니다 |
+| (없음) | 프런트가 `morning.toId` · `evening.fromId` 가 **지금 보는 날의** 첫 곳 · 마지막 곳일 때만 그립니다 | `routeLines` · `gapAfter` 가 이미 그렇게 거릅니다 — 날을 바꾸는 동안 어제의 아침 구간이 오늘 위에 붙지 않게 |

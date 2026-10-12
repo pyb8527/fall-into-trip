@@ -54,6 +54,14 @@ public class DayExtrasController {
         /* 장소가 너무 많아 뒷부분을 못 구했는지. 이 말을 안 하면 없는 것이
            고장으로 읽힙니다. */
         out.put("trimmed", got.trimmed());
+        /* 전날 밤 숙소에서 첫 곳까지, 마지막 곳에서 이 날 숙소까지.
+
+           gaps 에 섞지 않고 따로 싣습니다 — 지도 선과 「다음 곳까지」 가
+           gaps 를 장소 사이로 읽고 있어서, 섞으면 그쪽이 모두 숙소를 가려내야
+           합니다. 없으면 note 처럼 안 실립니다(application.yml 의 non_null 이
+           맵 값의 null 도 뺍니다). */
+        out.put("morning", got.morning());
+        out.put("evening", got.evening());
         return out;
     }
 

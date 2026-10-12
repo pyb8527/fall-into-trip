@@ -564,6 +564,26 @@ export type Gap = {
   cheapest: TravelMode | null;
 };
 
+/**
+ * 하루치 사이사이 — `GET /api/days/{dayId}/route/compare`.
+ *
+ * <p>숙소 구간은 <code>gaps</code> 에 섞지 않고 따로 옵니다. 지도 선과
+ * 「다음 곳까지」 가 <code>gaps</code> 를 장소 사이로 읽고 있어서, 섞으면
+ * 그쪽이 모두 숙소를 가려내야 합니다. 숙소 쪽 끝의 번호는 <code>"stay"</code>.
+ *
+ * @param morning 전날 밤 숙소에서 첫 곳까지. 첫째 날 · 숙소 좌표가 없는 날은 안 옵니다
+ * @param evening 마지막 곳에서 이 날 숙소까지. 숙소를 안 적은 날은 안 옵니다
+ */
+export type ComparedGaps = {
+  gaps: Gap[];
+  /** 대중교통이 하나도 안 나온 까닭. 없으면 안 옵니다. */
+  note?: string | null;
+  /** 장소가 너무 많아 뒷부분을 못 구했는지. */
+  trimmed?: boolean;
+  morning?: Gap | null;
+  evening?: Gap | null;
+};
+
 export type DayRoute = {
   mode: TravelMode;
   legs: RouteLeg[];

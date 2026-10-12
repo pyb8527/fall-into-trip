@@ -101,7 +101,12 @@ T("남은 못 봄", r.status === 403 || r.status === 404, r.data);
 r = await call("GET", `/api/days/${dayId}/route/compare`, { token: me });
 /* 이 확인용 서버에는 구글 키가 없습니다. 키가 없으면 400 으로 잘라 내고,
    있으면 구간 목록을 돌려줘야 합니다. 어느 쪽이든 500 이면 안 됩니다. */
-T("키가 없으면 꺼져 있다고 알림", r.status === 400 || (r.status === 200 && Array.isArray(r.data.gaps)), { status: r.status, data: r.data });
+/* 숙소 구간(morning · evening)은 없으면 안 실립니다(note 와 같음). 실렸다면
+   장소 사이 구간과 같은 모양이어야 합니다. */
+const stayLegOk = (g) => g == null || (Array.isArray(g.options) && typeof g.fromId === "string" && typeof g.toId === "string");
+T("키가 없으면 꺼져 있다고 알림", r.status === 400
+  || (r.status === 200 && Array.isArray(r.data.gaps) && stayLegOk(r.data.morning) && stayLegOk(r.data.evening)),
+  { status: r.status, data: r.data });
 r = await call("GET", "/api/days/없는날/route/compare", { token: me });
 T("없는 날짜는 404", r.status === 404, r.data);
 
