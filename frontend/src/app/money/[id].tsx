@@ -31,6 +31,7 @@ import {
   Empty,
   ErrorNote,
   Field,
+  Icon,
   Loading,
   Mark,
   Picker,
@@ -73,6 +74,14 @@ import { BudgetLine, BudgetSheet } from '@/components/budget';
 export default function Money() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [tab, setTab] = useState<'list' | 'settle'>('list');
+  /* 「쓴 돈」 안에서 묶는 기준. 날짜별이 기본입니다 — 지금까지 그래
+     왔고, 갈래별은 "밥에 얼마, 교통에 얼마" 가 궁금할 때 들여다보는
+     보기입니다. */
+  const [by, setBy] = useState<'day' | 'kind'>('day');
+  /* 갈래별 보기에서 펼쳐 둔 묶음들. 처음에는 다 접혀 있습니다 — 이 보기를
+     여는 까닭이 "갈래마다 얼마" 를 한눈에 보려는 것이라, 줄까지 펴 두면
+     날짜별과 다를 것이 없어집니다. */
+  const [openKinds, setOpenKinds] = useState<Set<IconName>>(new Set());
   const { user } = useAuth();
 
   const tripQ = useAsync<TripDetail>(
@@ -134,6 +143,18 @@ export default function Money() {
     days.forEach((d) => d.places.forEach((p) => box.set(p.id, p.name)));
     return box;
   }, [days]);
+  /*
+    날 번호 → 짧은 날짜 마디("10.05(일)").
+
+    <p>갈래별 보기의 묶음 머리는 날짜를 말하지 않으므로(묶는 기준이
+    갈래라서), 줄마다 언제 쓴 것인지 이 마디로 적어 둡니다(SpendRow 의
+    dayLabel). 날짜별 보기는 묶음 머리가 이미 그 말을 하므로 안 씁니다.
+  */
+  const dayLabels = useMemo(() => {
+    const box = new Map<string, string>();
+    days.forEach((d) => box.set(d.id, d.date || d.label));
+    return box;
+  }, [days]);
   const people = mates?.people ?? [];
   const list = spent.data?.expenses ?? [];
 
@@ -142,6 +163,19 @@ export default function Money() {
     books.reload();
     /* 통화를 처음 쓴 지출이 들어오면 적어야 할 환율이 하나 늘어납니다. */
     rates.reload();
+  }
+
+  /** 갈래별 보기의 묶음 하나를 펴거나 접습니다. */
+  function toggleKind(icon: IconName) {
+    setOpenKinds((was) => {
+      const next = new Set(was);
+      if (next.has(icon)) {
+        next.delete(icon);
+      } else {
+        next.add(icon);
+      }
+      return next;
+    });
   }
 
   /*
@@ -446,44 +480,104 @@ export default function Money() {
             <Empty message="아직 적어 둔 것이 없어요. 항공권·숙소처럼 미리 낸 돈부터 적어 두면 예산과 견줘 볼 수 있어요." />
           ) : null}
 
-          {/* 날짜별로 묶습니다. 여행의 돈은 하루 단위로 기억됩니다 —
-              "둘째 날에 많이 썼지" 처럼. */}
-          {byDay(list, days).map((group, at) => (
-            <View key={group.key}>
-              {at > 0 ? <Band /> : null}
-              {/*
-                날짜 머리.
+          {list.length > 0 ? (
+            /*
+              날짜별 · 갈래별 전환.
 
-                <p>왼쪽에 4px 색 띠를 세우고 그 안에 줄을 담았습니다. 띠가
-                세로로 길게 서면 그것이 구역의 테두리가 되어, 화면이 다시
-                <b>테두리 쳐진 상자의 더미</b>가 됩니다.
+              <p>묶는 기준만 바뀌지 화면 자체가 바뀌는 것은 아니라서
+              {@code SegmentedTabs} 를 "쓴 돈 / 정산" 밑에 또 세우지
+              않습니다 — 작은 칩 둘로 둡니다. 줄 모양({@code SpendRow})은
+              그대로이고 묶는 머리만 다릅니다.
+            */
+            <Row gap={Spacing.s2} style={styles.byChips}>
+              <Chip label="날짜별" selected={by === 'day'} onPress={() => setBy('day')} />
+              <Chip label="갈래별" selected={by === 'kind'} onPress={() => setBy('kind')} />
+            </Row>
+          ) : null}
 
-                <p>색은 날짜를 가리키는 이름표일 뿐입니다. 동그라미 하나로
-                줄이고, 구역을 가르는 일은 회색 띠가 맡습니다 — 일정 화면의
-                날짜 머리와 같은 모양입니다.
-              */}
-              <Split align="baseline" style={styles.groupHead}>
-                <Row gap={Spacing.s2}>
-                  {group.color ? (
-                    <View style={[styles.dayDot, { backgroundColor: group.color }]} />
-                  ) : null}
-                  <Text style={styles.groupLabel}>{group.label}</Text>
-                </Row>
-                <Caption tone="secondary">
-                  {group.totals.map(([c, t]) => money(t.sum, c, t.decimals)).join(' · ')}
-                </Caption>
-              </Split>
-              {group.items.map((e) => (
-                <SpendRow
-                  key={e.id}
-                  spend={e}
-                  people={people}
-                  placeName={e.placeId ? (placeNames.get(e.placeId) ?? null) : null}
-                  onOpen={() => setEditing(e)}
-                />
-              ))}
-            </View>
-          ))}
+          {by === 'day' ? (
+            /* 날짜별로 묶습니다. 여행의 돈은 하루 단위로 기억됩니다 —
+                "둘째 날에 많이 썼지" 처럼. */
+            byDay(list, days).map((group, at) => (
+              <View key={group.key}>
+                {at > 0 ? <Band /> : null}
+                {/*
+                  날짜 머리.
+
+                  <p>왼쪽에 4px 색 띠를 세우고 그 안에 줄을 담았습니다. 띠가
+                  세로로 길게 서면 그것이 구역의 테두리가 되어, 화면이 다시
+                  <b>테두리 쳐진 상자의 더미</b>가 됩니다.
+
+                  <p>색은 날짜를 가리키는 이름표일 뿐입니다. 동그라미 하나로
+                  줄이고, 구역을 가르는 일은 회색 띠가 맡습니다 — 일정 화면의
+                  날짜 머리와 같은 모양입니다.
+                */}
+                <Split align="baseline" style={styles.groupHead}>
+                  <Row gap={Spacing.s2}>
+                    {group.color ? (
+                      <View style={[styles.dayDot, { backgroundColor: group.color }]} />
+                    ) : null}
+                    <Text style={styles.groupLabel}>{group.label}</Text>
+                  </Row>
+                  <Caption tone="secondary">
+                    {group.totals.map(([c, t]) => money(t.sum, c, t.decimals)).join(' · ')}
+                  </Caption>
+                </Split>
+                {group.items.map((e) => (
+                  <SpendRow
+                    key={e.id}
+                    spend={e}
+                    people={people}
+                    placeName={e.placeId ? (placeNames.get(e.placeId) ?? null) : null}
+                    onOpen={() => setEditing(e)}
+                  />
+                ))}
+              </View>
+            ))
+          ) : (
+            /*
+              갈래별로 묶습니다.
+
+              <p>묶음은 접힌 채로 엽니다 — 이 보기를 여는 까닭이 "갈래마다
+              얼마" 를 한눈에 보려는 것이라, 줄까지 펴 두면 날짜별과 다를
+              것이 없어집니다. 차례는 KINDS 가 정한 고정 차례이고, 빈 칸은
+              안 그립니다.
+            */
+            byKind(list).map((group, at) => {
+              const open = openKinds.has(group.icon);
+              return (
+                <View key={group.key}>
+                  {at > 0 ? <Band /> : null}
+                  <Press
+                    onPress={() => toggleKind(group.icon)}
+                    style={styles.kindHead}
+                    accessibilityLabel={`${group.label} ${open ? '접기' : '펴기'}`}>
+                    <Mark icon={group.icon} />
+                    <View style={styles.kindHeadText}>
+                      <Text style={styles.groupLabel}>{group.label}</Text>
+                      <Caption tone="secondary">{group.items.length}건</Caption>
+                    </View>
+                    <Caption tone="secondary">
+                      {group.totals.map(([c, t]) => money(t.sum, c, t.decimals)).join(' · ')}
+                    </Caption>
+                    <Icon name={open ? 'chevron-up' : 'chevron-down'} size={20} tone="muted" />
+                  </Press>
+                  {open
+                    ? group.items.map((e) => (
+                        <SpendRow
+                          key={e.id}
+                          spend={e}
+                          people={people}
+                          placeName={e.placeId ? (placeNames.get(e.placeId) ?? null) : null}
+                          dayLabel={dayLabels.get(e.dayId ?? '') ?? null}
+                          onOpen={() => setEditing(e)}
+                        />
+                      ))
+                    : null}
+                </View>
+              );
+            })
+          )}
         </>
       ) : (
         <Settle
@@ -698,12 +792,18 @@ function SpendRow({
   spend,
   people,
   placeName,
+  dayLabel,
   onOpen,
 }: {
   spend: Spend;
   people: Person[];
   /** 어디서 썼는지. 안 정했거나 그 장소가 지워졌으면 비어 있습니다. */
   placeName: string | null;
+  /**
+   * 짧은 날짜 마디("10.05(일)"). 갈래별 보기에서만 넘겨 줍니다 — 묶음
+   * 머리가 날짜를 더는 말하지 않는 자리라 줄에서 대신 말합니다.
+   */
+  dayLabel?: string | null;
   onOpen: () => void;
 }) {
   /* 전원이 나누면 굳이 적지 않습니다. 대개 그렇고, 매번 적으면 줄만
@@ -731,6 +831,7 @@ function SpendRow({
           {spend.cat ? <Badge label={spend.cat} tone="muted" /> : null}
         </Row>
         <Caption tone="secondary" numberOfLines={1}>
+          {dayLabel ? `${dayLabel} · ` : ''}
           {spend.payerName} 님이 냄{shared ? ` · ${shared} 나눔` : ''}
           {spend.pay ? ` · ${spend.pay}` : ''}
           {placeName ? ` · ${placeName}` : ''}
@@ -778,6 +879,29 @@ function catMark(cat: string | null | undefined): IconName {
   }
   return 'wallet';
 }
+
+/**
+ * 갈래별 보기에서 그림마다 붙일 이름, 그리고 묶음을 세우는 차례.
+ *
+ * <p>{@link catMark} 의 정규식 차례는 "여러 갈래가 걸리면 어느 말이
+ * 이기는가" 를 정합니다 — 이 차례와는 다른 일입니다. 여기는 "어느 묶음이
+ * 위에 서는가" 를 정합니다. 여행 돈에서 큰 것(숙소 · 교통)이 위에 오는
+ * 것이 대개 맞고, 그보다 <b>열 때마다 같은 자리에 있는 것</b>이 중요합니다
+ * — 통화가 둘이면 어느 갈래가 더 큰지 정할 수 없어 크기순으로는 못
+ * 세웁니다.
+ */
+const KINDS: { icon: IconName; label: string }[] = [
+  { icon: 'bed', label: '숙소' },
+  { icon: 'train', label: '교통' },
+  { icon: 'restaurant', label: '밥' },
+  { icon: 'cafe', label: '카페' },
+  { icon: 'ticket', label: '입장' },
+  { icon: 'bag', label: '쇼핑' },
+  /* 갈래를 안 적은 것과 catMark 가 못 알아낸 것이 함께 옵니다. 억지로
+     가까운 갈래에 넣지 않습니다 — 줄에 Badge 로 갈래 글이 보이므로 왜
+     "그 밖" 인지는 사람이 압니다. */
+  { icon: 'wallet', label: '그 밖' },
+];
 
 /**
  * 정산표.
@@ -1232,6 +1356,21 @@ function amountText(units: number, decimals: number) {
 }
 
 
+/**
+ * 지출들을 통화별로 더합니다.
+ *
+ * <p>{@link byDay} 와 {@link byKind} 가 묶는 기준만 다르고 묶음마다 통화별
+ * 합을 내는 셈은 같아서, 그 셈만 여기로 뺐습니다.
+ */
+function sumByCurrency(items: Spend[]) {
+  const sums = new Map<string, { sum: number; decimals: number }>();
+  items.forEach((e) => {
+    const had = sums.get(e.currency) ?? { sum: 0, decimals: e.decimals };
+    sums.set(e.currency, { sum: had.sum + e.amount, decimals: e.decimals });
+  });
+  return [...sums.entries()];
+}
+
 /** 날짜별로 묶고, 묶음마다 통화별 합계를 답니다. */
 function byDay(list: Spend[], days: TripDetail['days']) {
   const order = ['', ...days.map((d) => d.id)];
@@ -1255,11 +1394,6 @@ function byDay(list: Spend[], days: TripDetail['days']) {
     .filter((key) => box.has(key))
     .map((key) => {
       const items = box.get(key) ?? [];
-      const sums = new Map<string, { sum: number; decimals: number }>();
-      items.forEach((e) => {
-        const had = sums.get(e.currency) ?? { sum: 0, decimals: e.decimals };
-        sums.set(e.currency, { sum: had.sum + e.amount, decimals: e.decimals });
-      });
       return {
         key,
         /* 날을 안 고른 것. 대개 떠나기 전에 낸 항공권·숙소라 그 이름으로
@@ -1268,9 +1402,35 @@ function byDay(list: Spend[], days: TripDetail['days']) {
         /* 어느 날인지 모르는 것에는 색이 없습니다. */
         color: colors.get(key) ?? null,
         items,
-        totals: [...sums.entries()],
+        totals: sumByCurrency(items),
       };
     });
+}
+
+/**
+ * 갈래별로 묶고, 묶음마다 통화별 합계를 답니다.
+ *
+ * <p>{@link catMark} 가 이미 지출의 갈래 글에서 그림을 알아냅니다. 그
+ * 그림으로 묶으므로 줄 앞 그림과 묶음이 늘 같은 말을 합니다. 차례는
+ * {@link KINDS} 가 정한 고정 차례이고, 빈 묶음은 안 돌려줍니다.
+ */
+function byKind(list: Spend[]) {
+  const box = new Map<IconName, Spend[]>();
+  list.forEach((e) => {
+    const kind = catMark(e.cat);
+    box.set(kind, [...(box.get(kind) ?? []), e]);
+  });
+
+  return KINDS.filter((k) => box.has(k.icon)).map((k) => {
+    const items = box.get(k.icon) ?? [];
+    return {
+      key: k.icon,
+      icon: k.icon,
+      label: k.label,
+      items,
+      totals: sumByCurrency(items),
+    };
+  });
 }
 
 /*
@@ -1334,6 +1494,12 @@ const styles = StyleSheet.create({
   },
 
   /* -------------------------------------------------------------- 목록 */
+  /* 날짜별 · 갈래별 전환 칩. 목록 위, 오른쪽에 작게 둡니다 — 탭만큼 큰
+     전환이 아니라서 SegmentedTabs 와 같은 무게로 세우지 않습니다. */
+  byChips: {
+    justifyContent: 'flex-end',
+    paddingBottom: Spacing.s2,
+  },
   /*
     묶음의 이름.
 
@@ -1354,6 +1520,18 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: Radius.full,
+  },
+  /* 갈래 묶음 머리. 날짜 묶음 머리(groupHead)와 달리 눌러서 펴고 접습니다
+     — 그림·이름·건수·통화별 합·접힘 그림이 한 줄입니다. */
+  kindHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.s3,
+    paddingVertical: Spacing.s2,
+  },
+  kindHeadText: {
+    flex: 1,
+    gap: 2,
   },
   row: {
     flexDirection: 'row',
