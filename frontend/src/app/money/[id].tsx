@@ -888,6 +888,22 @@ function catMark(cat: string | null | undefined): IconName {
 }
 
 /**
+ * 판에서 고른 갈래를 저장할 글로.
+ *
+ * <p>칩을 안 바꿨으면 원래 글을 그대로 둡니다(위 SpendSheet 의 까닭). 바꿨으면
+ * 칩 이름을 적고, 「그 밖」 이면 비웁니다 — 갈래를 안 정한 것과 같습니다.
+ */
+function catOf(kind: IconName, first: IconName, original: string | null | undefined) {
+  if (kind === first && original) {
+    return original;
+  }
+  if (kind === 'wallet') {
+    return null;
+  }
+  return KINDS.find((k) => k.icon === kind)?.label ?? null;
+}
+
+/**
  * 갈래별 보기에서 그림마다 붙일 이름, 그리고 묶음을 세우는 차례.
  *
  * <p>{@link catMark} 의 정규식 차례는 "여러 갈래가 걸리면 어느 말이
@@ -1205,7 +1221,20 @@ function SpendSheet({
   /* 장소는 날에 딸려 있습니다. 날을 바꾸면 비웁니다 — 안 그러면 어제 고른
      가게가 오늘 지출에 붙습니다. */
   const [placeId, setPlaceId] = useState<string | null>(spend?.placeId ?? null);
-const [cat, setCat] = useState(spend?.cat ?? '');
+  /*
+    갈래는 고릅니다.
+
+    <p>글로 적게 두었더니 「스시」 · 「돈키호테」 처럼 무엇을 샀는지를 적었고,
+    그런 글은 갈래별 보기에서 전부 「그 밖」 으로 떨어졌습니다. 갈래는 칩
+    일곱(KINDS) 중 하나를 누르고, 무엇을 샀는지는 「무엇에」 에 적습니다.
+
+    <p>전에 글로 적어 둔 지출을 열면 그 글로 짐작한 칩이 골라져 있습니다
+    (catMark). 칩을 안 건드리고 저장하면 <b>원래 글을 그대로</b> 둡니다 —
+    열어 보기만 했는데 「저녁값」 이 「밥」 으로 바뀌면 남이 적은 것을 몰래
+    고친 셈입니다.
+  */
+  const firstKind = catMark(spend?.cat);
+  const [kind, setKind] = useState<IconName>(firstKind);
   /* 비어 있으면 전원이 나눕니다. 여행 경비는 대개 그렇습니다. */
   const [share, setShare] = useState<string[]>(spend?.share ?? []);
   const [busy, setBusy] = useState(false);
@@ -1230,7 +1259,7 @@ const [cat, setCat] = useState(spend?.cat ?? '');
       payerId: payer,
       dayId,
       placeId,
-      cat: cat.trim() || null,
+      cat: catOf(kind, firstKind, spend?.cat),
       share: share.length > 0 ? share : null,
     };
     try {
@@ -1255,7 +1284,7 @@ const [cat, setCat] = useState(spend?.cat ?? '');
           payerId: payer ?? spend.payerId,
           dayId: dayId ?? '',
           placeId: placeId ?? '',
-          cat: cat.trim(),
+          cat: catOf(kind, firstKind, spend?.cat) ?? '',
           share,
           version: spend.version,
         });
@@ -1264,7 +1293,7 @@ const [cat, setCat] = useState(spend?.cat ?? '');
       }
       setName('');
       setAmount('');
-      setCat('');
+      setKind('wallet');
       setShare([]);
       onDone();
     } catch (e) {
@@ -1415,7 +1444,19 @@ const [cat, setCat] = useState(spend?.cat ?? '');
         </View>
       ) : null}
 
-      <Field label="갈래" value={cat} onChangeText={setCat} placeholder="밥 / 교통 / 쇼핑" />
+      <View style={styles.pick}>
+        <Text style={styles.pickLabel}>갈래</Text>
+        <Row gap={Spacing.s2} style={styles.chips}>
+          {KINDS.map((k) => (
+            <Chip
+              key={k.icon}
+              label={k.label}
+              selected={kind === k.icon}
+              onPress={() => setKind(k.icon)}
+            />
+          ))}
+        </Row>
+      </View>
 
       {/* 지우는 것은 맨 아래, 조용하게. 미리 묻지 않습니다 — 지운 뒤에
           목록 위로 되돌리는 띠가 잠깐 뜹니다. */}
