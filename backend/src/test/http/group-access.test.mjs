@@ -142,41 +142,6 @@ T("동행은 부를 수 있음(404 아님)", r.status === 200 && Array.isArray(r
 r = await call("GET", `/api/days/${dayId}/places-info`, { token: nam });
 T("모임 밖 사람은 404 — 403 이 아님", r.status === 404, r.data);
 
-console.log("\n[5-1] 숙소 구간도 같은 문 — 동행만, 남의 여행 숙소는 안 샘");
-/* 하루를 펼치면 어젯밤 숙소에서 첫 곳까지 · 마지막 곳에서 오늘 숙소까지가
-   /route/compare 에 함께 옵니다. 숙소는 앞 날에서 꺼내므로, 그 「앞 날」 이
-   다른 여행으로 새지 않는지까지 봅니다. 확인용 서버에는 구글 키가 없어
-   200 대신 400(경로 안내 꺼짐)이 오기도 합니다 — 404 가 아닌 것이 요점입니다. */
-{
-  const d0 = (await call("GET", "/api/trip?trip=" + groupTrip, { token: mina })).data.days[0];
-  r = await call("PATCH", "/api/days/" + d0.id, { token: mina,
-    body: { version: d0.version, stayName: "관악 산장", stayLat: 37.45, stayLng: 126.95 } });
-  T("숙소를 적음", r.status === 200 && r.data.day.stay?.name === "관악 산장", r.data);
-
-  r = await call("GET", `/api/days/${d0.id}/route/compare`, { token: jun });
-  T("모임 동행은 숙소 구간이 붙는 날도 부름(404 아님)", r.status === 200 || r.status === 400, { status: r.status, data: r.data });
-  r = await call("GET", `/api/days/${d0.id}/route/compare`, { token: nam });
-  T("모임 밖 사람은 404(403 아님)", r.status === 404, { status: r.status, data: r.data });
-
-  /* 내 여행 둘. 첫 여행에만 숙소를 적고, 둘째 여행의 첫 날을 펼칩니다.
-     앞 날을 여행 밖에서 찾으면 첫 여행의 숙소가 둘째 여행의 아침으로 샙니다. */
-  r = await call("POST", "/api/trips", { token: mina, body: { title: "숙소 하나", startIso: "2027-05-01", nights: 1 } });
-  const tA = r.data.trip.id;
-  r = await call("POST", "/api/trips", { token: mina, body: { title: "숙소 둘", startIso: "2027-05-03", nights: 1 } });
-  const tB = r.data.trip.id;
-  const aDays = (await call("GET", "/api/trip?trip=" + tA, { token: mina })).data.days;
-  for (const d of aDays) {
-    await call("PATCH", "/api/days/" + d.id, { token: mina,
-      body: { version: d.version, stayName: "남의 여행 호텔", stayLat: 34.665, stayLng: 135.501 } });
-  }
-  const bFirst = (await call("GET", "/api/trip?trip=" + tB, { token: mina })).data.days[0];
-  await call("POST", "/api/places", { token: mina, body: { dayId: bFirst.id, name: "첫 곳", lat: 34.70, lng: 135.50 } });
-  r = await call("GET", `/api/days/${bFirst.id}/route/compare`, { token: mina });
-  T("다른 여행의 숙소가 첫 날 아침으로 새지 않음",
-    r.status === 404 || r.status === 400 || (r.status === 200 && r.data.morning == null),
-    { status: r.status, data: r.data });
-}
-
 console.log("\n[6] 남의 모임에 여행을 꽂을 수는 없다");
 r = await call("POST", "/api/trips", { token: nam, body: { title: "끼어들기", startIso: "2027-03-06", nights: 0, groupId } });
 T("남의 모임 id 로는 못 만듦", r.status === 404, r.data);

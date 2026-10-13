@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { API_BASE } from '@/api/client';
 import type { MapPlace, TripMapProps } from '@/components/map-types';
@@ -553,7 +553,7 @@ export function TripMap({
   activeId,
   onSelect,
   routes,
-  routesPending = false,
+  stations,
   traveler,
   dayFilter = false,
   here,
@@ -904,28 +904,70 @@ export function TripMap({
       <p>이제 구간마다 봅니다. 받은 구간은 실선, 못 받은 구간은 점선. 길이
       안 끊기고, 어디까지가 진짜 길이고 어디부터가 "이 순서로 간다" 인지도
       생김새로 갈립니다.
+
+      <p>구글 경로선은 2026-10-13 에 걷어냈습니다(lib/directions). 지금 따로 오는
+      선은 역을 적어 둔 구간의 토막뿐이고, 나머지는 모두 점선입니다.
     */
     const drawn = (routes ?? []).filter((r) => r.points.length > 1);
     drawn.forEach((line) => {
       lines.current.push(
-        new g.Polyline({
-          path: line.points,
-          map: map.current,
-          strokeColor: line.color,
-          strokeOpacity: 0.9,
-          /* 4 였습니다. 핀을 한 눈금 줄이면서 선도 함께 줄입니다 — 선이
-             핀보다 굵으면 동선이 아니라 색 띠로 보입니다. */
-          strokeWeight: 3,
-          zIndex: 2,
-        }),
+        line.dashed
+          ? new g.Polyline({
+              path: line.points,
+              map: map.current,
+              strokeOpacity: 0,
+              zIndex: 2,
+              icons: [
+                {
+                  icon: {
+                    path: 'M 0,-1 0,1',
+                    strokeColor: line.color,
+                    strokeOpacity: 0.85,
+                    strokeWeight: 2.4,
+                    scale: 3,
+                  },
+                  offset: '0',
+                  repeat: '13px',
+                },
+              ],
+            })
+          : new g.Polyline({
+              path: line.points,
+              map: map.current,
+              strokeColor: line.color,
+              strokeOpacity: 0.9,
+              /* 4 였습니다. 핀을 한 눈금 줄이면서 선도 함께 줄입니다 — 선이
+                 핀보다 굵으면 동선이 아니라 색 띠로 보입니다. */
+              strokeWeight: 3,
+              zIndex: 2,
+            }),
       );
     });
 
-    /* 묻고 있는 동안에는 점선도 안 그립니다. 점선은 "길을 못 찾았다" 는
-       뜻인데, 찾는 중에 그렇게 말하면 틀린 말입니다. */
-    if (link && !routesPending) {
-      /* 실제 경로가 덮은 구간. id 는 "떠나는곳-닿는곳" 입니다. */
-      const covered = new Set(drawn.map((r) => r.id));
+    /* 이동에 적어 둔 역. 번호 핀과 헷갈리지 않게 번호 없는 작은 동그라미입니다.
+       선과 함께 지웠다 다시 세우므로 같은 상자에 담습니다. */
+    for (const st of stations ?? []) {
+      lines.current.push(
+        new g.Marker({
+          position: { lat: st.lat, lng: st.lng },
+          map: map.current,
+          title: st.name,
+          zIndex: 600,
+          icon: {
+            path: g.SymbolPath.CIRCLE,
+            scale: 5,
+            fillColor: Colors.surface,
+            fillOpacity: 1,
+            strokeColor: st.color,
+            strokeWeight: 2.5,
+          },
+        }),
+      );
+    }
+
+    if (link) {
+      /* 따로 그린 선이 덮은 구간. id 는 "떠나는곳-닿는곳" 입니다. */
+      const covered = new Set(drawn.map((r) => r.covers ?? r.id));
       const byDay = new Map<number, MapPlace[]>();
       shown.forEach((p) => {
         const list = byDay.get(p.dayIndex) ?? [];
@@ -996,7 +1038,7 @@ export function TripMap({
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, shown, routes, link, routesPending]);
+  }, [ready, shown, routes, stations, link]);
 
   /*
     동행자와 임시 핀.
@@ -1372,15 +1414,6 @@ export function TripMap({
         </View>
       ) : null}
 
-      {/* 지도 위에서 말합니다. 판 안 목록에도 같은 안내가 있지만, 판을
-          내리고 지도를 보는 동안에는 그것이 안 보입니다. */}
-      {routesPending ? (
-        <View style={styles.pending} pointerEvents="none">
-          <ActivityIndicator size="small" color={Colors.textSecondary} />
-          <Caption tone="secondary">길을 찾고 있어요</Caption>
-        </View>
-      ) : null}
-
       {chosen ? <PlaceSheet place={chosen} onClose={() => setSheetId(null)} /> : null}
     </div>
   );
@@ -1454,21 +1487,6 @@ const styles = StyleSheet.create({
     top: Spacing.md,
     right: Spacing.md,
     /* 지도가 만든 층 위로 올려야 눌립니다. */
-    zIndex: 2,
-  },
-  /* 지도 한가운데 위쪽. 왼쪽 위는 날짜 띠가, 오른쪽 위는 단추들이,
-     아래쪽은 판이 씁니다. 남는 자리가 여기뿐입니다. */
-  pending: {
-    position: 'absolute',
-    top: Spacing.md,
-    alignSelf: 'center',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xs,
-    paddingVertical: Spacing.xs,
-    paddingHorizontal: Spacing.md,
-    borderRadius: Radius.full,
-    backgroundColor: Colors.surface,
     zIndex: 2,
   },
   /* 지도 왼쪽 위. 오른쪽 위에는 전체화면·내 위치 단추가 섭니다. */

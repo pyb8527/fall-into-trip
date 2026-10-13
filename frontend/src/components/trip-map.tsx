@@ -1,7 +1,6 @@
 import { Image } from 'expo-image';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Modal,
   PixelRatio,
   Platform,
@@ -260,7 +259,7 @@ export function TripMap({
   activeId,
   onSelect,
   routes,
-  routesPending = false,
+  stations,
   traveler,
   here,
   mates,
@@ -503,10 +502,13 @@ export function TripMap({
    * 비었습니다.</b> 길이 한가운데서 끊긴 것처럼 보이는 것이 이것입니다.
    *
    * <p>이제 구간마다 봅니다. 받은 구간은 실선, 못 받은 구간만 점선.
+   *
+   * <p>구글 경로선은 2026-10-13 에 걷어냈습니다(lib/directions). 지금 따로 오는
+   * 선은 역을 적어 둔 구간의 토막뿐이고, 나머지는 모두 점선입니다.
    */
   const hops = useMemo(() => {
-    /* 실제 경로가 덮은 구간. id 는 "떠나는곳-닿는곳" 입니다. */
-    const covered = new Set(drawn.map((r) => r.id));
+    /* 따로 그린 선이 덮은 구간. id 는 "떠나는곳-닿는곳" 입니다. */
+    const covered = new Set(drawn.map((r) => r.covers ?? r.id));
     const byDay = new Map<number, MapPlace[]>();
     shown.forEach((p) => {
       const list = byDay.get(p.dayIndex) ?? [];
@@ -730,11 +732,10 @@ export function TripMap({
           /* 4 였습니다. 핀을 한 눈금 줄이면서 선도 함께 줄입니다 — 선이
              핀보다 굵으면 동선이 아니라 색 띠로 보입니다. */
           strokeWidth={3}
+          lineDashPattern={line.dashed ? [6, 8] : undefined}
         />
       ))}
-      {/* 묻고 있는 동안에는 점선도 안 그립니다. 점선은 "길을 못 찾았다" 는
-          뜻인데, 찾는 중에 그렇게 말하면 틀린 말입니다. */}
-      {link && !routesPending
+      {link
         ? hops.map((hop) => (
             <Polyline
               key={`hop-${hop.id}`}
@@ -831,6 +832,19 @@ export function TripMap({
         />
       ))}
 
+      {/* 이동에 적어 둔 역. 번호 핀과 헷갈리지 않게 번호 없는 작은 동그라미입니다. */}
+      {(stations ?? []).map((st) => (
+        <Marker
+          key={`station-${st.id}`}
+          coordinate={{ latitude: st.lat, longitude: st.lng }}
+          anchor={{ x: 0.5, y: 0.5 }}
+          title={st.name}
+          tracksViewChanges={false}
+          zIndex={600}>
+          <View style={[styles.station, { borderColor: st.color }]} />
+        </Marker>
+      ))}
+
       {/* 잠깐 꽂아 둔 깃발. 꽂는 단추가 깃발이니 지도에도 깃발이 서야
           누른 것과 찍힌 것이 같은 것인 줄 압니다. */}
       {(notes ?? []).map((note) => (
@@ -898,14 +912,6 @@ export function TripMap({
     <>
       <View style={[styles.frame, bleed ? styles.frameBleed : { height }]}>
         {full ? null : body}
-        {/* 지도 위에서 말합니다. 판 안 목록에도 같은 안내가 있지만, 판을
-            내리고 지도를 보는 동안에는 그것이 안 보입니다. */}
-        {routesPending && !full ? (
-          <View style={styles.pending} pointerEvents="none">
-            <ActivityIndicator size="small" color={Colors.textSecondary} />
-            <Caption tone="secondary">길을 찾고 있어요</Caption>
-          </View>
-        ) : null}
         {full ? null : dayRail}
         {full || !chrome ? null : (
           <View style={styles.overlay}>
@@ -1253,16 +1259,11 @@ const styles = StyleSheet.create({
   },
   /* 지도 한가운데 위쪽. 왼쪽 위는 날짜 띠가, 오른쪽 위는 단추들이,
      아래쪽은 판이 씁니다. 남는 자리가 여기뿐입니다. */
-  pending: {
-    position: 'absolute',
-    top: Spacing.md,
-    alignSelf: 'center',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xs,
-    paddingVertical: Spacing.xs,
-    paddingHorizontal: Spacing.md,
-    borderRadius: Radius.full,
+  station: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 2.5,
     backgroundColor: Colors.surface,
   },
   /* 지도 왼쪽 위. 오른쪽 위에는 전체화면 단추가 섭니다. */

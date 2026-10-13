@@ -24,9 +24,10 @@ import java.io.IOException;
  * 꺼져 있든 똑같이 뺐습니다. 그래서 구글을 한 번도 안 부르고도 한도에 걸리는
  * 일이 생겼습니다 — 없는 날짜를 열세 번 부르면 그날치가 바닥났습니다.
  *
- * <p>이제 세는 일은 구글을 실제로 부르는 네 자리가 합니다
- * ({@code PlaceSearchService}, {@code PlaceInfoService}, {@code RouteService},
- * {@code StaticMapService}). 각자 캐시를 지나 요청을 보내기 직전에 씁니다.
+ * <p>이제 세는 일은 구글을 실제로 부르는 세 자리가 합니다
+ * ({@code PlaceSearchService}, {@code PlaceInfoService}, {@code StaticMapService}).
+ * 각자 캐시를 지나 요청을 보내기 직전에 씁니다. 길찾기({@code RouteService})도
+ * 넷째 자리였는데 2026-10-13 에 걷어냈습니다 — 길은 구글 지도 앱이 셉니다.
  *
  * <h3>그래도 문턱은 남깁니다</h3>
  *
@@ -59,8 +60,6 @@ public class GoogleQuotaFilter extends OncePerRequestFilter {
             return "POST".equals(method);
         }
         return path.endsWith("/places-info")
-                || path.endsWith("/route/compare")
-                || path.endsWith("/route")
                 || path.endsWith("/info")
                 /*
                   사진 주소 풀기(/api/places/photo).

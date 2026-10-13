@@ -1,3 +1,5 @@
+import type { LegPiece } from '@/lib/leg-path';
+
 /**
  * 여행 상세의 「3D」 보기 (앱 짝).
  *
@@ -14,7 +16,7 @@ export type Place3D = {
   order: number;
   color: string;
   mode?: string | null;
-  path?: { lat: number; lng: number }[] | null;
+  pieces?: LegPiece[] | null;
 };
 
 export function TripMap3D(_: {

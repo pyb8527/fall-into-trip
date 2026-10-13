@@ -1,6 +1,6 @@
 import { Linking } from 'react-native';
 
-import type { TravelMode } from '@/api/types';
+import type { Move, Station, TravelMode } from '@/api/types';
 
 /**
  * 길찾기를 구글 지도에 넘깁니다.
@@ -60,6 +60,90 @@ export async function openDirections(to: Destination, mode: TravelMode | null) {
     return true;
   } catch {
     /* 열 수 있는 앱도 브라우저도 없는 경우입니다. 화면이 알려 주게 합니다. */
+    return false;
+  }
+}
+
+/**
+ * 장소 사이 길찾기 — 이 앱이 길을 셈하던 자리를 대신합니다.
+ *
+ * <h3>왜 셈을 걷어냈나 (2026-10-13)</h3>
+ *
+ * <p>장소 사이마다 구글 Routes 로 세 수단(걷기 · 대중교통 · 차)을 물어 「몇 분 ·
+ * 얼마」, 빠름 · 저렴 칩, 「N분 모자라요」 경고, 숙소 앞뒤 구간까지 그렸습니다.
+ * 그런데 그 숫자가 실제와 자주 안 맞았습니다 — 일본은 대중교통을 API 로 거의
+ * 안 주고, 택시 요금은 우리가 어림한 값이고, 출발 시각은 경도로 짐작했습니다.
+ * 그리고 사람은 어차피 길 위에서 구글 지도를 켭니다. 틀릴 수 있는 숫자를 사 와서
+ * 보여 주느니, 그 두 곳을 구글 지도에 그대로 넘깁니다. 구글 호출도 그만큼
+ * 줄었습니다(장소 N곳이면 하루를 펼칠 때마다 3×(N−1)번이었습니다).
+ *
+ * <p>사람이 적어 둔 이동({@code place.move})은 그대로 둡니다. 그쪽은 셈이 아니라
+ * 사람이 정한 길이라 틀릴 일이 없습니다. 수단도 거기서 읽습니다.
+ */
+export type Spot = {
+  name: string;
+  lat: number;
+  lng: number;
+  placeId?: string | null;
+};
+
+/** 사람이 적은 수단 → 구글 길찾기 수단. 모르거나 안 적었으면 대중교통입니다. */
+export function travelModeOf(move: Move | null | undefined): TravelMode {
+  switch (move?.mode) {
+    case 'walk':
+      return 'WALK';
+    case 'car':
+    case 'taxi':
+      return 'DRIVE';
+    default:
+      /* transit · bus 는 물론이고, 비행기 · 배도 구글에서는 대중교통 쪽이
+         가장 가깝습니다. */
+      return 'TRANSIT';
+  }
+}
+
+/* 좌표가 있으면 좌표를, 이름만 적은 역이면 이름을 넘깁니다 — 구글이 이름으로도
+   찾아 줍니다. */
+function where(at: Spot | Station) {
+  return at.lat != null && at.lng != null ? `${at.lat},${at.lng}` : at.name;
+}
+
+/**
+ * A 에서 B 까지 구글 지도 길찾기 주소.
+ *
+ * <h3>역을 적어 두었으면</h3>
+ *
+ * <p>대중교통 길은 <b>출발역 → 도착역</b>으로 엽니다. A → 출발역 → 도착역 → B 를
+ * 경유지(waypoints)로 넣고 싶었지만, 구글 지도는 대중교통 길에 경유지를 받지
+ * 않습니다(앱에서도 「경유지 추가」 가 대중교통에는 없고, 문서는 「경유지를 안
+ * 받는 제품에서는 이 값을 무시한다」 고만 적어 둡니다). 넣으면 조용히 버려져
+ * A → B 가 열리고, 그러면 적어 둔 역이 아무 소용이 없습니다. 역까지 걷는 짧은
+ * 길은 지도 앱이 알아서 붙입니다. 역 하나만 적었으면 그쪽만 바꿉니다.
+ */
+export function routeUrl(from: Spot, to: Spot, move?: Move | null) {
+  const mode = travelModeOf(move);
+  const start = mode === 'TRANSIT' && move?.from ? move.from : from;
+  const end = mode === 'TRANSIT' && move?.to ? move.to : to;
+  const params = new URLSearchParams({
+    api: '1',
+    origin: where(start),
+    destination: where(end),
+    travelmode: AS_GOOGLE[mode],
+  });
+  if (start.placeId) {
+    params.set('origin_place_id', start.placeId);
+  }
+  if (end.placeId) {
+    params.set('destination_place_id', end.placeId);
+  }
+  return `https://www.google.com/maps/dir/?${params.toString()}`;
+}
+
+export async function openRoute(from: Spot, to: Spot, move?: Move | null) {
+  try {
+    await Linking.openURL(routeUrl(from, to, move));
+    return true;
+  } catch {
     return false;
   }
 }

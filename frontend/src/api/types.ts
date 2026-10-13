@@ -119,11 +119,28 @@ export type Trip = {
   voteUntil?: Maybe<string>;
 };
 
+/**
+ * 이동에 적어 둔 역 · 정류장.
+ *
+ * <p>장소 검색으로 골랐으면 좌표와 구글 번호가 함께 있고, 검색이 안 돼 이름만
+ * 적었으면 좌표가 없습니다.
+ */
+export type Station = {
+  name: string;
+  lat?: number;
+  lng?: number;
+  placeId?: string;
+};
+
 export type Move = {
   mode?: string;
   min?: number;
   via?: string;
   cost?: string;
+  /** 타는 역. 전철 · 버스일 때만 적습니다. */
+  from?: Station;
+  /** 내리는 역. */
+  to?: Station;
 };
 
 export type Place = {
@@ -506,92 +523,15 @@ export type InvitePreview = {
   expiresAt: Maybe<string>;
 };
 
-/* ------------------------------------------------------------ 이동 경로 */
+/* ------------------------------------------------------------ 이동 수단 */
 
-/** 서버 RouteService.Mode 와 같아야 합니다. */
+/**
+ * 구글 지도 길찾기에 넘기는 수단(lib/directions).
+ *
+ * <p>서버에 같은 이름의 셈(RouteService.Mode)이 있었는데 2026-10-13 에 걷어냈습니다.
+ * 이제 이 값은 구글 지도 주소에만 쓰입니다.
+ */
 export type TravelMode = 'WALK' | 'TRANSIT' | 'DRIVE';
-
-export type RouteLeg = {
-  fromId: string;
-  toId: string;
-  seconds: number;
-  meters: number;
-  /** 지도에 그릴 길. 이어지지 않는 구간이면 비어 있습니다. */
-  polyline: string | null;
-  /** 그 수단으로 갈 수 있는지. 섬과 뭍 사이 같은 경우가 있습니다. */
-  reachable: boolean;
-  /** 대중교통은 구글이 준 값, 자동차는 우리가 어림한 값, 걷기는 없음. */
-  fare: Money | null;
-};
-
-/**
- * 돈.
- *
- * @param estimated 우리가 어림한 값인지. 대중교통 요금은 구글이 계산한 것이라
- *                  false 이고, 택시는 나라별 기본요금으로 어림한 것이라 true
- *                  입니다. 화면은 이것을 보고 "어림" 을 붙일지 정합니다.
- */
-export type Money = {
-  currency: string;
-  amount: number;
-  estimated: boolean;
-};
-
-/** 한 구간을 한 수단으로 갔을 때. */
-export type GapOption = {
-  mode: TravelMode;
-  seconds: number;
-  meters: number;
-  polyline: string | null;
-  fare: Money | null;
-};
-
-/**
- * 장소와 장소 사이의 빈칸.
- *
- * <p>수단을 하나 고르게 하지 않고 셋을 다 계산해 나란히 놓습니다. "지하철 25분
- * / 택시 10분" 이 함께 보여야 시간을 살지 돈을 살지 그 자리에서 정할 수
- * 있습니다.
- *
- * @param fastest  가장 빨리 가는 수단
- * @param cheapest 가장 돈이 덜 드는 수단. 둘이 같으면 고민할 것이 없습니다.
- */
-export type Gap = {
-  fromId: string;
-  toId: string;
-  options: GapOption[];
-  fastest: TravelMode | null;
-  cheapest: TravelMode | null;
-};
-
-/**
- * 하루치 사이사이 — `GET /api/days/{dayId}/route/compare`.
- *
- * <p>숙소 구간은 <code>gaps</code> 에 섞지 않고 따로 옵니다. 지도 선과
- * 「다음 곳까지」 가 <code>gaps</code> 를 장소 사이로 읽고 있어서, 섞으면
- * 그쪽이 모두 숙소를 가려내야 합니다. 숙소 쪽 끝의 번호는 <code>"stay"</code>.
- *
- * @param morning 전날 밤 숙소에서 첫 곳까지. 첫째 날 · 숙소 좌표가 없는 날은 안 옵니다
- * @param evening 마지막 곳에서 이 날 숙소까지. 숙소를 안 적은 날은 안 옵니다
- */
-export type ComparedGaps = {
-  gaps: Gap[];
-  /** 대중교통이 하나도 안 나온 까닭. 없으면 안 옵니다. */
-  note?: string | null;
-  /** 장소가 너무 많아 뒷부분을 못 구했는지. */
-  trimmed?: boolean;
-  morning?: Gap | null;
-  evening?: Gap | null;
-};
-
-export type DayRoute = {
-  mode: TravelMode;
-  legs: RouteLeg[];
-  totalSeconds: number;
-  totalMeters: number;
-  /** 장소가 너무 많아 뒷부분을 계산하지 않았는지. */
-  trimmed: boolean;
-};
 
 /* ------------------------------------------------------------ 장소 정보 */
 

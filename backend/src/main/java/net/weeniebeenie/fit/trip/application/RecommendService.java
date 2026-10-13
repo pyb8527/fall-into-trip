@@ -67,9 +67,6 @@ public class RecommendService {
     private final SavedPlaceRepository saved;
     private final PlaceSearchService search;
     private final PlaceInfoService info;
-    /* 두 곳 사이의 길을 구하는 데만 씁니다. 구간 답을 이미 6시간 들고
-       있어서, 사람이 그 날을 펼친 직후면 대개 새로 안 묻습니다. */
-    private final RouteService route;
 
     /**
      * @param dayId 없어도 됩니다. 있으면 그 날짜로 영업 여부를 봅니다.
@@ -150,16 +147,19 @@ public class RecommendService {
         }
 
         /*
-          두 곳 사이를 물었으면 길을 구해 옵니다.
+          두 곳 사이를 물었으면 그 두 곳을 잇는 선을 만듭니다.
 
-          못 구해도 그냥 갑니다 — 점으로 내려앉습니다. 길을 못 구한 것이
-          "찾은 것이 없음" 이 되면, 이 기능은 있는 것이 없는 것보다
-          나쁩니다.
+          전에는 구글 Routes 에 걷는 길을 물어 그 선을 받았습니다. 길찾기
+          셈을 통째로 걷어내면서(2026-10-13, 구글 셈이 실제와 안 맞았고
+          사람은 어차피 구글 지도를 켭니다) 여기도 직선으로 바꿨습니다. 장소
+          검색이 받는 것은 encoded polyline 하나라 점 둘짜리 직선도 받습니다.
+          「가는 길에 있는 곳」 이 걷는 길에서 직선으로 조금 비켜나는 대신
+          구글을 한 번 덜 부릅니다.
          */
         String path = null;
         if (between != null) {
             Place[] ends = endsOf(tripId, inTrip, mine, between);
-            path = route.pathBetween(ends[0], ends[1], RouteService.Mode.WALK);
+            path = straightLine(ends[0], ends[1]);
             /* 선으로 찾을 때는 그 두 곳의 한가운데를 기울기로 함께 보냅니다.
                길이 아주 짧으면 선만으로는 아무것도 안 나올 수 있습니다. */
             Coordinates mid = middleOf(List.of(ends[0], ends[1]));
@@ -222,10 +222,39 @@ public class RecommendService {
     }
 
     /**
+     * 두 곳을 잇는 직선을 구글 encoded polyline 으로.
+     *
+     * <p>구글이 밝혀 둔 셈 그대로입니다 — 위경도를 10⁵ 배해 정수로 두고, 앞
+     * 점과의 차이를 부호 비트를 붙여 다섯 비트씩 끊어 63 을 더한 글자로
+     * 적습니다. 첫 점은 0 에서의 차이입니다.
+     */
+    static String straightLine(Place from, Place to) {
+        StringBuilder out = new StringBuilder();
+        long lat0 = Math.round(from.getLat() * 1e5);
+        long lng0 = Math.round(from.getLng() * 1e5);
+        long lat1 = Math.round(to.getLat() * 1e5);
+        long lng1 = Math.round(to.getLng() * 1e5);
+        encode(lat0, out);
+        encode(lng0, out);
+        encode(lat1 - lat0, out);
+        encode(lng1 - lng0, out);
+        return out.toString();
+    }
+
+    private static void encode(long delta, StringBuilder out) {
+        long v = delta < 0 ? ~(delta << 1) : delta << 1;
+        while (v >= 0x20) {
+            out.append((char) ((0x20 | (v & 0x1f)) + 63));
+            v >>= 5;
+        }
+        out.append((char) (v + 63));
+    }
+
+    /**
      * 어느 곳과 어느 곳 사이인지.
      *
-     * <p>폴리라인을 화면에서 받지 않고 <b>번호만</b> 받습니다. 길은 서버가
-     * 구합니다. 화면에서 받으면 아무 길이나 실어 보낼 수 있게 되고, 그러면
+     * <p>폴리라인을 화면에서 받지 않고 <b>번호만</b> 받습니다. 선은 서버가
+     * 긋습니다. 화면에서 받으면 아무 길이나 실어 보낼 수 있게 되고, 그러면
      * 우리 사용량으로 남의 질의를 태웁니다 — {@link #queryOf} 가 {@code intent}
      * 에 대해 같은 경계를 이미 적어 두었습니다.
      */

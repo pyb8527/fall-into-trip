@@ -2,7 +2,6 @@ import { Stack, useLocalSearchParams, useNavigation, useRouter } from 'expo-rout
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Animated,
   Image,
   PanResponder,
@@ -16,14 +15,15 @@ import {
 } from 'react-native';
 
 import { api, ApiError, UNEXPECTED } from '@/api/client';
-import type { ComparedGaps, Day, FeedPost, Gap, GapOption, LivePin, LiveWhere, Money, OurStars, Person, Place, PlaceInfo, SavedPlace, Spend, Story, TravelMode, Trip, TripDetail } from '@/api/types';
+import type { Day, FeedPost, LivePin, LiveWhere, OurStars, Person, Place, PlaceInfo, SavedPlace, Spend, Story, Trip, TripDetail } from '@/api/types';
 import { useAsync, useInvalidation } from '@/api/use-async';
 import { useAuth } from '@/auth/auth-provider';
 import { DatePollSheet } from '@/components/date-poll-sheet';
 import { NoticeBox } from '@/components/notice-box';
 import { ViewLinkSheet } from '@/components/view-link-sheet';
 import { PeopleSheet } from '@/components/people-sheet';
-import type { RouteLine } from '@/components/map-types';
+import type { MapStation, RouteLine } from '@/components/map-types';
+import { RouteLink } from '@/components/route-link';
 import { FeedForm } from '@/components/feed-form';
 import { PlaceForm } from '@/components/place-form';
 import { SavedPicker } from '@/components/saved-picker';
@@ -60,7 +60,7 @@ import { costLabel, money } from '@/lib/money';
 import { canPrint, printItinerary } from '@/lib/print';
 import { useHere } from '@/lib/here';
 import { inShell } from '@/lib/shell-bridge.web';
-import { decodePolyline } from '@/lib/polyline';
+import { legPieces, stationsOf } from '@/lib/leg-path';
 import { DateField } from '@/ui/date-field';
 import {
   Colors,
@@ -139,25 +139,6 @@ const MAP_KEEP_FOR = 12 * 60 * 60 * 1000;
  */
 const TOUCHED_FOR = 3 * 24 * 60 * 60 * 1000;
 
-const MODE_LABEL: Record<TravelMode, string> = {
-  WALK: '걸어서',
-  TRANSIT: '대중교통',
-  DRIVE: '택시·차',
-};
-
-/**
- * 적어 둔 시각에 못 닿을 때, 그래도 되는 수단을 말해 주는 한 줄.
- *
- * <p>위의 이름을 그대로 잇지 않습니다. 칩에 붙는 "걸어서" 는 그 자리에서는
- * 맞지만 뒤에 조사를 달면 "걸어서면" 이 됩니다. 셋이 각각 다른 조사를
- * 받으므로 문장째로 적어 둡니다.
- */
-const MODE_FITS: Record<TravelMode, string> = {
-  WALK: '걸어서 가면 닿아요',
-  TRANSIT: '대중교통으로 가면 닿아요',
-  DRIVE: '택시로 가면 닿아요',
-};
-
 /**
  * 일정 화면.
  *
@@ -166,9 +147,9 @@ const MODE_FITS: Record<TravelMode, string> = {
  * 넉넉하지 않았습니다. 지도를 화면 전체로 깔고 일정을 그 위에 얹은 판에
  * 담습니다. 판을 내리면 지도가 다 보이고, 올리면 일정이 다 보입니다.
  *
- * <p>이동 수단을 고르는 칩도 없앴습니다. 정작 알고 싶은 것은 "이 구간은 뭘
- * 타야 하나" 이고 그건 셋을 나란히 놓아야만 압니다. 날짜를 펼치면 서버가 세
- * 수단을 한꺼번에 계산해 장소 사이사이에 끼워 넣습니다.
+ * <p>장소 사이에는 「구글 지도로 길찾기」 한 줄이 섭니다. 전에는 서버가 세
+ * 수단(걷기 · 대중교통 · 차)을 구글에 물어 사이사이에 끼워 넣었는데, 그 숫자가
+ * 실제와 자주 안 맞아 2026-10-13 에 걷어냈습니다(까닭은 lib/directions).
  *
  * <p>지도와 목록이 같은 것을 가리킵니다. 목록에서 장소를 누르면 지도의 핀이
  * 커지고, 핀을 누르면 목록의 그 줄이 켜집니다.
@@ -453,28 +434,6 @@ export default function TripScreen() {
   const { undo, show: showUndo, hide: hideUndo } = useUndo();
   /* "내 위치로" 를 누른 횟수. 값이 바뀌면 지도가 그리로 갑니다. 자리가 아니라
      "눌렀다" 는 것만 넘겨야 같은 자리를 두 번 눌러도 두 번 다 움직입니다. */
-  /*
-    이동 시간을 볼지.
-
-    <p>켜 둔 채로 시작합니다. 쓸모 있는 값이고, 처음 여는 사람에게 숨겨
-    두면 그런 것이 있는 줄도 모릅니다.
-
-    <p>이 화면을 보는 동안만 기억합니다. 렌터카로 도는 날이나 이미 아는
-    동네에서 잠깐 걷어 두는 것이지, 계정에 새겨 둘 만한 일이 아닙니다.
-  */
-  /*
-    이동 시간을 볼지.
-
-    <p>기본은 <b>끔</b>입니다. 켜면 장소 사이마다 "걸어서 12분 · 택시 6분"
-    줄이 들어가 목록 길이가 두 배가 되고, 렌터카로 도는 여행이나 이미 익숙한
-    동네에서는 볼 일이 없습니다.
-
-    <p>그리고 끄면 길찾기를 <b>아예 안 부릅니다.</b> 화면만 가리는 것이
-    아니라 사 오지 않는 것입니다 — 구간마다 수단마다 구글에 묻는 호출이라
-    요금이 붙습니다. 늘 켜 두는 기본값이 그대로 요금이 됩니다.
-  */
-  const [showGaps, setShowGaps] = useState(false);
-
   /** 자주 안 쓰는 것들을 모아 둔 판. 상단 점 세 개로 엽니다. */
   const [more, setMore] = useState(false);
   const [goHereAt, setGoHereAt] = useState(0);
@@ -592,10 +551,10 @@ export default function TripScreen() {
 
     <p>전에는 Looked 만 들고 있었습니다. 그런데 판 안에서 한 줄을 열려면
     <b>어느 장소인지</b>가 있어야 하고(한 줄은 구글 번호에 달립니다), 길찾기를
-    제대로 열려면 그 곳까지 오는 구간에 고른 수단이 있어야 합니다. 둘 다 줄만
-    알던 것이라 판까지 함께 넘깁니다.
+    알던 것이라 판까지 함께 넘깁니다. (길찾기에 넘기던 「고른 수단」은 구글
+    길찾기 셈과 함께 걷어냈습니다 — 판의 길찾기는 대중교통으로 엽니다.)
   */
-  const [looking, setLooking] = useState<{ place: Place; mode: TravelMode | null } | null>(null);
+  const [looking, setLooking] = useState<{ place: Place } | null>(null);
   /* 다니면서 볼 사진을 넣어 두는 판. */
   const [stashing, setStashing] = useState<Place | null>(null);
   /*
@@ -804,15 +763,9 @@ export default function TripScreen() {
   /*
     이 날의 장소가 어떤 순서로 늘어서 있는지.
 
-    사이사이 이동 시간은 <b>어느 곳에서 어느 곳으로</b> 가느냐로 정해집니다.
-    날짜만 보고 다시 물으면, 순서를 바꿔도 · 하나 넣어도 · 빼도 시간이 그대로
-    남아 있습니다. 이치란 다음이 카페였다가 시장으로 바뀌었는데 화면에는 여전히
-    카페까지 걸리는 시간이 붙어 있는 것입니다.
-
-    늘어선 차례를 그대로 열쇠로 삼습니다. 바뀌면 다시 묻습니다.
-
-    영업시간도 같습니다. 순서와는 상관없지만 장소가 늘거나 줄면 다시 물어야
-    새로 넣은 곳의 여는 시간이 붙습니다.
+    영업시간을 다시 묻는 열쇠입니다. 장소가 늘거나 줄면 다시 물어야 새로 넣은
+    곳의 여는 시간이 붙습니다. (사이사이 이동 시간을 다시 묻는 열쇠이기도
+    했는데, 그 셈은 2026-10-13 에 걷어냈습니다 — lib/directions.)
 
     <h3>자리와 구글 번호도 열쇠에 넣습니다</h3>
 
@@ -831,134 +784,6 @@ export default function TripScreen() {
         : '',
     [days, dayIndex],
   );
-
-  /*
-    아침에 나서는 숙소와 저녁에 돌아가는 숙소가 어디인지.
-
-    <p>사이사이 이동에 숙소 구간이 붙습니다 — 어젯밤 숙소에서 첫 곳까지,
-    마지막 곳에서 오늘 숙소까지. 숙소를 고치면 그 둘을 다시 물어야 하는데,
-    장소만 늘어놓은 daySeq 로는 숙소가 바뀐 줄 모릅니다. 고친 숙소 밑에 전
-    호텔에서 잰 시간이 그대로 붙어 있게 됩니다.
-
-    <h3>daySeq 에 섞지 않습니다</h3>
-
-    <p>daySeq 는 영업시간을 다시 묻는 열쇠이기도 하고, 사람이 장소 사이에서
-    고른 수단을 비우는 열쇠이기도 합니다. 숙소를 고쳤다고 영업시간을 다시 사
-    오고 고른 수단까지 잃을 까닭이 없어, 구간을 묻는 자리에만 더합니다.
-
-    <p>아침은 <b>앞 날</b>의 숙소입니다. 그날 숙소는 그날 밤 자는 곳이라,
-    거기서 나서게 하면 옮기는 날 아직 안 들어간 호텔에서 출발합니다.
-  */
-  const staySeq = useMemo(() => {
-    if (dayIndex < 0) {
-      return '';
-    }
-    const at = (stay: Day['stay'] | undefined) =>
-      stay?.lat != null && stay?.lng != null ? `${stay.lat.toFixed(5)},${stay.lng.toFixed(5)}` : '';
-    return `${at(days[dayIndex - 1]?.stay)}>${at(days[dayIndex]?.stay)}`;
-  }, [days, dayIndex]);
-
-  /*
-    사이사이 이동 — 세 수단을 한꺼번에.
-
-    "전체" 를 보고 있을 때는 부르지 않습니다. 날짜 수만큼, 구간마다, 수단마다
-    구글에 묻게 되어 요금이 감당이 안 됩니다. 한 날을 펼쳤을 때만입니다.
-  */
-  const {
-    data: compared,
-    loading: gapping,
-    error: gapError,
-  } = useAsync<ComparedGaps>(
-    (signal) =>
-      dayId && showGaps
-        ? api.get<ComparedGaps>(`/api/days/${dayId}/route/compare`, signal)
-        : /* 꺼 두었으면 부르지도 않습니다. 구간마다 수단마다 구글에 묻는
-             호출이라, 안 보는 것을 사 올 이유가 없습니다. */
-          Promise.resolve({ gaps: [], note: null }),
-    [dayId, daySeq, staySeq, showGaps],
-  );
-  const gaps = compared?.gaps ?? null;
-  /*
-    대중교통이 하나도 안 나온 까닭.
-
-    구글은 일본에 대중교통 길찾기를 API 로 주지 않습니다. 그래서 조용히
-    비워 두면 쓰는 사람은 앱이 고장 난 줄 압니다 — 구글 지도에는 나오는
-    전철이 여기만 없으니까요. 서버가 판단해서 한 줄로 보냅니다.
-  */
-  const gapNote = compared?.note ?? null;
-  /*
-    장소가 너무 많아 뒷부분의 이동 시간을 못 구했는지.
-
-    <p>구간마다 구글에 따로 물어야 해서 한 날에 구하는 수를 막아 두었습니다
-    (RouteService.MAX_LEGS). 넘는 구간은 비어 있는데, 그 말을 안 하면 앞쪽만
-    시간이 붙고 뒤쪽만 비어서 <b>고장으로 읽힙니다.</b>
-  */
-  const gapTrimmed = compared?.trimmed ?? false;
-
-  /*
-    숙소 구간 — 어젯밤 숙소에서 첫 곳까지, 마지막 곳에서 오늘 숙소까지.
-
-    <p>지금 보는 날의 첫 곳 · 마지막 곳에 닿는 것만 씁니다. 날을 바꾸는 동안
-    compared 에는 직전 날의 답이 그대로 들어 있어서(routeLines 와 같은 까닭),
-    거르지 않으면 어제의 「호텔에서 첫 곳까지」 가 오늘 첫 줄 위에 붙습니다.
-  */
-  const stayMorning = useMemo(() => {
-    const first = dayIndex >= 0 ? days[dayIndex]?.places[0] : undefined;
-    const gap = compared?.morning ?? null;
-    return gap && first && gap.toId === first.id ? gap : null;
-  }, [compared, dayIndex, days]);
-  const stayEvening = useMemo(() => {
-    const list = dayIndex >= 0 ? (days[dayIndex]?.places ?? []) : [];
-    const last = list[list.length - 1];
-    const gap = compared?.evening ?? null;
-    return gap && last && gap.fromId === last.id ? gap : null;
-  }, [compared, dayIndex, days]);
-
-  /**
-   * 구간마다 어느 수단으로 볼지.
-   *
-   * <p>비워 두면 가장 빠른 것입니다. 사람이 한 구간을 눌러 바꾸면 그 구간만
-   * 기억합니다 — 하나 바꿨다고 나머지까지 따라 바뀌면 방금 본 것을 잃습니다.
-   */
-  const [picked, setPicked] = useState<Record<string, TravelMode>>({});
-  useEffect(() => {
-    /*
-      날짜를 옮기거나 순서가 바뀌면 고른 것을 비웁니다.
-
-      고른 수단은 "이치란에서 카페까지" 처럼 <b>두 곳 사이</b>에 대한 것입니다.
-      순서가 바뀌면 같은 자리에서 다른 곳으로 가게 되므로, 그때 고른 것을 그대로
-      들고 있으면 엉뚱한 구간에 붙습니다.
-    */
-    setPicked({});
-  }, [dayId, daySeq]);
-
-  const chosenOf = useCallback(
-    (gap: Gap): GapOption | null => {
-      const want = picked[gap.fromId] ?? gap.fastest;
-      return gap.options.find((o) => o.mode === want) ?? gap.options[0] ?? null;
-    },
-    [picked],
-  );
-
-  /*
-    다시 물은 뒤 무엇이 달라졌는지.
-
-    <h3>바뀌었다고 말해 주지 않았습니다</h3>
-
-    <p>순서를 바꾸거나 장소를 하나 넣으면 구간을 다시 묻습니다. "알아보는
-    중…" 까지는 보이는데, 답이 오고 나면 그냥 숫자가 바뀌어 있습니다. 아홉
-    구간 중 어디가 달라졌는지 보려면 바꾸기 전 화면을 기억하고 있어야 했고,
-    그래서 대개 <b>안 봤습니다.</b>
-
-    <p>직전 답을 들고 있다가 새 답과 견줍니다. 달라진 구간에만 잠깐 표시를
-    답니다 — 계속 붙여 두면 그냥 장식이 되고, 다음에 정말 바뀌었을 때 눈에
-    안 걸립니다.
-
-    <p>처음 열었을 때는 아무것도 안 답니다. 견줄 직전 답이 없으면 전부
-    "바뀐 것" 이 되는데, 그것은 아무 말도 안 하는 것과 같습니다.
-  */
-  const lastGaps = useRef<Map<string, string> | null>(null);
-  const [changedGaps, setChangedGaps] = useState<Set<string>>(() => new Set());
 
   /*
     엑셀로 빼 가기.
@@ -990,94 +815,58 @@ export default function TripScreen() {
     }
   }, [data, booking, spending]);
 
-  useEffect(() => {
-    if (!gaps) {
-      return;
-    }
-    const now = new Map<string, string>();
-    for (const gap of gaps) {
-      const option = chosenOf(gap);
-      /* 수단과 분 단위까지만 봅니다. 초가 몇 흔들린 것은 바뀐 것이
-         아닙니다 — 구글이 같은 길을 조금 다르게 재기도 합니다. */
-      now.set(gap.fromId, option ? `${option.mode}:${Math.round(option.seconds / 60)}` : '-');
-    }
-    const before = lastGaps.current;
-    lastGaps.current = now;
-    if (!before) {
-      return;
-    }
-    const diff = new Set<string>();
-    now.forEach((value, key) => {
-      if (before.has(key) && before.get(key) !== value) {
-        diff.add(key);
-      }
-    });
-    if (diff.size === 0) {
-      return;
-    }
-    setChangedGaps(diff);
-    const timer = setTimeout(() => setChangedGaps(new Set()), 6000);
-    return () => clearTimeout(timer);
-  }, [gaps, chosenOf]);
+  /*
+    지도에 따로 긋는 선과 역 — 사람이 이동에 역을 적어 둔 구간만.
 
-  /**
-   * 고른 수단의 길만 지도에 그립니다. 셋을 다 그리면 어느 것이 진짜인지 모릅니다.
-   *
-   * <h3>지난 날의 길이 남아 있었습니다</h3>
-   *
-   * <p>날짜를 바꾸면 장소는 곧바로 바뀌는데 구간은 다시 물어봐야 합니다.
-   * 그동안 {@code gaps} 에는 <b>직전 날의 것</b>이 그대로 들어 있습니다 —
-   * 다시 읽는 동안 화면을 비우지 않는 것이 useAsync 의 뜻이고, 목록에서는
-   * 그것이 맞습니다.
-   *
-   * <p>그런데 지도에서는 아니었습니다. 어제의 실선이 그대로 그려진 채,
-   * 오늘 구간에는 아직 길이 없으니 점선까지 얹혔습니다. 두 날의 길이 한
-   * 지도에 겹쳐 있었던 것입니다.
-   *
-   * <p>지금 보고 있는 날의 장소에서 출발하는 구간만 씁니다. 어제 것은
-   * 여기서 걸러지므로, 다시 읽는 동안에는 아예 아무 길도 안 그립니다.
-   */
-  const routeLines = useMemo<RouteLine[]>(() => {
-    if (dayIndex < 0) {
-      return [];
-    }
-    const here = new Set((days[dayIndex]?.places ?? []).map((p) => p.id));
-    const color = days[dayIndex]?.color || dayColor(dayIndex);
-    const out: RouteLine[] = [];
-    for (const gap of gaps ?? []) {
-      if (!here.has(gap.fromId) || !here.has(gap.toId)) {
-        continue;
+    <p>구글 경로선(polyline)을 받아 그리던 자리입니다. 길찾기 셈을 걷어낸 뒤로는
+    지도가 장소끼리 점선으로 잇고, 역을 적은 구간만 여기서 A → 타는 역(점선) →
+    내리는 역(실선) → B(점선) 로 꺾어 긋습니다. 구글을 부르지 않습니다 — 역의
+    자리는 적을 때 골라 둔 값입니다. 3D 지도와 탈것도 같은 토막(lib/leg-path)을
+    씁니다.
+
+    <p>보이는 날의 것만 씁니다. 지도는 「전체」 일 때 모든 날을, 한 날을 고르면 그
+    날만 그리므로 같은 기준으로 거릅니다.
+  */
+  const { routeLines, stations } = useMemo(() => {
+    const lines: RouteLine[] = [];
+    const marks: MapStation[] = [];
+    days.forEach((day, di) => {
+      if (activeDay !== ALL && di !== activeDay) {
+        return;
       }
-      const option = chosenOf(gap);
-      if (option?.polyline) {
-        out.push({
-          id: `${gap.fromId}-${gap.toId}`,
-          color,
-          points: decodePolyline(option.polyline),
+      const color = day.color || dayColor(di);
+      day.places.forEach((p, i) => {
+        stationsOf(p.move).forEach((st, k) => {
+          marks.push({ id: `${p.id}-${k}`, name: st.name, lat: st.lat, lng: st.lng, color });
         });
-      }
-    }
-    return out;
-  }, [gaps, chosenOf, dayIndex, days]);
-
-  /* 구간 정보도 같은 이유로 거릅니다. 어제 구간이 오늘 줄 밑에 붙으면
-     "버스 12분" 이 엉뚱한 두 곳 사이의 값이 됩니다. */
-  const gapAfter = useMemo(() => {
-    const here = dayIndex >= 0 ? new Set((days[dayIndex]?.places ?? []).map((p) => p.id)) : null;
-    return new Map(
-      (gaps ?? [])
-        .filter((g) => !here || (here.has(g.fromId) && here.has(g.toId)))
-        .map((g) => [g.fromId, g]),
-    );
-  }, [gaps, dayIndex, days]);
+        const next = day.places[i + 1];
+        if (!next) {
+          return;
+        }
+        const pieces = legPieces(p, next, p.move);
+        if (pieces.length < 2) {
+          return;
+        }
+        pieces.forEach((piece, k) => {
+          lines.push({
+            id: `${p.id}-${next.id}#${k}`,
+            covers: `${p.id}-${next.id}`,
+            color,
+            dashed: !piece.ride,
+            points: [piece.from, piece.to],
+          });
+        });
+      });
+    });
+    return { routeLines: lines, stations: marks };
+  }, [days, activeDay]);
 
   /*
     3D 지도에 줄 곳들 — 평평한 지도와 같은 곳에, 다음 곳까지 무엇을 타고 어느
     길로 가는지를 붙입니다.
 
-    <p>수단은 적어 둔 이동(place.move)이 먼저이고, 없으면 「이동 시간」에서 고른
-    수단입니다. 길은 「이동 시간」으로 찾아 둔 구간의 선(gapAfter — 지금 보는
-    날의 것만)입니다. 전체를 볼 때는 구간을 안 물으므로 곧게 갑니다.
+    <p>수단은 적어 둔 이동(place.move)이고, 길은 적어 둔 역을 거치는 토막입니다
+    (lib/leg-path — 평평한 지도의 선과 같은 것). 역이 없으면 곧게 갑니다.
   */
   const places3d = useMemo<Place3D[]>(() => {
     if (!threeD) {
@@ -1089,8 +878,7 @@ export default function TripScreen() {
         return;
       }
       day.places.forEach((p, i) => {
-        const gap = gapAfter.get(p.id);
-        const option = gap ? chosenOf(gap) : null;
+        const next = day.places[i + 1];
         out.push({
           id: p.id,
           name: p.name,
@@ -1099,13 +887,13 @@ export default function TripScreen() {
           dayIndex: di,
           order: i + 1,
           color: day.color || dayColor(di),
-          mode: p.move?.mode ?? (option ? MODE_OF[option.mode] : null),
-          path: option?.polyline ? decodePolyline(option.polyline) : null,
+          mode: p.move?.mode ?? null,
+          pieces: next ? legPieces(p, next, p.move) : null,
         });
       });
     });
     return out;
-  }, [threeD, days, activeDay, gapAfter, chosenOf]);
+  }, [threeD, days, activeDay]);
 
   /*
     「지금 여기」에서 갈 곳.
@@ -1517,6 +1305,7 @@ export default function TripScreen() {
         activeId={activePlaceId}
         onSelect={pickOnMap}
         routes={routeLines}
+        stations={stations}
         here={me.here}
         /* 지도에 서는 얼굴은 사진 · 표식 · 이름 차례입니다(components/profile-face
            와 같은 차례). 표식은 사진을 안 올린 사람의 자리라서 함께 넘깁니다 —
@@ -1534,9 +1323,6 @@ export default function TripScreen() {
         notes={pins.map((p) => ({ id: p.id, label: p.label ?? null, lat: p.lat, lng: p.lng }))}
         bleed
         chrome={false}
-        /* 길을 다시 묻는 동안에는 지도가 아무 길도 안 그리고 그렇다고 말합니다.
-           안 그러면 어제 길과 오늘 점선이 한 지도에 겹칩니다. */
-        routesPending={gapping}
         /* 판과 띠가 함께 아래를 덮습니다. 둘을 다 세야 고른 장소가
            보이는 곳의 가운데에 옵니다. */
         bottomInset={covered + dock}
@@ -1830,7 +1616,6 @@ export default function TripScreen() {
         {data.notice && (data.trip.groupId || data.notice.text) ? (
           <NoticeBox tripId={data.trip.id} notice={data.notice} onSaved={reload} />
         ) : null}
-        {gapError && dayId ? <Caption tone="danger">{gapError}</Caption> : null}
         {me.error ? <Caption tone="danger">{me.error}</Caption> : null}
 
         {/*
@@ -1867,23 +1652,6 @@ export default function TripScreen() {
             보여요.
           </Caption>
         ) : null}
-
-        {/*
-          오늘 이동에 얼마나 쓰는지.
-
-          <p>판 맨 위(peek)에 있었습니다. 그런데 거기는 판을 내려 둬도 보이는
-          자리라 <b>이 화면이 무엇인지</b>를 적는 데여야 하고, 이것은 이동
-          시간을 켜 둔 사람에게만 뜻이 있는 곁다리입니다. 켜고 끄는 단추
-          바로 위로 내립니다.
-        */}
-        <MovingNote
-          gaps={gaps}
-          stayLegs={[stayMorning, stayEvening]}
-          gapping={gapping}
-          chosenOf={chosenOf}
-        />
-
-
 
         {/*
           이 화면에서 하는 일들.
@@ -1927,22 +1695,6 @@ export default function TripScreen() {
             {mine ? (
               <Shortcut icon="upload" label="글 올리기" onPress={() => setPublishing(true)} />
             ) : null}
-            {/*
-              이것만 켜고 끄는 것입니다.
-
-              <p>나머지 셋은 누르면 판이 하나 열리고 끝인데, 이것은 <b>켠
-              채로 남습니다.</b> 그래서 켜졌는지가 보여야 합니다 — 켜면 그림과
-              글자가 함께 물듭니다.
-
-              <p>끄면 길찾기를 아예 안 부릅니다. 화면만 가리는 것이 아니라
-              사 오지 않는 것이라, 기본은 꺼짐입니다.
-            */}
-            <Shortcut
-              icon="clock"
-              label="이동 시간"
-              active={showGaps}
-              onPress={() => setShowGaps((on) => !on)}
-            />
         </Row>
 
         {days.length === 0 ? <Empty message="아직 날짜가 없어요." /> : null}
@@ -1962,21 +1714,13 @@ export default function TripScreen() {
               onChanged={refresh}
               onNote={showUndo}
               onRemove={remove}
-              gapAfter={gapAfter}
-              gapping={gapping}
-              gapNote={gapNote}
-              gapTrimmed={gapTrimmed}
-              stayMorning={stayMorning}
-              stayEvening={stayEvening}
-              prevStayName={days[di - 1]?.stay?.name ?? null}
-              chosenOf={chosenOf}
-              changedGaps={changedGaps}
-              onPick={(fromId, mode) => setPicked((p) => ({ ...p, [fromId]: mode }))}
+              prevStay={days[di - 1]?.stay ?? null}
+              lastDay={di === days.length - 1}
               infoOf={infoOf}
               folded={foldedDays.has(day.id)}
               onFold={(fold) => foldDay(day.id, fold)}
               holdRow={holdRow}
-              onLook={(place, mode) => setLooking({ place, mode })}
+              onLook={(place) => setLooking({ place })}
               tipCounts={tipCounts}
               refsOf={refsOf}
               feedByPlace={feedByPlace}
@@ -2092,7 +1836,6 @@ export default function TripScreen() {
         /* 날짜 하나를 보고 있으면 그날 기준으로 영업시간을 봅니다. */
         onIso={dayIndex >= 0 ? (days[dayIndex]?.iso ?? null) : null}
         here={me.here}
-        mode={looking?.mode ?? null}
         /*
           한 줄이 줄에서 판 안으로 들어왔습니다.
 
@@ -2640,49 +2383,6 @@ function Shortcut({
 }
 
 /**
- * 오늘 이동에 얼마나 쓰는지.
- *
- * <p>구간을 다시 묻는 동안에는 도는 것을 하나 보여 줍니다. 글자만 두었더니
- * 멈춰 있는 것과 구별이 안 됐습니다.
- */
-function MovingNote({
-  gaps,
-  stayLegs,
-  gapping,
-  chosenOf,
-}: {
-  gaps: Gap[] | null;
-  /**
-   * 숙소에서 첫 곳까지 · 마지막 곳에서 숙소까지. 없으면 null.
-   *
-   * <p>함께 더합니다. 「오늘 이동에 ○분」 을 묻는 사람이 알고 싶은 것은 호텔을
-   * 나서서 돌아올 때까지이고, 장소 사이만 더하면 하루에서 가장 긴 두 구간이
-   * 빠지기 쉽습니다.
-   */
-  stayLegs: (Gap | null)[];
-  gapping: boolean;
-  chosenOf: (gap: Gap) => GapOption | null;
-}) {
-  const moving = [...(gaps ?? []), ...stayLegs].reduce(
-    (n, g) => n + (g ? (chosenOf(g)?.seconds ?? 0) : 0),
-    0,
-  );
-
-  if (gapping) {
-    return (
-      <Row gap={Spacing.s1}>
-        <ActivityIndicator size="small" color={Colors.textMuted} />
-        <Caption tone="secondary">이동 시간을 알아보고 있어요</Caption>
-      </Row>
-    );
-  }
-  if (moving > 0) {
-    return <Caption tone="secondary">오늘 이동에 {asDuration(moving)}</Caption>;
-  }
-  return null;
-}
-
-/**
  * 판 맨 위에 늘 보이는 줄.
  *
  * <h3>판을 내려 둬도 이것만은 보입니다</h3>
@@ -2815,16 +2515,8 @@ function DayCard({
   onChanged,
   onNote,
   onRemove,
-  gapAfter,
-  gapping,
-  gapNote,
-  gapTrimmed,
-  stayMorning,
-  stayEvening,
-  prevStayName,
-  chosenOf,
-  changedGaps,
-  onPick,
+  prevStay,
+  lastDay,
   infoOf,
   folded,
   onFold,
@@ -2848,24 +2540,10 @@ function DayCard({
   /** 방금 한 일을 목록 위에 띄웁니다. 물러설 길도 함께 줄 수 있습니다. */
   onNote: (note: UndoNote) => void;
   onRemove: (placeId: string) => void;
-  /** 이 장소를 떠나 다음 장소로 가는 구간. "전체" 를 볼 때는 비어 있습니다. */
-  gapAfter: Map<string, Gap>;
-  /** 구간을 다시 묻고 있는 중인지. 날짜를 바꾸면 한두 박자 걸립니다. */
-  gapping: boolean;
-  /** 대중교통이 하나도 안 나온 까닭. 없으면 비어 있습니다. */
-  gapNote: string | null;
-  /** 장소가 너무 많아 뒷부분의 이동 시간을 못 구했는지. */
-  gapTrimmed: boolean;
-  /** 어젯밤 숙소에서 이 날 첫 곳까지. 첫째 날 · 숙소를 안 적은 날은 없습니다. */
-  stayMorning: Gap | null;
-  /** 이 날 마지막 곳에서 오늘 숙소까지. 숙소를 안 적은 날은 없습니다. */
-  stayEvening: Gap | null;
-  /** 앞 날에 적어 둔 숙소 이름. 아침 구간의 머리에 씁니다. */
-  prevStayName: string | null;
-  chosenOf: (gap: Gap) => GapOption | null;
-  /** 다시 물은 뒤 달라진 구간들. 출발하는 장소의 id 입니다. */
-  changedGaps: Set<string>;
-  onPick: (fromId: string, mode: TravelMode) => void;
+  /** 앞 날에 적어 둔 숙소 — 아침에 나서는 곳. 첫째 날이면 없습니다. */
+  prevStay: Day['stay'] | null;
+  /** 여행의 마지막 날인지. 체크아웃하고 떠나는 날이라 저녁 숙소 길이 없습니다. */
+  lastDay: boolean;
   /** 장소별 영업시간 등. 좌표만 직접 넣은 곳에는 없습니다. */
   infoOf: Map<string, PlaceInfo>;
   /**
@@ -2879,7 +2557,7 @@ function DayCard({
   /** 줄이 목록의 어디쯤인지 재려고 화면 요소를 붙들어 둡니다. */
   holdRow: (placeId: string, node: unknown) => void;
   /** 장소 하나를 들여다보는 판을 엽니다. 한 줄도 그 판 안에 있습니다. */
-  onLook: (place: Place, mode: TravelMode | null) => void;
+  onLook: (place: Place) => void;
   /** 두 날에 걸쳐 들어간 곳. 구글 번호 → 그 날들의 이름. */
   /** 구글 번호별 최근 팁 수. 줄에서는 점으로만 알립니다. */
   tipCounts: Record<string, number>;
@@ -2927,6 +2605,29 @@ function DayCard({
   */
   const [order, setOrder] = useState<Place[]>(day.places);
   useEffect(() => setOrder(day.places), [day.places]);
+
+  /*
+    아침에 나서는 숙소와 저녁에 돌아가는 숙소 — 서버가 셈하던 규칙 그대로입니다
+    (RouteService.stayEnds, 2026-10-13 에 걷어냄).
+
+    <ul>
+      <li>아침은 <b>앞 날</b>의 숙소입니다. 그날 숙소는 그날 밤 자는 곳이라, 거기서
+          나서게 하면 옮기는 날 아직 안 들어간 호텔에서 출발합니다. 첫째 날은 앞
+          날이 없어 아침이 없습니다.</li>
+      <li>저녁은 그날 숙소입니다. 마지막 날은 공항이나 집으로 가는 날이라 없습니다
+          — 「이후 날들도 같은 곳」 으로 채운 숙소에 체크아웃한 호텔이 붙곤 했습니다.</li>
+      <li>자리를 모르는 숙소는 없습니다. 이름만으로 길을 열면 구글이 엉뚱한 같은
+          이름을 집습니다.</li>
+      <li>숙소를 장소로도 넣은 사람이 있습니다. 숙소와 첫 곳 · 마지막 곳이 100m
+          안이면 「호텔에서 호텔까지」 라 안 세웁니다.</li>
+    </ul>
+  */
+  const morning = stayEnd(prevStay, order[0]);
+  const evening = lastDay ? null : stayEnd(day.stay, order[order.length - 1]);
+  const failRoute = useCallback(
+    () => onNote({ message: '구글 지도를 열지 못했어요. 잠시 뒤에 다시 눌러 보세요.' }),
+    [onNote],
+  );
 
   /** 줄마다의 높이. 어디로 끌었는지는 이것으로만 알 수 있습니다. */
   const heights = useRef<number[]>([]);
@@ -3266,29 +2967,18 @@ function DayCard({
           />
 
           {/*
-            어젯밤 숙소에서 첫 곳까지.
-
-            <p>하루를 짤 때 가장 먼저 묻는 구간입니다 — 아침에 몇 시에 나가야
-            하나. 없어서 사람들이 숙소를 장소로 한 번 더 넣었고, 그러면 숙소가
-            「1번 장소」 가 되어 다녀온 곳 수에 들어갔습니다.
+            어젯밤 숙소에서 첫 곳까지 — 구글 지도로 길찾기.
 
             <p>그날 숙소가 아니라 <b>어젯밤</b> 숙소입니다. 숙소 카드 바로 아래에
-            있어도 그 카드는 오늘 밤 자는 곳이라, 머리 한 줄에 어느 호텔인지를
-            적어 둡니다. 「방금 바뀜」 표시는 달지 않습니다 — 이 구간은 숙소를
-            고칠 때만 바뀌고, 그때 사람은 방금 숙소 판을 닫은 참입니다.
+            있어도 그 카드는 오늘 밤 자는 곳이라, 어느 호텔인지를 함께 적습니다.
           */}
-          {stayMorning ? (
-            <View>
-              <View style={styles.stayLegHead}>
-                <Caption tone="muted">어젯밤 숙소{prevStayName ? `(${prevStayName})` : ''}에서</Caption>
-              </View>
-              <GapBlock
-                gap={stayMorning}
-                chosen={chosenOf(stayMorning)}
-                leaveAt={null}
-                arriveBy={order[0]?.time ?? null}
-                onPick={onPick}
-                justChanged={false}
+          {morning && order[0] ? (
+            <View style={styles.stayRoute}>
+              <RouteLink
+                from={morning}
+                to={order[0]}
+                label={`어젯밤 숙소(${morning.name})에서 구글 지도로 길찾기`}
+                onFail={failRoute}
               />
             </View>
           ) : null}
@@ -3357,16 +3047,11 @@ function DayCard({
                         land(at, end);
                       }
                     }}
-                    gap={gapAfter.get(place.id)}
-                    /* 마지막 장소 뒤에는 갈 데가 없습니다. */
-                    gapping={gapping && i < order.length - 1}
-                    arriveBy={order[i + 1]?.time ?? null}
+                    next={order[i + 1] ?? null}
+                    onRouteFail={failRoute}
                     earlierThan={earlierThan(order, i)}
                     spent={spentAt.get(place.id) ?? null}
                     touched={touchedOf(place)}
-                    chosenOf={chosenOf}
-                    changedGaps={changedGaps}
-                    onPick={onPick}
                   />
                 </Animated.View>
               ))}
@@ -3374,23 +3059,19 @@ function DayCard({
           )}
 
           {/*
-            마지막 곳에서 오늘 숙소까지 — 밤에 몇 시에 끊어야 하나.
+            마지막 곳에서 오늘 숙소까지 — 구글 지도로 길찾기.
 
-            <p>지도에는 긋지 않고 숫자만 둡니다. 지도에 숙소 핀이 없어서, 끝이
-            안 보이는 선이 하나 생기면 「이 선은 어디로 가나」 를 묻게 됩니다.
+            <p>지도에는 긋지 않습니다. 지도에 숙소 핀이 없어서, 끝이 안 보이는
+            선이 하나 생기면 「이 선은 어디로 가나」 를 묻게 됩니다.
           */}
-          {stayEvening ? (
-            <View>
-              <View style={styles.stayLegHead}>
-                <Caption tone="muted">오늘 숙소{day.stay?.name ? `(${day.stay.name})` : ''}까지</Caption>
-              </View>
-              <GapBlock
-                gap={stayEvening}
-                chosen={chosenOf(stayEvening)}
-                leaveAt={order[order.length - 1]?.time ?? null}
-                arriveBy={null}
-                onPick={onPick}
-                justChanged={false}
+          {evening && order.length > 0 ? (
+            <View style={styles.stayRoute}>
+              <RouteLink
+                from={order[order.length - 1]}
+                to={evening}
+                move={order[order.length - 1].move}
+                label={`오늘 숙소(${evening.name})까지 구글 지도로 길찾기`}
+                onFail={failRoute}
               />
             </View>
           ) : null}
@@ -3421,26 +3102,6 @@ function DayCard({
                 onPress={() => setDigging(true)}
               />
             </Row>
-          ) : null}
-
-          {/*
-            대중교통이 하나도 안 나왔을 때 왜인지.
-
-            조용히 비워 두면 쓰는 사람은 앱이 고장 난 줄 압니다 — 구글 지도
-            에는 나오는 전철이 여기만 없으니까요. 모르는 것을 아는 척하지
-            않는 것만큼, 아는 것을 말하지 않는 것도 틀린 일입니다.
-
-            판단은 서버가 합니다. 짧은 구간만 있는 하루를 "이 지역은 대중교통이
-            없다" 로 읽으면 안 되는데, 그 셈은 구간을 다 가진 쪽이 해야
-            맞습니다.
-          */}
-          {gapNote ? <Caption tone="secondary">{gapNote}</Caption> : null}
-          {/* 없는 것이 고장으로 읽히지 않게. 앞쪽 구간에는 시간이 붙어 있어서
-              뒤쪽만 비면 더 그렇게 보입니다. */}
-          {gapTrimmed ? (
-            <Caption tone="muted">
-              장소가 많아 뒷부분은 이동 시간을 못 구했어요. 길찾기는 그대로 돼요.
-            </Caption>
           ) : null}
 
           {/* 영업시간과 평점은 구글에서 온 것이라 어디서 왔는지 밝혀야 합니다.
@@ -3571,15 +3232,11 @@ function PlaceRow({
   onAddAfter,
   onLeg,
   onRemove,
-  gap,
-  gapping,
-  arriveBy,
+  next,
+  onRouteFail,
   earlierThan,
   spent,
   touched,
-  chosenOf,
-  changedGaps,
-  onPick,
 }: {
   place: Place;
   order: number;
@@ -3589,7 +3246,7 @@ function PlaceRow({
   info?: PlaceInfo;
   /** 이 곳이 들어가 있는 다른 날들. 비어 있으면 이 날에만 있습니다. */
   /** 평점·영업시간을 들여다보는 판을 엽니다. 한 줄도 그 판 안에 있습니다. */
-  onLook: (place: Place, mode: TravelMode | null) => void;
+  onLook: (place: Place) => void;
   /** 이 곳에 달린 한 줄의 개수. 판을 열기 전에는 점으로만 알립니다. */
   tipCount: number;
   /** 다녀와서 남긴 것들. 안 남겼으면 비어 있습니다. */
@@ -3615,28 +3272,21 @@ function PlaceRow({
   /** 다음 장소까지의 이동을 적는 판을 엽니다. */
   onLeg: () => void;
   onRemove: () => void;
-  /** 다음 장소까지의 이동. 마지막 장소 뒤에는 없습니다. */
-  gap?: Gap;
-  /** 구간을 다시 묻고 있는 중인지. 마지막 장소 뒤에는 안 붙습니다. */
-  gapping: boolean;
-  /** 다음 장소에 적어 둔 시각. 안 적었으면 비어 있습니다. */
-  arriveBy: string | null;
+  /** 다음 장소. 그리로 가는 길찾기 한 줄이 이 줄 아래에 섭니다. 마지막 곳이면 없습니다. */
+  next: Place | null;
+  /** 구글 지도를 못 열었을 때. */
+  onRouteFail: () => void;
   /** 앞 장소에 이 줄보다 늦은 시각이 적혀 있으면 그 시각. 아니면 null. */
   earlierThan?: string | null;
   /** 여기서 실제로 쓴 돈. 통화마다 하나씩. 안 적었으면 비어 있습니다. */
   spent: Map<string, { sum: number; decimals: number }> | null;
   /** 남이 최근에 손댔으면 "지영 님 · 2시간 전". 아니면 비어 있습니다. */
   touched: string | null;
-  chosenOf: (gap: Gap) => GapOption | null;
-  /** 다시 물은 뒤 달라진 구간들. 출발하는 장소의 id 입니다. */
-  changedGaps: Set<string>;
-  onPick: (fromId: string, mode: TravelMode) => void;
 }) {
   const [confirming, setConfirming] = useState(false);
   /** 점 세 개로 접어 둔 것들을 펼쳤는지. */
   const [folded, setFolded] = useState(false);
   const emoji = iconOf(place.icon);
-  const chosen = gap ? chosenOf(gap) : null;
   /* 통화를 더하지 않습니다. 엔과 원을 합치려면 "언제 환율로" 가 남고 그
      답은 사람마다 다릅니다. 나란히 둡니다. */
   const spentHere = spent
@@ -3672,7 +3322,7 @@ function PlaceRow({
         아니라 <b>이어진 동선</b>으로 읽힙니다. 노드의 번호는 지도의 번호와 같은
         번호입니다.
 
-        <p>선은 이동 시간 구간까지 이어집니다 — 그 구간이 곧 두 장소 사이이기
+        <p>선은 아래 길찾기 줄까지 이어집니다 — 그 줄이 곧 두 장소 사이이기
         때문입니다.
       */}
       <View style={styles.rail}>
@@ -3934,7 +3584,7 @@ function PlaceRow({
                     ? `${place.name} 자세히 보기 · 한 줄 ${tipCount}개`
                     : `${place.name} 자세히 보기`,
                 dot: tipCount > 0,
-                onPress: () => onLook(place, chosen?.mode ?? null),
+                onPress: () => onLook(place),
               },
               /*
                 여기서 올리기 — <b>다녀와서</b> 하는 하나입니다.
@@ -4092,34 +3742,16 @@ function PlaceRow({
         />
       </View>
 
-      {/* 사람이 적어 둔 길. 구글이 셈한 구간(아래) 위에 섭니다 — 정해 둔 것이
-          먼저입니다. */}
+      {/* 사람이 적어 둔 길. 길찾기 줄(아래) 위에 섭니다 — 정해 둔 것이 먼저입니다. */}
       <View style={styles.legSlot}>
         <LegLine move={place.move} onPress={canEdit ? onLeg : undefined} />
       </View>
 
-      {gap ? (
-        <GapBlock
-          gap={gap}
-          chosen={chosen}
-          leaveAt={place.time}
-          arriveBy={arriveBy}
-          onPick={onPick}
-          justChanged={changedGaps.has(gap.fromId)}
-        />
-      ) : gapping ? (
-        /*
-          날짜를 바꾸면 구간을 다시 묻습니다. 그동안 gaps 가 비어서 <b>구간
-          줄이 통째로 사라졌다가</b> 한두 박자 뒤에 다시 나타났습니다. 아무
-          말도 없으니 없어진 것인지 오는 중인지 알 수가 없습니다.
-
-          자리를 비워 두지 않고 알아보는 중이라고 적어 둡니다. 줄 높이도
-          그대로라 목록이 덜컥거리지 않습니다.
-        */
-        <Row gap={Spacing.s1} style={styles.gap}>
-          <ActivityIndicator size="small" color={Colors.textMuted} />
-          <Caption tone="muted">이동 시간을 알아보고 있어요</Caption>
-        </Row>
+      {/* 다음 곳까지 — 구글이 셈한 「몇 분」 칩이 서던 자리입니다(lib/directions). */}
+      {next ? (
+        <View style={styles.legSlot}>
+          <RouteLink from={place} to={next} move={place.move} onFail={onRouteFail} />
+        </View>
       ) : null}
       </View>
     </View>
@@ -4195,159 +3827,17 @@ function DragHandle({
   );
 }
 
-/**
- * 장소와 장소 사이에 끼는 이동.
- *
- * <p>수단을 하나 고르게 하지 않고 셋을 나란히 놓습니다. "지하철 25분 / 택시
- * 10분에 1,500엔" 이 함께 보여야 시간을 살지 돈을 살지 그 자리에서 정할 수
- * 있습니다.
- *
- * <p>가장 빠른 것과 가장 싼 것에 표시를 답니다. 누르면 그 수단으로 지도의 길도
- * 함께 바뀝니다.
- *
- * <h3>적어 둔 시각과 맞춰 봅니다</h3>
- *
- * <p>두 값이 여기 나란히 있으면서도 서로를 본 적이 없었습니다. 14:00 에
- * 떠나 14:30 에 닿기로 해 두고 그 사이가 지하철로 50분인 일정이, 화면에
- * 그 둘을 다 띄워 놓고도 아무 말을 하지 않았습니다. 영업시간은 "적어 둔
- * 시각에 안 엽니다" 까지 짚어 주면서 정작 갈 수 없는 자리는 조용했습니다.
- *
- * <p>재는 데 드는 것이 없습니다. 두 시각도 이동 시간도 이미 받아 온
- * 것이라 구글을 다시 부르지 않습니다.
- */
-function GapBlock({
-  gap,
-  chosen,
-  leaveAt,
-  arriveBy,
-  onPick,
-  justChanged,
-}: {
-  gap: Gap;
-  chosen: GapOption | null;
-  /** 방금 다시 물어서 달라진 구간인지. 잠깐만 참입니다. */
-  justChanged: boolean;
-  /** 이 장소에 적어 둔 시각. */
-  leaveAt: string | null;
-  /** 다음 장소에 적어 둔 시각. */
-  arriveBy: string | null;
-  onPick: (fromId: string, mode: TravelMode) => void;
-}) {
-  if (gap.options.length === 0) {
-    return (
-      <Row gap={Spacing.s1} style={styles.gap}>
-        <Caption tone="muted">이어지는 길을 찾지 못했어요</Caption>
-      </Row>
-    );
-  }
-
-  /* 빠른 것과 싼 것이 같으면 고민할 것이 없습니다. 그럴 때는 표시를 달지
-     않습니다 — 둘 다 붙으면 무엇을 고르라는 것인지 알 수 없습니다. */
-  const oneAnswer = gap.fastest === gap.cheapest;
-
-  const spare = spareMinutes(leaveAt, arriveBy);
-  /* 지금 보고 있는 수단으로 몇 분 늦는지. 시각을 안 적었거나 고른 수단이
-     없으면 맞춰 볼 것이 없습니다 — 어느 수단 이야기인지 모르는 경고는
-     도움이 안 됩니다. */
-  const late = spare === null || chosen === null ? 0 : Math.round(chosen.seconds / 60) - spare;
-  /* 다른 수단으로는 닿는지. 가장 빠른 것이 못 가면 나머지도 못 갑니다. */
-  const rescue =
-    late > 0 && spare !== null
-      ? (gap.options.find((o) => o.mode === gap.fastest && Math.round(o.seconds / 60) <= spare) ??
-        null)
-      : null;
-
-  return (
-    <View style={styles.gap}>
-      <View style={styles.gapLine} />
-      {/*
-        방금 달라진 구간.
-
-        <p>잠깐만 답니다. 계속 붙여 두면 그냥 장식이 되고, 다음에 정말
-        바뀌었을 때 눈에 안 걸립니다.
-      */}
-      {justChanged ? <Badge label="이 구간이 바뀌었어요" tone="accent" /> : null}
-      <Row gap={Spacing.s1}>
-        {gap.options.map((option) => {
-          const on = chosen?.mode === option.mode;
-          return (
-            <Press
-              key={option.mode}
-              onPress={() => onPick(gap.fromId, option.mode)}
-              scale={0.94}
-              accessibilityState={{ selected: on }}
-              accessibilityLabel={`${MODE_LABEL[option.mode]} ${asDuration(option.seconds)}`}
-              style={[
-                styles.option,
-                on ? { borderColor: Colors.accent, backgroundColor: Colors.accentSoft } : null,
-              ]}>
-              <Row gap={Spacing.s1}>
-                <Caption tone={on ? 'accent' : 'muted'}>{MODE_LABEL[option.mode]}</Caption>
-                {!oneAnswer && option.mode === gap.fastest ? (
-                  <Caption tone="hot" strong>
-                    빠름
-                  </Caption>
-                ) : null}
-                {!oneAnswer && option.mode === gap.cheapest ? (
-                  <Caption tone="success" strong>
-                    저렴
-                  </Caption>
-                ) : null}
-              </Row>
-              <Body small strong tone={on ? 'default' : 'secondary'}>
-                {asDuration(option.seconds)}
-              </Body>
-              <Caption tone="muted">{fareText(option.fare) || asDistance(option.meters)}</Caption>
-            </Press>
-          );
-        })}
-      </Row>
-      {/*
-        적어 둔 시각까지 못 닿는 자리.
-
-        얼마나 모자라는지를 함께 적습니다. "빠듯합니다" 만으로는 5분을
-        당기면 되는 것인지 계획을 다시 짜야 하는 것인지 알 수 없습니다.
-
-        다른 수단으로 닿으면 그것을 말해 줍니다. 안 되는 것만 말하고 되는
-        길을 안 말하면 사람이 셋을 하나씩 눌러 보며 다시 재야 합니다.
-      */}
-      {late > 0 ? (
-        <Row gap={Spacing.s2}>
-          <Caption tone="danger" strong>
-            {arriveBy} 까지 {asDuration(late * 60)} 모자라요
-          </Caption>
-          {rescue ? <Caption tone="secondary">{MODE_FITS[rescue.mode]}</Caption> : null}
-        </Row>
-      ) : null}
-
-      {/* 택시 요금은 구글이 알려 주지 않아 나라별 기본요금으로 어림한 값입니다.
-          정확한 값인 척하면 그 돈만 들고 탔다가 모자랍니다. */}
-      {gap.options.some((o) => o.fare?.estimated) ? (
-        <Caption tone="muted">택시 요금은 기본요금으로 어림한 값이에요</Caption>
-      ) : null}
-    </View>
-  );
-}
-
-/**
- * 적어 둔 두 시각 사이에 남는 분.
- *
- * <p>둘 중 하나라도 안 적었으면 <code>null</code> 입니다. 안 적은 것은
- * "아무 때나" 라는 뜻이므로 맞춰 볼 것이 없습니다.
- *
- * <p>뒤엣것이 앞엣것보다 이르면 자정을 넘긴 자리입니다. 그때도
- * <code>null</code> 로 둡니다 — 24시간을 더해 재면 "열여덟 시간 남았다" 가
- * 되어 아무 말도 못 하게 되고, 아니라면 이미 순서가 잘못된 것이라 이동
- * 시간으로 할 이야기가 아닙니다.
- */
-function spareMinutes(leaveAt: string | null, arriveBy: string | null) {
-  const from = minutesOfDay(leaveAt);
-  const to = minutesOfDay(arriveBy);
-  if (from === null || to === null || to < from) {
+/** 숙소를 길찾기 끝으로 — 자리를 모르거나 그 곳과 100m 안이면 없습니다. */
+function stayEnd(stay: Day['stay'] | null | undefined, place: Place | undefined) {
+  if (!stay || stay.lat == null || stay.lng == null || !place) {
     return null;
   }
-  return to - from;
+  const at = { name: stay.name, lat: stay.lat, lng: stay.lng, placeId: stay.placeId };
+  return metersBetween(at, place) < STAY_SAME_PLACE ? null : at;
 }
+
+/** 숙소를 장소로도 넣은 사람의 「호텔에서 호텔까지」 를 가리는 거리(m). */
+const STAY_SAME_PLACE = 100;
 
 /**
  * 받아 온 그림을 <code>data:</code> 주소로.
@@ -4366,49 +3856,6 @@ function asDataUrl(png: Blob): Promise<string | null> {
       done(null);
     }
   });
-}
-
-/** "14:30" 을 자정부터의 분으로. 모양이 다르면 null 입니다. */
-function minutesOfDay(at: string | null) {
-  if (!at || !/^\d{2}:\d{2}$/.test(at)) {
-    return null;
-  }
-  const [h, m] = at.split(':').map(Number);
-  return h * 60 + m;
-}
-
-/** "¥1,500" 처럼. 요금이 없는 것(걷기)은 빈 문자열입니다. */
-function fareText(fare: Money | null) {
-  if (!fare) {
-    return '';
-  }
-  const sign: Record<string, string> = {
-    KRW: '₩',
-    JPY: '¥',
-    USD: '$',
-    TWD: 'NT$',
-    HKD: 'HK$',
-    SGD: 'S$',
-    THB: '฿',
-    VND: '₫',
-  };
-  return `${sign[fare.currency] ?? ''}${fare.amount.toLocaleString()}`;
-}
-
-/** "1시간 12분" 처럼. 초는 버립니다 — 이동 시간에서 초는 뜻이 없습니다. */
-function asDuration(seconds: number) {
-  const minutes = Math.max(1, Math.round(seconds / 60));
-  if (minutes < 60) {
-    return `${minutes}분`;
-  }
-  const hours = Math.floor(minutes / 60);
-  const rest = minutes % 60;
-  return rest === 0 ? `${hours}시간` : `${hours}시간 ${rest}분`;
-}
-
-/** 가까우면 미터로, 멀면 킬로미터로. */
-function asDistance(meters: number) {
-  return meters < 1000 ? `${meters}m` : `${(meters / 1000).toFixed(1)}km`;
 }
 
 /**
@@ -5108,13 +4555,6 @@ function minutesOf(time: string | null): number | null {
   return m ? Number(m[1]) * 60 + Number(m[2]) : null;
 }
 
-/** 「이동 시간」의 수단 → 동선 탈것의 수단(lib/vehicles 의 FROM_MODE 열쇠). */
-const MODE_OF: Record<TravelMode, string> = {
-  WALK: 'walk',
-  TRANSIT: 'transit',
-  DRIVE: 'car',
-};
-
 const styles = StyleSheet.create({
   /* 챙길 것을 맡을 사람 얼굴. 손가락 크기는 Tap.chip 높이에 맞춥니다. */
   packFace: {
@@ -5448,7 +4888,7 @@ const styles = StyleSheet.create({
     자리에서 시작합니다. 위 여백은 몸통의 첫 줄 높이에 맞춰, 시각이 이름과
     나란히 보이게 합니다.
   */
-  /* 장소 카드 바로 아래, 구간 줄(gap)과 같은 들여쓰기. */
+  /* 장소 카드 바로 아래 — 적어 둔 이동 한 줄과 길찾기 한 줄. */
   legSlot: {
     paddingLeft: Spacing.s2,
   },
@@ -5639,34 +5079,9 @@ const styles = StyleSheet.create({
   },
 
   /* --------------------------------------------------- 사이사이 이동 */
-  gap: {
+  /* 숙소에서 첫 곳까지 · 마지막 곳에서 숙소까지의 길찾기 한 줄. 장소 줄의
+     번호 선 오른쪽에 섭니다. */
+  stayRoute: {
     paddingLeft: Spacing.s5,
-    paddingVertical: Spacing.s2,
-    gap: Spacing.s1,
-  },
-  /* 숙소 구간의 머리 한 줄. 구간 줄(gap)과 같은 들여쓰기에 섭니다. */
-  stayLegHead: {
-    paddingLeft: Spacing.s5,
-    paddingTop: Spacing.s2,
-  },
-  /* 앞 장소에서 이어진다는 것을 눈으로 잇습니다. */
-  gapLine: {
-    width: StyleSheet.hairlineWidth,
-    height: 10,
-    marginLeft: Spacing.s1,
-    backgroundColor: Colors.borderStrong,
-  },
-  option: {
-    flexGrow: 1,
-    /* 셋이 폭 360 인 폰에서도 한 줄에 서야 합니다. 이보다 넓게 잡으면
-       마지막 하나가 아래로 접혀 비교가 안 됩니다. */
-    flexBasis: 76,
-    borderRadius: Radius.r3,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: Colors.border,
-    backgroundColor: Colors.fill,
-    paddingVertical: Spacing.s2,
-    paddingHorizontal: Spacing.s3,
-    gap: 2,
   },
 });

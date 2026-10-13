@@ -95,21 +95,6 @@ r = await call("GET", `/api/trip?trip=${copied}`, { token: stranger });
 const copiedPlace = r.data.days[0].places.find(p => p.name === "구라시키 목욕탕");
 T("가져간 것에도 그림이 있음", copiedPlace?.icon === "onsen", copiedPlace);
 
-console.log("\n[8] 사이사이 이동 비교");
-r = await call("GET", `/api/days/${dayId}/route/compare`, { token: stranger });
-T("남은 못 봄", r.status === 403 || r.status === 404, r.data);
-r = await call("GET", `/api/days/${dayId}/route/compare`, { token: me });
-/* 이 확인용 서버에는 구글 키가 없습니다. 키가 없으면 400 으로 잘라 내고,
-   있으면 구간 목록을 돌려줘야 합니다. 어느 쪽이든 500 이면 안 됩니다. */
-/* 숙소 구간(morning · evening)은 없으면 안 실립니다(note 와 같음). 실렸다면
-   장소 사이 구간과 같은 모양이어야 합니다. */
-const stayLegOk = (g) => g == null || (Array.isArray(g.options) && typeof g.fromId === "string" && typeof g.toId === "string");
-T("키가 없으면 꺼져 있다고 알림", r.status === 400
-  || (r.status === 200 && Array.isArray(r.data.gaps) && stayLegOk(r.data.morning) && stayLegOk(r.data.evening)),
-  { status: r.status, data: r.data });
-r = await call("GET", "/api/days/없는날/route/compare", { token: me });
-T("없는 날짜는 404", r.status === 404, r.data);
-
 console.log("\n[9] 지운 뒤에도 나머지는 멀쩡");
 r = await call("DELETE", `/api/places/${oddId}`, { token: me });
 T("지움", r.status === 200, r.data);

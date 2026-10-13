@@ -39,12 +39,12 @@ export type JourneyPoint = {
   /** 그날의 색. 평평한 비행기 그림(3D 를 못 받았을 때)에 씁니다. */
   color: string;
   /**
-   * 다음 곳까지 실제로 가는 길(구글 경로의 선, 풀어 둔 것 — lib/polyline).
+   * 다음 곳까지 실제로 가는 길(풀어 둔 점들).
    *
    * <p>있으면 탈것이 이 길을 따라가고 길이 꺾이는 대로 방향을 틉니다. 없으면
-   * 두 곳을 곧게 잇습니다. 여행 상세에서 「이동 시간」으로 길을 찾아 두었으면
-   * 그 구간의 선(GapOption.polyline)을 넘기면 됩니다 — 「일자로 달리지 말고
-   * 찾은 길대로」.
+   * 두 곳을 곧게 잇습니다. 여행 상세의 「이동 시간」(구글 경로선)을 넘기던
+   * 자리인데 그 셈은 2026-10-13 에 걷어냈습니다. 지금 여행 상세는 역을 거치는
+   * 구간을 토막(lib/leg-path)으로 나눠 토막마다 travel 을 부릅니다.
    */
   path?: { lat: number; lng: number }[] | null;
 };
@@ -172,10 +172,20 @@ export type Journey = {
    * from 에서 to 까지 한 번 갑니다. 닿으면 true, 다른 travel · aim · overview 로
    * 끊기면 false 로 풉니다.
    */
-  travel(from: JourneyPoint, to: JourneyPoint, opts?: { after?: JourneyPoint | null }): Promise<boolean>;
-  /* from.path 가 있으면 그 길로 갑니다(JourneyPoint.path). */
-  /** 그 곳에 내려 섭니다(움직이지 않고). */
-  park(at: JourneyPoint, heading?: number): void;
+  travel(
+    from: JourneyPoint,
+    to: JourneyPoint,
+    opts?: { after?: JourneyPoint | null; ms?: number },
+  ): Promise<boolean>;
+  /* from.path 가 있으면 그 길로 갑니다(JourneyPoint.path). opts.ms 를 주면 탈것 ·
+     거리로 정하는 시간(lib/vehicles.legMs) 대신 그만큼 걸립니다 — 여러 토막을
+     이어 갈 때 전체가 너무 길어지지 않게 부르는 쪽이 줄입니다. */
+  /**
+   * 그 곳에 내려 섭니다(움직이지 않고).
+   *
+   * @param jump 카메라까지 한 번에 옮길지. 안 주면 카메라는 다가가듯 옮겨 갑니다.
+   */
+  park(at: JourneyPoint, heading?: number, jump?: boolean): void;
   /** 탈것을 걷고 곳들이 다 들어오게 물러나 비스듬히 봅니다. */
   overview(points: { lat: number; lng: number }[]): void;
   dispose(): void;
@@ -379,7 +389,7 @@ export function createJourney(map: any): Journey {
       const km = road ? pathKm(road) : distanceKm(start, to);
       const vehicle = vehicleFor(start.mode, distanceKm(start, to));
       /* 시간은 실제로 가는 길이로 — 굽은 길은 곧은 길보다 깁니다. */
-      const ms = legMs(vehicle, km);
+      const ms = opts?.ms ?? legMs(vehicle, km);
       const after = opts?.after ?? null;
       return new Promise<boolean>((resolve) => {
         let stopped = false;
@@ -410,9 +420,13 @@ export function createJourney(map: any): Journey {
       });
     },
 
-    park(at, heading) {
+    park(at, heading, jump) {
       cancelTrip();
       goal = aimAlong(at, null, null, 0, heading ?? cam?.heading ?? 0);
+      if (jump) {
+        /* 다음 화면이 카메라를 목표 자리에서 새로 세웁니다(frame 의 cam ?? want). */
+        cam = null;
+      }
     },
 
     overview(points) {

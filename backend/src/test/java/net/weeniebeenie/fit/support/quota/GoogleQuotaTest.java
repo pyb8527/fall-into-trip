@@ -31,6 +31,9 @@ class GoogleQuotaTest {
         assertFalse(touchesGoogle("POST", "/api/auth/login"));
         /* 동선 정리는 직선거리로 잽니다. 구글을 부르지 않습니다. */
         assertFalse(touchesGoogle("GET", "/api/places/tidy"));
+        /* 길찾기 셈은 걷어냈습니다. 이 자리는 이제 없고, 셀 것도 없습니다. */
+        assertFalse(touchesGoogle("GET", "/api/days/abc/route/compare"));
+        assertFalse(touchesGoogle("GET", "/api/days/abc/route"));
     }
 
     @Test
@@ -40,8 +43,6 @@ class GoogleQuotaTest {
         assertTrue(touchesGoogle("POST", "/api/recommend"));
         assertTrue(touchesGoogle("POST", "/api/trips/abc/recommend"));
         assertTrue(touchesGoogle("GET", "/api/days/abc/places-info"));
-        assertTrue(touchesGoogle("GET", "/api/days/abc/route/compare"));
-        assertTrue(touchesGoogle("GET", "/api/days/abc/route"));
         assertTrue(touchesGoogle("GET", "/api/places/ChIJabc/info"));
         assertTrue(touchesGoogle("GET", "/api/posts/abc/map"));
     }

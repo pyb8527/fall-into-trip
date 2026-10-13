@@ -3,67 +3,30 @@ package net.weeniebeenie.fit.trip.api;
 import lombok.RequiredArgsConstructor;
 import net.weeniebeenie.fit.account.infrastructure.security.AuthPrincipal;
 import net.weeniebeenie.fit.account.infrastructure.security.CurrentUser;
-import net.weeniebeenie.fit.shared.error.ApiException;
 import net.weeniebeenie.fit.trip.application.PlaceInfoService;
-import net.weeniebeenie.fit.trip.application.RouteService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Locale;
 import java.util.Map;
 
 /**
- * 하루치 곁다리 정보 — 동선과 장소 안내.
+ * 하루치 곁다리 정보 — 장소 안내.
  *
- * <p>날짜 하나를 통째로 묻습니다. 구간을 하나씩 묻게 두면 화면이 장소 수만큼
+ * <p>날짜 하나를 통째로 묻습니다. 장소를 하나씩 묻게 두면 화면이 장소 수만큼
  * 요청을 던지고, 그만큼 요금이 붙습니다.
+ *
+ * <p>장소 사이 동선({@code /route}, {@code /route/compare})도 여기 있었습니다.
+ * 2026-10-13 에 걷어냈습니다 — 화면의 길찾기 링크가 왜 그런지 적어 둡니다
+ * ({@code frontend/src/lib/directions.ts}).
  */
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/days/{dayId}")
 public class DayExtrasController {
 
-    private final RouteService routes;
     private final PlaceInfoService info;
-
-    @GetMapping("/route")
-    public Map<String, Object> of(@CurrentUser AuthPrincipal me,
-                                  @PathVariable String dayId,
-                                  @RequestParam(name = "mode", defaultValue = "TRANSIT") String mode) {
-        return Map.of("route", routes.of(me, dayId, parse(mode)));
-    }
-
-    /**
-     * 사이사이를 세 수단으로 한꺼번에.
-     *
-     * <p>수단을 고르게 하지 않고 알아서 셋을 다 계산해 내려 줍니다. 대신
-     * 구간마다 요금이 세 배로 나가므로, 화면은 <b>날짜 하나를 펼쳤을 때만</b>
-     * 이것을 부릅니다.
-     */
-    @GetMapping("/route/compare")
-    public Map<String, Object> compare(@CurrentUser AuthPrincipal me,
-                                       @PathVariable String dayId) {
-        RouteService.Compared got = routes.compare(me, dayId);
-        Map<String, Object> out = new java.util.HashMap<>();
-        out.put("gaps", got.gaps());
-        /* 대중교통이 하나도 없으면 왜인지 한 줄. 없으면 안 실립니다. */
-        out.put("note", got.note());
-        /* 장소가 너무 많아 뒷부분을 못 구했는지. 이 말을 안 하면 없는 것이
-           고장으로 읽힙니다. */
-        out.put("trimmed", got.trimmed());
-        /* 전날 밤 숙소에서 첫 곳까지, 마지막 곳에서 이 날 숙소까지.
-
-           gaps 에 섞지 않고 따로 싣습니다 — 지도 선과 「다음 곳까지」 가
-           gaps 를 장소 사이로 읽고 있어서, 섞으면 그쪽이 모두 숙소를 가려내야
-           합니다. 없으면 note 처럼 안 실립니다(application.yml 의 non_null 이
-           맵 값의 null 도 뺍니다). */
-        out.put("morning", got.morning());
-        out.put("evening", got.evening());
-        return out;
-    }
 
     /**
      * 이 날에 넣어 둔 장소들이 언제 문을 여는지.
@@ -74,13 +37,5 @@ public class DayExtrasController {
     @GetMapping("/places-info")
     public Map<String, Object> places(@CurrentUser AuthPrincipal me, @PathVariable String dayId) {
         return Map.of("info", info.ofDay(me, dayId));
-    }
-
-    private static RouteService.Mode parse(String mode) {
-        try {
-            return RouteService.Mode.valueOf(mode.trim().toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException e) {
-            throw ApiException.badRequest("알 수 없는 이동 수단이에요.");
-        }
     }
 }

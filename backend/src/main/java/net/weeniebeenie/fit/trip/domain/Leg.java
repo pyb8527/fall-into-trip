@@ -18,14 +18,23 @@ import java.util.Set;
  * 「몇 곳」이 부풀고, 지도에 역 핀이 깔리고, 「지금 뜨는 곳」에 역이 올라옵니다.
  *
  * <p>칸({@code move} jsonb)은 V1 부터 있었는데 그리는 화면이 없었습니다. 구글이
- * 셈해 주는 구간({@code GapBlock})과 다릅니다 — 그쪽은 「몇 분 걸린다」이고
- * 이쪽은 <b>사람이 정한 길</b>입니다(어느 노선, 몇 번 출구, 스이카 충전).
+ * 셈해 주던 구간과 다릅니다(2026-10-13 에 걷어내고 구글 지도 링크로 바꿈) —
+ * 그쪽은 「몇 분 걸린다」였고 이쪽은 <b>사람이 정한 길</b>입니다(어느 노선,
+ * 몇 번 출구, 스이카 충전).
  *
  * <h3>받는 모양</h3>
  *
- * <p>{@code {mode, min, via, cost}}. 모르는 칸은 버리고, 길이를 자르지 않고
- * 거절합니다 — 잘라 두면 적은 사람은 다 들어간 줄 압니다. 넷 다 비면 「적은
+ * <p>{@code {mode, min, via, cost, from, to}}. 모르는 칸은 버리고, 길이를 자르지
+ * 않고 거절합니다 — 잘라 두면 적은 사람은 다 들어간 줄 압니다. 다 비면 「적은
  * 것 없음」(null)입니다.
+ *
+ * <h3>타는 역 · 내리는 역</h3>
+ *
+ * <p>{@code from} · {@code to} 는 {@code {name, lat, lng, placeId}} 입니다. 장소
+ * 검색으로 골랐으면 넷 다 있고, 검색이 안 돼 이름만 적었으면 이름뿐입니다.
+ * 표가 바뀌지 않습니다 — 이 칸은 처음부터 jsonb 라 모양만 넓히면 됩니다.
+ * 좌표는 둘 다 있거나 둘 다 없어야 합니다. 하나만 있으면 지도에 세울 수 없고,
+ * 반쪽 좌표를 받아 두면 그 역은 영영 「자리 모름」 인데 화면은 아는 척합니다.
  */
 public final class Leg {
 
@@ -37,6 +46,9 @@ public final class Leg {
 
     static final int VIA_MAX = 80;
     static final int COST_MAX = 40;
+    static final int STATION_MAX = 80;
+    /* 구글 장소 번호는 대개 서른 자 안팎입니다. 넉넉히 두되 아무 글이나 쌓이지 않게. */
+    static final int PLACE_ID_MAX = 300;
     /** 하루. 그보다 긴 이동은 날을 나눠 적습니다. */
     static final int MIN_MAX = 24 * 60;
 
@@ -94,7 +106,52 @@ public final class Leg {
             }
             out.put("cost", cost);
         }
+        station(in, "from", out);
+        station(in, "to", out);
         return out.isEmpty() ? null : out.toString();
+    }
+
+    private static void station(JsonNode in, String field, ObjectNode out) {
+        JsonNode v = in.get(field);
+        if (v == null || v.isNull()) {
+            return;
+        }
+        if (!v.isObject()) {
+            throw ApiException.badRequest("역을 읽지 못했어요.");
+        }
+        String name = text(v, "name");
+        if (name == null) {
+            /* 이름 없는 역은 적은 것이 아닙니다. 다른 칸처럼 빈 것은 버립니다. */
+            return;
+        }
+        if (name.length() > STATION_MAX) {
+            throw ApiException.badRequest("역 이름은 " + STATION_MAX + "자까지 적을 수 있어요.");
+        }
+        ObjectNode st = out.putObject(field);
+        st.put("name", name);
+
+        JsonNode lat = v.get("lat");
+        JsonNode lng = v.get("lng");
+        boolean hasLat = lat != null && !lat.isNull();
+        boolean hasLng = lng != null && !lng.isNull();
+        if (hasLat != hasLng) {
+            throw ApiException.badRequest("역의 자리를 읽지 못했어요.");
+        }
+        if (hasLat) {
+            if (!lat.isNumber() || !lng.isNumber()
+                    || Math.abs(lat.asDouble()) > 90 || Math.abs(lng.asDouble()) > 180) {
+                throw ApiException.badRequest("역의 자리를 읽지 못했어요.");
+            }
+            st.put("lat", lat.asDouble());
+            st.put("lng", lng.asDouble());
+        }
+        String placeId = text(v, "placeId");
+        if (placeId != null) {
+            if (placeId.length() > PLACE_ID_MAX) {
+                throw ApiException.badRequest("역의 구글 번호가 너무 길어요.");
+            }
+            st.put("placeId", placeId);
+        }
     }
 
     private static String text(JsonNode in, String field) {
