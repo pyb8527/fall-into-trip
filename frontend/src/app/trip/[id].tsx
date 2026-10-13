@@ -112,6 +112,7 @@ import { TripTabs } from '@/ui/tab-bar';
 import { TripMark } from '@/components/trip-mark';
 import { CountdownBadge } from '@/components/countdown-badge';
 import { quoted } from '@/lib/josa';
+import { type StayPick, staysFor } from '@/lib/stay-picks';
 import { hasLeg, LegLine, LegSheet } from '@/components/leg-sheet';
 
 /** 전체를 보는 상태. 특정 날짜가 아니라는 뜻입니다. */
@@ -1716,6 +1717,7 @@ export default function TripScreen() {
               onRemove={remove}
               prevStay={days[di - 1]?.stay ?? null}
               lastDay={di === days.length - 1}
+              stays={staysFor(days, di)}
               infoOf={infoOf}
               folded={foldedDays.has(day.id)}
               onFold={(fold) => foldDay(day.id, fold)}
@@ -2517,6 +2519,7 @@ function DayCard({
   onRemove,
   prevStay,
   lastDay,
+  stays,
   infoOf,
   folded,
   onFold,
@@ -2544,6 +2547,8 @@ function DayCard({
   prevStay: Day['stay'] | null;
   /** 여행의 마지막 날인지. 체크아웃하고 떠나는 날이라 저녁 숙소 길이 없습니다. */
   lastDay: boolean;
+  /** 「이 장소 다음에」 판에서 곧장 넣을 수 있는 숙소들 — 가까운 날 차례. */
+  stays: StayPick[];
   /** 장소별 영업시간 등. 좌표만 직접 넣은 곳에는 없습니다. */
   infoOf: Map<string, PlaceInfo>;
   /**
@@ -3130,6 +3135,7 @@ function DayCard({
         visible={addingAfter !== null}
         dayId={day.id}
         after={addingAfter ?? undefined}
+        stays={stays}
         onDone={() => {
           setAddingAfter(null);
           onChanged();

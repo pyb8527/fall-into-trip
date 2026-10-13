@@ -7,6 +7,7 @@ import { PlaceSearch } from '@/components/place-search';
 import { IconPicker } from '@/components/icon-picker';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { COMMON, decimalsOf, unitsOf } from '@/lib/money';
+import type { StayPick } from '@/lib/stay-picks';
 import {
   Body,
   BottomSheet,
@@ -16,6 +17,7 @@ import {
   ErrorNote,
   Field,
   Icon,
+  ListRow,
   Row,
 } from '@/ui';
 
@@ -34,6 +36,7 @@ export function PlaceForm({
   dayId,
   after,
   place,
+  stays,
   onDone,
   onCancel,
 }: {
@@ -48,6 +51,11 @@ export function PlaceForm({
   after?: string;
   /** 있으면 고치기, 없으면 새로 넣기. */
   place?: Place;
+  /**
+   * 검색 없이 곧장 넣을 수 있는 숙소들(lib/stay-picks). 비어 있으면 「숙소」 칩이
+   * 안 섭니다 — 적어 둔 숙소가 없는데 칩을 세우면 눌러도 고를 것이 없습니다.
+   */
+  stays?: StayPick[];
   onDone: () => void;
   onCancel: () => void;
 }) {
@@ -83,6 +91,8 @@ export function PlaceForm({
 
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  /* 「숙소」 칩을 눌러 적어 둔 숙소 목록을 펼쳤는지. */
+  const [showStays, setShowStays] = useState(false);
 
   /*
     판은 닫혀도 화면에서 사라지지 않습니다. 닫히는 동안 아래로 미끄러져
@@ -117,6 +127,7 @@ export function PlaceForm({
     setUrl(place?.url ?? '');
     setError(null);
     setBusy(false);
+    setShowStays(false);
     /* place 는 새로 고칠 때마다 다른 객체가 되지만 가리키는 곳은 같습니다.
        객체 자체를 보면 열어 놓고 치던 것이 지워집니다. id 만 봅니다. */
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -192,12 +203,68 @@ export function PlaceForm({
     }
   }
 
+  /*
+    적어 둔 숙소를 곧장 넣습니다 — 고르면 끝입니다.
+
+    <p>나머지 칸(시각 · 비용 · 메모)을 채우라고 판에 남겨 두지 않습니다. 숙소를
+    넣는 사람이 바라는 것은 「짐 맡기러 호텔」 한 줄이고, 더 적을 것이 있으면
+    넣은 뒤에 고치면 됩니다. 자리는 숙소 칸에 적어 둔 값이라 구글을 다시 안
+    부릅니다.
+  */
+  async function putStay(stay: StayPick) {
+    if (busy) {
+      return;
+    }
+    setError(null);
+    setBusy(true);
+    try {
+      await api.post('/api/places', {
+        dayId,
+        after,
+        name: stay.name,
+        lat: stay.lat,
+        lng: stay.lng,
+        placeId: stay.placeId,
+        icon: 'stay',
+        fit: true,
+      });
+      onDone();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : UNEXPECTED);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <BottomSheet
       visible={visible}
       title={editing ? '장소 고치기' : '장소 넣기'}
       onClose={onCancel}
       footer={<Button label={editing ? '저장' : '넣기'} onPress={submit} busy={busy} />}>
+      {/* 0. 적어 둔 숙소에서 — 새로 넣을 때만, 적어 둔 숙소가 있을 때만. */}
+      {!editing && stays && stays.length > 0 ? (
+        <View style={styles.stays}>
+          <Row gap={Spacing.s2}>
+            <Chip label="숙소" selected={showStays} onPress={() => setShowStays((on) => !on)} />
+          </Row>
+          {showStays ? (
+            <View style={styles.stayList}>
+              {stays.map((stay, i) => (
+                <ListRow
+                  key={`${stay.name}@${stay.lat},${stay.lng}`}
+                  title={stay.name}
+                  subtitle={`${stay.when} 숙소 · 누르면 바로 들어가요`}
+                  last={i === stays.length - 1}
+                  onPress={() => putStay(stay)}
+                />
+              ))}
+            </View>
+          ) : null}
+          {showStays && error ? <ErrorNote message={error} /> : null}
+        </View>
+      ) : null}
+
       {/* 1. 어디인지 먼저 정합니다. */}
       <PlaceSearch
         onPick={(found) => {
@@ -327,6 +394,13 @@ export function PlaceForm({
 }
 
 const styles = StyleSheet.create({
+  stays: {
+    gap: Spacing.s2,
+  },
+  stayList: {
+    borderRadius: Radius.md,
+    overflow: 'hidden',
+  },
   /* 나란한 두 칸은 위쪽으로 맞춥니다. 한쪽에만 힌트가 붙어 키가 달라져도
      입력 상자끼리는 한 줄에 서야 합니다. */
   pair: {
