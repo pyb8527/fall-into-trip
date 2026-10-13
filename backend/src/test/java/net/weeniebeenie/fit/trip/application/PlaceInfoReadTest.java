@@ -3,9 +3,14 @@ package net.weeniebeenie.fit.trip.application;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import net.weeniebeenie.fit.trip.application.PlaceInfoService.Info;
+import net.weeniebeenie.fit.trip.application.PlaceInfoService.Price;
 import net.weeniebeenie.fit.trip.application.PlaceInfoService.Raw;
+import net.weeniebeenie.fit.trip.application.PlaceInfoService.Span;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+
+import java.time.LocalDate;
+import java.util.List;
 
 import static net.weeniebeenie.fit.trip.application.PlaceInfoService.rawOf;
 import static net.weeniebeenie.fit.trip.application.PlaceInfoService.viewOf;
@@ -188,5 +193,218 @@ class PlaceInfoReadTest {
         assertNull(info.lng());
         assertNull(info.address());
         assertNull(info.wheelchairEntrance());
+        assertNull(info.price());
+        assertEquals(List.of(), info.breaks());
+        assertNull(info.lastOrder());
+    }
+
+    /* ------------------------------------------------------------ 값대 */
+
+    /*
+      값대의 모양은 2026-10-13 에 운영 키로 찍어 본 15곳을 따랐습니다
+      (docs/2026-10/plan-price-hours.md §10.1).
+    */
+
+    @Test
+    @DisplayName("시작과 끝이 다 오면 그 사이")
+    void priceBoth() throws Exception {
+        Raw raw = read("""
+                { "priceRange": {
+                    "startPrice": { "currencyCode": "JPY", "units": "1000" },
+                    "endPrice": { "currencyCode": "JPY", "units": "2000" } } }
+                """);
+        assertEquals(new Price("JPY", 1000.0, 2000.0), raw.price());
+    }
+
+    @Test
+    @DisplayName("시작이 1 이면 「까지」 — 마츠야 · 요시노야")
+    void priceUpTo() throws Exception {
+        /* 「1엔부터 1,000엔」 이 아니라 「1,000엔 이하」 입니다. */
+        Raw raw = read("""
+                { "priceRange": {
+                    "startPrice": { "currencyCode": "JPY", "units": "1" },
+                    "endPrice": { "currencyCode": "JPY", "units": "1000" } } }
+                """);
+        assertEquals(new Price("JPY", null, 1000.0), raw.price());
+    }
+
+    @Test
+    @DisplayName("시작만 오면 「부터」 — Cretya")
+    void priceFrom() throws Exception {
+        Raw raw = read("""
+                { "priceRange": { "startPrice": { "currencyCode": "IDR", "units": "250000" } } }
+                """);
+        assertEquals(new Price("IDR", 250000.0, null), raw.price());
+    }
+
+    @Test
+    @DisplayName("값대가 없으면 모른다 — 이케부쿠로 · AKASA")
+    void priceAbsent() throws Exception {
+        assertNull(read("""
+                { "businessStatus": "OPERATIONAL" }
+                """).price());
+        /* 통화를 모르면 금액을 못 읽습니다. */
+        assertNull(read("""
+                { "priceRange": { "startPrice": { "units": "1000" } } }
+                """).price());
+    }
+
+    @Test
+    @DisplayName("작은 단위(nanos)도 합친다")
+    void priceNanos() throws Exception {
+        Raw raw = read("""
+                { "priceRange": {
+                    "startPrice": { "currencyCode": "USD", "units": "10", "nanos": 500000000 },
+                    "endPrice": { "currencyCode": "USD", "units": "20" } } }
+                """);
+        assertEquals(new Price("USD", 10.5, 20.0), raw.price());
+    }
+
+    /* ------------------------------------------------------- 쉬는 시간 */
+
+    /** 월요일(구글 1) 구간들을 periods 로. "11:00-14:30" 모양을 받습니다. */
+    private static String monday(String... spans) {
+        StringBuilder out = new StringBuilder("[");
+        for (String s : spans) {
+            String[] p = s.split("-");
+            String[] o = p[0].split(":");
+            String[] c = p[1].split(":");
+            /* 닫는 시각이 여는 시각보다 앞서면 다음 날(화요일)에 닫습니다. */
+            int closeDay = p[1].compareTo(p[0]) <= 0 ? 2 : 1;
+            if (out.length() > 1) {
+                out.append(',');
+            }
+            out.append(String.format(
+                    "{\"open\":{\"day\":1,\"hour\":%d,\"minute\":%d},"
+                            + "\"close\":{\"day\":%d,\"hour\":%d,\"minute\":%d}}",
+                    Integer.parseInt(o[0]), Integer.parseInt(o[1]),
+                    closeDay, Integer.parseInt(c[0]), Integer.parseInt(c[1])));
+        }
+        return out.append(']').toString();
+    }
+
+    /** 2026-10-12 은 월요일입니다. */
+    private static final LocalDate MONDAY = LocalDate.of(2026, 10, 12);
+
+    private static Info onMonday(String json) throws Exception {
+        return viewOf("p", "p", read(json), MONDAY);
+    }
+
+    @Test
+    @DisplayName("30분 넘는 틈이 쉬는 시간 — 수프 카레 카무이")
+    void breakGap() throws Exception {
+        Info info = onMonday("{ \"regularOpeningHours\": { \"periods\": "
+                + monday("11:00-14:30", "17:00-20:30") + " } }");
+        assertEquals(List.of(new Span("14:30", "17:00")), info.breaks());
+    }
+
+    @Test
+    @DisplayName("15분 틈은 쉬는 시간이 아니다 — 로쿠린샤")
+    void shortGap() throws Exception {
+        Info info = onMonday("{ \"regularOpeningHours\": { \"periods\": "
+                + monday("07:30-09:45", "10:00-23:00") + " } }");
+        assertEquals(List.of(), info.breaks());
+    }
+
+    @Test
+    @DisplayName("자정을 넘기는 구간도 그 앞의 틈만 센다")
+    void breakOvernight() throws Exception {
+        /* 17:00–02:00 은 그날의 마지막입니다. 차례가 뒤섞여 와도 같습니다. */
+        Info info = onMonday("{ \"regularOpeningHours\": { \"periods\": "
+                + monday("17:00-02:00", "11:00-14:30") + " } }");
+        assertEquals(List.of(new Span("14:30", "17:00")), info.breaks());
+    }
+
+    @Test
+    @DisplayName("전날 밤에서 이어진 00:00 구간 뒤의 틈은 밤에 닫은 것")
+    void breakAfterMidnightTail() throws Exception {
+        Info info = onMonday("{ \"regularOpeningHours\": { \"periods\": "
+                + monday("00:00-02:00", "11:00-23:00") + " } }");
+        assertEquals(List.of(), info.breaks());
+    }
+
+    @Test
+    @DisplayName("쉬는 시간은 그날 요일 것만")
+    void breakOtherDay() throws Exception {
+        /* 화요일(구글 2)에만 틈이 있습니다. 월요일을 보면 없어야 합니다. */
+        Info info = onMonday("""
+                { "regularOpeningHours": { "periods": [
+                  { "open": {"day":1,"hour":11,"minute":0}, "close": {"day":1,"hour":22,"minute":0} },
+                  { "open": {"day":2,"hour":11,"minute":0}, "close": {"day":2,"hour":14,"minute":0} },
+                  { "open": {"day":2,"hour":17,"minute":0}, "close": {"day":2,"hour":22,"minute":0} }
+                ] } }
+                """);
+        assertEquals(List.of(), info.breaks());
+        assertEquals(List.of(new Span("14:00", "17:00")),
+                viewOf("p", "p", read("""
+                { "regularOpeningHours": { "periods": [
+                  { "open": {"day":2,"hour":11,"minute":0}, "close": {"day":2,"hour":14,"minute":0} },
+                  { "open": {"day":2,"hour":17,"minute":0}, "close": {"day":2,"hour":22,"minute":0} }
+                ] } }
+                """), MONDAY.plusDays(1)).breaks());
+    }
+
+    /* ------------------------------------------------------- 주문 마감 */
+
+    private static String withKitchen(String main, String type, String kitchen) {
+        return "{ \"regularOpeningHours\": { \"periods\": " + main + " },"
+                + " \"regularSecondaryOpeningHours\": [ { \"secondaryHoursType\": \"" + type + "\","
+                + " \"periods\": " + kitchen + " } ] }";
+    }
+
+    @Test
+    @DisplayName("주방이 먼저 닫으면 라스트오더 — 이치란")
+    void kitchenEarlier() throws Exception {
+        Info info = onMonday(withKitchen(monday("09:30-22:45"), "KITCHEN", monday("09:30-22:30")));
+        assertEquals("22:30", info.lastOrder());
+    }
+
+    @Test
+    @DisplayName("자정을 넘겨 닫는 가게도 같은 기준으로 — 01:00 닫고 주방 00:30")
+    void kitchenOvernight() throws Exception {
+        Info info = onMonday(withKitchen(monday("18:00-01:00"), "KITCHEN", monday("18:00-00:30")));
+        assertEquals("00:30", info.lastOrder());
+        /* 주방이 자정 전에 닫아도 마찬가지입니다. 23:30 을 01:00 보다 늦다고 읽지 않습니다. */
+        assertEquals("23:30", onMonday(withKitchen(
+                monday("18:00-01:00"), "KITCHEN", monday("18:00-23:30"))).lastOrder());
+    }
+
+    @Test
+    @DisplayName("주방이 가게와 같이 닫으면 적지 않는다")
+    void kitchenEqual() throws Exception {
+        assertNull(onMonday(withKitchen(
+                monday("11:00-23:00"), "KITCHEN", monday("11:00-23:00"))).lastOrder());
+    }
+
+    @Test
+    @DisplayName("KITCHEN 이 없거나 다른 갈래뿐이면 적지 않는다")
+    void kitchenAbsent() throws Exception {
+        assertNull(onMonday("{ \"regularOpeningHours\": { \"periods\": "
+                + monday("09:30-22:45") + " } }").lastOrder());
+        /* 아침 시간이 일찍 닫는다고 라스트오더가 아닙니다. */
+        assertNull(onMonday(withKitchen(
+                monday("07:00-22:00"), "BREAKFAST", monday("07:00-10:30"))).lastOrder());
+        assertNull(onMonday(withKitchen(
+                monday("11:00-23:00"), "HAPPY_HOUR", monday("17:00-19:00"))).lastOrder());
+    }
+
+    @Test
+    @DisplayName("보조 시간을 전부 본 시간으로 채운 곳 — 타카하시야")
+    void kitchenNoise() throws Exception {
+        String main = monday("11:00-15:00", "17:00-21:00");
+        StringBuilder all = new StringBuilder();
+        for (String type : List.of("DRIVE_THROUGH", "HAPPY_HOUR", "DELIVERY", "TAKEOUT", "KITCHEN",
+                "BREAKFAST", "LUNCH", "DINNER", "BRUNCH", "PICKUP", "ACCESS", "SENIOR_HOURS")) {
+            if (!all.isEmpty()) {
+                all.append(',');
+            }
+            all.append("{ \"secondaryHoursType\": \"").append(type).append("\", \"periods\": ")
+                    .append(main).append(" }");
+        }
+        Info info = onMonday("{ \"regularOpeningHours\": { \"periods\": " + main + " },"
+                + " \"regularSecondaryOpeningHours\": [" + all + "] }");
+        assertNull(info.lastOrder());
+        /* 본 시간의 틈은 그대로 쉬는 시간입니다. */
+        assertEquals(List.of(new Span("15:00", "17:00")), info.breaks());
     }
 }

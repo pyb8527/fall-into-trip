@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Linking, StyleSheet, View } from 'react-native';
 
 import { api, ApiError, UNEXPECTED } from '@/api/client';
-import type { Comment, OurStars, PlaceInfo, TravelMode } from '@/api/types';
+import type { Comment, OurStars, PlaceInfo, PriceRange, TravelMode } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { CommentPeek } from '@/components/comment-list';
 import type { MapPlace } from '@/components/map-types';
@@ -12,6 +12,7 @@ import { iconOf, labelOf } from '@/constants/place-icons';
 import { Colors, Gutter, Radius, Spacing, Tap } from '@/constants/theme';
 import { openDirections, openPlace } from '@/lib/directions';
 import { awayFrom } from '@/lib/geo';
+import { decimalsOf, money } from '@/lib/money';
 import {
   Badge,
   Band,
@@ -285,6 +286,9 @@ export function PlaceDetailSheet({
      곳의 입구를 말할 이유가 없습니다. */
   const wheelchair = info != null && !info.permanentlyClosed && info.wheelchairEntrance === true;
 
+  /* 값대 한 줄. 아주 닫은 곳에는 안 세웁니다 — 영업시간 · 입구와 같은 까닭입니다. */
+  const price = info != null && !info.permanentlyClosed ? priceLabel(info.price) : null;
+
   /* 판에 펼칠 것이 몇 줄인지. 받은 것이 다섯보다 적을 수 있으므로 개수와
      견주는 것은 「다섯」이 아니라 <b>실제로 펼치는 수</b>입니다 — 그걸 안
      보면 셋을 다 펼쳐 놓고 「더 보기」라고 말하게 됩니다. */
@@ -526,7 +530,7 @@ export function PlaceDetailSheet({
        */}
       {/* 휠체어 줄도 조건에 넣습니다. 안 넣으면 주소 · 영업시간이 없는 가게에서
           그 한 줄이 상자째 안 뜹니다. */}
-      {place.address || hasHours || wheelchair ? (
+      {place.address || hasHours || wheelchair || price ? (
         <View style={styles.facts0}>
           {place.address ? (
             <Row gap={Spacing.s2} style={styles.fact}>
@@ -537,6 +541,22 @@ export function PlaceDetailSheet({
                 <Body small selectable>
                   {place.address}
                 </Body>
+              </View>
+            </Row>
+          ) : null}
+          {/*
+            값대 한 줄.
+
+            <p>「얼마쯤 드는 곳인지」 를 보려고 구글 지도로 나가던 것입니다.
+            영업시간 앞에 둡니다 — 이 곳을 고를지 정하는 쪽에 더 가깝습니다.
+          */}
+          {price ? (
+            <Row gap={Spacing.s2} style={styles.fact}>
+              <View style={styles.factLabel}>
+                <Caption tone="secondary">가격</Caption>
+              </View>
+              <View style={styles.factValue}>
+                <Body small>{price}</Body>
               </View>
             </Row>
           ) : null}
@@ -743,9 +763,6 @@ function Hours({ info, onIso }: { info: PlaceInfo; onIso?: string | null }) {
             ) : (
               <Body small>{info.onDay ?? '영업시간을 알 수 없어요'}</Body>
             )}
-            {/* 구간이 둘이면 사이가 브레이크 타임입니다. 점심에 갔다가 문이 닫혀
-                있는 일을 막습니다. */}
-            {info.spans.length > 1 ? <Badge label="브레이크 타임 있음" tone="warning" /> : null}
             {/* 요일 일곱 줄을 늘 펼쳐 두면 정작 볼 한 줄이 묻힙니다. */}
             {info.hours.length > 0 ? (
               <Press
@@ -757,6 +774,30 @@ function Hours({ info, onIso }: { info: PlaceInfo; onIso?: string | null }) {
               </Press>
             ) : null}
           </Row>
+          {/*
+            쉬는 시간과 주문 마감.
+
+            <p>전에는 구간이 둘이기만 하면 「브레이크 타임 있음」 배지를 세웠습니다.
+            몇 시부터인지는 요일 일곱 줄을 펼쳐 읽어야 했고, 아침에서 점심으로
+            넘어가는 15분 틈(로쿠린샤)도 브레이크 타임이 됐습니다. 이제 서버가
+            30분 넘는 틈만 골라 주므로 시각을 그대로 적습니다.
+
+            <p>라스트오더는 주방이 가게보다 먼저 닫는 날에만 옵니다 — 이치란은
+            22:45 까지 열지만 22:30 에 주문을 끝냅니다(plan-price-hours.md §10.1).
+            쉬는 날에는 둘 다 뜻이 없어 안 세웁니다.
+          */}
+          {!info.closedOnDay && ((info.breaks ?? []).length > 0 || info.lastOrder) ? (
+            <View style={styles.week}>
+              {(info.breaks ?? []).map((b) => (
+                <Caption key={b.start} tone="warning">
+                  {`브레이크타임 ${b.start}~${b.end}`}
+                </Caption>
+              ))}
+              {info.lastOrder ? (
+                <Caption tone="warning">{`라스트오더 ${info.lastOrder}`}</Caption>
+              ) : null}
+            </View>
+          ) : null}
           {all ? (
             <View style={styles.week}>
               {info.hours.map((line, i) => (
@@ -770,6 +811,33 @@ function Hours({ info, onIso }: { info: PlaceInfo; onIso?: string | null }) {
       </Row>
     </>
   );
+}
+
+/**
+ * 값대를 한 줄로 — 「1,000~2,000 JPY」, 「1,000 JPY 이하」, 「250,000 IDR 이상」.
+ *
+ * <p>금액 적는 법은 가계부와 같은 {@link money} 를 씁니다. 같은 엔이 판과
+ * 가계부에서 다른 모양으로 적히지 않게 합니다. 서버는 큰 단위(엔 · 루피아)로
+ * 보내므로 그 통화의 자릿수만큼 키워 넘깁니다. 모르는 통화(루피아)는 자릿수
+ * 0 입니다.
+ *
+ * <p>범위는 통화를 끝에 한 번만 붙입니다 — 「1,000 JPY~2,000 JPY」 는 같은 말을
+ * 두 번 합니다.
+ */
+function priceLabel(price: PriceRange | null | undefined) {
+  if (!price || (price.start == null && price.end == null)) {
+    return null;
+  }
+  const decimals = decimalsOf(price.currency);
+  const units = (v: number) => Math.round(v * 10 ** decimals);
+  if (price.start != null && price.end != null) {
+    const from = money(units(price.start), price.currency, decimals).replace(` ${price.currency}`, '');
+    return `${from}~${money(units(price.end), price.currency, decimals)}`;
+  }
+  if (price.end != null) {
+    return `${money(units(price.end), price.currency, decimals)} 이하`;
+  }
+  return `${money(units(price.start as number), price.currency, decimals)} 이상`;
 }
 
 /** 찾은 장소 하나. 검색 결과와 추천 카드가 같은 모양으로 넘겨줍니다. */

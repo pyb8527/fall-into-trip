@@ -4448,17 +4448,47 @@ function PlaceHours({ info, at }: { info: PlaceInfo; at?: string | null }) {
     info.spans.length > 0
       ? info.spans.map((s) => (s.end ? `${s.start}~${s.end}` : `${s.start}~`)).join(' · ')
       : (info.onDay ?? '').replace(/^[^:]+:\s*/, '');
-  const off = at ? outsideHours(at, info.spans) : false;
+  /*
+    적어 둔 시각이 어디에 걸리는지.
+
+    <p>쉬는 시간 안이면 「안 열어요」 대신 그 시각을 적습니다 — 몇 시에 다시
+    여는지를 알면 사람은 일정을 조금 미루면 됩니다. 쉬는 시간도 구간 밖이라
+    {@link outsideHours} 가 먼저 잡으므로, 쉬는 시간을 먼저 봅니다.
+
+    <p>주문 마감 뒤는 문이 열려 있어서 지금까지 아무 말이 없었습니다. 이치란은
+    22:45 까지 열고 22:30 에 주문을 끝냅니다 — 22:40 에 가면 자리는 있어도 라멘은
+    없습니다. 닫은 뒤는 이미 「안 열어요」 가 말하므로 여는 동안만 봅니다.
+    (plan-price-hours.md §1)
+  */
+  const breaks = info.breaks ?? [];
+  const resting = at ? breaks.find((b) => inSpan(at, b.start, b.end, false)) : undefined;
+  const off = !resting && at ? outsideHours(at, info.spans) : false;
+  const late = !resting && !off && at && info.lastOrder
+    ? afterLastOrder(at, info.lastOrder, info.spans)
+    : false;
+  const warn = !!resting || off;
 
   return (
     <Row gap={Spacing.s2}>
-      <Caption tone={off ? 'danger' : 'secondary'} strong={off}>
+      <Caption tone={warn ? 'danger' : 'secondary'} strong={warn}>
         {text}
-        {info.spans.length > 1 ? ' (브레이크 타임 있음)' : ''}
+        {/* 서버가 30분 넘는 틈만 쉬는 시간으로 줍니다. 구간이 둘이기만 하면
+            붙이던 때는 아침 · 점심 사이 15분도 「브레이크 타임」 이 됐습니다. */}
+        {breaks.length > 0 ? ' (브레이크 타임 있음)' : ''}
       </Caption>
+      {resting ? (
+        <Caption tone="danger" strong>
+          {`쉬는 시간이에요 (${resting.start}~${resting.end})`}
+        </Caption>
+      ) : null}
       {off ? (
         <Caption tone="danger" strong>
           적어 둔 시각에 안 열어요
+        </Caption>
+      ) : null}
+      {late ? (
+        <Caption tone="warning" strong>
+          {`주문 마감 뒤예요 (${info.lastOrder})`}
         </Caption>
       ) : null}
       {info.rating ? (
@@ -4492,6 +4522,46 @@ function outsideHours(at: string, spans: { start: string; end?: string | null }[
       ? at >= span.start && at <= span.end
       : at >= span.start || at <= span.end;
   });
+}
+
+/**
+ * 시각이 그 구간 안인지. 닫는 시각이 여는 시각보다 앞서면 자정을 넘긴 것으로
+ * 봅니다 — {@link outsideHours} 와 같은 기준입니다.
+ *
+ * @param closedEnd 닫는 시각 그 분도 안으로 칠지. 영업 구간은 칩니다(22:45 에
+ *                  닫는 가게에 22:45 를 적어도 「안 열어요」 는 지나칩니다).
+ *                  쉬는 시간은 안 칩니다 — 17:00 에 다시 여는 곳의 17:00 은
+ *                  쉬는 시간이 아닙니다.
+ */
+function inSpan(at: string, start: string, end: string | null | undefined, closedEnd: boolean) {
+  if (!/^\d{2}:\d{2}$/.test(at)) {
+    return false;
+  }
+  if (!end) {
+    return at >= start;
+  }
+  const beforeEnd = closedEnd ? at <= end : at < end;
+  return end > start ? at >= start && beforeEnd : at >= start || beforeEnd;
+}
+
+/**
+ * 주문 마감 뒤, 닫기 전인지.
+ *
+ * <p>마감 시각이 든 영업 구간을 찾아, 적어 둔 시각이 마감부터 그 구간이 닫을
+ * 때까지 사이인지 봅니다. 「마감보다 늦은가」 만 보면 자정을 넘기는 가게에서
+ * 틀립니다 — 01:00 에 닫고 00:30 에 마감하는 곳에 20:00 을 적으면 「00:30 보다
+ * 늦다」 가 되어 저녁 시간을 마감 뒤라고 말합니다.
+ */
+function afterLastOrder(
+  at: string,
+  lastOrder: string,
+  spans: { start: string; end?: string | null }[],
+) {
+  const span = spans.find((s) => inSpan(lastOrder, s.start, s.end, true));
+  if (!span?.end) {
+    return false;
+  }
+  return inSpan(at, lastOrder, span.end, false);
 }
 
 /**

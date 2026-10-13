@@ -192,7 +192,30 @@ public class PlaceInfoService {
             */
             "displayName",
             "location",
-            "formattedAddress");
+            "formattedAddress",
+            /*
+              값대.
+
+              <p>「얼마쯤 드는 곳인지」 를 보려고 사람이 구글 지도로 나가던 것을
+              판에 한 줄로 둡니다. 2026-10-13 에 우리 장소 15곳을 찍어 보니
+              식당 · 카페 13곳에 왔습니다(docs/2026-10/plan-price-hours.md §10.1).
+
+              <p>{@code priceLevel}(₩ · ₩₩ 등급)은 받지 않습니다 — 값대가 있으면
+              같은 말을 더 흐리게 할 뿐입니다.
+            */
+            "priceRange",
+            /*
+              주방 시간 — 라스트오더를 알려고 받습니다.
+
+              <p>보조 시간은 아침 · 해피아워 · 포장 · 배달 … 열몇 갈래로 오는데
+              그중 KITCHEN 하나만 씁니다. 그래도 갈래를 골라 달라고 할 수는 없어서
+              갈래 이름과 구간만 받고, 요일 설명 글은 받지 않습니다.
+
+              <p>둘 다 Enterprise 라 이 요청의 등급이 오르지 않습니다
+              (plan-price-hours.md §10.2).
+            */
+            "regularSecondaryOpeningHours.secondaryHoursType",
+            "regularSecondaryOpeningHours.periods");
 
     private final GoogleQuota quota;
     private final GoogleQuotaKey quotaKey;
@@ -319,6 +342,8 @@ public class PlaceInfoService {
 
         String text = null;
         List<Span> spans = List.of();
+        List<Span> breaks = List.of();
+        String lastOrder = null;
         boolean closed = false;
 
         if (target != null) {
@@ -332,6 +357,11 @@ public class PlaceInfoService {
             int googleDay = weekday == 7 ? 0 : weekday;
             spans = raw.spansByDay().getOrDefault(googleDay, List.of());
             closed = spans.isEmpty() && text != null && looksClosed(text);
+            /* 쉬는 시간과 주문 마감도 같은 요일로 고릅니다. 둘 다 Raw 에서
+               요일별로 미리 셈해 두었습니다 — Raw 는 날짜에 매이지 않아 캐시에
+               두고, 「그날」 을 고르는 것은 여기 한 자리입니다. */
+            breaks = raw.breaksByDay().getOrDefault(googleDay, List.of());
+            lastOrder = raw.lastOrderByDay().get(googleDay);
         }
 
         boolean gone = CLOSED_PERMANENTLY.equals(raw.status());
@@ -340,7 +370,8 @@ public class PlaceInfoService {
                 gone, raw.status(), raw.mapUrl(),
                 raw.photoName(), raw.photoBy(), raw.wheelchairEntrance(),
                 movedTo(gone, googleId, raw.movedPlaceId()),
-                raw.name(), raw.lat(), raw.lng(), raw.address());
+                raw.name(), raw.lat(), raw.lng(), raw.address(),
+                raw.price(), breaks, lastOrder);
     }
 
     /**
@@ -424,9 +455,11 @@ public class PlaceInfoService {
             hours.add(line.asText());
         }
 
+        Map<Integer, List<Span>> spans = spansOf(r.path("regularOpeningHours").path("periods"));
+
         return new Raw(
                 hours,
-                spansOf(r.path("regularOpeningHours").path("periods")),
+                spans,
                 r.hasNonNull("utcOffsetMinutes") ? r.path("utcOffsetMinutes").asInt() : null,
                 text(r, "nationalPhoneNumber"),
                 text(r, "websiteUri"),
@@ -441,7 +474,182 @@ public class PlaceInfoService {
                 text(r.path("displayName"), "text"),
                 coordOf(r, "latitude"),
                 coordOf(r, "longitude"),
-                text(r, "formattedAddress"));
+                text(r, "formattedAddress"),
+                priceOf(r.path("priceRange")),
+                breaksOf(spans),
+                lastOrdersOf(spans, kitchenOf(r)));
+    }
+
+    /** 이보다 짧은 틈은 쉬는 시간으로 안 봅니다. */
+    private static final int BREAK_MIN_MINUTES = 30;
+
+    /**
+     * 값대.
+     *
+     * <p>구글은 {@code startPrice} · {@code endPrice} 를 {@code Money} 로 줍니다 —
+     * 금액은 {@code units}(글자) 와 {@code nanos} 로 나뉘어 옵니다. 그 통화의
+     * <b>큰 단위</b>(엔 · 루피아 · 달러)로 합쳐 내보냅니다. 가계부처럼 가장 작은
+     * 단위로 바꾸지 않는 것은, 이 값이 셈에 들어가지 않고 읽히기만 하기
+     * 때문입니다. 자릿수는 화면이 {@code decimalsOf} 로 맞춥니다.
+     *
+     * <p><b>시작이 1 이하면 「까지」 로 읽습니다.</b> 마츠야 · 요시노야가
+     * {@code 1 ~ 1000} 엔으로 왔습니다 — 「1엔부터」 가 아니라 「1,000엔까지」
+     * 입니다. 시작을 비워서 내보내면 화면은 「이하」 로 적습니다. 끝만 없으면
+     * (Cretya IDR 250000) 「이상」 입니다(plan-price-hours.md §10.1).
+     *
+     * <p>통화를 모르면 금액을 읽을 수 없으니 통째로 버립니다.
+     */
+    private static Price priceOf(JsonNode range) {
+        if (range.isMissingNode() || range.isNull()) {
+            return null;
+        }
+        JsonNode from = range.path("startPrice");
+        JsonNode to = range.path("endPrice");
+        String currency = text(from, "currencyCode");
+        if (currency == null) {
+            currency = text(to, "currencyCode");
+        }
+        Double start = amountOf(from);
+        Double end = amountOf(to);
+        if (start != null && start <= 1) {
+            start = null;
+        }
+        if (currency == null || (start == null && end == null)) {
+            return null;
+        }
+        return new Price(currency, start, end);
+    }
+
+    private static Double amountOf(JsonNode money) {
+        if (!money.hasNonNull("units") && !money.hasNonNull("nanos")) {
+            return null;
+        }
+        try {
+            double units = money.hasNonNull("units") ? Double.parseDouble(money.path("units").asText()) : 0;
+            return units + money.path("nanos").asInt(0) / 1_000_000_000.0;
+        } catch (NumberFormatException e) {
+            /* 글자로 오는 칸이라 숫자가 아닐 수도 있습니다. 모르는 값으로 둡니다. */
+            return null;
+        }
+    }
+
+    /**
+     * 요일별 쉬는 시간.
+     *
+     * <p>구글은 쉬는 시간을 따로 주지 않습니다(BREAK 갈래는 15곳 중 한 번도
+     * 안 왔습니다). <b>같은 요일의 여는 구간 사이 틈</b>이 쉬는 시간입니다 —
+     * 수프 카레 카무이가 11:00–14:30, 17:00–20:30 으로 와서 14:30–17:00 이
+     * 비었습니다.
+     *
+     * <p>짧은 틈은 버립니다. 로쿠린샤는 7:30–9:45, 10:00–23:00 으로 왔습니다.
+     * 아침 메뉴에서 점심으로 넘어가는 15분이고, 그 사이에 가도 문 앞에서
+     * 기다리면 됩니다. 이것까지 「브레이크 타임」 이라고 하면 사람은 그 가게가
+     * 오후 내내 쉬는 줄 압니다. 30분을 넘어야 쉬는 시간으로 봅니다.
+     *
+     * <p>자정을 넘는 구간(17:00–02:00)은 그날의 마지막이라 그 뒤에 틈이 없습니다.
+     * 그리고 그날 <b>00:00 에 여는 구간</b>은 전날 밤에서 이어진 것이라 그 뒤의
+     * 틈(02:00–11:00)은 쉬는 시간이 아니라 밤에 닫은 것입니다. 둘 다 세지
+     * 않습니다.
+     */
+    static Map<Integer, List<Span>> breaksOf(Map<Integer, List<Span>> spansByDay) {
+        Map<Integer, List<Span>> out = new LinkedHashMap<>();
+        spansByDay.forEach((day, spans) -> {
+            List<Span> sorted = new ArrayList<>(spans);
+            sorted.sort((a, b) -> a.start().compareTo(b.start()));
+            List<Span> gaps = new ArrayList<>();
+            for (int i = 0; i + 1 < sorted.size(); i++) {
+                Span now = sorted.get(i);
+                Span next = sorted.get(i + 1);
+                if (now.end() == null || "00:00".equals(now.start())) {
+                    continue;
+                }
+                int end = minutes(now.end());
+                if (end <= minutes(now.start())) {
+                    /* 자정을 넘겨 닫습니다. 그 뒤로는 이 요일이 아닙니다. */
+                    continue;
+                }
+                if (minutes(next.start()) - end >= BREAK_MIN_MINUTES) {
+                    gaps.add(new Span(now.end(), next.start()));
+                }
+            }
+            if (!gaps.isEmpty()) {
+                out.put(day, List.copyOf(gaps));
+            }
+        });
+        return out;
+    }
+
+    /**
+     * 주방 시간. KITCHEN 갈래의 요일별 구간이고, 없으면 빈 것.
+     *
+     * <p>다른 갈래(아침 · 해피아워 · 포장 …)는 읽지 않습니다. 관문에서 넷 중
+     * 둘이 그쪽이었고, 타카하시야는 열두 갈래가 전부 본 영업시간과 같았습니다.
+     * 띄울 만한 말이 「언제까지 주문을 받나」 하나뿐입니다.
+     */
+    private static Map<Integer, List<Span>> kitchenOf(JsonNode r) {
+        for (JsonNode hours : r.path("regularSecondaryOpeningHours")) {
+            if ("KITCHEN".equals(hours.path("secondaryHoursType").asText())) {
+                return spansOf(hours.path("periods"));
+            }
+        }
+        return Map.of();
+    }
+
+    /**
+     * 요일별 라스트오더.
+     *
+     * <p>그 요일에 <b>주방이 가게보다 먼저 닫을 때만</b> 주방 마감을 적습니다.
+     * 이치란은 22:45 까지 열고 주방은 22:30 에 닫습니다 — 22:40 에 가면 자리는
+     * 있어도 라멘은 없습니다.
+     *
+     * <p>같이 닫으면 적지 않습니다. 「라스트오더 22:45」 는 「22:45 까지」 와 같은
+     * 말을 두 번 하는 것이고, 타카하시야처럼 보조 시간을 전부 본 시간으로 채워
+     * 보내는 곳이 있어서 그 소음이 그대로 화면에 섭니다. 주방이 늦게 닫는
+     * 것도 적지 않습니다 — 무슨 뜻인지 모릅니다.
+     *
+     * <p>닫는 시각을 견줄 때 자정을 넘긴 것(23:00–01:00)은 다음 날로 셉니다.
+     * 일정 줄의 {@code outsideHours} 가 「닫는 시각이 여는 시각보다 앞서면
+     * 자정을 넘긴 것」 으로 읽는 것과 같은 기준입니다. 닫는 시각이 없으면
+     * 그날 안 닫는 것입니다.
+     */
+    static Map<Integer, String> lastOrdersOf(Map<Integer, List<Span>> main,
+                                             Map<Integer, List<Span>> kitchen) {
+        Map<Integer, String> out = new LinkedHashMap<>();
+        kitchen.forEach((day, spans) -> {
+            Span shop = latestClose(main.getOrDefault(day, List.of()));
+            Span kit = latestClose(spans);
+            if (shop == null || kit == null || kit.end() == null) {
+                return;
+            }
+            if (closeMinutes(kit) < closeMinutes(shop)) {
+                out.put(day, kit.end());
+            }
+        });
+        return out;
+    }
+
+    /** 가장 늦게 닫는 구간. */
+    private static Span latestClose(List<Span> spans) {
+        Span last = null;
+        for (Span s : spans) {
+            if (last == null || closeMinutes(s) > closeMinutes(last)) {
+                last = s;
+            }
+        }
+        return last;
+    }
+
+    /** 그 요일 0시부터 닫을 때까지의 분. 자정을 넘기면 하루를 더합니다. */
+    private static int closeMinutes(Span span) {
+        if (span.end() == null) {
+            return Integer.MAX_VALUE;
+        }
+        int end = minutes(span.end());
+        return end <= minutes(span.start()) ? end + 24 * 60 : end;
+    }
+
+    private static int minutes(String clock) {
+        return Integer.parseInt(clock.substring(0, 2)) * 60 + Integer.parseInt(clock.substring(3, 5));
     }
 
     private static Double coordOf(JsonNode r, String axis) {
@@ -652,7 +860,22 @@ public class PlaceInfoService {
                        /** 구글이 부르는 이름. 옮긴 자리 판의 제목이 됩니다. */
                        String name,
                        Double lat, Double lng,
-                       String address) {
+                       String address,
+                       /** 값대. 구글이 안 주면 null — {@link #priceOf} 를 보세요. */
+                       Price price,
+                       /** 그날 30분 넘게 닫는 틈들. 없으면 빈 목록. */
+                       List<Span> breaks,
+                       /** 그날 주방이 가게보다 먼저 닫으면 그 시각. 아니면 null. */
+                       String lastOrder) {
+    }
+
+    /**
+     * 값대. 금액은 그 통화의 큰 단위입니다.
+     *
+     * @param start 「부터」. 비어 있으면 「end 까지」 입니다
+     * @param end   「까지」. 비어 있으면 「start 부터」 입니다
+     */
+    public record Price(String currency, Double start, Double end) {
     }
 
     /** 구글에서 받은 주간 원본. 날짜에 매이지 않아 캐시에 둘 수 있습니다. */
@@ -663,7 +886,12 @@ public class PlaceInfoService {
                String photoName, String photoBy,
                Boolean wheelchairEntrance,
                String movedPlaceId,
-               String name, Double lat, Double lng, String address) {
+               String name, Double lat, Double lng, String address,
+               Price price,
+               /** 요일별(일요일 0) 쉬는 시간. 쉬는 시간이 없는 요일은 빠집니다. */
+               Map<Integer, List<Span>> breaksByDay,
+               /** 요일별(일요일 0) 라스트오더. 적을 것이 없는 요일은 빠집니다. */
+               Map<Integer, String> lastOrderByDay) {
     }
 
     private record Cached(Raw raw, Instant until) {

@@ -664,6 +664,26 @@ export type PlaceInfo = {
   lat?: Maybe<number>;
   lng?: Maybe<number>;
   address?: Maybe<string>;
+  /**
+   * 값대. 구글이 안 주면 null.
+   *
+   * <p>금액은 그 통화의 <b>큰 단위</b>(엔 · 루피아)입니다 — 가계부처럼 가장 작은
+   * 단위가 아닙니다. 셈에 안 들어가고 읽히기만 합니다. {@code start} 가 비면
+   * 「end 이하」, {@code end} 가 비면 「start 이상」 입니다(서버가 「1 ~ 1000」
+   * 을 「1000 이하」 로 고쳐 보냅니다 — docs/2026-10/plan-price-hours.md §6).
+   */
+  price?: Maybe<PriceRange>;
+  /** 그날 30분 넘게 닫는 틈들. 15분 같은 짧은 틈은 서버가 뺍니다. */
+  breaks?: OpenSpan[];
+  /** 그날 주방이 가게보다 먼저 닫으면 그 시각. 같이 닫거나 모르면 null. */
+  lastOrder?: Maybe<string>;
+};
+
+/** 구글이 주는 값대. 금액은 그 통화의 큰 단위입니다. */
+export type PriceRange = {
+  currency: string;
+  start: Maybe<number>;
+  end: Maybe<number>;
 };
 
 /* -------------------------------------------------------------- 게시판 */
