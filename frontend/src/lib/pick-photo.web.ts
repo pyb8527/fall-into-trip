@@ -66,10 +66,24 @@ const QUALITY = 0.85;
  * <p>다섯 장 중 넷이 올라가고 하나가 깨졌을 때 통째로 버리면, 이미 올라간
  * 넷도 다시 골라야 합니다. 올라간 것은 돌려주고 못 올린 것만 말합니다.
  *
+ * <h3>고르자마자 자리가 섭니다</h3>
+ *
+ * <p>전에는 다 올라갈 때까지 판에 아무것도 안 떴습니다. 로밍에서 다섯 장이면
+ * 수십 초인데, 그동안 고른 사람이 보는 것은 바쁜 단추 하나뿐이라 고르기가
+ * 안 된 줄 알고 다시 고릅니다. {@code onProgress} 를 주면 고른 장마다 자리를
+ * 바로 알려 주고, 줄여지면 작은 미리보기를, 올라가면 번호를 얹어 줍니다.
+ *
+ * <p>미리보기 주소({@code URL.createObjectURL})는 <b>받는 쪽이 거둡니다</b>
+ * ({@code URL.revokeObjectURL}). 여기서는 화면이 언제 그 그림을 그만 쓰는지
+ * 모릅니다 — 진짜 사진으로 갈아 끼울 때인지, 사람이 뺄 때인지, 판을 닫을
+ * 때인지는 화면만 압니다.
+ * {@code onProgress} 를 안 주면 미리보기를 아예 안 만듭니다.
+ *
  * @param room 넣을 수 있는 자리 수. 이보다 많이 골라도 여기까지만 올립니다
+ * @param options 고른 장마다 어디까지 왔는지를 받을 자리
  * @return 올라간 사진의 번호들. 고르다 말면 빈 배열
  */
-export async function pickAndUpload(room = 1): Promise<Pick> {
+export async function pickAndUpload(room = 1, options: PickOptions = {}): Promise<Pick> {
   const files = await pick(room > 1);
   if (files.length === 0) {
     return { ids: [], skipped: 0, failed: 0 };
@@ -78,28 +92,88 @@ export async function pickAndUpload(room = 1): Promise<Pick> {
   const taking = files.slice(0, Math.max(1, room));
   const ids: string[] = [];
   let failed = 0;
-  /* 한 장씩 차례로 올립니다. 한꺼번에 밀어 넣으면 로밍이 느린 데서
-     서로의 대역을 나눠 먹어 다 같이 느려집니다 — 길 위에서 도장을
-     찍는 자리가 바로 그런 데입니다. */
   /* 못 푼 것이 아이폰 사진이었는지. 그때만 무엇을 하면 되는지 말합니다 —
      여느 실패에 이 말을 붙이면 엉뚱한 데를 고치게 합니다. */
   let heicFailed = false;
 
-  for (const file of taking) {
+  /* 고른 장마다 자리. 고치고 나면 통째로 새로 알려 줍니다 — 받는 쪽이
+     React 상태에 그대로 넣어도 바뀐 것이 보이게. */
+  const stamp = Date.now().toString(36);
+  let items: Pending[] = taking.map((_, i) => ({
+    key: `${stamp}-${i}`,
+    previewUrl: null,
+    state: 'preparing',
+  }));
+  const tell = (i: number, change: Partial<Pending>) => {
+    if (!options.onProgress) {
+      return;
+    }
+    items = items.map((it, at) => (at === i ? { ...it, ...change } : it));
+    options.onProgress(items);
+  };
+  options.onProgress?.(items);
+
+  /*
+    줄이기(CPU)와 올리기(망)를 겹칩니다.
+
+    <p>올리는 것은 여전히 <b>한 장씩</b>입니다. 한꺼번에 밀어 넣으면 로밍이
+    느린 데서 서로의 대역을 나눠 먹어 다 같이 느려집니다 — 길 위에서 도장을
+    찍는 자리가 바로 그런 데입니다. 그러니 망은 늘 한 줄입니다.
+
+    <p>다만 전에는 <b>한 장을 줄이는 동안 망이 놀았고, 올리는 동안 CPU 가
+    놀았습니다.</b> 둘은 서로 안 다투는 자원입니다. 그래서 N 번째가 올라가는
+    동안 N+1 번째를 미리 줄여 둡니다. 다음 장이 올라갈 차례가 오면 이미 줄여져
+    있어서, 열 장이면 줄이는 시간 아홉 번이 통째로 빠집니다.
+
+    <p>미리 줄이는 것은 <b>한 장만</b>입니다. 더 앞서 가도 망이 한 줄이라
+    빨라지지 않고, 그 사이 폰은 큰 그림을 연달아 풀며 메모리와 열을 씁니다 —
+    오래된 안드로이드 웹뷰는 그러다 판째로 죽습니다.
+  */
+  const prepare = (i: number): Promise<Prepared> =>
+    (async () => {
+      const file = taking[i];
+      const heic = await looksHeic(file);
+      try {
+        /* 아이폰·갤럭시가 찍은 것은 브라우저가 못 그릴 수 있습니다. 그때만
+           푸는 코드를 받아 옵니다. */
+        const usable = heic ? await unHeic(file) : file;
+        const made = await shrink(usable, options.onProgress != null);
+        /* 줄여지는 대로 바로 보여 줍니다 — 앞 장이 올라가기를 기다리지
+           않습니다. */
+        if (made.thumb) {
+          tell(i, { previewUrl: URL.createObjectURL(made.thumb) });
+        }
+        return { ok: true as const, heic, small: made.small };
+      } catch {
+        return { ok: false as const, heic };
+      }
+    })();
+
+  let next = prepare(0);
+  for (let i = 0; i < taking.length; i++) {
+    const ready = await next;
+    /* 이 장이 올라가는 동안 다음 장을 줄입니다. */
+    if (i + 1 < taking.length) {
+      next = prepare(i + 1);
+    }
+
+    if (!ready.ok) {
+      failed += 1;
+      heicFailed ||= ready.heic;
+      tell(i, { state: 'failed' });
+      continue;
+    }
+    tell(i, { state: 'uploading' });
     try {
-      /* 아이폰·갤럭시가 찍은 것은 브라우저가 못 그릴 수 있습니다. 그때만
-         푸는 코드를 받아 옵니다. */
-      const usable = (await looksHeic(file)) ? await unHeic(file) : file;
-      const small = await shrink(usable);
       const form = new FormData();
-      form.append('file', small, 'photo.jpg');
+      form.append('file', ready.small, 'photo.jpg');
       const got = await api.upload<{ id: string }>('/api/photos', form);
       ids.push(got.id);
+      tell(i, { state: 'done', id: got.id });
     } catch {
       failed += 1;
-      if (!heicFailed && (await looksHeic(file))) {
-        heicFailed = true;
-      }
+      heicFailed ||= ready.heic;
+      tell(i, { state: 'failed' });
     }
   }
 
@@ -162,6 +236,28 @@ export type Pick = {
   failed: number;
 };
 
+/** 고른 한 장이 어디까지 왔는지. */
+export type Pending = {
+  /** 한 번 고를 때 안에서, 그리고 여러 번 고르는 사이에도 겹치지 않는 이름. */
+  key: string;
+  /**
+   * 작은 미리보기. 줄여지기 전에는 null 입니다. 다 쓰면 받는 쪽이
+   * {@code URL.revokeObjectURL} 로 거둡니다.
+   */
+  previewUrl: string | null;
+  state: 'preparing' | 'uploading' | 'done' | 'failed';
+  /** 올라간 사진 번호. {@code done} 일 때만 있습니다. */
+  id?: string;
+};
+
+export type PickOptions = {
+  /** 고른 장 전부의 지금 모습. 무엇이 바뀌든 통째로 다시 옵니다. */
+  onProgress?: (items: Pending[]) => void;
+};
+
+/** 한 장을 올릴 채비가 끝난 것. 깨졌으면 아이폰 사진이었는지만 남깁니다. */
+type Prepared = { ok: true; heic: boolean; small: Blob } | { ok: false; heic: boolean };
+
 /**
  * 파일 고르기.
  *
@@ -206,13 +302,68 @@ function pick(many: boolean): Promise<File[]> {
   });
 }
 
-/** 긴 쪽을 맞춰 다시 그립니다. 그러면서 JPEG 이 됩니다. */
-async function shrink(file: File): Promise<Blob> {
+/**
+ * 미리보기의 긴 쪽.
+ *
+ * <p>판의 네모가 88픽셀이고 세 배 화면이면 264 입니다. 1600짜리를 그대로
+ * 미리보기로 걸면 네모 열 개가 큰 그림 열 장을 풀어 들고 있게 됩니다 — 이미
+ * 풀어 둔 그림에서 한 번 더 작게 그리는 값은 거의 없습니다.
+ */
+const THUMB_SIDE = 264;
+
+/**
+ * 긴 쪽을 맞춰 다시 그립니다. 그러면서 JPEG 이 됩니다.
+ *
+ * <h3>{@code createImageBitmap} 을 안 씁니다 — 재 보니 더 느렸습니다</h3>
+ *
+ * <p>「풀어서 넘겨 달라」는 말이라 옆 줄에서 풀고 화면 줄을 덜 붙잡을 것 같아
+ * 보입니다. 크롬(안드로이드 웹뷰가 같은 엔진입니다)에서 4032×3024 넉 장을
+ * 1600 으로 줄여 구워 보니 반대였습니다.
+ *
+ * <ul>
+ *   <li>{@code <img>} → {@code <canvas>}: 약 0.2~0.4초, 화면 줄을 가장 오래 붙잡은
+ *       때 40~80ms</li>
+ *   <li>{@code createImageBitmap} → {@code OffscreenCanvas}: 약 0.4~0.7초,
+ *       60~100ms</li>
+ *   <li>{@code resizeWidth·resizeHeight} 를 준 것: 0.35~0.95초, 50~160ms</li>
+ * </ul>
+ *
+ * <p>CPU 를 네 배 느리게 묶어도(오래된 폰 흉내) 차례가 같았습니다. 까닭은
+ * JPEG 을 푸는 방식에 있습니다. {@code <img>} 를 작게 그리면 브라우저가 JPEG 을
+ * <b>처음부터 1/2·1/4 크기로 풉니다</b> — 다 풀고 줄이는 것이 아니라 덜 풉니다.
+ * {@code createImageBitmap} 은 크기를 줘도 일단 다 푼 다음 줄입니다. 큰 사진일수록
+ * 벌어집니다. 그래서 「더 빠르게」는 푸는 길을 바꾸는 대신 줄이기와 올리기를
+ * 겹치는 것({@link pickAndUpload})으로 얻습니다.
+ *
+ * <p>돌아간 사진도 이 길이 맞게 세웁니다. 폰 사진은 대개 누운 채로 저장되고
+ * 「세워서 보라」는 딱지(EXIF)가 붙어 있는데, 요즘 브라우저는 {@code <img>} 를
+ * 그 딱지대로 세워서 캔버스에 그립니다. 다시 구우면 딱지는 떨어집니다 — 서버도
+ * 한 번 더 지웁니다.
+ *
+ * @param thumb 미리보기도 만들지. 이미 풀어 둔 그림에서 한 번 더 작게 그리는
+ *        것이라 큰 그림을 다시 풀지 않습니다
+ */
+async function shrink(file: File, thumb: boolean): Promise<{ small: Blob; thumb: Blob | null }> {
   const image = await draw(file);
-  let { width, height } = image;
+  const small = await encode(image, MAX_SIDE, QUALITY);
+  if (!small) {
+    /* 그릴 데가 없으면 원본 그대로 보냅니다. 서버가 어차피 다시 굽습니다. */
+    return { small: file, thumb: null };
+  }
+  return { small, thumb: thumb ? await encode(image, THUMB_SIDE, 0.7) : null };
+}
+
+/**
+ * 긴 쪽이 {@code side} 를 넘지 않게 그려 JPEG 으로 굽습니다.
+ *
+ * @return 구운 것. 그릴 데가 없으면 null
+ */
+async function encode(image: HTMLImageElement, side: number, quality: number): Promise<Blob | null> {
+  let width = image.naturalWidth;
+  let height = image.naturalHeight;
   const longest = Math.max(width, height);
-  if (longest > MAX_SIDE) {
-    const by = MAX_SIDE / longest;
+  if (longest > side) {
+    const by = side / longest;
     width = Math.max(1, Math.round(width * by));
     height = Math.max(1, Math.round(height * by));
   }
@@ -222,18 +373,16 @@ async function shrink(file: File): Promise<Blob> {
   canvas.height = height;
   const g = canvas.getContext('2d');
   if (!g) {
-    /* 그릴 데가 없으면 원본 그대로 보냅니다. 서버가 어차피 다시 굽습니다. */
-    return file;
+    return null;
   }
   /* 투명한 PNG 를 JPEG 으로 구우면 투명한 자리가 검게 나옵니다. */
   g.fillStyle = '#FFFFFF';
   g.fillRect(0, 0, width, height);
+  /* 4000 에서 1600 으로 한 번에 줄이면 기본 품질에서는 잔물결이 섭니다. */
+  g.imageSmoothingQuality = 'high';
   g.drawImage(image, 0, 0, width, height);
 
-  const blob = await new Promise<Blob | null>((done) =>
-    canvas.toBlob(done, 'image/jpeg', QUALITY),
-  );
-  return blob ?? file;
+  return new Promise<Blob | null>((done) => canvas.toBlob(done, 'image/jpeg', quality));
 }
 
 function draw(file: File): Promise<HTMLImageElement> {

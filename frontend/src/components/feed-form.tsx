@@ -1,19 +1,31 @@
-import { useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Image } from 'expo-image';
+import { useEffect, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Animated,
+  PanResponder,
+  Pressable,
+  StyleSheet,
+  View,
+  type ViewStyle,
+} from 'react-native';
 
 import { api, ApiError, UNEXPECTED } from '@/api/client';
 import type { FeedAudience, FeedPost, TripDetail, TripSummary } from '@/api/types';
 import { useAsync } from '@/api/use-async';
 import { OurPhoto } from '@/components/our-photo';
-import { Spacing } from '@/constants/theme';
-import { PickError, pickAndUpload } from '@/lib/pick-photo';
+import { Colors, Radius, Spacing } from '@/constants/theme';
+import { feelGrab } from '@/lib/feel';
+import { type Pending, PickError, pickAndUpload } from '@/lib/pick-photo';
 import {
+  Badge,
   BottomSheet,
   Button,
   Caption,
   Chip,
   ErrorNote,
   Field,
+  Icon,
   IconButton,
   Row,
 } from '@/ui';
@@ -176,6 +188,100 @@ export function FeedForm({
   const [notice, setNotice] = useState<string | null>(null);
 
   /*
+    고른 뒤 아직 번호를 못 받은 사진.
+
+    <p>전에는 다 올라갈 때까지 판에 아무것도 안 섰습니다. 로밍에서 다섯 장이면
+    수십 초인데 그동안 보이는 것이 바쁜 단추 하나라, 고르기가 안 된 줄 알고
+    다시 고릅니다. 이제 고르자마자 자리가 서고, 줄여지면 미리보기가, 올라가면
+    진짜 사진이 그 자리를 넘겨받습니다.
+
+    <p>깨진 것은 남겨 둡니다 — 표시 없이 사라지면 몇 장이 빠졌는지를 세어 봐야
+    압니다. 빼기를 누르면 그때 갑니다.
+  */
+  const [pending, setPending] = useState<Pending[]>([]);
+  /* 판을 다시 열 때마다 하나씩 올라갑니다. 앞에서 올리던 것의 소식이 늦게
+     오면 이것으로 가려 버립니다 — 안 그러면 새로 쓰는 글에 앞 글의 사진이 끼어듭니다. */
+  const round = useRef(0);
+  /* 아직 거두지 않은 미리보기 주소. 판이 사라질 때 한꺼번에 거둡니다. */
+  const live = useRef(new Set<string>());
+  /* 빼기를 누른 깨진 자리. 소식이 다시 와도 되살리지 않습니다. */
+  const dismissed = useRef(new Set<string>());
+  const sending = pending.some((p) => p.state === 'preparing' || p.state === 'uploading');
+
+  /** 미리보기 주소를 거둡니다. 두 번 거둬도 탈이 없습니다. */
+  function letGo(url: string | null) {
+    if (url) {
+      URL.revokeObjectURL(url);
+      live.current.delete(url);
+    }
+  }
+
+  useEffect(() => {
+    const urls = live.current;
+    return () => {
+      urls.forEach((u) => URL.revokeObjectURL(u));
+      urls.clear();
+    };
+  }, []);
+
+  /*
+    끌어서 순서 옮기기.
+
+    <p>첫 장이 대표 사진입니다. 그런데 고르는 창이 주는 순서는 보관함의 순서라,
+    대표로 세우고 싶은 한 장이 가운데 끼어 있으면 전에는 빼고 다시 골라야
+    했습니다.
+
+    <p>손잡이에만 손짓을 겁니다 — 일정의 장소 줄({@code trip/[id]} 의
+    DragHandle)과 같은 까닭입니다. 사진 전체를 잡게 하면 판을 굴리려는 것과
+    다투어, 굴리려다 사진이 옮겨집니다. 손잡이 옆의 ◀ ▶ 는 한 칸씩 옮깁니다 —
+    끌기가 어려운 손, 키보드, 화면을 읽어 주는 기기를 위한 길입니다.
+
+    <p>올라간 사진만 옮깁니다. 아직 올라가는 것은 번호가 없어 보낼 순서에
+    넣을 수가 없고, 늘 뒤에 붙습니다.
+  */
+  const centers = useRef<{ x: number; y: number }[]>([]);
+  const [dragFrom, setDragFrom] = useState<number | null>(null);
+  const [dragTo, setDragTo] = useState<number | null>(null);
+  const dragTo$ = useRef<number | null>(null);
+  const [drag] = useState(() => new Animated.ValueXY());
+
+  /** 끌고 있는 사진의 한가운데가 지금 어느 사진의 한가운데에 가장 가까운지. */
+  function landingOf(start: number, dx: number, dy: number) {
+    const from = centers.current[start];
+    if (!from) {
+      return start;
+    }
+    const cx = from.x + dx;
+    const cy = from.y + dy;
+    let best = start;
+    let near = Infinity;
+    for (let i = 0; i < photoIds.length; i++) {
+      const at = centers.current[i];
+      if (!at) {
+        continue;
+      }
+      const gap = Math.hypot(at.x - cx, at.y - cy);
+      if (gap < near) {
+        near = gap;
+        best = i;
+      }
+    }
+    return best;
+  }
+
+  function movePhoto(start: number, end: number) {
+    if (start === end) {
+      return;
+    }
+    setPhotoIds((was) => {
+      const next = [...was];
+      const [moved] = next.splice(start, 1);
+      next.splice(Math.max(0, Math.min(end, next.length)), 0, moved);
+      return next;
+    });
+  }
+
+  /*
     고를 수 있는 여행.
 
     <p>모임에 올리는 글이면 <b>그 모임의 여행만</b> 나옵니다. 안 그러면 모임
@@ -243,6 +349,12 @@ export function FeedForm({
     setError(null);
     setNotice(null);
     setBusy(false);
+    /* 앞에서 올리던 것은 이 판과 끊습니다. 미리보기도 거둡니다. */
+    round.current += 1;
+    live.current.forEach((u) => URL.revokeObjectURL(u));
+    live.current.clear();
+    dismissed.current.clear();
+    setPending([]);
     /*
       {@code at} 을 통째로 보지 않고 <b>안의 글자 둘</b>을 봅니다. 부르는 쪽이
       {@code at={{ tripId, placeId }}} 로 그 자리에서 짓는 꼴이면 생김새는
@@ -261,11 +373,45 @@ export function FeedForm({
     setPicking(true);
     setError(null);
     setNotice(null);
-    try {
-      const got = await pickAndUpload(room);
-      if (got.ids.length > 0) {
-        setPhotoIds([...photoIds, ...got.ids]);
+    const mine = round.current;
+    /* 이번에 고른 것 중 판에 이미 넣은 번호. 넣은 뒤 사람이 빼도, 소식이
+       다시 오면서 되살아나지 않게 합니다. */
+    const placed = new Set<string>();
+    const place = (ids: string[]) => {
+      const fresh = ids.filter((id) => !placed.has(id));
+      if (fresh.length === 0) {
+        return;
       }
+      fresh.forEach((id) => placed.add(id));
+      setPhotoIds((was) => [...was, ...fresh.filter((id) => !was.includes(id))]);
+    };
+    const onProgress = (items: Pending[]) => {
+      if (mine !== round.current) {
+        /* 이미 닫고 다시 연 판입니다. 미리보기만 거둡니다. */
+        items.forEach((it) => letGo(it.previewUrl));
+        return;
+      }
+      for (const it of items) {
+        if (it.state === 'done' || dismissed.current.has(it.key)) {
+          /* 진짜 사진이 자리를 넘겨받았거나 사람이 뺐습니다. */
+          letGo(it.previewUrl);
+        } else if (it.previewUrl) {
+          live.current.add(it.previewUrl);
+        }
+      }
+      place(items.flatMap((it) => (it.state === 'done' && it.id ? [it.id] : [])));
+      const keys = new Set(items.map((it) => it.key));
+      setPending((was) => [
+        ...was.filter((p) => !keys.has(p.key)),
+        ...items.filter((it) => it.state !== 'done' && !dismissed.current.has(it.key)),
+      ]);
+    };
+    try {
+      const got = await pickAndUpload(room, { onProgress });
+      if (mine !== round.current) {
+        return;
+      }
+      place(got.ids);
       /* 몇 장이 왜 안 들어갔는지 말해 줍니다 — 아홉 장을 골랐는데 일곱만
          뜨면, 말해 주지 않는 한 고른 사람은 모릅니다. */
       const said: string[] = [];
@@ -301,7 +447,9 @@ export function FeedForm({
   }
 
   async function submit() {
-    if (busy) {
+    /* 올라가는 중인 사진은 번호가 없어서 글에 못 붙습니다. 그대로 보내면
+       고른 사진이 빠진 채 글이 서고, 사람은 올린 뒤에야 압니다. */
+    if (busy || sending) {
       return;
     }
     if (!text.trim() && photoIds.length === 0) {
@@ -370,11 +518,42 @@ export function FeedForm({
       visible={visible}
       title={where}
       onClose={onClose}
-      footer={<Button label={editing ? '저장' : '올리기'} onPress={submit} busy={busy} />}>
+      footer={
+        <View style={styles.foot}>
+          {sending ? (
+            <Caption tone="muted">사진을 올리는 중이에요. 다 올라가면 올릴 수 있어요.</Caption>
+          ) : null}
+          <Button
+            label={editing ? '저장' : '올리기'}
+            onPress={submit}
+            busy={busy}
+            disabled={sending}
+          />
+        </View>
+      }>
       <Row gap={Spacing.s2} style={styles.wrap}>
-        {photoIds.map((id) => (
-          <View key={id} style={styles.shot}>
+        {photoIds.map((id, i) => (
+          <Animated.View
+            key={id}
+            onLayout={(e) => {
+              const { x, y, width, height } = e.nativeEvent.layout;
+              centers.current[i] = { x: x + width / 2, y: y + height / 2 };
+            }}
+            style={[
+              styles.cell,
+              dragFrom === i
+                ? { transform: drag.getTranslateTransform(), zIndex: 2, opacity: 0.85 }
+                : null,
+            ]}>
+          <View style={[styles.shot, dragTo === i && dragFrom !== i ? styles.landing : null]}>
             <OurPhoto id={id} width={THUMB} height={THUMB} />
+            {/* 첫 장이 글의 얼굴입니다. 순서를 바꾸는 까닭이 대개 이것이라,
+                지금 누가 그 자리에 있는지 보여 줍니다. */}
+            {i === 0 ? (
+              <View style={styles.cover}>
+                <Badge label="대표" tone="accent" solid />
+              </View>
+            ) : null}
             <View style={styles.pull}>
               {/* 사진 위에 얹히는 단추라 바탕 없이 둡니다 — 회색 네모를 두르면
                   그 네모가 사진의 일부처럼 보입니다.
@@ -390,6 +569,94 @@ export function FeedForm({
                 onPress={() => setPhotoIds(photoIds.filter((x) => x !== id))}
               />
             </View>
+          </View>
+          {photoIds.length > 1 ? (
+            <View style={styles.order}>
+              <Nudge
+                name="chevron-left"
+                label="앞으로 옮기기"
+                disabled={i === 0}
+                onPress={() => movePhoto(i, i - 1)}
+              />
+              <PhotoGrip
+                index={i}
+                dragging={dragFrom === i}
+                onStart={(at) => {
+                  setDragFrom(at);
+                  setDragTo(at);
+                  dragTo$.current = at;
+                  drag.setValue({ x: 0, y: 0 });
+                }}
+                onMove={(at, dx, dy) => {
+                  drag.setValue({ x: dx, y: dy });
+                  const next = landingOf(at, dx, dy);
+                  if (next !== dragTo$.current) {
+                    dragTo$.current = next;
+                    setDragTo(next);
+                  }
+                }}
+                onEnd={(at) => {
+                  const end = dragTo$.current ?? at;
+                  setDragFrom(null);
+                  setDragTo(null);
+                  dragTo$.current = null;
+                  drag.setValue({ x: 0, y: 0 });
+                  movePhoto(at, end);
+                }}
+              />
+              <Nudge
+                name="chevron-right"
+                label="뒤로 옮기기"
+                disabled={i === photoIds.length - 1}
+                onPress={() => movePhoto(i, i + 1)}
+              />
+            </View>
+          ) : null}
+          </Animated.View>
+        ))}
+        {pending.map((p) => (
+          <View key={p.key} style={styles.shot}>
+            {p.previewUrl ? (
+              <Image
+                source={{ uri: p.previewUrl }}
+                style={styles.preview}
+                contentFit="cover"
+                accessibilityLabel="올리는 중인 사진"
+              />
+            ) : (
+              <View style={styles.preview} />
+            )}
+            {/* 덮개는 옅게 둡니다 — 무엇을 골랐는지가 보여야 하고, 진행은
+                가운데 바퀴 하나로 충분합니다. */}
+            {p.state === 'failed' ? (
+              <>
+                <View style={[styles.veil, styles.veilFailed]}>
+                  <Icon name="alert" size={20} color={Colors.danger} />
+                  <Caption tone="danger">못 올렸어요</Caption>
+                </View>
+                <View style={styles.pull}>
+                  <IconButton
+                    name="x"
+                    label="이 사진 빼기"
+                    tone="danger"
+                    bare
+                    onPress={() => {
+                      dismissed.current.add(p.key);
+                      letGo(p.previewUrl);
+                      setPending((was) => was.filter((x) => x.key !== p.key));
+                    }}
+                  />
+                </View>
+              </>
+            ) : (
+              <View style={styles.veil}>
+                <ActivityIndicator
+                  size="small"
+                  color={Colors.onAccent}
+                  accessibilityLabel={p.state === 'uploading' ? '올리는 중' : '줄이는 중'}
+                />
+              </View>
+            )}
           </View>
         ))}
       </Row>
@@ -585,6 +852,15 @@ function hintOf(audience: FeedAudience, groupId?: string | null) {
   return groupId && found.inGroupHint ? found.inGroupHint : found.hint;
 }
 
+/**
+ * 손잡이 위에서는 브라우저가 화면을 굴리지 않게.
+ *
+ * <p>{@code trip/[id]} 의 손잡이와 같습니다. 안 막으면 손가락으로 끄는 순간
+ * 판이 같이 굴러가고, 굴러가기 시작하면 브라우저가 손짓을 거둬 가 사진이
+ * 허공에서 멈춥니다. RN 의 꼴 이름에 없는 것이라 이렇게 넘깁니다.
+ */
+const NO_SCROLL_HERE = { touchAction: 'none', cursor: 'grab' } as unknown as ViewStyle;
+
 const styles = StyleSheet.create({
   wrap: {
     flexWrap: 'wrap',
@@ -593,6 +869,74 @@ const styles = StyleSheet.create({
     position: 'relative',
     width: THUMB,
     height: THUMB,
+  },
+  /* 한 칸 = 사진 + 그 아래 옮기는 단추들. */
+  cell: {
+    width: THUMB,
+    gap: Spacing.s1,
+  },
+  /* 끌어서 놓을 자리. 테두리를 안쪽으로 두르면 사진이 그만큼 가려집니다 —
+     바깥으로 도드라지게 둡니다. */
+  landing: {
+    borderRadius: Radius.r3,
+    outlineWidth: 2,
+    outlineStyle: 'solid',
+    outlineColor: Colors.accent,
+  } as ViewStyle,
+  cover: {
+    position: 'absolute',
+    top: Spacing.s1,
+    left: Spacing.s1,
+  },
+  order: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  preview: {
+    width: THUMB,
+    height: THUMB,
+    borderRadius: Radius.r3,
+    backgroundColor: Colors.fill,
+  },
+  veil: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    borderRadius: Radius.r3,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.s1,
+    backgroundColor: 'rgba(0, 0, 0, 0.28)',
+  },
+  veilFailed: {
+    backgroundColor: 'rgba(255, 255, 255, 0.82)',
+  },
+  foot: {
+    gap: Spacing.s2,
+  },
+  nudge: {
+    width: 28,
+    height: 28,
+    borderRadius: Radius.r2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  nudgeOff: {
+    opacity: 0.3,
+  },
+  grip: {
+    width: 28,
+    height: 28,
+    borderRadius: Radius.r2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...NO_SCROLL_HERE,
+  },
+  gripOn: {
+    backgroundColor: Colors.accentSoft,
   },
   /* 빼는 단추는 사진 위 오른쪽. 사진마다 줄을 따로 두면 아홉 장에 아홉
      줄이 생깁니다. */
@@ -606,3 +950,87 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
 });
+
+
+/** 한 칸 옮기는 작은 단추. 끌기가 어려운 손과 키보드를 위한 길입니다. */
+function Nudge({
+  name,
+  label,
+  disabled,
+  onPress,
+}: {
+  name: 'chevron-left' | 'chevron-right';
+  label: string;
+  disabled: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled }}
+      hitSlop={4}
+      style={[styles.nudge, disabled ? styles.nudgeOff : null]}>
+      <Icon name={name} size={16} tone="muted" />
+    </Pressable>
+  );
+}
+
+/**
+ * 끌어서 옮기는 손잡이.
+ *
+ * <p>{@code trip/[id]} 의 DragHandle 을 본떴습니다 — 거기는 세로 한 줄이라
+ * 위아래만 보고, 여기는 사진이 줄을 바꿔 감기므로 가로세로를 다 봅니다.
+ * 닿자마자 붙잡고 놓아 달라는 요청도 거절하는 것까지 같습니다. 판을 감싼
+ * 스크롤이 먼저 가져가면 끌리지 않습니다.
+ */
+function PhotoGrip({
+  index,
+  dragging,
+  onStart,
+  onMove,
+  onEnd,
+}: {
+  index: number;
+  dragging: boolean;
+  onStart: (index: number) => void;
+  onMove: (index: number, dx: number, dy: number) => void;
+  onEnd: (index: number) => void;
+}) {
+  /* 손짓은 한 번만 만듭니다. 끄는 도중에 갈아 끼워지면 손가락이 떨어진
+     것처럼 됩니다. 바뀌는 값은 상자에 담아 봅니다. */
+  const [now] = useState(() => ({ index, onStart, onMove, onEnd }));
+  /* 그리는 중에 상자를 고치면 React 가 막습니다. 그린 뒤에 고칩니다 — 손짓은
+     그 뒤에야 오므로 늘 새 값을 봅니다. */
+  useEffect(() => {
+    Object.assign(now, { index, onStart, onMove, onEnd });
+  });
+
+  const [pan] = useState(() =>
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponderCapture: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponderCapture: () => true,
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderGrant: () => {
+        feelGrab();
+        now.onStart(now.index);
+      },
+      onPanResponderMove: (_, g) => now.onMove(now.index, g.dx, g.dy),
+      onPanResponderRelease: () => now.onEnd(now.index),
+      onPanResponderTerminate: () => now.onEnd(now.index),
+    }),
+  );
+
+  return (
+    <View
+      {...pan.panHandlers}
+      accessibilityLabel="끌어서 순서 옮기기"
+      style={[styles.grip, dragging ? styles.gripOn : null]}>
+      <Icon name="menu" size={16} tone={dragging ? 'accent' : 'muted'} />
+    </View>
+  );
+}
